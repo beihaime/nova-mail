@@ -1,5 +1,8 @@
 const en = {
     inbox: 'Inbox',
+    compose: 'Compose',
+    searchMail: 'Search emails, senders, or keywords…',
+    folders: 'Folders',
     drafts: 'Drafts',
     sent: 'Sent',
     starred: 'Starred',

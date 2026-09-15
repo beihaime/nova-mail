@@ -2,7 +2,11 @@
   <div :class="accountShow && hasPerm('account:query') ? 'main-box-show' : 'main-box-hide'">
     <div :class="accountShow && hasPerm('account:query') ? 'block-show' : 'block-hide'" @click="uiStore.accountShow = false"></div>
     <account  :class="accountShow && hasPerm('account:query') ? 'show' : 'hide'" />
-    <router-view class="main-view" v-slot="{ Component,route }">
+    <div v-if="isDesktopReading" class="desktop-mail-workspace">
+      <EmailPane class="desktop-message-list" />
+      <ContentPane class="desktop-reading-pane" />
+    </div>
+    <router-view v-else class="main-view" v-slot="{ Component,route }">
       <keep-alive :include="['email','all-email','send','sys-setting','star','user','role','analysis','reg-key','draft']">
         <component :is="Component" :key="route.name"/>
       </keep-alive>
@@ -13,20 +17,25 @@
 import account from '@/layout/account/index.vue'
 import {useUiStore} from "@/store/ui.js";
 import {useSettingStore} from "@/store/setting.js";
-import {computed, onBeforeUnmount, onMounted, watch} from "vue";
+import {computed, onBeforeUnmount, onMounted, ref, watch} from "vue";
 import { useRoute } from 'vue-router'
 import { hasPerm } from "@/perm/perm.js"
+import EmailPane from '@/views/email/index.vue'
+import ContentPane from '@/views/content/index.vue'
 
 const settingStore = useSettingStore()
 const uiStore = useUiStore();
 const route = useRoute()
 let  innerWidth =  window.innerWidth
+const isDesktop = ref(window.innerWidth >= 1024)
 
 let elNotification = null
 
 const accountShow = computed(() => {
-  return uiStore.accountShow && settingStore.settings.manyEmail === 0
+  return uiStore.accountShow && settingStore.settings.manyEmail === 0 && route.name !== 'content'
 })
+
+const isDesktopReading = computed(() => route.name === 'content' && isDesktop.value)
 
 watch(() => uiStore.changeNotice, () => {
 
@@ -91,6 +100,7 @@ onBeforeUnmount(() => {
 })
 
 const handleResize = () => {
+  isDesktop.value = window.innerWidth >= 1024
   if (['content','email','send'].includes(route.meta.name)) {
     if (innerWidth !==  window.innerWidth) {
       innerWidth = window.innerWidth;
@@ -163,6 +173,18 @@ const handleResize = () => {
 .main-view {
   background: var(--el-bg-color);
 }
+
+.desktop-mail-workspace {
+  display: grid;
+  grid-template-columns: minmax(340px, 38%) minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  background: var(--el-bg-color);
+}
+
+.desktop-message-list { min-width: 0; border-right: 1px solid var(--light-border-color); }
+.desktop-reading-pane { min-width: 0; }
 
 
 .navigation {

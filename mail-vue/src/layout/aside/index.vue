@@ -2,34 +2,37 @@
   <el-scrollbar class="scroll">
     <div>
       <div class="title" >
-        <Icon icon="mdi:email-outline" width="24" height="24" />
+        <img class="brand-mark" src="@/icons/svg/brand-mark.svg" alt="" />
         <div>{{settingStore.settings.title}}</div>
       </div>
-      <el-menu :collapse="false" text-color="#fff" active-text-color="#fff" style="margin-top: 10px">
+      <button v-perm="'email:send'" class="compose" @click="openCompose">
+        <img src="@/icons/svg/compose.svg" alt="" /> <span>{{ $t('compose') }}</span>
+      </button>
+      <el-menu :collapse="false" style="margin-top: 14px">
         <el-menu-item @click="router.push({name: 'email'})" index="email"
                       :class="route.meta.name === 'email' ? 'choose-item' : ''">
-          <Icon icon="hugeicons:mailbox-01" width="20" height="20" />
-          <span class="menu-name" style="margin-left: 16px">{{$t('inbox')}}</span>
+          <img src="@/icons/svg/inbox.svg" alt="" />
+          <span class="menu-name">{{$t('inbox')}}</span>
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'send'})" index="send" v-perm="'email:send'"
                       :class="route.meta.name === 'send' ? 'choose-item' : ''">
-          <Icon icon="cil:send" width="20" height="20" />
-          <span class="menu-name" style="margin-left: 16px">{{$t('sent')}}</span>
+          <img src="@/icons/svg/sent-nav.svg" alt="" />
+          <span class="menu-name">{{$t('sent')}}</span>
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'draft'})" index="draft" v-perm="'email:send'"
                       :class="route.meta.name === 'draft' ? 'choose-item' : ''">
-          <Icon icon="ep:document" width="19" height="19" />
-          <span class="menu-name" style="margin-left: 17px">{{$t('drafts')}}</span>
+          <img src="@/icons/svg/drafts-nav.svg" alt="" />
+          <span class="menu-name">{{$t('drafts')}}</span>
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'star'})" index="star"
                       :class="route.meta.name === 'star' ? 'choose-item' : ''">
-          <Icon icon="solar:star-line-duotone" width="20" height="20" />
-          <span class="menu-name" style="margin-left: 16px">{{$t('starred')}}</span>
+          <img src="@/icons/svg/starred-nav.svg" alt="" />
+          <span class="menu-name">{{$t('starred')}}</span>
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'setting'})" index="setting"
                       :class="route.meta.name === 'setting' ? 'choose-item' : ''">
-          <Icon icon="fluent:settings-48-regular" width="20" height="20" />
-          <span class="menu-name" style="margin-left: 16px">{{$t('settings')}}</span>
+          <img src="@/icons/svg/settings-top.svg" alt="" />
+          <span class="menu-name">{{$t('settings')}}</span>
         </el-menu-item>
         <div class="manage-title" v-perm="['all-email:query','user:query','role:query','setting:query','analysis:query','reg-key:query']">
           <div>{{$t('manage')}}</div>
@@ -74,18 +77,21 @@ import router from "@/router/index.js";
 import { useRoute } from "vue-router";
 import {Icon} from "@iconify/vue";
 import {useSettingStore} from "@/store/setting.js";
+import {useUiStore} from "@/store/ui.js";
 
 const settingStore = useSettingStore();
 const route = useRoute();
+const uiStore = useUiStore();
+const openCompose = () => uiStore.writerRef?.open()
 
 </script>
 
 <style lang="scss" scoped>
 
 .title {
-  margin: 15px 10px;
-  height: 45px;
-  border-radius: 6px;
+  margin: 16px 14px 10px;
+  height: 42px;
+  border-radius: 12px;
   display: flex;
   position: relative;
   font-size: 16px;
@@ -93,9 +99,7 @@ const route = useRoute();
   align-items: center;
   justify-content: center;
   gap: 5px;
-  color: #ffffff;
-  background: linear-gradient(135deg, #1890ff, #3a80dd);
-  transition: all 0.3s ease;
+  color: var(--el-text-color-primary);
   max-width: 240px;
   padding: 0 10px;
   > div {
@@ -119,35 +123,42 @@ const route = useRoute();
   }
 
 }
+.brand-mark { width: 24px; height: 24px; }
+.compose { margin: 8px 14px 4px; width: calc(100% - 28px); height: 42px; border-radius: 11px; color: #fff; background: var(--el-color-primary); display: flex; gap: 10px; align-items: center; justify-content: center; cursor: pointer; font-weight: 650; transition: filter .16s ease, transform .16s ease; }
+.compose:hover { filter: brightness(.94); }
+.compose:active { transform: scale(.98); }
+.compose img { width: 18px; height: 18px; filter: brightness(0) invert(1); }
 
 
 .manage-title {
   margin-top: 10px;
-  padding-left: 20px;
-  color: #fff;
+  padding-left: 24px;
+  color: var(--secondary-text-color);
+  font-size: 12px;
 }
 
 .el-menu-item {
-  margin: 3px 10px !important;
-  border-radius: 6px;
-  height: 36px;
-  padding: 10px !important;
+  margin: 2px 10px !important;
+  border-radius: 10px;
+  height: 40px;
+  padding: 10px 12px !important;
 }
 
 .choose-item {
-  font-weight: 400;
+  font-weight: 650;
   background: var(--aside-menu-active-background) !important;
   backdrop-filter: blur(4px);
 }
 
 @media (hover: hover) {
   .el-menu-item:hover {
-    background: rgba(255, 255, 255, 0.08) !important;
+    background: var(--base-fill) !important;
   }
 }
 
 .menu-name {
   user-select: none;
+  margin-left: 12px;
 }
 
 
@@ -158,6 +169,8 @@ const route = useRoute();
 :deep(.el-menu-item) {
   background: var(--aside-backgound);
 }
+:deep(.el-menu-item img) { width: 19px; height: 19px; opacity: .78; }
+:deep(.choose-item img) { opacity: 1; }
 
 :deep(.el-menu) {
   background: var(--aside-backgound);
@@ -165,7 +178,7 @@ const route = useRoute();
 
 .el-menu {
   border-right: 0;
-  width: 260px;
+  width: 250px;
 }
 
 :deep(.el-divider__text) {

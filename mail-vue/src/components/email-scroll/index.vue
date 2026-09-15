@@ -970,16 +970,17 @@ function loadData() {
 
 :deep(.email-row) {
   display: flex;
-  padding: 8px 0;
+  padding: 10px 12px;
   justify-content: space-between;
-  box-shadow: var(--header-actions-border);
+  box-shadow: none;
   cursor: pointer;
   align-items: center;
   position: relative;
-  transition: background 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
-  height: 48px;
+  transition: background .16s ease, transform .16s ease;
+  height: 64px;
+  border-bottom: 1px solid var(--light-border-color);
   @media (max-width: 1366px) {
-    height: 83px;
+    height: 76px;
   }
 
   @media (pointer: coarse) {
@@ -992,6 +993,7 @@ function loadData() {
       height: 132px;
     }
   }
+  &:hover { background: var(--email-hover-background); }
   .user-info {
     display: flex;
     flex-wrap: wrap;
@@ -1271,8 +1273,9 @@ function loadData() {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: 15px;
-  padding: 3px 15px;
+  min-height: 52px;
+  gap: 12px;
+  padding: 8px 16px;
   box-shadow: var(--header-actions-border);
 
   .header-left {

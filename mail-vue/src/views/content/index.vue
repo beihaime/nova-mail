@@ -65,6 +65,10 @@
         </div>
       </div>
     </el-scrollbar>
+    <div v-if="emailStore.contentData.showReply" class="mobile-message-actions">
+      <button v-perm="'email:send'" @click="openReply"><img src="@/icons/svg/reply.svg" alt="" />{{ $t('reply') }}</button>
+      <button v-perm="'email:send'" @click="openForward"><img src="@/icons/svg/forward.svg" alt="" />{{ $t('forward') }}</button>
+    </div>
     <el-image-viewer
         v-if="showPreview"
         :url-list="srcList"
@@ -269,14 +273,16 @@ const handleDelete = () => {
 .box {
   height: 100%;
   overflow: hidden;
+  position: relative;
 }
 
 .header-actions {
-  padding: 9px 15px 8px;
+  min-height: 52px;
+  padding: 10px 18px;
   display: flex;
   align-items: center;
-  gap: 20px;
-  box-shadow: var(--header-actions-border);
+  gap: 10px;
+  border-bottom: 1px solid var(--light-border-color);
   font-size: 18px;
   .star {
     display: flex;
@@ -286,6 +292,11 @@ const handleDelete = () => {
   }
   .icon {
     cursor: pointer;
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    padding: 7px;
+    &:hover { background: var(--base-fill); }
   }
 }
 
@@ -297,18 +308,19 @@ const handleDelete = () => {
 
 .container {
   font-size: 14px;
-  padding-left: 20px;
-  padding-right: 20px;
-  padding-top: 10px;
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 28px 36px 40px;
   @media (max-width: 1023px) {
-    padding-left: 15px;
-    padding-right: 15px;
+    padding: 20px 18px 32px;
   }
 
   .email-title {
-    font-size: 20px;
-    font-weight: bold;
-    margin-bottom: 10px;
+    font-size: clamp(22px, 2vw, 28px);
+    line-height: 1.28;
+    font-weight: 700;
+    letter-spacing: -.02em;
+    margin-bottom: 22px;
   }
 
   .htm-scrollbar {
@@ -394,9 +406,11 @@ const handleDelete = () => {
 
     .email-info {
 
-      border-bottom: 1px solid var(--light-border-color);
-      margin-bottom: 20px;
-      padding-bottom: 8px;
+      border: 1px solid var(--light-border-color);
+      border-radius: 12px;
+      background: var(--extra-light-fill);
+      margin-bottom: 24px;
+      padding: 16px;
       @media (max-width: 1024px) {
         margin-bottom: 15px;
       }
@@ -473,6 +487,15 @@ const handleDelete = () => {
 
 .bottom-distance {
   margin-bottom: 30px;
+}
+
+.mobile-message-actions { display: none; }
+
+@media (max-width: 767px) {
+  .scrollbar { height: calc(100% - 112px); }
+  .mobile-message-actions { position: absolute; z-index: 2; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px 14px max(12px, env(safe-area-inset-bottom)); background: color-mix(in srgb, var(--el-bg-color) 94%, transparent); border-top: 1px solid var(--light-border-color); backdrop-filter: blur(16px); }
+  .mobile-message-actions button { height: 36px; display: inline-flex; gap: 7px; align-items: center; justify-content: center; color: var(--el-text-color-primary); border: 1px solid var(--light-border); border-radius: 10px; font-weight: 600; cursor: pointer; }
+  .mobile-message-actions img { width: 17px; height: 17px; }
 }
 
 

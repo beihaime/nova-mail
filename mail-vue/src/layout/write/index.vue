@@ -619,6 +619,7 @@ function close() {
 <style scoped lang="scss">
 .send {
   position: fixed;
+  z-index: 40;
   top: 0;
   left: 0;
   width: 100%;
@@ -634,7 +635,7 @@ function close() {
     border: 1px solid var(--el-border-color-light);
     transition: var(--el-transition-duration);
     padding: 15px;
-    border-radius: 8px;
+    border-radius: 16px;
     display: grid;
     grid-template-rows: auto 1fr;
     overflow: hidden;

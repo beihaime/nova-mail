@@ -106,30 +106,30 @@ button, input, select, textarea {
 }
 
 :root {
-    --el-color-primary: #1890ff;
-    --el-color-primary-dark-2: #1064c0;
-    --el-color-primary-light-3: #4dabff;
-    --el-color-primary-light-5: #69c0ff;
-    --el-color-primary-light-7: #91d5ff;
-    --el-color-primary-light-9: #e6f7ff;
+    --el-color-primary: #0a84ff;
+    --el-color-primary-dark-2: #0067d6;
+    --el-color-primary-light-3: #5aaeff;
+    --el-color-primary-light-5: #8bc5ff;
+    --el-color-primary-light-7: #b9ddff;
+    --el-color-primary-light-9: #edf7ff;
 
-    --extra-light-fill: #FAFCFF;
-    --settings-page-background: #fafbfc;
-    --light-ill: #F5F7FA;
-    --light-border: #E4E7ED;
+    --extra-light-fill: #f7f8fa;
+    --settings-page-background: #f5f6f8;
+    --light-ill: #f2f4f7;
+    --light-border: #e5e7eb;
     --header-actions-border: inset 0 -1px 0 0 var(--el-border-color-lighter);
-    --aside-backgound: #191A23;
-    --aside-menu-active-background: #27282D;
+    --aside-backgound: #f7f8fa;
+    --aside-menu-active-background: #e2efff;
     --loadding-background: rgba(255, 255, 255, 0.8);
-    --dark-border: #CDD0D6;
-    --base-fill: #F0F2F5;
-    --regular-text-color: #585d69;
-    --light-border-color: #e7e9ec;
-    --aside-right-border: 3px 0 5px rgba(0, 21, 41, .35);
+    --dark-border: #d1d5db;
+    --base-fill: #eef1f5;
+    --regular-text-color: #5e6673;
+    --light-border-color: #e4e7ec;
+    --aside-right-border: 1px 0 0 rgba(17, 24, 39, .08);
     --choose-account-background: var(--el-color-primary-light-8);
     --el-text-color-regular: var(--el-text-color-primary);
     --email-scroll-content-color: rgba(25, 41, 59, 0.4);
-    --email-hover-background: #F2F6FC;
+    --email-hover-background: #f2f7ff;
     --email-right-click-background: #FDF6EC;
     --login-border: none;
     --form-desc-color: #71717a;
@@ -146,19 +146,19 @@ button, input, select, textarea {
 }
 
 .dark {
-    --extra-light-fill: #191919;
+    --extra-light-fill: #1c1d20;
     --settings-page-background: var(--extra-light-fill);
-    --light-ill: #262727;
-    --light-border: #414243;
-    --aside-backgound: #141414;
-    --aside-menu-active-background: rgba(255, 255, 255, 0.08);
+    --light-ill: #27292d;
+    --light-border: #383a3f;
+    --aside-backgound: #1b1c1f;
+    --aside-menu-active-background: rgba(10, 132, 255, .22);
     --header-actions-border: inset 0 -1px 0 0 var(--el-border-color-lighter);
     --loadding-background: rgba(0, 0, 0, 0.3);
     --dark-border: #636466;
-    --base-fill: #303030;
-    --regular-text-color: #bfbdbc;
-    --light-border-color: #414243;
-    --aside-right-border: 3px 0 5px #0A0A0A;
+    --base-fill: #2b2d31;
+    --regular-text-color: #b7bbc3;
+    --light-border-color: #37393e;
+    --aside-right-border: 1px 0 0 #313338;
     --choose-account-background: #39393A;
     --email-scroll-content-color: rgba(255, 255, 255, 0.3);
     --email-hover-background: #1D1E1F;
@@ -172,6 +172,13 @@ button, input, select, textarea {
     --message-block-color: rgba(30, 30, 30, 0.2);
     --el-border-color: #414243 !important;
 }
+
+/* Shared Nova Mail surface language.  Component styles keep the existing behavior. */
+.el-button { border-radius: 10px; font-weight: 600; }
+.el-button--primary { box-shadow: 0 1px 2px rgba(10, 132, 255, .2); }
+.el-input__wrapper, .el-textarea__inner { border-radius: 10px; box-shadow: 0 0 0 1px var(--light-border) inset !important; }
+.el-dialog { border-radius: 16px; overflow: hidden; }
+.el-popper { border-radius: 12px !important; }
 
 .el-input {
     --el-input-text-color: var(--el-text-color-primary) !important;

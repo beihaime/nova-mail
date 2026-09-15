@@ -1,5 +1,8 @@
 const zh = {
     inbox: '收件箱',
+    compose: '写邮件',
+    searchMail: '搜索邮件、发件人或关键词…',
+    folders: '文件夹',
     drafts: '草稿箱',
     sent: '已发送',
     starred: '星标邮件',

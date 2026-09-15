@@ -4,9 +4,14 @@
       <hanburger @click="changeAside"></hanburger>
       <span class="breadcrumb-item">{{ $t(route.meta.title) }}</span>
     </div>
+    <label class="search-shell">
+      <img src="@/icons/svg/search.svg" alt="" />
+      <input :placeholder="$t('searchMail')" type="search" />
+      <kbd>⌘ K</kbd>
+    </label>
     <div v-perm="'email:send'" class="writer-box" @click="openSend">
       <div class="writer">
-        <Icon icon="material-symbols:edit-outline-sharp" width="22" height="22"/>
+        <img src="@/icons/svg/compose.svg" alt="" />
       </div>
     </div>
     <div class="toolbar">
@@ -17,7 +22,7 @@
         <Icon icon="solar:moon-linear"/>
       </div>
       <div class="notice icon-item" @click="openNotice">
-        <Icon icon="streamline-plump:announcement-megaphone"/>
+        <img src="@/icons/svg/notifications.svg" alt="" />
       </div>
       <el-dropdown ref="userinfoRef" @visible-change="e => userInfoShow = e" :teleported="false" popper-class="detail-dropdown">
         <div class="avatar" @click="userInfoHide" >
@@ -360,12 +365,31 @@ function formatName(email) {
   font-size: 12px;
   display: grid;
   height: 100%;
-  gap: 10px;
-  grid-template-columns: auto auto 1fr;
+  gap: 16px;
+  grid-template-columns: auto minmax(220px, 610px) auto 1fr;
 }
 
 .header.not-send {
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(220px, 610px) 1fr;
+}
+
+.search-shell {
+  height: 44px;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  color: var(--regular-text-color);
+  background: var(--extra-light-fill);
+  border: 1px solid var(--light-border);
+  border-radius: 13px;
+  transition: border-color .16s ease, box-shadow .16s ease;
+  img { width: 18px; height: 18px; opacity: .68; }
+  input { width: 100%; min-width: 0; color: inherit; }
+  input::placeholder { color: var(--regular-text-color); opacity: .92; }
+  &:focus-within { border-color: var(--el-color-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--el-color-primary) 14%, transparent); }
+  kbd { padding: 2px 7px; white-space: nowrap; font-size: 12px; color: var(--regular-text-color); background: var(--base-fill); border-radius: 6px; }
 }
 
 .writer-box {
@@ -373,15 +397,15 @@ function formatName(email) {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-left: 5px;
+  margin-left: 2px;
 
   .writer {
-    width: 34px;
-    height: 34px;
-    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
     color: #ffffff;
-    background: linear-gradient(135deg, #1890ff, #3a80dd);
-    transition: all 0.3s ease;
+    background: var(--el-color-primary);
+    transition: filter .16s ease, transform .16s ease;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -392,6 +416,9 @@ function formatName(email) {
       font-weight: bold;;
     }
   }
+  &:hover .writer { filter: brightness(.94); }
+  &:active .writer { transform: scale(.96); }
+  img { width: 18px; filter: brightness(0) invert(1); }
 }
 
 .header-btn {
@@ -403,7 +430,7 @@ function formatName(email) {
 
 .breadcrumb-item {
   font-weight: bold;
-  font-size: 14px;
+  font-size: 15px;
   color: var(--el-text-color-primary);
   overflow: hidden;
   white-space: nowrap;
@@ -413,16 +440,16 @@ function formatName(email) {
 .toolbar {
   display: flex;
   justify-content: end;
-  gap: 15px;
+  gap: 6px;
   @media (max-width: 767px) {
     gap: 10px;
   }
 
   .icon-item {
     align-self: center;
-    width: 30px;
-    height: 30px;
-    border-radius: 4px;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -454,12 +481,12 @@ function formatName(email) {
     .avatar-text {
       background: var(--el-bg-color);
       color: var(--el-text-color-primary);
-      height: 30px;
-      width: 30px;
+      height: 34px;
+      width: 34px;
       display: flex;
       justify-content: center;
       align-items: center;
-      border-radius: 8px;
+      border-radius: 10px;
       border: 1px solid var(--dark-border);
     }
 
@@ -471,6 +498,17 @@ function formatName(email) {
     }
   }
 
+}
+
+@media (max-width: 767px) {
+  .header { height: auto; min-height: 58px; padding: 8px 12px; gap: 8px; grid-template-columns: auto 1fr auto; }
+  .header.not-send { grid-template-columns: auto 1fr; }
+  .search-shell { display: none; }
+  .writer-box { margin-left: 0; }
+  .toolbar .notice { display: none; }
+  .toolbar .setting-icon { display: none; }
+  .toolbar .avatar { margin-left: 2px; }
+  .breadcrumb-item { font-size: 16px; }
 }
 
 .el-tooltip__trigger:first-child:focus-visible {
