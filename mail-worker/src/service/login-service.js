@@ -19,10 +19,15 @@ import dayjs from 'dayjs';
 import { toUtc } from '../utils/date-uitil';
 import { t } from '../i18n/i18n.js';
 import verifyRecordService from './verify-record-service';
+import rateLimitUtils from '../utils/rate-limit-utils';
 
 const loginService = {
 
 	async register(c, params, oauth = false) {
+
+		if (!oauth) {
+			await rateLimitUtils.register(c);
+		}
 
 		const { email, password, token, code } = params;
 
@@ -30,7 +35,7 @@ const loginService = {
 
 		if (oauth) {
 			// The provider code exchange is the identity check for this flow. Do not
-			// override `register`: OAuth must not create accounts when registration is closed.
+			override `register`: OAuth must not create accounts when registration is closed.
 			registerVerify = settingConst.registerVerify.CLOSE;
 		}
 
@@ -208,9 +213,9 @@ const loginService = {
 			throw new BizError(t('emailAndPwdEmpty'));
 		}
 
-		// Password login is a public entry point. OAuth providers keep their own
-		// identity exchange and are intentionally not routed through this method.
+		// Rate-limit password login only (OAuth uses createSession directly).
 		if (!noVerifyPwd) {
+			await rateLimitUtils.login(c);
 			await turnstileService.verify(c, token);
 		}
 
@@ -276,7 +281,7 @@ const loginService = {
 	},
 
 	async logout(c, userId) {
-		const token =userContext.getToken(c);
+		const token = userContext.getToken(c);
 		const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
 		const index = authInfo.tokens.findIndex(item => item === token);
 		authInfo.tokens.splice(index, 1);

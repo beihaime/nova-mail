@@ -11,6 +11,11 @@ import verifyRecordService from './verify-record-service';
 import userContext from '../security/user-context';
 import domainUtils from '../utils/domain-uitls';
 
+function isMaskedSecret(value) {
+	if (value == null || typeof value !== 'string') return false;
+	return value.includes('******') || value === '********';
+}
+
 const settingService = {
 
 	async refresh(c) {
@@ -87,13 +92,17 @@ const settingService = {
 		delete settingRow.githubClientSecret;
 		delete settingRow.githubSwitch;
 
-		Object.keys(settingRow.resendTokens).forEach(key => {
+		Object.keys(settingRow.resendTokens || {}).forEach(key => {
 			settingRow.resendTokens[key] = `${settingRow.resendTokens[key].slice(0, 12)}******`;
 		});
 
 		settingRow.s3AccessKey = settingRow.s3AccessKey ? `${settingRow.s3AccessKey.slice(0, 12)}******` : null;
 		settingRow.s3SecretKey = settingRow.s3SecretKey ? `${settingRow.s3SecretKey.slice(0, 12)}******` : null;
-		settingRow.tgBotToken = settingRow.tgBotToken ? `${settingRow.tgBotToken.slice(0, 20)}******` : null;
+
+		// Never return any fragment of the bot token — only whether it is configured.
+		settingRow.hasTgBot = !!settingRow.tgBotToken;
+		delete settingRow.tgBotToken;
+
 		settingRow.hasR2 = !!c.env.r2
 		settingRow.hasCfEmail = !!c.env.email
 
@@ -125,6 +134,19 @@ const settingService = {
 		delete params.githubClientId;
 		delete params.githubClientSecret;
 		delete params.githubSwitch;
+
+		// Do not overwrite real secrets with masked placeholders from the admin UI.
+		if (isMaskedSecret(params.tgBotToken)) delete params.tgBotToken;
+		if (isMaskedSecret(params.s3AccessKey)) delete params.s3AccessKey;
+		if (isMaskedSecret(params.s3SecretKey)) delete params.s3SecretKey;
+		if (params.resendTokens && typeof params.resendTokens === 'object') {
+			Object.keys(params.resendTokens).forEach(domain => {
+				if (isMaskedSecret(params.resendTokens[domain])) {
+					delete params.resendTokens[domain];
+				}
+			});
+		}
+
 		const settingData = await this.query(c);
 		let resendTokens = { ...settingData.resendTokens, ...params.resendTokens };
 		Object.keys(resendTokens).forEach(domain => {
