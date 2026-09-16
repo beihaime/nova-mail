@@ -1,16 +1,20 @@
 <template>
-  <div id="login-box" :style=" background ? 'background: var(--el-bg-color)' : ''" v-loading="oauthLoading" element-loading-text="登录中...">
-    <div id="background-wrap" v-if="!settingStore.settings.background">
-      <div class="x1 cloud"></div>
-      <div class="x2 cloud"></div>
-      <div class="x3 cloud"></div>
-      <div class="x4 cloud"></div>
-      <div class="x5 cloud"></div>
+  <div id="login-box" :class="{ 'has-custom-background': background }" :style="background" v-loading="oauthLoading" element-loading-text="登录中...">
+    <div class="login-scene" aria-hidden="true">
+      <div class="login-sky-glow"></div>
+      <div class="login-mountain login-mountain-far"></div>
+      <div class="login-mountain login-mountain-near"></div>
     </div>
-    <div v-else :style="background"></div>
+    <header class="login-brand">
+      <img :src="uiStore.dark ? brandDark : brandLight" alt="Nova Mail" />
+      <div>
+        <strong>Nova Mail</strong>
+        <span>{{ $t('loginTagline') }}</span>
+      </div>
+    </header>
     <div class="form-wrapper">
       <div class="container">
-        <span class="form-title">{{ settingStore.settings.title }}</span>
+        <span class="form-title">{{ show === 'login' ? $t('welcomeBack') : $t('createAccount') }}</span>
         <span class="form-desc" v-if="show === 'login'">{{ $t('loginTitle') }}</span>
         <span class="form-desc" v-else>{{ $t('regTitle') }}</span>
         <div v-show="show === 'login'">
@@ -41,13 +45,7 @@
           </el-input>
           <el-input v-model="form.password" :placeholder="$t('password')" type="password" autocomplete="off" @keyup.enter="submit">
           </el-input>
-          <div
-              v-if="settingStore.settings.siteKey"
-              ref="loginTurnstileRef"
-              class="login-turnstile"
-          ></div>
-          <div v-else class="turnstile-unavailable">{{ $t('verifyModuleFailed') }}</div>
-          <el-button class="btn" type="primary" @click="submit" :loading="loginLoading" :disabled="!loginVerifyToken || loginLoading"
+          <el-button class="btn" type="primary" @click="submit" :loading="loginLoading" :disabled="loginLoading"
           >{{ $t('loginBtn') }}
           </el-button>
           <div class="oauth-divider"><span>{{ $t('orContinueWith') }}</span></div>
@@ -163,13 +161,14 @@
     <a v-show="settingStore.settings.projectLink" class="github" href="https://github.com/maillab/cloud-mail">
       <Icon icon="mingcute:github-line" color="#1890ff" width="20" height="20" />
     </a>
+    <footer class="login-copyright">© {{ new Date().getFullYear() }} Nova Mail</footer>
   </div>
 </template>
 
 <script setup>
 import router from "@/router";
 import {useRoute} from "vue-router";
-import {computed, nextTick, onMounted, reactive, ref, watch} from "vue";
+import {computed, nextTick, reactive, ref} from "vue";
 import {login} from "@/request/login.js";
 import {register} from "@/request/login.js";
 import {websiteConfig} from "@/request/setting.js";
@@ -184,6 +183,8 @@ import {loginUserInfo} from "@/request/my.js";
 import {permsToRouter} from "@/perm/perm.js";
 import {useI18n} from "vue-i18n";
 import {githubOauthComplete, oauthBindUser, oauthLinuxDoLogin, oauthGoogleLogin} from "@/request/ouath.js";
+import brandLight from '@/icons/svg/brand-app-light.svg'
+import brandDark from '@/icons/svg/brand-app-dark.svg'
 
 const {t} = useI18n();
 const accountStore = useAccountStore();
@@ -235,9 +236,6 @@ const registerForm = reactive({
 })
 const domainList = settingStore.domainList;
 const registerLoading = ref(false)
-const loginVerifyToken = ref('')
-const loginTurnstileRef = ref(null)
-let loginTurnstileId = null
 suffix.value = domainList[0]
 const verifyShow = ref(false)
 let verifyToken = ''
@@ -248,57 +246,6 @@ let verifyErrorCount = 0
 window.onTurnstileSuccess = (token) => {
   verifyToken = token;
 };
-
-window.onLoginTurnstileSuccess = (token) => {
-  loginVerifyToken.value = token
-}
-
-window.onLoginTurnstileExpired = () => {
-  loginVerifyToken.value = ''
-}
-
-window.onLoginTurnstileError = () => {
-  loginVerifyToken.value = ''
-}
-
-watch(() => uiStore.dark, () => {
-  loginVerifyToken.value = ''
-  if (!loginTurnstileId || !window.turnstile) return
-  window.turnstile.remove(loginTurnstileId)
-  loginTurnstileId = null
-  nextTick(renderLoginTurnstile)
-})
-
-watch(() => settingStore.settings.siteKey, () => {
-  nextTick(renderLoginTurnstile)
-})
-
-onMounted(() => {
-  const waitForTurnstile = () => {
-    renderLoginTurnstile()
-    if (!loginTurnstileId && !window.turnstile) {
-      window.setTimeout(waitForTurnstile, 120)
-    }
-  }
-  waitForTurnstile()
-})
-
-function renderLoginTurnstile() {
-  if (!loginTurnstileRef.value || !window.turnstile || loginTurnstileId || !settingStore.settings.siteKey) return
-  try {
-    loginTurnstileId = window.turnstile.render(loginTurnstileRef.value, {
-      sitekey: settingStore.settings.siteKey,
-      theme: uiStore.dark ? 'dark' : 'light',
-      callback: window.onLoginTurnstileSuccess,
-      'expired-callback': window.onLoginTurnstileExpired,
-      'error-callback': window.onLoginTurnstileError,
-    })
-  } catch (error) {
-    // The explicit API should not race Vue. Keep the failure recoverable in
-    // case the script was blocked or the browser restored an old DOM node.
-    console.warn('Turnstile render failed', error)
-  }
-}
 
 window.onTurnstileError = (e) => {
   if (verifyErrorCount >= 4) {
@@ -520,22 +467,10 @@ const submit = () => {
     return
   }
 
-  if (!loginVerifyToken.value) {
-    ElMessage({ message: t('botVerifyMsg'), type: 'error', plain: true })
-    renderLoginTurnstile()
-    return
-  }
-
-  // Turnstile tokens are single-use. Consume it before the request so a
-  // second click or a delayed retry can never submit the same token twice.
-  const verificationToken = loginVerifyToken.value
-  loginVerifyToken.value = ''
   loginLoading.value = true
-  login(email, form.password, verificationToken).then(async data => {
+  login(email, form.password).then(async data => {
     await saveToken(data.token)
   }).catch(() => {
-    loginVerifyToken.value = ''
-    window.turnstile?.reset(loginTurnstileId)
   }).finally(() => {
     loginLoading.value = false
   })
@@ -737,9 +672,11 @@ function submitRegister() {
 
 .form-wrapper {
   position: fixed;
-  right: 0;
-  height: 100%;
   z-index: 10;
+  top: 24px;
+  right: 24px;
+  bottom: 24px;
+  width: clamp(390px, 30vw, 460px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -755,23 +692,25 @@ function submitRegister() {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  width: 450px;
+  width: 100%;
   height: 100%;
-  border-left: 1px solid var(--login-border);
+  border: 1px solid var(--login-border);
+  border-radius: 28px;
   box-shadow: var(--el-box-shadow-light);
+  backdrop-filter: blur(20px);
   @media (max-width: 1024px) {
     padding: 20px 18px;
-    width: 384px;
-    margin-left: 18px;
+    width: 100%;
+    margin-left: 0;
   }
   @media (max-width: 767px) {
     border: 1px solid var(--login-border);
     padding: 20px 18px;
-    border-radius: 6px;
+    border-radius: 22px;
     height: fit-content;
     width: 100%;
-    margin-right: 18px;
-    margin-left: 18px;
+    margin-right: 0;
+    margin-left: 0;
   }
 
   .btn {
@@ -932,7 +871,9 @@ function submitRegister() {
 
 
 #login-box {
-  background: linear-gradient(to bottom, #2980b9, #6dd5fa, #fff);
+  position: relative;
+  min-height: 100%;
+  background: linear-gradient(145deg, #dbeafe 0%, #93c5fd 48%, #dbeafe 100%);
   font: 100% Arial, sans-serif;
   height: 100%;
   margin: 0;
@@ -940,6 +881,57 @@ function submitRegister() {
   overflow-x: hidden;
   display: grid;
   grid-template-columns: 1fr;
+}
+
+.login-scene {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: radial-gradient(circle at 22% 18%, rgba(255,255,255,.72), transparent 34%), linear-gradient(160deg, rgba(255,255,255,.18), rgba(15,23,42,.22));
+}
+
+.login-sky-glow {
+  position: absolute;
+  inset: -20%;
+  background: radial-gradient(ellipse at 30% 18%, rgba(255,255,255,.55), transparent 42%);
+}
+
+.login-mountain {
+  position: absolute;
+  left: -8%;
+  right: 28%;
+  bottom: -18%;
+  height: 62%;
+  transform: skewX(-12deg) rotate(-4deg);
+  background: linear-gradient(145deg, rgba(30,64,175,.35), rgba(15,23,42,.82));
+}
+
+.login-mountain-far { opacity: .48; bottom: -8%; transform: skewX(-18deg) rotate(8deg); background: linear-gradient(145deg, rgba(96,165,250,.7), rgba(30,41,59,.72)); }
+.login-mountain-near { opacity: .72; left: 16%; right: -14%; bottom: -28%; height: 54%; transform: skewX(14deg) rotate(-8deg); background: linear-gradient(145deg, rgba(15,23,42,.42), rgba(2,6,23,.92)); }
+
+.login-brand {
+  position: fixed;
+  z-index: 5;
+  top: 30px;
+  left: 34px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #fff;
+  text-shadow: 0 1px 12px rgba(15,23,42,.24);
+  img { width: 38px; height: 38px; object-fit: contain; }
+  strong { display: block; font-size: 18px; letter-spacing: -.02em; }
+  span { display: block; margin-top: 3px; font-size: 12px; opacity: .82; }
+}
+
+.login-copyright { position: fixed; z-index: 5; left: 34px; bottom: 24px; color: rgba(255,255,255,.72); font-size: 12px; }
+
+@media (max-width: 767px) {
+  .login-brand { top: 22px; left: 22px; }
+  .login-copyright { left: 22px; bottom: 14px; }
+  .form-wrapper { top: 84px; right: 16px; bottom: 48px; left: 16px; width: auto; }
+  .login-scene { opacity: .72; }
 }
 
 

@@ -209,9 +209,11 @@ const loginService = {
 		}
 
 		// Rate-limit password login only (OAuth uses createSession directly).
+		// Browser navigation to the login page is protected by Cloudflare's
+		// Managed Challenge. Keep the API path independent from the Turnstile
+		// widget so a solved edge challenge does not require a second token.
 		if (!noVerifyPwd) {
 			await rateLimitUtils.login(c);
-			await turnstileService.verify(c, token);
 		}
 
 		const userRow = await userService.selectByEmailIncludeDel(c, email);
