@@ -6,6 +6,7 @@
 
 <script setup>
 import { ref, onMounted, watch } from 'vue'
+import DOMPurify from 'dompurify'
 
 const props = defineProps({
   html: {
@@ -18,18 +19,53 @@ const container = ref(null)
 const contentBox = ref(null)
 let shadowRoot = null
 
+const allowedStyleProperties = new Set([
+  'background', 'background-color', 'border', 'border-bottom', 'border-collapse',
+  'border-color', 'border-radius', 'border-spacing', 'border-style', 'border-width',
+  'color', 'display', 'font-family', 'font-size', 'font-style', 'font-weight',
+  'height', 'line-height', 'margin', 'margin-bottom', 'margin-left', 'margin-right',
+  'margin-top', 'max-height', 'max-width', 'min-height', 'min-width', 'padding',
+  'padding-bottom', 'padding-left', 'padding-right', 'padding-top', 'text-align',
+  'text-decoration', 'vertical-align', 'white-space', 'width', 'word-break', 'word-wrap'
+])
+
+function sanitizeInlineStyle(style) {
+  return style.split(';').map((declaration) => {
+    const separator = declaration.indexOf(':')
+    if (separator === -1) return ''
+
+    const property = declaration.slice(0, separator).trim().toLowerCase()
+    const value = declaration.slice(separator + 1).trim()
+    const unsafeValue = /(?:expression\s*\(|url\s*\(|@import|javascript:|behavior\s*:|-moz-binding)/i.test(value)
+
+    return allowedStyleProperties.has(property) && !unsafeValue ? `${property}: ${value}` : ''
+  }).filter(Boolean).join('; ')
+}
+
+function sanitizeEmailHtml(html) {
+  DOMPurify.addHook('uponSanitizeAttribute', (_node, data) => {
+    if (data.attrName === 'style') {
+      data.attrValue = sanitizeInlineStyle(data.attrValue)
+      data.keepAttr = Boolean(data.attrValue)
+    }
+  })
+
+  try {
+    return DOMPurify.sanitize(html, {
+      USE_PROFILES: { html: true },
+      FORBID_TAGS: ['base', 'embed', 'form', 'iframe', 'link', 'math', 'meta', 'object', 'script', 'style', 'svg'],
+      FORBID_ATTR: ['srcset']
+    })
+  } finally {
+    DOMPurify.removeAllHooks()
+  }
+}
+
 function updateContent() {
   if (!shadowRoot) return;
 
-  // 1. 提取 <body> 的 style 属性（如果存在）
-  const bodyStyleRegex = /<body[^>]*style="([^"]*)"[^>]*>/i;
-  const bodyStyleMatch = props.html.match(bodyStyleRegex);
-  const bodyStyle = bodyStyleMatch ? bodyStyleMatch[1] : '';
+  const cleanedHtml = sanitizeEmailHtml(props.html)
 
-  // 2. 移除 <body> 标签（保留内容）
-  const cleanedHtml = props.html.replace(/<\/?body[^>]*>/gi, '');
-
-  // 3. 将 body 的 style 应用到 .shadow-content
   shadowRoot.innerHTML = `
     <style>
       :host {
@@ -63,7 +99,6 @@ function updateContent() {
         width: fit-content;
         height: fit-content;
         min-width: 100%;
-        ${bodyStyle ? bodyStyle : ''} /* 注入 body 的 style */
       }
 
       img:not(table img) {

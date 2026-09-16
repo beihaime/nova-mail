@@ -29,8 +29,9 @@ const loginService = {
 		let { regKey, register, registerVerify, regVerifyCount, minEmailPrefix, emailPrefixFilter } = await settingService.query(c)
 
 		if (oauth) {
+			// The provider code exchange is the identity check for this flow. Do not
+			// override `register`: OAuth must not create accounts when registration is closed.
 			registerVerify = settingConst.registerVerify.CLOSE;
-			register = settingConst.register.OPEN;
 		}
 
 		if (register === settingConst.register.CLOSE) {

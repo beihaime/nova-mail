@@ -8,18 +8,24 @@ import permService from '../service/perm-service';
 import { t } from '../i18n/i18n'
 import app from '../hono/hono';
 
-const exclude = [
-	'/login',
-	'/register',
-	'/oss',
-	'/setting/websiteConfig',
-	'/webhooks',
-	'/init',
-	'/public/genToken',
-	'/telegram',
-	'/test',
-	'/oauth'
-];
+const publicRoutes = new Set([
+	'POST /login',
+	'POST /register',
+	'GET /setting/websiteConfig',
+	'POST /webhooks',
+	'POST /public/genToken',
+	'POST /oauth/linuxDo/login',
+	'POST /oauth/github/login',
+	'POST /oauth/google/login',
+	'PUT /oauth/bindUser'
+]);
+
+function isPublicRoute(c) {
+	const route = `${c.req.method} ${c.req.path}`;
+	return publicRoutes.has(route)
+		|| (c.req.method === 'GET' && c.req.path.startsWith('/init/'))
+		|| (c.req.method === 'GET' && c.req.path.startsWith('/telegram/getEmail/'));
+}
 
 const requirePerms = [
 	'/email/send',
@@ -93,11 +99,7 @@ app.use('*', async (c, next) => {
 
 	const path = c.req.path;
 
-	const index = exclude.findIndex(item => {
-		return path.startsWith(item);
-	});
-
-	if (index > -1) {
+	if (isPublicRoute(c)) {
 		return await next();
 	}
 

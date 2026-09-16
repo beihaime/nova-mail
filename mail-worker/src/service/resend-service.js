@@ -1,8 +1,27 @@
 import emailService from './email-service';
 import { emailConst } from '../const/entity-const';
 import BizError from '../error/biz-error';
+import { Resend } from 'resend';
 
 const resendService = {
+
+	async verifyWebhook(c, payload) {
+		const webhookSecret = c.env.resend_webhook_secret;
+		if (!webhookSecret) {
+			throw new BizError('Resend webhook secret is not configured');
+		}
+
+		const resend = new Resend();
+		return await resend.webhooks.verify({
+			payload,
+			headers: {
+				id: c.req.header('svix-id'),
+				timestamp: c.req.header('svix-timestamp'),
+				signature: c.req.header('svix-signature')
+			},
+			webhookSecret
+		});
+	},
 
 	async webhooks(c, body) {
 

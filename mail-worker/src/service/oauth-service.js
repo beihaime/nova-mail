@@ -7,14 +7,27 @@ import loginService from "./login-service";
 import cryptoUtils from "../utils/crypto-utils";
 import settingService from "./setting-service";
 import {t} from '../i18n/i18n';
+import { v4 as uuidv4 } from 'uuid';
+import KvConst from '../const/kv-const';
 
 const oauthService = {
 
 	async bindUser(c, params) {
 
-		const { email, oauthUserId, code } = params;
+		const { email, bindToken, code } = params;
+		if (!bindToken) {
+			throw new BizError('OAuth binding has expired');
+		}
 
-		const oauthRow = await this.getById(c, oauthUserId);
+		const bindInfo = await c.env.kv.get(KvConst.OAUTH_BIND + bindToken, { type: 'json' });
+		if (!bindInfo?.oauthUserId) {
+			throw new BizError('OAuth binding has expired');
+		}
+
+		const oauthRow = await this.getById(c, bindInfo.oauthUserId);
+		if (!oauthRow) {
+			throw new BizError('OAuth user does not exist');
+		}
 
 		let userRow = await userService.selectByIdIncludeDel(c, oauthRow.userId);
 
@@ -22,11 +35,14 @@ const oauthService = {
 			throw new BizError('用户已绑定有邮箱')
 		}
 
+		// OAuth login verifies the external identity, but account creation must still
+		// honor this installation's registration and registration-key policy.
 		await loginService.register(c, { email, password: cryptoUtils.genRandomPwd(), code }, true);
 
 		userRow = await userService.selectByEmail(c, email);
 
-		orm(c).update(oauth).set({ userId: userRow.userId }).where(eq(oauth.oauthUserId, oauthUserId)).run();
+		await orm(c).update(oauth).set({ userId: userRow.userId }).where(eq(oauth.oauthUserId, oauthRow.oauthUserId)).run();
+		await c.env.kv.delete(KvConst.OAUTH_BIND + bindToken);
 		const jwtToken = await loginService.login(c, { email, password: null }, true);
 
 		return { userInfo: oauthRow, token: jwtToken}
@@ -185,7 +201,11 @@ const oauthService = {
 		const userRow = await userService.selectByIdIncludeDel(c, oauthRow.userId);
 
 		if (!userRow) {
-			return { userInfo: oauthRow, token: null };
+			const bindToken = uuidv4();
+			await c.env.kv.put(KvConst.OAUTH_BIND + bindToken, JSON.stringify({
+				oauthUserId: oauthRow.oauthUserId
+			}), { expirationTtl: 600 });
+			return { userInfo: oauthRow, token: null, bindToken };
 		}
 
 		const JwtToken = await loginService.login(c, { email: userRow.email, password: null }, true);
