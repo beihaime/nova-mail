@@ -45,14 +45,9 @@
               v-if="settingStore.settings.siteKey"
               ref="loginTurnstileRef"
               class="login-turnstile"
-              :data-sitekey="settingStore.settings.siteKey"
-              :data-theme="uiStore.dark ? 'dark' : 'light'"
-              data-callback="onLoginTurnstileSuccess"
-              data-expired-callback="onLoginTurnstileExpired"
-              data-error-callback="onLoginTurnstileError"
           ></div>
           <div v-else class="turnstile-unavailable">{{ $t('verifyModuleFailed') }}</div>
-          <el-button class="btn" type="primary" @click="submit" :loading="loginLoading" :disabled="!loginVerifyToken"
+          <el-button class="btn" type="primary" @click="submit" :loading="loginLoading" :disabled="!loginVerifyToken || loginLoading"
           >{{ $t('loginBtn') }}
           </el-button>
           <el-button v-for="p in oauthProviders" :key="p.key" class="btn" style="margin-top: 10px" @click="oauthLogin(p.key)">
@@ -280,7 +275,7 @@ onMounted(() => {
 })
 
 function renderLoginTurnstile() {
-  if (!loginTurnstileRef.value || !window.turnstile || loginTurnstileId) return
+  if (!loginTurnstileRef.value || !window.turnstile || loginTurnstileId || !settingStore.settings.siteKey) return
   try {
     loginTurnstileId = window.turnstile.render(loginTurnstileRef.value, {
       sitekey: settingStore.settings.siteKey,
@@ -289,9 +284,10 @@ function renderLoginTurnstile() {
       'expired-callback': window.onLoginTurnstileExpired,
       'error-callback': window.onLoginTurnstileError,
     })
-  } catch {
-    // Auto-render from the official script can win the race; either rendering
-    // mode still invokes the callbacks above.
+  } catch (error) {
+    // The explicit API should not race Vue. Keep the failure recoverable in
+    // case the script was blocked or the browser restored an old DOM node.
+    console.warn('Turnstile render failed', error)
   }
 }
 
@@ -500,8 +496,12 @@ const submit = () => {
     return
   }
 
+  // Turnstile tokens are single-use. Consume it before the request so a
+  // second click or a delayed retry can never submit the same token twice.
+  const verificationToken = loginVerifyToken.value
+  loginVerifyToken.value = ''
   loginLoading.value = true
-  login(email, form.password, loginVerifyToken.value).then(async data => {
+  login(email, form.password, verificationToken).then(async data => {
     await saveToken(data.token)
   }).catch(() => {
     loginVerifyToken.value = ''

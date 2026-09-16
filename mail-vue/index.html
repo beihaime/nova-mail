@@ -7,7 +7,8 @@
   <meta name="description" content="Nova Mail 是一个 Serverless 响应式邮箱服务，支持邮件发送，可部署到 Novaflare 平台，降低服务器成本。Nova Mail is a serverless responsive email service that supports email sending and can be deployed on Novaflare to reduce server costs.">
   <title>Nova Mail</title>
   <link rel="icon" href="/src/icons/svg/brand-mark.svg" type="image/svg+xml">
-  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+  <!-- Explicit rendering prevents the API script from racing Vue's lifecycle. -->
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
   <script>
     const uiStoreStr =  localStorage.getItem('ui')
     let isDark = false
