@@ -3,7 +3,7 @@
   <h1 align="center">Nova Mail</h1>
   <p align="center">基于 Cloudflare 的简约响应式自托管邮箱服务</p>
   <p align="center">
-    简体中文 | <a href="README.md">English</a>
+    简体中文 | <a href="https://github.com/beihaime/nova-mail/blob/main/README.md">English</a>
   </p>
   <p align="center">
     <a href="https://mail.beihaime.com" target="_blank">在线演示</a> ·
