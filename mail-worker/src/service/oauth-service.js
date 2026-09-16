@@ -10,6 +10,22 @@ import {t} from '../i18n/i18n';
 import { v4 as uuidv4 } from 'uuid';
 import KvConst from '../const/kv-const';
 
+function assertSafeRedirectUri(c, redirectUri) {
+	if (!redirectUri || typeof redirectUri !== 'string') {
+		throw new BizError('Invalid redirect_uri');
+	}
+	let parsed;
+	try {
+		parsed = new URL(redirectUri);
+	} catch {
+		throw new BizError('Invalid redirect_uri');
+	}
+	const origin = new URL(c.req.url).origin;
+	if (parsed.origin !== origin) {
+		throw new BizError('redirect_uri must match this site');
+	}
+}
+
 const oauthService = {
 
 	async bindUser(c, params) {
@@ -51,6 +67,7 @@ const oauthService = {
 	async linuxDoLogin(c, params) {
 
 		const { code, redirectUri } = params;
+		assertSafeRedirectUri(c, redirectUri);
 
 		const setting = await settingService.query(c);
 		this.assertEnabled(setting, 'linuxdoSwitch');
@@ -99,6 +116,7 @@ const oauthService = {
 	async googleLogin(c, params) {
 
 		const { code, redirectUri } = params;
+		assertSafeRedirectUri(c, redirectUri);
 
 		const setting = await settingService.query(c);
 		this.assertEnabled(setting, 'googleSwitch');

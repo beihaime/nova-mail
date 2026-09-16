@@ -1,10 +1,39 @@
 import { parseHTML } from 'linkedom';
 import domainUtils from '../utils/domain-uitls';
 
+/** Allow only safe CSS declarations in injected body style */
+function sanitizeCss(style = '') {
+	return String(style)
+		.replace(/[<>`"']/g, '')
+		.replace(/\\/g, '')
+		.replace(/expression\s*\(/gi, '')
+		.replace(/url\s*\(\s*['"]?\s*javascript:/gi, '')
+		.replace(/@import/gi, '')
+		slice(0, 2000);
+}
+
+function hardenDocument(document) {
+	document.querySelectorAll('script, iframe, object, embed, link[rel="import"]').forEach(el => el.remove());
+
+	document.querySelectorAll('*').forEach(el => {
+		[...el.attributes].forEach(attr => {
+			const name = attr.name.toLowerCase();
+			const value = (attr.value || '').trim();
+			if (name.startsWith('on')) {
+				el.removeAttribute(attr.name);
+				return;
+			}
+			if ((name === 'href' || name === 'src' || name === 'xlink:href') && /^\s*javascript:/i.test(value)) {
+				el.removeAttribute(attr.name);
+			}
+		});
+	});
+}
+
 export default function emailHtmlTemplate(html, domain) {
 
-	const { document } = parseHTML(html);
-	document.querySelectorAll('script').forEach(script => script.remove());
+	const { document } = parseHTML(html || '');
+	hardenDocument(document);
 	html = document.toString();
 	html = html.replace(/{{domain}}/g, domainUtils.toOssDomain(domain) + '/');
 	const safeHtmlJson = JSON.stringify(html).replace(/</g, '\\u003C');
@@ -14,6 +43,7 @@ export default function emailHtmlTemplate(html, domain) {
 <head>
     <meta charset='UTF-8'>
     <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src https: data: http:; font-src data:; script-src 'unsafe-inline'">
     <style>
         * {
             box-sizing: border-box;
@@ -26,7 +56,7 @@ export default function emailHtmlTemplate(html, domain) {
         		padding: 15px 10px;
             width: 100%;
             height: 100%;
-            overflow: auto; /* 改为 auto 允许滚动 */
+            overflow: auto;
             font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         }
 
@@ -43,19 +73,26 @@ export default function emailHtmlTemplate(html, domain) {
 
     <script>
 
+        function sanitizeCss(style) {
+            return String(style || '')
+                .replace(/[<>\`"']/g, '')
+                .replace(/\\\\/g, '')
+                .replace(/expression\\s*\\(/gi, '')
+                .replace(/url\\s*\\(\\s*['"]?\\s*javascript:/gi, '')
+                .replace(/@import/gi, '')
+                .slice(0, 2000);
+        }
+
         function renderHTML(html) {
             const container = document.getElementById('container');
             const shadowRoot = container.attachShadow({ mode: 'open' });
 
-            // 提取 <body> 的 style 属性
-            const bodyStyleRegex = /<body[^>]*style="([^"]*)"[^>]*>/i;
+            const bodyStyleRegex = /<body[^>]*style=\"([^\"]*)\"[^>]*>/i;
             const bodyStyleMatch = html.match(bodyStyleRegex);
-            const bodyStyle = bodyStyleMatch ? bodyStyleMatch[1] : '';
+            const bodyStyle = sanitizeCss(bodyStyleMatch ? bodyStyleMatch[1] : '');
 
-            // 移除 <body> 标签
             const cleanedHtml = html.replace(/<\\/?body[^>]*>/gi, '');
 
-            // 渲染内容
             shadowRoot.innerHTML = \`
                 <style>
                     :host {
@@ -68,7 +105,7 @@ export default function emailHtmlTemplate(html, domain) {
                         line-height: 1.5;
                         color: #13181D;
                         word-break: break-word;
-                        overflow: auto; /* 添加滚动 */
+                        overflow: auto;
                     }
 
                     h1, h2, h3, h4 {
@@ -90,7 +127,7 @@ export default function emailHtmlTemplate(html, domain) {
                         width: fit-content;
                         height: fit-content;
                         min-width: 100%;
-                        \${bodyStyle ? bodyStyle : ''} /* 注入 body 的 style */
+                        \${bodyStyle}
                     }
 
                     img:not(table img) {
@@ -103,7 +140,6 @@ export default function emailHtmlTemplate(html, domain) {
                 </div>
             \`;
 
-            // 自动缩放
             autoScale(shadowRoot, container);
         }
 
@@ -127,10 +163,8 @@ export default function emailHtmlTemplate(html, domain) {
             hostElement.style.zoom = scale;
         }
 
-        // 使用示例
         const exampleHtml = ${safeHtmlJson};
 
-        // 渲染HTML
         renderHTML(exampleHtml);
     </script>
 </body>

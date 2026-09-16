@@ -249,7 +249,11 @@ const loginService = {
 		}
 
 		const uuid = uuidv4();
-		const jwt = await JwtUtils.generateToken(c,{ userId: userRow.userId, token: uuid });
+		const jwt = await JwtUtils.generateToken(
+			c,
+			{ userId: userRow.userId, token: uuid },
+			constant.TOKEN_EXPIRE
+		);
 
 		let authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userRow.userId, { type: 'json' });
 

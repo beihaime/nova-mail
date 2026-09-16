@@ -5,7 +5,6 @@ import result from '../model/result';
 import { cors } from 'hono/cors';
 
 function resolveCorsOrigin(c, origin) {
-	// Same-origin / non-browser requests
 	if (!origin) return '*';
 
 	const allowed = [];
@@ -31,7 +30,6 @@ function resolveCorsOrigin(c, origin) {
 	}
 
 	if (allowed.length === 0) {
-		// No host configured yet — keep permissive for first-time setup
 		return origin;
 	}
 
@@ -46,6 +44,21 @@ app.use('*', async (c, next) => {
 		maxAge: 86400
 	});
 	return middleware(c, next);
+});
+
+app.use('*', async (c, next) => {
+	await next();
+	c.header('X-Content-Type-Options', 'nosniff');
+	c.header('X-Frame-Options', 'DENY');
+	c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+	c.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+	// API JSON responses; SPA assets may override as needed
+	if (!c.res.headers.get('Content-Security-Policy')) {
+		c.header(
+			'Content-Security-Policy',
+			"frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+		);
+	}
 });
 
 app.onError((err, c) => {
