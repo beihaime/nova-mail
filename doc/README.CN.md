@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="mail-vue/src/icons/svg/brand-app-dark.svg" width="80" alt="Nova Mail" />
+  <img src="https://raw.githubusercontent.com/beihaime/nova-mail/main/mail-vue/src/icons/svg/brand-app-dark.svg" width="80" alt="Nova Mail" />
   <h1 align="center">Nova Mail</h1>
   <p align="center">基于 Cloudflare 的简约响应式自托管邮箱服务</p>
   <p align="center">
