@@ -3,7 +3,7 @@
   <h1 align="center">Nova Mail</h1>
   <p align="center">A simple, responsive self-hosted email service on Cloudflare</p>
   <p align="center">
-    <a href="./doc/cn.md">简体中文</a> | English
+    <a href="doc/README.CN.md">简体中文</a> | English
   </p>
   <p align="center">
     <a href="https://mail.beihaime.com" target="_blank">Live Demo</a> ·
