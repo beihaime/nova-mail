@@ -2,8 +2,16 @@
   <div :class="accountShow && hasPerm('account:query') ? 'main-box-show' : 'main-box-hide'">
     <div :class="accountShow && hasPerm('account:query') ? 'block-show' : 'block-hide'" @click="uiStore.accountShow = false"></div>
     <account  :class="accountShow && hasPerm('account:query') ? 'show' : 'hide'" />
-    <div v-if="isDesktopReading" class="desktop-mail-workspace">
+    <div v-if="isDesktopReading" ref="workspaceRef" class="desktop-mail-workspace" :style="workspaceStyle">
       <EmailPane class="desktop-message-list" />
+      <div
+          class="mail-splitter"
+          role="separator"
+          aria-label="Resize message list"
+          aria-orientation="vertical"
+          @pointerdown="startResize"
+          @dblclick="resetPaneWidth"
+      ></div>
       <ContentPane class="desktop-reading-pane" />
     </div>
     <router-view v-else class="main-view" v-slot="{ Component,route }">
@@ -28,14 +36,24 @@ const uiStore = useUiStore();
 const route = useRoute()
 let  innerWidth =  window.innerWidth
 const isDesktop = ref(window.innerWidth >= 1024)
+const workspaceRef = ref(null)
+const DEFAULT_PANE_WIDTH = 440
+const MIN_PANE_WIDTH = 300
+const MAX_PANE_WIDTH = 700
+const MIN_READING_WIDTH = 360
+const paneWidth = ref(readPaneWidth())
+let isResizing = false
 
 let elNotification = null
 
 const accountShow = computed(() => {
-  return uiStore.accountShow && settingStore.settings.manyEmail === 0 && route.name !== 'content'
+  // On a phone the account selector remains available from the reader as a
+  // drawer; desktop keeps the reading pane unobstructed.
+  return uiStore.accountShow && settingStore.settings.manyEmail === 0 && (!isDesktop.value || route.name !== 'content')
 })
 
 const isDesktopReading = computed(() => route.name === 'content' && isDesktop.value)
+const workspaceStyle = computed(() => ({ '--mail-list-width': `${paneWidth.value}px` }))
 
 watch(() => uiStore.changeNotice, () => {
 
@@ -100,11 +118,55 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize)
+  window.removeEventListener('pointermove', resizePane)
+  window.removeEventListener('pointerup', stopResize)
+  document.body.classList.remove('mail-pane-resizing')
 })
 
 const handleResize = () => {
   isDesktop.value = window.innerWidth >= 1024
   if (innerWidth !== window.innerWidth) innerWidth = window.innerWidth
+  paneWidth.value = clampPaneWidth(paneWidth.value)
+}
+
+function readPaneWidth() {
+  const value = Number(localStorage.getItem('nova-mail-pane-width'))
+  return Number.isFinite(value) ? Math.min(MAX_PANE_WIDTH, Math.max(MIN_PANE_WIDTH, value)) : DEFAULT_PANE_WIDTH
+}
+
+function clampPaneWidth(value) {
+  const workspaceWidth = workspaceRef.value?.clientWidth
+  const widthForReadingPane = workspaceWidth ? workspaceWidth - MIN_READING_WIDTH - 8 : MAX_PANE_WIDTH
+  const maxWidth = Math.max(MIN_PANE_WIDTH, Math.min(MAX_PANE_WIDTH, widthForReadingPane))
+  return Math.min(maxWidth, Math.max(MIN_PANE_WIDTH, Math.round(value)))
+}
+
+function startResize(event) {
+  if (event.button !== 0 || !workspaceRef.value) return
+  isResizing = true
+  event.currentTarget.setPointerCapture?.(event.pointerId)
+  document.body.classList.add('mail-pane-resizing')
+  window.addEventListener('pointermove', resizePane)
+  window.addEventListener('pointerup', stopResize, { once: true })
+}
+
+function resizePane(event) {
+  if (!isResizing || !workspaceRef.value) return
+  const workspaceLeft = workspaceRef.value.getBoundingClientRect().left
+  paneWidth.value = clampPaneWidth(event.clientX - workspaceLeft)
+}
+
+function stopResize() {
+  if (!isResizing) return
+  isResizing = false
+  localStorage.setItem('nova-mail-pane-width', String(paneWidth.value))
+  document.body.classList.remove('mail-pane-resizing')
+  window.removeEventListener('pointermove', resizePane)
+}
+
+function resetPaneWidth() {
+  paneWidth.value = clampPaneWidth(DEFAULT_PANE_WIDTH)
+  localStorage.setItem('nova-mail-pane-width', String(paneWidth.value))
 }
 
 </script>
@@ -184,15 +246,42 @@ const handleResize = () => {
 
 .desktop-mail-workspace {
   display: grid;
-  grid-template-columns: minmax(390px, 41%) minmax(0, 1fr);
+  grid-template-columns: minmax(300px, var(--mail-list-width)) 8px minmax(360px, 1fr);
   min-width: 0;
   min-height: 0;
   height: 100%;
   background: var(--el-bg-color);
 }
 
-.desktop-message-list { min-width: 0; border-right: 1px solid var(--light-border-color); }
+.desktop-message-list { min-width: 0; }
 .desktop-reading-pane { min-width: 0; }
+
+.mail-splitter {
+  position: relative;
+  z-index: 2;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+}
+
+.mail-splitter::after {
+  content: '';
+  position: absolute;
+  inset: 0 3px;
+  background: var(--nova-divider);
+  transition: background-color .16s ease, box-shadow .16s ease;
+}
+
+.mail-splitter:hover::after,
+.mail-pane-resizing .mail-splitter::after {
+  background: var(--el-color-primary);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--el-color-primary) 22%, transparent);
+}
+
+:global(body.mail-pane-resizing) {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
 
 
 .navigation {

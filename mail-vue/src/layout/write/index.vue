@@ -114,6 +114,7 @@ import dayjs from "dayjs";
 import {useI18n} from "vue-i18n";
 import router from "@/router/index.js";
 import {ElMessageBox} from "element-plus";
+import {accountList} from "@/request/account.js";
 
 defineExpose({
   open,
@@ -459,7 +460,24 @@ function openForward(email) {
   });
 }
 
-function openReply(email) {
+async function replyAccount(email) {
+  if (!email.accountId || email.accountId === accountStore.currentAccount?.accountId) {
+    return accountStore.currentAccount
+  }
+
+  const cached = accountStore.addresses.find(account => account.accountId === email.accountId)
+  if (cached) return cached
+
+  try {
+    const addresses = await accountList(0, 30)
+    accountStore.addresses = addresses
+    return addresses.find(account => account.accountId === email.accountId) || accountStore.currentAccount
+  } catch {
+    return accountStore.currentAccount
+  }
+}
+
+async function openReply(email) {
 
   resetForm();
 
@@ -476,6 +494,8 @@ function openReply(email) {
 
   defValue.value = ''
 
+  const senderAccount = await replyAccount(email)
+
   setTimeout(() => {
     defValue.value = `
     <div></div>
@@ -488,7 +508,7 @@ function openReply(email) {
           ${formatImage(email.content) || `<pre style="font-family: inherit;word-break: break-word;white-space: pre-wrap;margin: 0">${email.text}</pre>`}
       </article>
     </blockquote>`
-    open()
+    open(senderAccount)
 
     nextTick(() => {
       backReply.content = editor.value.getContent()
@@ -506,15 +526,16 @@ function formatImage(content) {
   return content.replace(/{{domain}}/g, toOssDomain(domain) + '/');
 }
 
-function open() {
-  if (!accountStore.currentAccount.email) {
+function open(preferredAccount) {
+  const account = preferredAccount || accountStore.currentAccount
+  if (!account?.email) {
     form.sendEmail = userStore.user.email;
     form.accountId = userStore.user.account.accountId;
     form.name = userStore.user.name;
   } else {
-    form.sendEmail = accountStore.currentAccount.email;
-    form.accountId = accountStore.currentAccount.accountId;
-    form.name = accountStore.currentAccount.name;
+    form.sendEmail = account.email;
+    form.accountId = account.accountId;
+    form.name = account.name;
   }
   show.value = true;
   editor.value.focus()

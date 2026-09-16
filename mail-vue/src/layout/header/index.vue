@@ -25,50 +25,40 @@
         <img src="@/icons/svg/notifications.svg" alt="" />
       </div>
       <el-dropdown ref="userinfoRef" @visible-change="e => userInfoShow = e" :teleported="false" popper-class="detail-dropdown">
-        <div class="avatar" @click="userInfoHide" >
+        <div class="avatar" @click="openAccountSwitcher" >
           <div class="avatar-text">
-            <div>{{ formatName(userStore.user.email) }}</div>
+            <div>{{ formatName(currentAccount.email || userStore.user.email) }}</div>
+          </div>
+          <div class="account-summary">
+            <strong>{{ userStore.user.name || currentAccount.name || formatName(userStore.user.email) }}</strong>
+            <span>{{ currentAccount.email || userStore.user.email }}</span>
           </div>
           <Icon class="setting-icon" icon="mingcute:down-small-fill" width="24" height="24"/>
         </div>
         <template #dropdown>
           <div class="user-details">
-            <div class="details-avatar">
-              {{ formatName(userStore.user.email) }}
+            <div class="account-dropdown-head">
+              <strong>{{ userStore.user.name || currentAccount.name }}</strong>
+              <span @click="copyEmail(userStore.user.email)">{{ userStore.user.email }}</span>
             </div>
-            <div class="user-name">
-              {{ userStore.user.name }}
+            <div class="address-list" v-if="accounts.length">
+              <button
+                  v-for="address in accounts"
+                  :key="address.accountId"
+                  class="address-option"
+                  :class="{ selected: address.accountId === currentAccount.accountId }"
+                  @click="selectAccount(address)"
+              >
+                <img v-if="address.accountId === currentAccount.accountId" src="@/icons/svg/checkbox-checked.svg" alt="" />
+                <span v-else class="address-check-placeholder"></span>
+                <span>{{ address.email }}</span>
+              </button>
             </div>
-            <div class="detail-email" @click="copyEmail(userStore.user.email)">
-              {{ userStore.user.email }}
-            </div>
-            <div class="detail-user-type">
-              <el-tag>{{ userStore.user.role.name }}</el-tag>
-            </div>
-            <div class="action-info">
-              <div>
-                <span style="margin-right: 10px">{{ $t('sendCount') }}</span>
-                <span style="margin-right: 10px">{{ $t('accountCount') }}</span>
-              </div>
-              <div>
-                <div>
-                  <span v-if="sendCount" style="margin-right: 5px">{{ sendCount }}</span>
-                  <el-tag v-if="!hasPerm('email:send')">{{ sendType }}</el-tag>
-                  <el-tag v-else>{{ sendType }}</el-tag>
-                </div>
-                <div>
-                  <el-tag v-if="settingStore.settings.manyEmail || settingStore.settings.addEmail">
-                    {{ $t('disabled') }}
-                  </el-tag>
-                  <span v-else-if="accountCount && hasPerm('account:add')"
-                        style="margin-right: 5px">{{ $t('totalUserAccount', {msg: accountCount}) }}</span>
-                  <el-tag v-else-if="!accountCount && hasPerm('account:add')">{{ $t('unlimited') }}</el-tag>
-                  <el-tag v-else-if="!hasPerm('account:add')">{{ $t('unauthorized') }}</el-tag>
-                </div>
-              </div>
-            </div>
-            <div class="logout">
-              <el-button type="primary" :loading="logoutLoading" @click="clickLogout">{{ $t('logOut') }}</el-button>
+            <div v-else class="address-loading">{{ $t('loading') }}</div>
+            <div class="account-dropdown-actions">
+              <button v-if="hasPerm('account:query')" @click="openManageAddresses">{{ $t('manage') }} {{ $t('accountCount') }}</button>
+              <button @click="router.push({ name: 'setting' })">{{ $t('settings') }}</button>
+              <button class="sign-out" :disabled="logoutLoading" @click="clickLogout">{{ $t('logOut') }}</button>
             </div>
           </div>
         </template>
@@ -85,20 +75,28 @@ import {Icon} from "@iconify/vue";
 import {useUiStore} from "@/store/ui.js";
 import {useUserStore} from "@/store/user.js";
 import {useRoute} from "vue-router";
-import {computed, ref} from "vue";
+import {computed, onMounted, ref} from "vue";
 import {useSettingStore} from "@/store/setting.js";
 import {hasPerm} from "@/perm/perm.js"
 import {useI18n} from "vue-i18n";
 import {setExtend} from "@/utils/day.js"
+import {accountList} from "@/request/account.js";
+import {useAccountStore} from "@/store/account.js";
+import {useEmailStore} from "@/store/email.js";
 
 const {t} = useI18n();
 const route = useRoute();
 const settingStore = useSettingStore();
 const userStore = useUserStore();
 const uiStore = useUiStore();
+const accountStore = useAccountStore();
+const emailStore = useEmailStore();
 const logoutLoading = ref(false)
 const userInfoShow = ref(false)
 const userinfoRef = ref({})
+const accounts = ref([])
+
+const currentAccount = computed(() => accountStore.currentAccount || {})
 
 const accountCount = computed(() => {
   return userStore.user.role.accountCount
@@ -161,13 +159,55 @@ const sendCount = computed(() => {
   return userStore.user.sendCount + '/' + userStore.user.role.sendCount
 })
 
-function userInfoHide(e) {
+function userInfoHide() {
     if (userInfoShow.value) {
         userinfoRef.value.handleClose()
     } else {
         userinfoRef.value.handleOpen()
     }
 }
+
+function openAccountSwitcher() {
+  if (window.innerWidth < 768) {
+    uiStore.accountShow = true
+    return
+  }
+  userInfoHide()
+}
+
+function selectAccount(account) {
+  if (account.accountId === currentAccount.value.accountId) {
+    userinfoRef.value.handleClose()
+    return
+  }
+  accountStore.currentAccountId = account.accountId
+  accountStore.currentAccount = account
+  emailStore.emailScroll?.refreshList()
+  emailStore.sendScroll?.refreshList()
+  userinfoRef.value.handleClose()
+}
+
+function openManageAddresses() {
+  userinfoRef.value.handleClose()
+  uiStore.accountShow = true
+}
+
+async function loadAccounts() {
+  if (!hasPerm('account:query')) return
+  const list = await accountList(0, 30)
+  accounts.value = list
+  accountStore.addresses = list
+  if (!currentAccount.value?.accountId && list[0]) {
+    accountStore.currentAccountId = list[0].accountId
+    accountStore.currentAccount = list[0]
+  }
+}
+
+onMounted(() => {
+  loadAccounts().catch(() => {
+    accounts.value = []
+  })
+})
 
 async function copyEmail(email) {
   try {
@@ -272,11 +312,37 @@ function formatName(email) {
 }
 
 .user-details {
-  width: 250px;
+  width: 280px;
   font-size: 14px;
   display: grid;
   grid-template-columns: 1fr;
-  justify-items: center;
+  justify-items: stretch;
+
+  .account-dropdown-head {
+    display: grid;
+    gap: 2px;
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--nova-divider);
+
+    strong { font-size: 14px; color: var(--el-text-color-primary); }
+    span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--regular-text-color); cursor: pointer; }
+  }
+
+  .address-list { padding: 6px; max-height: min(300px, 42vh); overflow: auto; }
+  .address-option {
+    width: 100%; min-height: 36px; display: flex; align-items: center; gap: 9px; padding: 7px 9px;
+    text-align: left; color: var(--el-text-color-primary); border-radius: 8px; cursor: pointer;
+    transition: background-color .14s ease;
+    span:last-child { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    &:hover { background: var(--nova-hover); }
+    &.selected { color: var(--el-color-primary); font-weight: 600; background: var(--nova-selected); }
+    img, .address-check-placeholder { width: 16px; height: 16px; flex: 0 0 16px; }
+  }
+  .address-loading { padding: 16px; color: var(--regular-text-color); text-align: center; }
+  .account-dropdown-actions { border-top: 1px solid var(--nova-divider); padding: 6px; display: grid; }
+  .account-dropdown-actions button { min-height: 34px; padding: 0 10px; border-radius: 8px; text-align: left; color: var(--el-text-color-primary); cursor: pointer; }
+  .account-dropdown-actions button:hover { background: var(--nova-hover); }
+  .account-dropdown-actions .sign-out { color: #d84a4a; }
 
   .user-name {
     font-weight: bold;
@@ -497,6 +563,18 @@ function formatName(email) {
       margin-right: 10px;
       bottom: 10px;
     }
+
+    .account-summary {
+      display: grid;
+      gap: 1px;
+      max-width: min(180px, 16vw);
+      margin-left: 8px;
+      text-align: left;
+      line-height: 1.2;
+      strong, span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+      strong { font-size: 13px; font-weight: 650; color: var(--el-text-color-primary); }
+      span { font-size: 11px; color: var(--regular-text-color); }
+    }
   }
 
 }
@@ -509,6 +587,7 @@ function formatName(email) {
   .toolbar .notice { display: none; }
   .toolbar .setting-icon { display: none; }
   .toolbar .avatar { margin-left: 2px; }
+  .toolbar .avatar .account-summary { display: none; }
   .breadcrumb-item { font-size: 16px; }
 }
 

@@ -416,6 +416,7 @@ function getAccountList() {
     }
 
     accounts.push(...list)
+    accountStore.addresses = [...accounts]
 
     loading.value = false
     followLoading.value = false
