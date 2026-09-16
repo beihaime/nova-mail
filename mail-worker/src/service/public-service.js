@@ -14,10 +14,12 @@ import { isDel, roleConst } from '../const/entity-const';
 import email from '../entity/email';
 import userService from './user-service';
 import KvConst from '../const/kv-const';
+import rateLimitUtils from '../utils/rate-limit-utils';
 
 const publicService = {
 
 	async emailList(c, params) {
+		await rateLimitUtils.publicApi(c);
 
 		let { toEmail, content, subject, sendName, sendEmail, timeSort, num, size, type, isDel } = params;
 
@@ -35,16 +37,19 @@ const publicService = {
 			isDel: email.isDel,
 		}).from(email);
 
-		if (!size) {
-			size = 20;
-		}
-
-		if (!num) {
-			num = 1;
-		}
-
 		size = Number(size);
 		num = Number(num);
+
+		if (!size || isNaN(size) || size < 1) {
+			size = 20;
+		}
+		if (size > 50) {
+			size = 50;
+		}
+
+		if (!num || isNaN(num) || num < 1) {
+			num = 1;
+		}
 
 		num = (num - 1) * size;
 
@@ -94,9 +99,15 @@ const publicService = {
 	},
 
 	async addUser(c, params) {
+		await rateLimitUtils.publicApi(c);
+
 		const { list } = params;
 
-		if (list.length === 0) return;
+		if (!list || list.length === 0) return;
+
+		if (list.length > 100) {
+			throw new BizError('Batch size limit is 100');
+		}
 
 		for (const emailRow of list) {
 			if (!verifyUtils.isEmail(emailRow.email)) {
@@ -179,6 +190,7 @@ const publicService = {
 	},
 
 	async genToken(c, params) {
+		await rateLimitUtils.genToken(c);
 		await this.verifyUser(c, params);
 
 		const uuid = uuidv4();

@@ -10,6 +10,7 @@ import {t} from '../i18n/i18n'
 import verifyRecordService from './verify-record-service';
 import userContext from '../security/user-context';
 import domainUtils from '../utils/domain-uitls';
+import urlSafety from '../utils/url-safety';
 
 function isMaskedSecret(value) {
 	if (value == null || typeof value !== 'string') return false;
@@ -147,6 +148,14 @@ const settingService = {
 			});
 		}
 
+		if (params.webhookUrl !== undefined && params.webhookUrl) {
+			const normalized = domainUtils.toOssDomain(params.webhookUrl) || '';
+			if (normalized) {
+				urlSafety.assertSafeWebhookUrl(normalized);
+			}
+			params.webhookUrl = normalized;
+		}
+
 		const settingData = await this.query(c);
 		let resendTokens = { ...settingData.resendTokens, ...params.resendTokens };
 		Object.keys(resendTokens).forEach(domain => {
@@ -159,10 +168,6 @@ const settingService = {
 
 		if (Array.isArray(params.aiCodeFilter)) {
 			params.aiCodeFilter = params.aiCodeFilter + '';
-		}
-
-		if (params.webhookUrl !== undefined) {
-			params.webhookUrl = domainUtils.toOssDomain(params.webhookUrl) || '';
 		}
 
 		params.resendTokens = JSON.stringify(resendTokens);

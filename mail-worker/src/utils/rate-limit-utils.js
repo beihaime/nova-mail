@@ -29,6 +29,16 @@ const rateLimitUtils = {
 	/** Register: 5 attempts / minute / IP */
 	async register(c) {
 		await check(c, 'register', 5, 60);
+	},
+
+	/** Public API (requires public token): 60 / minute / IP */
+	async publicApi(c) {
+		await check(c, 'public', 60, 60);
+	},
+
+	/** Admin password used for genToken: same as login */
+	async genToken(c) {
+		await check(c, 'gen-token', 10, 60);
 	}
 };
 

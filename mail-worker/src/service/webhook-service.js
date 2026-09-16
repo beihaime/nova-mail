@@ -1,4 +1,5 @@
 import domainUtils from '../utils/domain-uitls';
+import urlSafety from '../utils/url-safety';
 
 const webhookService = {
 
@@ -10,9 +11,19 @@ const webhookService = {
 			return;
 		}
 
+		try {
+			webhookUrl = urlSafety.assertSafeWebhookUrl(webhookUrl);
+		} catch (e) {
+			console.error(`Webhook URL rejected: ${e.message}`);
+			return;
+		}
+
 		retry = Number(retry);
 		if (isNaN(retry) || retry < 0) {
 			retry = 0;
+		}
+		if (retry > 3) {
+			retry = 3;
 		}
 
 		const headers = {
