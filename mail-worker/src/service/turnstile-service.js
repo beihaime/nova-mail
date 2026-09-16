@@ -30,7 +30,15 @@ const turnstileService = {
 
 		const result = await res.json();
 
-		if (!result.success || (c.env.TURNSTILE_HOSTNAME && result.hostname !== c.env.TURNSTILE_HOSTNAME)) {
+		const expectedHostname = c.env.TURNSTILE_HOSTNAME;
+		if (!result.success || (expectedHostname && result.hostname !== expectedHostname)) {
+			// Siteverify error codes are safe diagnostics. Never log the token or
+			// secret: both are credentials and must remain unavailable in logs.
+			console.warn('Turnstile verification rejected', {
+				errorCodes: result['error-codes'] || [],
+				hostname: result.hostname || null,
+				expectedHostname: expectedHostname || null,
+			});
 			throw new BizError(t('botVerifyFail'),400)
 		}
 	}
