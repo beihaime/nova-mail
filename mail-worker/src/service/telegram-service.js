@@ -14,6 +14,9 @@ import emailHtmlTemplate from '../template/email-html';
 import verifyUtils from '../utils/verify-utils';
 import domainUtils from "../utils/domain-uitls";
 
+/** Telegram email preview links expire after 7 days */
+const TG_EMAIL_TOKEN_TTL = 7 * 24 * 60 * 60;
+
 const telegramService = {
 
 	async getEmailContent(c, params) {
@@ -49,7 +52,7 @@ const telegramService = {
 
 		const tgChatIds = tgChatId.split(',');
 
-		const jwtToken = await jwtUtils.generateToken(c, { emailId: email.emailId })
+		const jwtToken = await jwtUtils.generateToken(c, { emailId: email.emailId }, TG_EMAIL_TOKEN_TTL)
 
 		const webAppUrl = customDomain ? `${domainUtils.toOssDomain(customDomain)}/api/telegram/getEmail/${jwtToken}` : 'https://www.cloudflare.com/404'
 		const inlineKeyboard = [
