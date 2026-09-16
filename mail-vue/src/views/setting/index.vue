@@ -34,8 +34,15 @@
       <div class="title">{{$t('connectedAccounts')}}</div>
       <div class="connected-account-row">
         <div class="connected-account-details">
-          <el-avatar v-if="githubAccount.connected && githubAccount.avatarUrl" :src="githubAccount.avatarUrl" :size="32" />
-          <span v-else class="github-mark">GitHub</span>
+          <el-avatar
+            v-if="githubAccount.connected && githubAccount.avatarUrl"
+            :src="githubAccount.avatarUrl"
+            :size="32"
+            @error="handleGithubAvatarError"
+          />
+          <span v-else class="github-mark" aria-hidden="true">
+            <Icon icon="codicon:github-inverted" width="18" height="18" />
+          </span>
           <div>
             <div class="provider-name">GitHub</div>
             <div class="provider-status" v-if="githubAccount.connected">@{{ githubAccount.login }} · {{$t('connected')}}</div>
@@ -86,6 +93,7 @@ import {useAccountStore} from "@/store/account.js";
 import {useI18n} from "vue-i18n";
 import {useSettingStore} from "@/store/setting.js";
 import {connectGithubAccount, disconnectGithubAccount, githubConnectedAccount} from '@/request/ouath.js';
+import {Icon} from '@iconify/vue';
 
 const { t } = useI18n()
 const accountStore = useAccountStore()
@@ -119,6 +127,12 @@ async function connectGithub() {
   } finally {
     githubLoading.value = false
   }
+}
+
+function handleGithubAvatarError() {
+  // The connection is still valid if GitHub temporarily declines the avatar
+  // request. Fall back to the provider mark instead of a broken image.
+  githubAccount.avatarUrl = ''
 }
 
 function disconnectGithub() {
@@ -373,8 +387,7 @@ function submitPwd() {
       place-items: center;
       border-radius: 50%;
       background: var(--el-fill-color);
-      font-size: 10px;
-      font-weight: 700;
+      color: var(--el-text-color-primary);
     }
 
     .provider-name { font-weight: 600; }
