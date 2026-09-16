@@ -31,10 +31,10 @@ const loginService = {
 
 		const { email, password, token, code } = params;
 
-		let { regKey, register, registerVerify, regVerifyCount, minEmailPrefix, emailPrefixFilter } = await settingService.query(c)
+		let { regKey, register, registerVerify, regVerifyCount, minEmailPrefix, emailPrefixFilter } = await settingService.query(c);
 
+		// OAuth is already verified by the provider; still honor closed registration.
 		if (oauth) {
-			// OAuth identity is verified by the provider; still respect register=CLOSE.
 			registerVerify = settingConst.registerVerify.CLOSE;
 		}
 
@@ -71,18 +71,18 @@ const loginService = {
 		}
 
 		let type = null;
-		let regKeyId = 0
+		let regKeyId = 0;
 
 		if (regKey === settingConst.regKey.OPEN) {
-			const result = await this.handleOpenRegKey(c, regKey, code)
-			type = result?.type
-			regKeyId = result?.regKeyId
+			const result = await this.handleOpenRegKey(c, regKey, code);
+			type = result?.type;
+			regKeyId = result?.regKeyId;
 		}
 
 		if (regKey === settingConst.regKey.OPTIONAL) {
-			const result = await this.handleOpenOptional(c, regKey, code)
-			type = result?.type
-			regKeyId = result?.regKeyId
+			const result = await this.handleOpenOptional(c, regKey, code);
+			type = result?.type;
+			regKeyId = result?.regKeyId;
 		}
 
 		const accountRow = await accountService.selectByEmailIncludeDel(c, email);
@@ -95,45 +95,41 @@ const loginService = {
 			throw new BizError(t('isRegAccount'));
 		}
 
-		let defType = null
+		let defType = null;
 
 		if (!type) {
 			const roleRow = await roleService.selectDefaultRole(c);
-			defType = roleRow.roleId
+			defType = roleRow.roleId;
 		}
-
 
 		const roleRow = await roleService.selectById(c, type || defType);
 
-		if(!roleService.hasAvailDomainPerm(roleRow.availDomain, email)) {
-
+		if (!roleService.hasAvailDomainPerm(roleRow.availDomain, email)) {
 			if (type) {
-				throw new BizError(t('noDomainPermRegKey'),403)
+				throw new BizError(t('noDomainPermRegKey'), 403);
 			}
-
 			if (defType) {
-				throw new BizError(t('noDomainPermReg'),403)
+				throw new BizError(t('noDomainPermReg'), 403);
 			}
-
 		}
 
-		let regVerifyOpen = false
+		let regVerifyOpen = false;
 
 		if (registerVerify === settingConst.registerVerify.OPEN) {
-			regVerifyOpen = true
-			await turnstileService.verify(c,token)
+			regVerifyOpen = true;
+			await turnstileService.verify(c, token);
 		}
 
 		if (registerVerify === settingConst.registerVerify.COUNT) {
 			regVerifyOpen = await verifyRecordService.isOpenRegVerify(c, regVerifyCount);
 			if (regVerifyOpen) {
-				await turnstileService.verify(c,token)
+				await turnstileService.verify(c, token);
 			}
 		}
 
 		const { salt, hash } = await saltHashUtils.hashPassword(password);
 
-		const userId = await userService.insert(c, { email, regKeyId,password: hash, salt, type: type || defType });
+		const userId = await userService.insert(c, { email, regKeyId, password: hash, salt, type: type || defType });
 
 		await accountService.insert(c, { userId: userId, email, name: emailUtils.getName(email) });
 
@@ -145,10 +141,10 @@ const loginService = {
 
 		if (registerVerify === settingConst.registerVerify.COUNT && !regVerifyOpen) {
 			const row = await verifyRecordService.increaseRegCount(c);
-			return {regVerifyOpen: row.count >= regVerifyCount}
+			return { regVerifyOpen: row.count >= regVerifyCount };
 		}
 
-		return {regVerifyOpen}
+		return { regVerifyOpen };
 
 	},
 
@@ -172,7 +168,7 @@ const loginService = {
 			throw new BizError(t('noRegKeyCount'));
 		}
 
-		const today = toUtc().tz('Asia/Shanghai').startOf('day')
+		const today = toUtc().tz('Asia/Shanghai').startOf('day');
 		const expireTime = toUtc(regKeyRow.expireTime).tz('Asia/Shanghai').startOf('day');
 
 		if (expireTime.isBefore(today)) {
@@ -185,20 +181,20 @@ const loginService = {
 	async handleOpenOptional(c, regKey, code) {
 
 		if (!code) {
-			return null
+			return null;
 		}
 
 		const regKeyRow = await regKeyService.selectByCode(c, code);
 
 		if (!regKeyRow) {
-			return null
+			return null;
 		}
 
-		const today = toUtc().tz('Asia/Shanghai').startOf('day')
+		const today = toUtc().tz('Asia/Shanghai').startOf('day');
 		const expireTime = toUtc(regKeyRow.expireTime).tz('Asia/Shanghai').startOf('day');
 
 		if (regKeyRow.count <= 0 || expireTime.isBefore(today)) {
-			return null
+			return null;
 		}
 
 		return { type: regKeyRow.roleId, regKeyId: regKeyRow.regKeyId };
@@ -224,11 +220,11 @@ const loginService = {
 			throw new BizError(t('notExistUser'));
 		}
 
-		if(userRow.isDel === isDel.DELETE) {
+		if (userRow.isDel === isDel.DELETE) {
 			throw new BizError(t('isDelUser'));
 		}
 
-		if(userRow.status === userConst.status.BAN) {
+		if (userRow.status === userConst.status.BAN) {
 			throw new BizError(t('isBanUser'));
 		}
 
