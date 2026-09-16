@@ -5,24 +5,24 @@
       <span class="breadcrumb-item">{{ $t(route.meta.title) }}</span>
     </div>
     <label class="search-shell">
-      <img src="@/icons/svg/search.svg" alt="" />
+      <AppIcon name="search" :size="18" />
       <input :placeholder="$t('searchMail')" type="search" />
       <kbd>⌘ K</kbd>
     </label>
-    <div v-perm="'email:send'" class="writer-box" @click="openSend">
-      <div class="writer">
-        <img src="@/icons/svg/compose.svg" alt="" />
+      <div v-perm="'email:send'" class="writer-box" @click="openSend">
+        <div class="writer">
+        <AppIcon name="compose" :size="18" />
       </div>
     </div>
     <div class="toolbar">
       <div v-if="uiStore.dark" class="sun-icon icon-item" @click="openDark($event)">
-        <Icon icon="mingcute:sun-fill"/>
+        <AppIcon name="theme-toggle" :size="20" />
       </div>
       <div v-else class="dark-icon icon-item" @click="openDark($event)">
-        <Icon icon="solar:moon-linear"/>
+        <AppIcon name="theme-toggle" :size="20" />
       </div>
       <div class="notice icon-item" @click="openNotice">
-        <img src="@/icons/svg/notifications.svg" alt="" />
+        <AppIcon name="notifications" :size="20" />
       </div>
       <el-dropdown ref="userinfoRef" @visible-change="e => userInfoShow = e" :teleported="false" popper-class="detail-dropdown">
         <div class="avatar" @click="openAccountSwitcher" >
@@ -30,7 +30,7 @@
             <div>{{ formatName(currentAccount.email || userStore.user.email) }}</div>
           </div>
           <div class="account-summary">
-            <strong>{{ userStore.user.name || currentAccount.name || formatName(userStore.user.email) }}</strong>
+            <strong>{{ accountDisplayName }}</strong>
             <span>{{ currentAccount.email || userStore.user.email }}</span>
           </div>
           <Icon class="setting-icon" icon="mingcute:down-small-fill" width="24" height="24"/>
@@ -38,26 +38,37 @@
         <template #dropdown>
           <div class="user-details">
             <div class="account-dropdown-head">
-              <strong>{{ userStore.user.name || currentAccount.name }}</strong>
-              <span @click="copyEmail(userStore.user.email)">{{ userStore.user.email }}</span>
+              <div class="account-dropdown-avatar">{{ formatName(primaryAddress) }}</div>
+              <div>
+                <strong>{{ accountDisplayName }}</strong>
+                <span>{{ $t('accountLabel') }}</span>
+              </div>
             </div>
-            <div class="address-list" v-if="accounts.length">
-              <button
-                  v-for="address in accounts"
-                  :key="address.accountId"
-                  class="address-option"
-                  :class="{ selected: address.accountId === currentAccount.accountId }"
-                  @click="selectAccount(address)"
-              >
-                <img v-if="address.accountId === currentAccount.accountId" src="@/icons/svg/checkbox-checked.svg" alt="" />
-                <span v-else class="address-check-placeholder"></span>
-                <span>{{ address.email }}</span>
-              </button>
+            <div class="primary-address">
+              <span>{{ $t('primaryAddress') }}</span>
+              <button @click="copyEmail(primaryAddress)">{{ primaryAddress }}</button>
             </div>
-            <div v-else class="address-loading">{{ $t('loading') }}</div>
+            <div class="address-section">
+              <div class="address-section-label">{{ $t('mailAddresses') }}</div>
+              <div class="address-list" v-if="accounts.length">
+                <button
+                    v-for="address in accounts"
+                    :key="address.accountId"
+                    class="address-option"
+                    :class="{ selected: address.accountId === currentAccount.accountId }"
+                    @click="selectAccount(address)"
+                >
+                  <AppIcon v-if="address.accountId === currentAccount.accountId" name="checkbox-checked" :size="16" />
+                  <span v-else class="address-check-placeholder"></span>
+                  <span class="address-email">{{ address.email }}</span>
+                  <small v-if="address.email === primaryAddress" class="primary-badge">{{ $t('primary') }}</small>
+                </button>
+              </div>
+              <div v-else class="address-loading">{{ $t('loading') }}</div>
+            </div>
             <div class="account-dropdown-actions">
-              <button v-if="hasPerm('account:query')" @click="openManageAddresses">{{ $t('manage') }} {{ $t('accountCount') }}</button>
-              <button @click="router.push({ name: 'setting' })">{{ $t('settings') }}</button>
+              <button v-if="hasPerm('account:query')" @click="openManageAddresses"><AppIcon name="user" :size="17" />{{ $t('manageAddresses') }}</button>
+              <button @click="router.push({ name: 'setting' })"><AppIcon name="settings-top" :size="17" />{{ $t('settings') }}</button>
               <button class="sign-out" :disabled="logoutLoading" @click="clickLogout">{{ $t('logOut') }}</button>
             </div>
           </div>
@@ -71,7 +82,6 @@
 import router from "@/router";
 import hanburger from '@/components/hamburger/index.vue'
 import {logout} from "@/request/login.js";
-import {Icon} from "@iconify/vue";
 import {useUiStore} from "@/store/ui.js";
 import {useUserStore} from "@/store/user.js";
 import {useRoute} from "vue-router";
@@ -97,6 +107,8 @@ const userinfoRef = ref({})
 const accounts = ref([])
 
 const currentAccount = computed(() => accountStore.currentAccount || {})
+const primaryAddress = computed(() => userStore.user.email || currentAccount.value.email || '')
+const accountDisplayName = computed(() => userStore.user.name || formatName(primaryAddress.value))
 
 const accountCount = computed(() => {
   return userStore.user.role.accountCount
@@ -296,7 +308,7 @@ function clickLogout() {
 }
 
 function formatName(email) {
-  return email[0]?.toUpperCase() || ''
+  return email?.[0]?.toUpperCase() || ''
 }
 
 </script>
@@ -308,121 +320,58 @@ function formatName(email) {
 <style lang="scss" scoped>
 
 :deep(.el-popper.is-pure) {
-  border-radius: 6px;
+  border: 1px solid var(--nova-divider);
+  border-radius: 14px;
+  box-shadow: 0 14px 34px color-mix(in srgb, #101828 14%, transparent);
+  overflow: hidden;
 }
 
 .user-details {
-  width: 280px;
+  width: min(340px, calc(100vw - 24px));
+  min-width: 300px;
+  max-height: min(620px, calc(100vh - 100px));
   font-size: 14px;
-  display: grid;
-  grid-template-columns: 1fr;
-  justify-items: stretch;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 
   .account-dropdown-head {
-    display: grid;
-    gap: 2px;
-    padding: 14px 16px 10px;
-    border-bottom: 1px solid var(--nova-divider);
-
-    strong { font-size: 14px; color: var(--el-text-color-primary); }
-    span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--regular-text-color); cursor: pointer; }
-  }
-
-  .address-list { padding: 6px; max-height: min(300px, 42vh); overflow: auto; }
-  .address-option {
-    width: 100%; min-height: 36px; display: flex; align-items: center; gap: 9px; padding: 7px 9px;
-    text-align: left; color: var(--el-text-color-primary); border-radius: 8px; cursor: pointer;
-    transition: background-color .14s ease;
-    span:last-child { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-    &:hover { background: var(--nova-hover); }
-    &.selected { color: var(--el-color-primary); font-weight: 600; background: var(--nova-selected); }
-    img, .address-check-placeholder { width: 16px; height: 16px; flex: 0 0 16px; }
-  }
-  .address-loading { padding: 16px; color: var(--regular-text-color); text-align: center; }
-  .account-dropdown-actions { border-top: 1px solid var(--nova-divider); padding: 6px; display: grid; }
-  .account-dropdown-actions button { min-height: 34px; padding: 0 10px; border-radius: 8px; text-align: left; color: var(--el-text-color-primary); cursor: pointer; }
-  .account-dropdown-actions button:hover { background: var(--nova-hover); }
-  .account-dropdown-actions .sign-out { color: #d84a4a; }
-
-  .user-name {
-    font-weight: bold;
-    margin-top: 10px;
-    padding-left: 20px;
-    padding-right: 20px;
-    width: 250px;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    text-align: center;
-  }
-
-  .detail-user-type {
-    margin-top: 10px;
-  }
-
-  .action-info {
-    width: 100%;
-    display: grid;
-    grid-template-columns: auto auto;
-    margin-top: 10px;
-
-    > div:first-child {
-      display: grid;
-      align-items: center;
-      gap: 10px;
-    }
-
-    > div:last-child {
-      display: grid;
-      gap: 10px;
-      text-align: center;
-
-      > div {
-        display: flex;
-        align-items: center;
-      }
-    }
-  }
-
-  .detail-email {
-    padding-left: 20px;
-    padding-right: 20px;
-    width: 250px;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    text-align: center;
-    color: var(--regular-text-color);
-    cursor: pointer;
-  }
-
-  .logout {
-    margin-top: 20px;
-    width: 100%;
-    padding-left: 10px;
-    padding-right: 10px;
-    padding-bottom: 10px;
-
-    .el-button {
-      border-radius: 6px;
-      height: 28px;
-      width: 100%;
-    }
-  }
-
-  .details-avatar {
-    margin-top: 20px;
-    height: 40px;
-    width: 40px;
-    background: var(--el-bg-color);
-    color: var(--el-text-color-primary);
-    border: 1px solid var(--dark-border);
-    font-size: 18px;
     display: flex;
     align-items: center;
-    justify-content: center;
-    border-radius: 10px;
+    gap: 10px;
+    padding: 15px 16px 12px;
+    strong, span { display: block; }
+    strong { font-size: 14px; color: var(--el-text-color-primary); font-weight: 680; }
+    span { margin-top: 2px; font-size: 12px; color: var(--regular-text-color); }
   }
+
+  .account-dropdown-avatar {
+    width: 34px; height: 34px; display: grid; place-items: center; flex: 0 0 34px;
+    border-radius: 50%; color: var(--el-color-primary); background: var(--nova-selected);
+    border: 1px solid color-mix(in srgb, var(--el-color-primary) 18%, var(--nova-divider)); font-weight: 700;
+  }
+  .primary-address { padding: 0 16px 14px; border-bottom: 1px solid var(--nova-divider); }
+  .primary-address span, .address-section-label { display: block; color: var(--regular-text-color); font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+  .primary-address button { display: block; max-width: 100%; padding: 5px 0 0; color: var(--el-text-color-primary); font-size: 13px; font-weight: 560; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+  .primary-address button:hover { color: var(--el-color-primary); }
+  .address-section { display: flex; flex: 1 1 auto; min-height: 0; flex-direction: column; padding-top: 11px; }
+  .address-section-label { padding: 0 16px 6px; }
+  .address-list { padding: 0 7px 7px; max-height: min(360px, calc(100vh - 285px)); overflow: auto; }
+  .address-option {
+    width: 100%; height: 42px; display: flex; align-items: center; gap: 9px; padding: 0 9px;
+    text-align: left; color: var(--el-text-color-primary); border-radius: 8px; cursor: pointer;
+    transition: background-color .14s ease;
+    .address-email { min-width: 0; flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    &:hover { background: var(--nova-hover); }
+    &.selected { color: var(--el-color-primary); font-weight: 600; background: var(--nova-selected); }
+    .app-icon, .address-check-placeholder { width: 16px; height: 16px; flex: 0 0 16px; }
+  }
+  .primary-badge { flex: 0 0 auto; padding: 2px 6px; border-radius: 5px; color: var(--el-color-primary); background: color-mix(in srgb, var(--el-color-primary) 10%, transparent); font-size: 10px; font-weight: 650; }
+  .address-loading { padding: 16px; color: var(--regular-text-color); text-align: center; }
+  .account-dropdown-actions { flex: 0 0 auto; border-top: 1px solid var(--nova-divider); padding: 7px; display: grid; }
+  .account-dropdown-actions button { min-height: 36px; display: flex; align-items: center; gap: 9px; padding: 0 10px; border-radius: 8px; text-align: left; color: var(--el-text-color-primary); cursor: pointer; }
+  .account-dropdown-actions button:hover { background: var(--nova-hover); }
+  .account-dropdown-actions .sign-out { color: #d84a4a; }
 }
 
 
@@ -452,7 +401,7 @@ function formatName(email) {
   border: 1px solid var(--nova-divider);
   border-radius: 10px;
   transition: border-color .16s ease, box-shadow .16s ease;
-  img { width: 18px; height: 18px; opacity: .68; }
+  .app-icon { opacity: .68; }
   input { width: 100%; min-width: 0; color: inherit; }
   input::placeholder { color: var(--regular-text-color); opacity: .92; }
   &:focus-within { border-color: var(--el-color-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--el-color-primary) 12%, transparent); }
@@ -485,7 +434,7 @@ function formatName(email) {
   }
   &:hover .writer { filter: brightness(.94); }
   &:active .writer { transform: scale(.96); }
-  img { width: 18px; filter: brightness(0) invert(1); }
+  .app-icon { width: 18px; height: 18px; }
 }
 
 .header-btn {
@@ -527,18 +476,7 @@ function formatName(email) {
     background: var(--base-fill);
   }
 
-  .notice {
-    font-size: 22px;
-    margin-right: 4px;
-  }
-
-  .dark-icon {
-    font-size: 20px;
-  }
-
-  .sun-icon {
-    font-size: 24px;
-  }
+  .notice { margin-right: 4px; }
 
   .avatar {
     display: flex;

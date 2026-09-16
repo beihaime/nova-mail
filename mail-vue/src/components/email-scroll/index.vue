@@ -11,18 +11,18 @@
       <div class="header-left" :style="'padding-left:' + actionLeft">
 
         <slot name="first"></slot>
-        <Icon class="icon reload" icon="ion:reload" width="18" height="18" @click="refresh"/>
-        <Icon v-perm="'email:delete'" class="icon delete" icon="uiw:delete" width="16" height="16"
+        <AppIcon class="icon reload" name="refresh" :size="18" @click="refresh"/>
+        <AppIcon v-perm="'email:delete'" class="icon delete" name="delete-outline" :size="18"
               v-if="getSelectedMailsIds().length > 0"
               @click="handleDelete"/>
-        <Icon v-perm="'email:delete'" class="icon delete" icon="fluent:mail-read-20-regular" width="21" height="21"
+        <AppIcon v-perm="'email:delete'" class="icon delete" name="mail-unread" :size="20"
               v-if="getSelectedMailsIds().length > 0 && showUnread"
               @click="handleRead"/>
       </div>
 
       <div class="header-right">
         <span class="email-count" v-if="total">{{ $t('emailCount', {total: total}) }}</span>
-        <Icon v-if="showAccountIcon" class="more-icon icon" width="16" height="16" icon="akar-icons:dot-grid-fill"
+        <AppIcon v-if="showAccountIcon" class="more-icon icon" name="more-vertical" :size="18"
               @click="changeAccountShow"/>
       </div>
     </div>
@@ -50,8 +50,8 @@
                            :disabled="!item.checked && isSelectMax"
                            @click.stop></el-checkbox>
               <div @click.stop="starChange(item)" class="pc-star" v-if="showStar">
-                <Icon v-if="item.isStar" icon="fluent-color:star-16" width="20" height="20"/>
-                <Icon v-else icon="solar:star-line-duotone" width="18" height="18"/>
+                <AppIcon v-if="item.isStar" name="star-filled" :size="20"/>
+                <AppIcon v-else name="star-outline" :size="18"/>
               </div>
               <div v-if="!showStar"></div>
               <div class="title" :class="accountShow ? 'title-column' : 'title-column'">
@@ -74,7 +74,7 @@
                       <slot name="name" :email="item"> {{ item.name }}</slot>
                     </span>
                     <span>
-                      <Icon v-if="item.isStar" icon="fluent-color:star-16" width="18" height="18"/>
+                      <AppIcon v-if="item.isStar" name="star-filled" :size="18"/>
                     </span>
                   </span>
                   <span class="phone-time">{{ item.formatCreateTime }}</span>

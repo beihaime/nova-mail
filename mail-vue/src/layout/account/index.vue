@@ -1,15 +1,22 @@
 <template>
   <div class="account-box">
+    <div class="account-switcher-identity">
+      <div class="account-switcher-avatar">{{ primaryAddress?.[0]?.toUpperCase() }}</div>
+      <div><strong>{{ userStore.user.name || primaryAddress }}</strong><span>{{ $t('accountLabel') }}</span></div>
+      <small>{{ $t('primaryAddress') }} · {{ primaryAddress }}</small>
+    </div>
     <div class="head-opt">
-      <Icon v-perm="'account:add'" class="icon add" icon="ion:add-outline" width="23" height="23" @click="add"/>
-      <Icon class="icon refresh" icon="ion:reload" width="18" height="18" @click="refresh"/>
+      <AppIcon v-perm="'account:add'" class="icon add" name="add" :size="21" @click="add"/>
+      <AppIcon class="icon refresh" name="refresh" :size="18" @click="refresh"/>
     </div>
     <el-scrollbar class="scrollbar" ref="scrollbarRef">
       <div v-infinite-scroll="getAccountList" :infinite-scroll-distance="600" :infinite-scroll-immediate="false">
         <el-card class="item" :class="itemBg(item.accountId)" v-for="(item, index) in accounts" :key="item.accountId"
                  @click="changeAccount(item)">
           <div class="account">
-            {{ item.email }}
+            <AppIcon v-if="item.accountId === accountStore.currentAccountId" name="checkbox-checked" :size="16" />
+            <span class="account-email">{{ item.email }}</span>
+            <small v-if="item.email === primaryAddress" class="primary-badge">{{ $t('primary') }}</small>
           </div>
           <div class="opt">
             <div class="send-email" @click.stop>
@@ -151,6 +158,7 @@ const userStore = useUserStore();
 const accountStore = useAccountStore();
 const settingStore = useSettingStore();
 const emailStore = useEmailStore();
+const primaryAddress = computed(() => userStore.user.email || '')
 const showAdd = ref(false)
 const addLoading = ref(false);
 const domainList = computed(() => settingStore.domainList)
@@ -528,6 +536,22 @@ path[fill="#ffdda1"] {
   height: 100%;
   overflow: hidden;
 
+  .account-switcher-identity {
+    display: none;
+    @media (max-width: 767px) {
+      display: grid;
+      grid-template-columns: 34px 1fr;
+      gap: 0 9px;
+      align-items: center;
+      padding: 16px 14px 10px;
+      border-bottom: 1px solid var(--nova-divider);
+      .account-switcher-avatar { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--nova-selected); color: var(--el-color-primary); font-weight: 700; }
+      strong { font-size: 14px; }
+      span, small { color: var(--regular-text-color); font-size: 12px; }
+      small { grid-column: 1 / -1; padding-top: 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    }
+  }
+
   .head-opt {
     display: flex;
     align-items: center;
@@ -558,7 +582,7 @@ path[fill="#ffdda1"] {
     height: calc(100% - 38px);
     overflow: auto;
     @media (max-width: 767px) {
-      height: calc(100% - 98px);
+      height: calc(100% - 158px);
     }
 
     .empty {
@@ -592,12 +616,14 @@ path[fill="#ffdda1"] {
     cursor: pointer;
 
     .account {
-      font-weight: 400;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 500;
       font-size: 15px;
       margin-bottom: 20px;
-      overflow: hidden;
-      white-space: nowrap;
-      text-overflow: ellipsis;
+      .account-email { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+      .primary-badge { margin-left: auto; padding: 2px 6px; border-radius: 5px; color: var(--el-color-primary); background: var(--nova-selected); font-size: 10px; }
     }
 
     .opt {

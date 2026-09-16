@@ -3,12 +3,13 @@ import './style.css';
 import 'element-plus/theme-chalk/dark/css-vars.css';
 import 'nprogress/nprogress.css';
 import UiPreview from '@/views/ui-preview/index.vue'
+import AppIcon from '@/components/app-icon/index.vue'
 
 const isUiPreview = window.location.pathname === '/ui-preview'
 
 if (isUiPreview) {
     // Kept intentionally isolated: no Pinia, init(), router guard, or API imports.
-    createApp(UiPreview).mount('#app')
+    createApp(UiPreview).component('AppIcon', AppIcon).mount('#app')
 } else {
     const [{default: App}, {default: router}, {init}, {createPinia}, {default: piniaPersistedState}, {default: i18n}, {default: perm}] = await Promise.all([
         import('./App.vue'),
@@ -22,7 +23,7 @@ if (isUiPreview) {
     const pinia = createPinia().use(piniaPersistedState)
     const app = createApp(App).use(pinia)
     await init()
-    app.use(router).use(i18n).directive('perm', perm)
+    app.use(router).use(i18n).directive('perm', perm).component('AppIcon', AppIcon)
     app.config.devtools = true
     app.mount('#app')
 }

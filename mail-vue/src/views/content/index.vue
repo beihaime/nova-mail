@@ -1,14 +1,14 @@
 <template>
   <div class="box">
     <div class="header-actions">
-      <Icon class="icon" icon="material-symbols-light:arrow-back-ios-new" width="20" height="20" @click="handleBack"/>
-      <Icon v-perm="'email:delete'" class="icon" icon="uiw:delete" width="16" height="16" @click="handleDelete"/>
+      <AppIcon class="icon" name="back" :size="20" @click="handleBack"/>
+      <AppIcon v-perm="'email:delete'" class="icon" name="delete-outline" :size="18" @click="handleDelete"/>
       <span class="star" v-if="emailStore.contentData.showStar">
-        <Icon class="icon" @click="changeStar" v-if="email.isStar" icon="fluent-color:star-16" width="20" height="20"/>
-        <Icon class="icon" @click="changeStar" v-else icon="solar:star-line-duotone" width="18" height="18"/>
+        <AppIcon class="icon" @click="changeStar" v-if="email.isStar" name="star-filled" :size="20"/>
+        <AppIcon class="icon" @click="changeStar" v-else name="star-outline" :size="19"/>
       </span>
-      <Icon class="icon" v-if="emailStore.contentData.showReply" v-perm="'email:send'"  @click="openReply" icon="la:reply" width="21" height="21" />
-      <Icon class="icon" v-if="emailStore.contentData.showReply" v-perm="'email:send'"  @click="openForward" icon="iconoir:arrow-up-right" width="20" height="20" />
+      <AppIcon class="icon" v-if="emailStore.contentData.showReply" v-perm="'email:send'"  @click="openReply" name="reply" :size="21" />
+      <AppIcon class="icon" v-if="emailStore.contentData.showReply" v-perm="'email:send'"  @click="openForward" name="forward" :size="20" />
     </div>
     <div></div>
     <el-scrollbar class="scrollbar">
@@ -56,7 +56,7 @@
                 <div class="opt-icon att-icon">
                   <Icon v-if="isImage(att.filename)" icon="hugeicons:view" width="22" height="22" @click="showImage(att.key)"/>
                   <a :href="cvtR2Url(att.key)" download>
-                    <Icon icon="system-uicons:push-down" width="22" height="22"/>
+                    <AppIcon name="download-outline" :size="22" />
                   </a>
                 </div>
               </div>
@@ -66,8 +66,8 @@
       </div>
     </el-scrollbar>
     <div v-if="emailStore.contentData.showReply" class="mobile-message-actions">
-      <button v-perm="'email:send'" @click="openReply"><img src="@/icons/svg/reply.svg" alt="" />{{ $t('reply') }}</button>
-      <button v-perm="'email:send'" @click="openForward"><img src="@/icons/svg/forward.svg" alt="" />{{ $t('forward') }}</button>
+      <button v-perm="'email:send'" @click="openReply"><AppIcon name="reply" :size="18" />{{ $t('reply') }}</button>
+      <button v-perm="'email:send'" @click="openForward"><AppIcon name="forward" :size="18" />{{ $t('forward') }}</button>
     </div>
     <el-image-viewer
         v-if="showPreview"

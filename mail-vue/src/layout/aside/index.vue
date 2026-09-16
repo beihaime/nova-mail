@@ -2,36 +2,36 @@
   <el-scrollbar class="scroll">
     <div>
       <div class="title" >
-        <img class="brand-mark" src="@/icons/svg/brand-mark.svg" alt="" />
+        <AppIcon class="brand-mark" name="brand-app" :size="28" />
         <div>{{settingStore.settings.title}}</div>
       </div>
       <button v-perm="'email:send'" class="compose" @click="openCompose">
-        <img src="@/icons/svg/compose.svg" alt="" /> <span>{{ $t('compose') }}</span>
+        <AppIcon name="compose" :size="18" /> <span>{{ $t('compose') }}</span>
       </button>
       <el-menu :collapse="false" style="margin-top: 14px">
         <el-menu-item @click="router.push({name: 'email'})" index="email"
                       :class="route.meta.name === 'email' ? 'choose-item' : ''">
-          <img src="@/icons/svg/inbox.svg" alt="" />
+          <AppIcon name="inbox" :size="19" />
           <span class="menu-name">{{$t('inbox')}}</span>
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'send'})" index="send" v-perm="'email:send'"
                       :class="route.meta.name === 'send' ? 'choose-item' : ''">
-          <img src="@/icons/svg/sent-nav.svg" alt="" />
+          <AppIcon name="sent-nav" :size="19" />
           <span class="menu-name">{{$t('sent')}}</span>
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'draft'})" index="draft" v-perm="'email:send'"
                       :class="route.meta.name === 'draft' ? 'choose-item' : ''">
-          <img src="@/icons/svg/drafts-nav.svg" alt="" />
+          <AppIcon name="drafts-nav" :size="19" />
           <span class="menu-name">{{$t('drafts')}}</span>
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'star'})" index="star"
                       :class="route.meta.name === 'star' ? 'choose-item' : ''">
-          <img src="@/icons/svg/starred-nav.svg" alt="" />
+          <AppIcon name="starred-nav" :size="19" />
           <span class="menu-name">{{$t('starred')}}</span>
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'setting'})" index="setting"
                       :class="route.meta.name === 'setting' ? 'choose-item' : ''">
-          <img src="@/icons/svg/settings-top.svg" alt="" />
+          <AppIcon name="settings-top" :size="19" />
           <span class="menu-name">{{$t('settings')}}</span>
         </el-menu-item>
         <div class="manage-title" v-perm="['all-email:query','user:query','role:query','setting:query','analysis:query','reg-key:query']">
@@ -39,32 +39,32 @@
         </div>
         <el-menu-item @click="router.push({name: 'analysis'})" index="analysis" v-perm="'analysis:query'"
                       :class="route.meta.name === 'analysis' ? 'choose-item' : ''">
-          <img src="@/icons/svg/history.svg" alt="" />
+          <AppIcon name="history" :size="19" />
           <span class="menu-name">{{$t('analytics')}}</span>
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'user'})" index="setting" v-perm="'user:query'"
                       :class="route.meta.name === 'user' ? 'choose-item' : ''">
-          <img src="@/icons/svg/users.svg" alt="" />
+          <AppIcon name="users" :size="19" />
           <span class="menu-name">{{$t('allUsers')}}</span>
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'all-email'})" index="all-email" v-perm="'all-email:query'"
                       :class="route.meta.name === 'all-email' ? 'choose-item' : ''">
-          <img src="@/icons/svg/mail-unread.svg" alt="" />
+          <AppIcon name="mail-unread" :size="19" />
           <span class="menu-name">{{$t('allMail')}}</span>
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'role'})" index="setting" v-perm="'role:query'"
                       :class="route.meta.name === 'role' ? 'choose-item' : ''">
-          <img src="@/icons/svg/lock.svg" alt="" />
+          <AppIcon name="lock" :size="19" />
           <span class="menu-name">{{$t('permissions')}}</span>
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'reg-key'})" index="reg-key" v-perm="'reg-key:query'"
                       :class="route.meta.name === 'reg-key' ? 'choose-item' : ''">
-          <img src="@/icons/svg/label-nav.svg" alt="" />
+          <AppIcon name="label-nav" :size="19" />
           <span class="menu-name">{{$t('inviteCode')}}</span>
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'sys-setting'})" index="sys-setting" v-perm="'setting:query'"
                       :class="route.meta.name === 'sys-setting' ? 'choose-item' : ''">
-          <img src="@/icons/svg/settings-top.svg" alt="" />
+          <AppIcon name="settings-top" :size="19" />
           <span class="menu-name">{{$t('SystemSettings')}}</span>
         </el-menu-item>
       </el-menu>
@@ -122,11 +122,11 @@ const openCompose = () => uiStore.writerRef?.open()
   }
 
 }
-.brand-mark { width: 25px; height: 25px; }
+.brand-mark { width: 28px; height: 28px; }
 .compose { margin: 6px 14px 4px; width: calc(100% - 28px); height: 40px; border-radius: 10px; color: #fff; background: var(--el-color-primary); display: flex; gap: 9px; align-items: center; justify-content: center; cursor: pointer; font-weight: 650; transition: filter .16s ease, transform .16s ease; }
 .compose:hover { filter: brightness(.94); }
 .compose:active { transform: scale(.98); }
-.compose img { width: 18px; height: 18px; filter: brightness(0) invert(1); }
+.compose :deep(.app-icon) { width: 18px; height: 18px; }
 
 
 .manage-title {
