@@ -96,58 +96,6 @@ const oauthService = {
 		return await this.saveAndLogin(c, userInfo)
 	},
 
-	async githubLogin(c, params) {
-
-		const { code, redirectUri } = params;
-
-		const setting = await settingService.query(c);
-		this.assertEnabled(setting, 'githubSwitch');
-
-		const tokenRes = await fetch("https://github.com/login/oauth/access_token", {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				"Accept": "application/json"
-			},
-			body: JSON.stringify({
-				client_id: setting.githubClientId,
-				client_secret: setting.githubClientSecret,
-				code: code,
-				redirect_uri: redirectUri
-			})
-		});
-
-		if (!tokenRes.ok) {
-			throw new BizError(tokenRes.statusText);
-		}
-
-		const token = await tokenRes.json();
-
-		if (token.error) {
-			throw new BizError(token.error_description || token.error);
-		}
-
-		const userRes = await fetch('https://api.github.com/user', {
-			headers: {
-				Authorization: 'Bearer ' + token.access_token,
-				'User-Agent': 'cloud-mail'
-			}
-		});
-
-		if (!userRes.ok) {
-			throw new BizError(userRes.statusText);
-		}
-
-		const userInfo = await userRes.json();
-
-		userInfo.oauthUserId = String(userInfo.id);
-		userInfo.username = userInfo.login;
-		userInfo.avatar = userInfo.avatar_url;
-		userInfo.platform = 'github';
-
-		return await this.saveAndLogin(c, userInfo);
-	},
-
 	async googleLogin(c, params) {
 
 		const { code, redirectUri } = params;
@@ -240,6 +188,13 @@ const oauthService = {
 
 	async deleteByUserIds(c, userIds) {
 		await orm(c).delete(oauth).where(inArray(oauth.userId, userIds)).run();
+		if (userIds.length) {
+			try {
+				await c.env.db.prepare(`DELETE FROM oauth_accounts WHERE user_id IN (${userIds.map(() => '?').join(',')})`).bind(...userIds).run();
+			} catch (error) {
+				if (!String(error.message).includes('no such table')) throw error;
+			}
+		}
 	},
 
 	//定时任务凌晨清除未绑定邮箱的oauth用户

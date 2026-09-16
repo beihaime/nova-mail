@@ -232,6 +232,18 @@ const loginService = {
 			throw new BizError(t('IncorrectPwd'));
 		}
 
+		return await this.createSession(c, userRow);
+	},
+
+	async createSession(c, userRow) {
+		if (!userRow || userRow.isDel === isDel.DELETE) {
+			throw new BizError(t('notExistUser'));
+		}
+
+		if (userRow.status === userConst.status.BAN) {
+			throw new BizError(t('isBanUser'));
+		}
+
 		const uuid = uuidv4();
 		const jwt = await JwtUtils.generateToken(c,{ userId: userRow.userId, token: uuid });
 

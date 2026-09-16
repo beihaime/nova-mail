@@ -50,6 +50,11 @@
           <el-button class="btn" type="primary" @click="submit" :loading="loginLoading" :disabled="!loginVerifyToken || loginLoading"
           >{{ $t('loginBtn') }}
           </el-button>
+          <div class="oauth-divider"><span>{{ $t('orContinueWith') }}</span></div>
+          <el-button class="btn github-login" @click="startGithubLogin">
+            <Icon icon="codicon:github-inverted" width="18" height="18" style="margin-right: 10px" />
+            {{ $t('continueWithGithub') }}
+          </el-button>
           <el-button v-for="p in oauthProviders" :key="p.key" class="btn" style="margin-top: 10px" @click="oauthLogin(p.key)">
             <el-avatar v-if="p.iconType === 'image'" :src="p.icon" :size="18" style="margin-right: 10px" />
             <Icon v-else :icon="p.icon" width="18" height="18" style="margin-right: 10px" />
@@ -101,6 +106,11 @@
           </div>
           <el-button class="btn" style="margin: 0" type="primary" @click="submitRegister" :loading="registerLoading"
           >{{ $t('regBtn') }}
+          </el-button>
+          <div class="oauth-divider"><span>{{ $t('orContinueWith') }}</span></div>
+          <el-button class="btn github-login" @click="startGithubLogin">
+            <Icon icon="codicon:github-inverted" width="18" height="18" style="margin-right: 10px" />
+            {{ $t('continueWithGithub') }}
           </el-button>
           <el-button v-for="p in oauthProviders" :key="p.key" class="btn" style="margin-top: 10px" @click="oauthLogin(p.key)">
             <el-avatar v-if="p.iconType === 'image'" :src="p.icon" :size="18" style="margin-right: 10px" />
@@ -173,7 +183,7 @@ import {cvtR2Url} from "@/utils/convert.js";
 import {loginUserInfo} from "@/request/my.js";
 import {permsToRouter} from "@/perm/perm.js";
 import {useI18n} from "vue-i18n";
-import {oauthBindUser, oauthLinuxDoLogin, oauthGithubLogin, oauthGoogleLogin} from "@/request/ouath.js";
+import {githubOauthComplete, oauthBindUser, oauthLinuxDoLogin, oauthGoogleLogin} from "@/request/ouath.js";
 
 const {t} = useI18n();
 const accountStore = useAccountStore();
@@ -187,7 +197,7 @@ const oauthLoading = ref(false);
 const showBindForm = ref(false);
 const show = ref('login')
 
-const oauthKeys = ['linuxdo', 'github', 'google']
+const oauthKeys = ['linuxdo', 'google']
 
 const oauthProvider = computed(() => {
   const fromState = route.query.state
@@ -199,7 +209,6 @@ const oauthProvider = computed(() => {
 const oauthProviders = computed(() => {
   const allProviders = [
     { key: 'google', label: 'Google', icon: 'devicon:google', iconType: 'iconify' },
-    { key: 'github', label: 'GitHub', icon: 'codicon:github-inverted', iconType: 'iconify' },
     { key: 'linuxdo', label: 'LinuxDo', icon: '/image/linuxdo.webp', iconType: 'image' },
   ]
   return allProviders.filter(p => settingStore.settings[p.key + 'Switch'] === 0)
@@ -351,7 +360,6 @@ function oauthLogin(provider) {
   sessionStorage.setItem('oauthProvider', provider)
   const authorizeUrls = {
     linuxdo: `https://connect.linux.do/oauth2/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=openid+profile+email&state=${provider}`,
-    github: `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=user:email&state=${provider}`,
     google: `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=openid+profile+email&state=${provider}`,
   }
   window.location.href = authorizeUrls[provider]
@@ -359,7 +367,6 @@ function oauthLogin(provider) {
 
 const loginFns = {
   linuxdo: oauthLinuxDoLogin,
-  github: oauthGithubLogin,
   google: oauthGoogleLogin,
 }
 
@@ -368,6 +375,24 @@ oauthGetUser();
 async function oauthGetUser() {
 
   const params = new URLSearchParams(window.location.search)
+  const githubStatus = params.get('github')
+  const grant = params.get('grant')
+  if (githubStatus) {
+    window.history.replaceState({}, '', window.location.origin + window.location.pathname)
+    if (githubStatus === 'complete' && grant) {
+      oauthLoading.value = true
+      try {
+        const data = await githubOauthComplete(grant)
+        await saveToken(data.token)
+      } catch {
+        oauthLoading.value = false
+      }
+      return
+    }
+    const messageKey = githubStatus === 'unlinked' ? 'githubNotLinked' : 'githubLoginFailed'
+    ElMessage({ message: t(messageKey), type: 'warning', plain: true })
+    return
+  }
   const code = params.get('code')
   if (!code || !oauthProvider.value) return
 
@@ -396,6 +421,11 @@ async function oauthGetUser() {
   }).catch(() => {
     oauthLoading.value = false
   })
+}
+
+function startGithubLogin() {
+  const apiBase = (import.meta.env.VITE_BASE_URL || '/api').replace(/\/$/, '')
+  window.location.assign(`${apiBase}/oauth/github/login`)
 }
 
 function bind() {
@@ -858,6 +888,28 @@ function submitRegister() {
   margin: 4px 0 14px;
   color: var(--el-color-danger);
   font-size: 12px;
+}
+
+.oauth-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0 10px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+
+  &::before,
+  &::after {
+    content: '';
+    height: 1px;
+    flex: 1;
+    background: var(--el-border-color-lighter);
+  }
+}
+
+.github-login {
+  margin: 0;
+  border-color: var(--el-border-color);
 }
 
 .select {

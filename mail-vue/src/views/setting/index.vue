@@ -30,6 +30,22 @@
         </div>
       </div>
     </div>
+    <div class="connected-accounts">
+      <div class="title">{{$t('connectedAccounts')}}</div>
+      <div class="connected-account-row">
+        <div class="connected-account-details">
+          <el-avatar v-if="githubAccount.connected && githubAccount.avatarUrl" :src="githubAccount.avatarUrl" :size="32" />
+          <span v-else class="github-mark">GitHub</span>
+          <div>
+            <div class="provider-name">GitHub</div>
+            <div class="provider-status" v-if="githubAccount.connected">@{{ githubAccount.login }} · {{$t('connected')}}</div>
+            <div class="provider-status" v-else>{{$t('connectGithubDesc')}}</div>
+          </div>
+        </div>
+        <el-button v-if="githubAccount.connected" @click="disconnectGithub" :loading="githubLoading">{{$t('disconnect')}}</el-button>
+        <el-button v-else type="primary" @click="connectGithub" :loading="githubLoading">{{$t('connect')}}</el-button>
+      </div>
+    </div>
     <div class="language">
       <div class="title">{{$t('language')}}</div>
       <el-select
@@ -61,7 +77,7 @@
   </div>
 </template>
 <script setup>
-import {reactive, ref, defineOptions} from 'vue'
+import {onMounted, reactive, ref, defineOptions} from 'vue'
 import {resetPassword, userDelete} from "@/request/my.js";
 import {useUserStore} from "@/store/user.js";
 import router from "@/router/index.js";
@@ -69,6 +85,7 @@ import {accountSetName} from "@/request/account.js";
 import {useAccountStore} from "@/store/account.js";
 import {useI18n} from "vue-i18n";
 import {useSettingStore} from "@/store/setting.js";
+import {connectGithubAccount, disconnectGithubAccount, githubConnectedAccount} from '@/request/ouath.js';
 
 const { t } = useI18n()
 const accountStore = useAccountStore()
@@ -78,10 +95,48 @@ const setPwdLoading = ref(false)
 const setNameShow = ref(false)
 const accountName = ref(null)
 const langSelect = ref(settingStore.lang)
+const githubLoading = ref(false)
+const githubAccount = reactive({ connected: false, login: '', avatarUrl: '' })
 
 defineOptions({
   name: 'setting'
 })
+
+onMounted(async () => {
+  try {
+    Object.assign(githubAccount, await githubConnectedAccount())
+  } catch {
+    // The endpoint can be unavailable until the non-destructive migration runs.
+  }
+})
+
+async function connectGithub() {
+  if (githubLoading.value) return
+  githubLoading.value = true
+  try {
+    const { authorizeUrl } = await connectGithubAccount()
+    window.location.assign(authorizeUrl)
+  } finally {
+    githubLoading.value = false
+  }
+}
+
+function disconnectGithub() {
+  ElMessageBox.confirm(t('disconnectGithubConfirm'), {
+    confirmButtonText: t('disconnect'),
+    cancelButtonText: t('cancel'),
+    type: 'warning',
+  }).then(async () => {
+    githubLoading.value = true
+    try {
+      await disconnectGithubAccount()
+      Object.assign(githubAccount, { connected: false, login: '', avatarUrl: '' })
+      ElMessage({ message: t('githubDisconnected'), type: 'success', plain: true })
+    } finally {
+      githubLoading.value = false
+    }
+  })
+}
 
 function showSetName() {
   accountName.value = userStore.user.name
@@ -286,6 +341,44 @@ function submitPwd() {
     .language-select {
       width: 100px;
     }
+  }
+
+  .connected-accounts {
+    display: grid;
+    gap: 16px;
+    margin-bottom: 40px;
+    font-size: 14px;
+
+    .connected-account-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 14px 16px;
+      border: 1px solid var(--el-border-color-lighter);
+      border-radius: 12px;
+    }
+
+    .connected-account-details {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .github-mark {
+      width: 32px;
+      height: 32px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--el-fill-color);
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .provider-name { font-weight: 600; }
+    .provider-status { color: var(--el-text-color-secondary); font-size: 13px; margin-top: 2px; }
   }
 
   .del-email {

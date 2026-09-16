@@ -367,6 +367,17 @@ const en = {
     clientId: 'Client ID',
     clientSecret: 'Client Secret',
     notOwner: 'Base email does not belong to you',
+    connectedAccounts: 'Connected accounts',
+    connected: 'Connected',
+    connect: 'Connect',
+    disconnect: 'Disconnect',
+    connectGithubDesc: 'Connect your GitHub account',
+    continueWithGithub: 'Continue with GitHub',
+    orContinueWith: 'or',
+    githubNotLinked: 'This GitHub account is not linked to a Nova Mail account. Sign in with your password, then connect it in Settings.',
+    githubLoginFailed: 'GitHub sign-in could not be completed. Please try again.',
+    githubDisconnected: 'GitHub account disconnected',
+    disconnectGithubConfirm: 'Disconnect this GitHub account? You will no longer be able to sign in with it.',
 }
 
 export default en

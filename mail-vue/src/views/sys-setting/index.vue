@@ -1002,7 +1002,6 @@ const turnstileForm = reactive({
 
 const oauthPlatforms = [
   { key: 'google', label: 'Google', icon: 'devicon:google', iconType: 'iconify' },
-  { key: 'github', label: 'GitHub', icon: 'codicon:github-inverted', iconType: 'iconify' },
   { key: 'linuxdo', label: 'LinuxDo', icon: '/image/linuxdo.webp', iconType: 'image' },
 ]
 const oauthSettingShow = ref(false)

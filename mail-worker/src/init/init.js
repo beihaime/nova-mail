@@ -32,8 +32,39 @@ const dbInit = {
 		await this.v3_1DB(c);
 		await this.v3_2DB(c);
 		await this.v3_3DB(c);
+		await this.v3_4DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
+	},
+
+	async v3_4DB(c) {
+		try {
+			await c.env.db.batch([
+				c.env.db.prepare(`
+					CREATE TABLE IF NOT EXISTS oauth_accounts (
+						oauth_account_id INTEGER PRIMARY KEY AUTOINCREMENT,
+						user_id INTEGER NOT NULL,
+						provider TEXT NOT NULL,
+						provider_user_id TEXT NOT NULL,
+						provider_login TEXT,
+						provider_avatar_url TEXT,
+						created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+						updated_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+					)
+				`),
+				c.env.db.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_oauth_accounts_provider_identity ON oauth_accounts(provider, provider_user_id)`),
+				c.env.db.prepare(`CREATE INDEX IF NOT EXISTS idx_oauth_accounts_user ON oauth_accounts(user_id)`)
+			]);
+		} catch (e) {
+			console.warn(`跳过 OAuth 账户表：${e.message}`);
+		}
+		try {
+			// The legacy GitHub flow stored an OAuth secret in D1. New GitHub OAuth
+			// reads only Workers Secrets, so remove the obsolete database copy.
+			await c.env.db.prepare(`UPDATE setting SET github_client_secret = ''`).run();
+		} catch (e) {
+			console.warn(`跳过 GitHub 旧密钥清理：${e.message}`);
+		}
 	},
 
 	async v3_3DB(c) {

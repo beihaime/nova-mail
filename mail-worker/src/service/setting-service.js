@@ -81,6 +81,11 @@ const settingService = {
 		// Turnstile secrets belong to Workers Secrets. Do not return the legacy D1
 		// column, even masked, to browser clients.
 		delete settingRow.secretKey;
+		// GitHub OAuth now reads its credentials exclusively from Workers Secrets.
+		// Do not expose legacy database credentials through the administration API.
+		delete settingRow.githubClientId;
+		delete settingRow.githubClientSecret;
+		delete settingRow.githubSwitch;
 
 		Object.keys(settingRow.resendTokens).forEach(key => {
 			settingRow.resendTokens[key] = `${settingRow.resendTokens[key].slice(0, 12)}******`;
@@ -116,6 +121,10 @@ const settingService = {
 		// This key was historically stored in D1. Keep the column for backwards
 		// compatible schemas, but never persist another Turnstile secret there.
 		delete params.secretKey;
+		// GitHub OAuth credentials are Workers Secrets, not mutable D1 settings.
+		delete params.githubClientId;
+		delete params.githubClientSecret;
+		delete params.githubSwitch;
 		const settingData = await this.query(c);
 		let resendTokens = { ...settingData.resendTokens, ...params.resendTokens };
 		Object.keys(resendTokens).forEach(domain => {
@@ -226,8 +235,6 @@ const settingService = {
 			loginDomain: settingRow.loginDomain,
 			linuxdoClientId: settingRow.linuxdoClientId,
 			linuxdoSwitch: settingRow.linuxdoSwitch,
-			githubClientId: settingRow.githubClientId,
-			githubSwitch: settingRow.githubSwitch,
 			googleClientId: settingRow.googleClientId,
 			googleSwitch: settingRow.googleSwitch,
 			minEmailPrefix: settingRow.minEmailPrefix,

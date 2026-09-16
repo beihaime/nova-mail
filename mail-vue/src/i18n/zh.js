@@ -367,5 +367,16 @@ const zh = {
     clientId: '客户端 ID',
     clientSecret: '客户端密钥',
     notOwner: '基础邮箱不属于您',
+    connectedAccounts: '已连接账户',
+    connected: '已连接',
+    connect: '连接',
+    disconnect: '解除连接',
+    connectGithubDesc: '连接你的 GitHub 账户',
+    continueWithGithub: '使用 GitHub 继续',
+    orContinueWith: '或',
+    githubNotLinked: '此 GitHub 账户尚未连接到 Nova Mail。请先使用密码登录，再到设置中连接账户。',
+    githubLoginFailed: '无法完成 GitHub 登录，请重试。',
+    githubDisconnected: 'GitHub 账户已解除连接',
+    disconnectGithubConfirm: '要解除此 GitHub 账户吗？之后将无法再用它登录。',
 }
 export default zh

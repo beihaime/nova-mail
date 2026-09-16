@@ -15,9 +15,10 @@ const publicRoutes = new Set([
 	'POST /webhooks',
 	'POST /public/genToken',
 	'POST /oauth/linuxDo/login',
-	'POST /oauth/github/login',
 	'POST /oauth/google/login',
-	'PUT /oauth/bindUser'
+	'GET /oauth/github/login',
+	'GET /oauth/github/callback',
+	'POST /oauth/github/complete'
 ]);
 
 function isPublicRoute(c) {
