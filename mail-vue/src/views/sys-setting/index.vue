@@ -367,12 +367,7 @@
               </div>
               <div class="setting-item">
                 <div><span>Secret Key</span></div>
-                <div class="bot-verify">
-                  <span> {{ setting.secretKey }} </span>
-                  <el-button class="opt-button" size="small" type="primary" @click="turnstileShow = true">
-                    <Icon icon="lsicon:edit-outline" width="16" height="16"/>
-                  </el-button>
-                </div>
+                <div class="bot-verify"><span>Managed in Cloudflare Workers Secrets</span></div>
               </div>
             </div>
           </div>
@@ -523,11 +518,10 @@
           <el-button type="primary" :loading="settingLoading" @click="saveR2domain">{{ $t('save') }}</el-button>
         </form>
       </el-dialog>
-      <el-dialog v-model="turnstileShow" :title="$t('addTurnstileSecret')" width="340"
-                 @closed="turnstileForm.secretKey = '';turnstileForm.siteKey = ''">
+      <el-dialog v-model="turnstileShow" :title="$t('turnstileSetting')" width="340"
+                 @closed="turnstileForm.siteKey = ''">
         <form @submit.prevent>
           <el-input type="text" placeholder="Site Key" v-model="turnstileForm.siteKey" @keyup.enter="saveTurnstileKey"/>
-          <el-input type="text" style="margin-top: 15px" placeholder="Secret Key" v-model="turnstileForm.secretKey" @keyup.enter="saveTurnstileKey"/>
           <el-button type="primary" :loading="settingLoading" @click="saveTurnstileKey">{{ $t('save') }}</el-button>
         </form>
       </el-dialog>
@@ -1003,8 +997,7 @@ const resendTokenForm = reactive({
   token: '',
 })
 const turnstileForm = reactive({
-  siteKey: '',
-  secretKey: ''
+  siteKey: ''
 })
 
 const oauthPlatforms = [
@@ -1582,7 +1575,6 @@ function saveOauth() {
 function saveTurnstileKey() {
   const settingForm = {}
   settingForm.siteKey = turnstileForm.siteKey
-  settingForm.secretKey = turnstileForm.secretKey
   editSetting(settingForm)
 }
 

@@ -41,7 +41,18 @@
           </el-input>
           <el-input v-model="form.password" :placeholder="$t('password')" type="password" autocomplete="off" @keyup.enter="submit">
           </el-input>
-          <el-button class="btn" type="primary" @click="submit" :loading="loginLoading"
+          <div
+              v-if="settingStore.settings.siteKey"
+              ref="loginTurnstileRef"
+              class="login-turnstile"
+              :data-sitekey="settingStore.settings.siteKey"
+              :data-theme="uiStore.dark ? 'dark' : 'light'"
+              data-callback="onLoginTurnstileSuccess"
+              data-expired-callback="onLoginTurnstileExpired"
+              data-error-callback="onLoginTurnstileError"
+          ></div>
+          <div v-else class="turnstile-unavailable">{{ $t('verifyModuleFailed') }}</div>
+          <el-button class="btn" type="primary" @click="submit" :loading="loginLoading" :disabled="!loginVerifyToken"
           >{{ $t('loginBtn') }}
           </el-button>
           <el-button v-for="p in oauthProviders" :key="p.key" class="btn" style="margin-top: 10px" @click="oauthLogin(p.key)">
@@ -153,7 +164,7 @@
 <script setup>
 import router from "@/router";
 import {useRoute} from "vue-router";
-import {computed, nextTick, reactive, ref} from "vue";
+import {computed, nextTick, onMounted, reactive, ref, watch} from "vue";
 import {login} from "@/request/login.js";
 import {register} from "@/request/login.js";
 import {websiteConfig} from "@/request/setting.js";
@@ -220,6 +231,9 @@ const registerForm = reactive({
 })
 const domainList = settingStore.domainList;
 const registerLoading = ref(false)
+const loginVerifyToken = ref('')
+const loginTurnstileRef = ref(null)
+let loginTurnstileId = null
 suffix.value = domainList[0]
 const verifyShow = ref(false)
 let verifyToken = ''
@@ -230,6 +244,56 @@ let verifyErrorCount = 0
 window.onTurnstileSuccess = (token) => {
   verifyToken = token;
 };
+
+window.onLoginTurnstileSuccess = (token) => {
+  loginVerifyToken.value = token
+}
+
+window.onLoginTurnstileExpired = () => {
+  loginVerifyToken.value = ''
+}
+
+window.onLoginTurnstileError = () => {
+  loginVerifyToken.value = ''
+}
+
+watch(() => uiStore.dark, () => {
+  loginVerifyToken.value = ''
+  if (!loginTurnstileId || !window.turnstile) return
+  window.turnstile.remove(loginTurnstileId)
+  loginTurnstileId = null
+  nextTick(renderLoginTurnstile)
+})
+
+watch(() => settingStore.settings.siteKey, () => {
+  nextTick(renderLoginTurnstile)
+})
+
+onMounted(() => {
+  const waitForTurnstile = () => {
+    renderLoginTurnstile()
+    if (!loginTurnstileId && !window.turnstile) {
+      window.setTimeout(waitForTurnstile, 120)
+    }
+  }
+  waitForTurnstile()
+})
+
+function renderLoginTurnstile() {
+  if (!loginTurnstileRef.value || !window.turnstile || loginTurnstileId) return
+  try {
+    loginTurnstileId = window.turnstile.render(loginTurnstileRef.value, {
+      sitekey: settingStore.settings.siteKey,
+      theme: uiStore.dark ? 'dark' : 'light',
+      callback: window.onLoginTurnstileSuccess,
+      'expired-callback': window.onLoginTurnstileExpired,
+      'error-callback': window.onLoginTurnstileError,
+    })
+  } catch {
+    // Auto-render from the official script can win the race; either rendering
+    // mode still invokes the callbacks above.
+  }
+}
 
 window.onTurnstileError = (e) => {
   if (verifyErrorCount >= 4) {
@@ -430,9 +494,18 @@ const submit = () => {
     return
   }
 
+  if (!loginVerifyToken.value) {
+    ElMessage({ message: t('botVerifyMsg'), type: 'error', plain: true })
+    renderLoginTurnstile()
+    return
+  }
+
   loginLoading.value = true
-  login(email, form.password).then(async data => {
+  login(email, form.password, loginVerifyToken.value).then(async data => {
     await saveToken(data.token)
+  }).catch(() => {
+    loginVerifyToken.value = ''
+    window.turnstile?.reset(loginTurnstileId)
   }).finally(() => {
     loginLoading.value = false
   })
@@ -774,6 +847,17 @@ function submitRegister() {
 
 .register-turnstile {
   margin-bottom: 18px;
+}
+
+.login-turnstile {
+  min-height: 65px;
+  margin: 4px 0 14px;
+}
+
+.turnstile-unavailable {
+  margin: 4px 0 14px;
+  color: var(--el-color-danger);
+  font-size: 12px;
 }
 
 .select {

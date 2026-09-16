@@ -78,7 +78,9 @@ const settingService = {
 			settingRow.siteKey = settingRow.siteKey ? `${settingRow.siteKey.slice(0, 6)}******` : null;
 		}
 
-		settingRow.secretKey = settingRow.secretKey ? `${settingRow.secretKey.slice(0, 6)}******` : null;
+		// Turnstile secrets belong to Workers Secrets. Do not return the legacy D1
+		// column, even masked, to browser clients.
+		delete settingRow.secretKey;
 
 		Object.keys(settingRow.resendTokens).forEach(key => {
 			settingRow.resendTokens[key] = `${settingRow.resendTokens[key].slice(0, 12)}******`;
@@ -111,6 +113,9 @@ const settingService = {
 	},
 
 	async set(c, params) {
+		// This key was historically stored in D1. Keep the column for backwards
+		// compatible schemas, but never persist another Turnstile secret there.
+		delete params.secretKey;
 		const settingData = await this.query(c);
 		let resendTokens = { ...settingData.resendTokens, ...params.resendTokens };
 		Object.keys(resendTokens).forEach(domain => {

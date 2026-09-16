@@ -202,10 +202,16 @@ const loginService = {
 
 	async login(c, params, noVerifyPwd = false) {
 
-		const { email, password } = params;
+		const { email, password, token } = params;
 
 		if ((!email || !password) && !noVerifyPwd) {
 			throw new BizError(t('emailAndPwdEmpty'));
+		}
+
+		// Password login is a public entry point. OAuth providers keep their own
+		// identity exchange and are intentionally not routed through this method.
+		if (!noVerifyPwd) {
+			await turnstileService.verify(c, token);
 		}
 
 		const userRow = await userService.selectByEmailIncludeDel(c, email);
