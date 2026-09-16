@@ -1,158 +1,223 @@
 <p align="center">
-    <img src="doc/demo/logo.png" width="80px" />
-    <h1 align="center">Cloud Mail</h1>
-    <p align="center">基于 Cloudflare 的简约响应式邮箱服务，支持邮件发送、附件收发 🎉</p> 
-    <p align="center">
-        简体中文 | <a href="/README-en.md" style="margin-left: 5px">English </a>
-    </p>
-    <p align="center">
-        <a href="https://github.com/maillab/cloud-mail/tree/main?tab=MIT-1-ov-file" target="_blank" >
-            <img src="https://img.shields.io/badge/license-MIT-green" />
-        </a>    
-        <a href="https://github.com/maillab/cloud-mail/releases" target="_blank" >
-            <img src="https://img.shields.io/github/v/release/maillab/cloud-mail" alt="releases" />
-        </a>  
-        <a href="https://github.com/maillab/cloud-mail/issues" >
-            <img src="https://img.shields.io/github/issues/maillab/cloud-mail" alt="issues" />
-        </a>  
-        <a href="https://github.com/maillab/cloud-mail/stargazers" target="_blank">
-            <img src="https://img.shields.io/github/stars/maillab/cloud-mail" alt="stargazers" />
-        </a>  
-        <a href="https://github.com/maillab/cloud-mail/forks" target="_blank" >
-            <img src="https://img.shields.io/github/forks/maillab/cloud-mail" alt="forks" />
-        </a>
-    </p>
-    <p align="center">
-        <a href="https://trendshift.io/repositories/20459" target="_blank" >
-            <img src="https://trendshift.io/api/badge/repositories/20459" alt="trendshift" >
-        </a>
-    </p>
+  <img src="mail-vue/src/icons/svg/brand-app-dark.svg" width="80" alt="Nova Mail" />
+  <h1 align="center">Nova Mail</h1>
+  <p align="center">A simple, responsive self-hosted email service on Cloudflare</p>
+  <p align="center">
+    <a href="./doc/cn.md">简体中文</a> | English
+  </p>
+  <p align="center">
+    <a href="https://mail.beihaime.com" target="_blank">Live Demo</a> ·
+    <a href="#deployment">Deployment</a> ·
+    <a href="#features">Features</a>
+  </p>
 </p>
 
+<p align="center">
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="License" />
+  <img src="https://img.shields.io/badge/platform-Cloudflare%20Workers-orange" alt="Platform" />
+  <img src="https://img.shields.io/badge/frontend-Vue3-brightgreen" alt="Vue3" />
+  <img src="https://img.shields.io/badge/backend-Hono-blue" alt="Hono" />
+</p>
 
-## 项目简介
+---
 
-只需要一个域名，就可以创建多个不同的邮箱，类似各大邮箱平台，本项目支持署到 Cloudflare Workers ，降低服务器成本，搭建自己的邮箱服务
+## Introduction
 
-## 项目展示
+Nova Mail is a self-hosted email service designed to run on **Cloudflare Workers**.  
+With just one domain, you can create multiple email addresses, send and receive messages, handle attachments, and manage users through an admin panel with permission control.
 
-- [在线演示](https://skymail.ink)<br>
-- [部署文档](https://doc.skymail.ink)<br>
+This project is a fork and rebrand of [maillab/cloud-mail](https://github.com/maillab/cloud-mail), with a focus on improved UI experience, login security, and authentication.
 
-| ![](/doc/demo/demo1.png) | ![](/doc/demo/demo2.png) |
-|-----------------------|-----------------------|
-| ![](/doc/demo/demo3.png) | ![](/doc/demo/demo4.png) |
+**Live Demo**: [https://mail.beihaime.com](https://mail.beihaime.com)
 
+---
 
+## Features
 
+### Core
 
-## 功能介绍
+- **Low-cost deployment**: Runs entirely on Cloudflare Workers + D1 + R2 + KV — almost no extra server cost
+- **Send & receive email**: Integrated with Resend for sending (bulk, inline images, attachments); receive via Cloudflare Email Routing
+- **Attachments**: Store and download files with Cloudflare R2
+- **Multi-mailbox mode**: One user can bind multiple email addresses
+- **Responsive design**: Works on desktop and most mobile browsers; PWA supported
 
-- **💰 低成本使用**： 可部署到 Cloudflare Workers 降低服务器成本
+### Admin & Security
 
-- **💻 响应式设计**：响应式布局自动适配PC和大部分手机端浏览器
+- **Admin panel**: User management, email management, RBAC permission control and resource limits
+- **CAPTCHA**: Cloudflare Turnstile to prevent bulk registration and brute-force login
+- **GitHub login**: GitHub OAuth login and account linking
+- **Security hardening**: JWT secrets, server-side Turnstile verification, login protection, etc.
 
-- **📧 邮件发送**：集成Resend发送邮件，支持群发，内嵌图片和附件发送，发送状态查看
+### Extensions
 
-- **🛡️ 管理员功能**：可以对用户，邮件进行管理，RABC权限控制对功能及使用资源限制
+- **Email push**: Forward received emails to a Telegram bot or other email providers
+- **Open API**: Batch create users and query emails with multiple conditions
+- **Verification code recognition**: Auto-detect codes in emails via Workers AI
+- **Data visualization**: System stats and email growth charts with ECharts
+- **Personalization**: Custom site title, login background, transparency, etc.
+- **i18n**: Multi-language support
 
-- **📦 附件收发**：支持收发附件，使用R2对象存储保存和下载文件
+---
 
-- **🔔 邮件推送**：接收邮件后可以转发到TG机器人或其他服务商邮箱
+## Tech Stack
 
-- **📡 开放API**：支持使用API批量生成用户，多条件查询邮件 
+| Layer          | Technology              |
+|----------------|-------------------------|
+| Platform       | Cloudflare Workers      |
+| Backend        | Hono                    |
+| ORM            | Drizzle                 |
+| Frontend       | Vue 3 + Vite            |
+| UI Library     | Element Plus            |
+| State          | Pinia                   |
+| Email Sending  | Resend                  |
+| Database       | Cloudflare D1           |
+| Object Storage | Cloudflare R2           |
+| Cache          | Cloudflare KV           |
+| AI             | Cloudflare Workers AI   |
+| CAPTCHA        | Cloudflare Turnstile    |
 
-- **🔢 验证码识别**：使用Workers AI，自动识别邮件验证码 
+---
 
-- **📈 数据可视化**：使用ECharts对系统数据详情，用户邮件增长可视化显示
+## Project Structure
 
-- **🎨 个性化设置**：可以自定义网站标题，登录背景，透明度
-
-- **🤖 人机验证**：集成Turnstile人机验证，防止人机批量注册
-
-- **📜 更多功能**：正在开发中...
-
-
-
-## 技术栈
-
-- **平台**：[Cloudflare Workers](https://developers.cloudflare.com/workers/)
-
-- **Web框架**：[Hono](https://hono.dev/)
-
-- **ORM：**[Drizzle](https://orm.drizzle.team/)
-
-- **前端框架**：[Vue3](https://vuejs.org/) 
-
-- **UI框架**：[Element Plus](https://element-plus.org/) 
-
-- **邮件推送：** [Resend](https://resend.com/)
-
-- **缓存**：[Cloudflare KV](https://developers.cloudflare.com/kv/)
-
-- **数据库**：[Cloudflare D1](https://developers.cloudflare.com/d1/)
-
-- **文件存储**：[Cloudflare R2](https://developers.cloudflare.com/r2/)
-
-## 目录结构
-
-```
-cloud-mail
-├── mail-worker				    # worker后端项目
-│   ├── src                  
-│   │   ├── api	 			    # api接口层			
-│   │   ├── const  			    # 项目常量
-│   │   ├── dao                 # 数据访问层
-│   │   ├── email			    # 邮件处理接收
-│   │   ├── entity			    # 数据库实体
-│   │   ├── error			    # 自定义异常
-│   │   ├── hono			    # web框架配置、拦截器、全局异常等
-│   │   ├── i18n			    # 语言国际化
-│   │   ├── init			    # 数据库缓存初始化
-│   │   ├── model			    # 响应体数据封装
-│   │   ├── security			# 身份权限认证
-│   │   ├── service			    # 业务服务层
-│   │   ├── template			# 消息模板
-│   │   ├── utils			    # 工具类
-│   │   └── index.js			# 入口文件
-│   ├── pageckge.json			# 项目依赖
-│   └── wrangler.toml			# 项目配置
+```text
+nova-mail
+├── mail-worker/                 # Cloudflare Workers backend
+│   ├── src/
+│   │   ├── api/                 # API layer
+│   │   ├── dao/                 # Data access layer
+│   │   ├── email/               # Email receive & processing
+│   │   ├── entity/              # Database entities
+│   │   ├── security/            # Auth & permissions
+│   │   ├── service/             # Business logic
+│   │   ├── hono/                # Middleware & error handling
+│   │   └── index.js             # Entry point
+│   ├── wrangler.toml            # Workers config
+│   └── package.json
 │
-├── mail-vue				    # vue前端项目
-│   ├── src
-│   │   ├── axios 			    # axios配置
-│   │   ├── components			# 自定义组件
-│   │   ├── echarts			    # echarts组件导入
-│   │   ├── i18n			    # 语言国际化
-│   │   ├── init			    # 入站初始化
-│   │   ├── layout			    # 主体布局组件
-│   │   ├── perm			    # 权限认证
-│   │   ├── request			    # api接口
-│   │   ├── router			    # 路由配置
-│   │   ├── store			    # 全局状态管理
-│   │   ├── utils			    # 工具类
-│   │   ├── views			    # 页面组件
-│   │   ├── app.vue			    # 入口组件
-│   │   ├── main.js			    # 入口js
-│   │   └── style.css			# 全局css
-│   ├── package.json			# 项目依赖
-└── └── env.release				# 项目配置
+├── mail-vue/                    # Vue 3 frontend
+│   ├── src/
+│   │   ├── components/          # Shared components
+│   │   ├── views/               # Pages
+│   │   ├── layout/              # Layout
+│   │   ├── store/               # Pinia stores
+│   │   ├── router/              # Router
+│   │   ├── request/             # API requests
+│   │   └── icons/               # Icon system
+│   ├── package.json
+│   └── vite.config.js
+│
+├── doc/                         # Docs & demo assets
+├── cn.md                        # Chinese README
+├── en.md                        # English README
+└── README.md
 ```
 
-## 赞助
+---
 
-<a href="https://doc.skymail.ink/support.html" >
-<img width="170px" src="./doc/images/support.png" alt="">
-</a>
+## Getting Started
 
-## 许可证
+### Requirements
 
-本项目采用 [MIT](LICENSE) 许可证	
+- Node.js 18+
+- pnpm
+- Cloudflare account (Workers, D1, KV, R2, optional AI)
 
+### Local Development
 
-## 交流
+```bash
+# Clone the repository
+git clone https://github.com/beihaime/nova-mail.git
+cd nova-mail
 
-[Telegram](https://t.me/cloud_mail_tg)
+# Install backend dependencies
+cd mail-worker
+pnpm install
 
+# Install frontend dependencies
+cd ../mail-vue
+pnpm install
 
+# Start frontend dev server
+pnpm dev
 
+# Start Workers dev environment (separate terminal)
+cd ../mail-worker
+pnpm dev
+```
+
+### Deploy to Cloudflare
+
+1. Create a D1 database, KV namespace, and R2 bucket (if you need attachments) in Cloudflare
+2. Update bindings in `mail-worker/wrangler.toml`
+3. Set required secrets:
+
+```bash
+cd mail-worker
+pnpm wrangler secret put jwt_secret
+pnpm wrangler secret put TURNSTILE_SECRET_KEY
+# If using Resend
+pnpm wrangler secret put RESEND_API_KEY
+```
+
+4. Deploy:
+
+```bash
+pnpm deploy
+```
+
+Frontend static assets are published together with the Worker via the `[assets]` config in `wrangler.toml`.
+
+For more detailed deployment steps, refer to the upstream project docs and adjust according to this repository’s `wrangler.toml`.
+
+---
+
+## Configuration (Optional)
+
+You can set the following in the `[vars]` section of `wrangler.toml`:
+
+| Variable             | Description                                              |
+|----------------------|----------------------------------------------------------|
+| `domain`             | Allowed email domains, e.g. `["example.com"]`            |
+| `admin`              | Admin email address                                      |
+| `TURNSTILE_HOSTNAME` | Hostname for Turnstile verification (`mail.beihaime.com`) |
+| `ai_model`           | Workers AI model (optional)                              |
+
+JWT and Turnstile secrets must be set with `wrangler secret` — do not put them in the config file.
+
+---
+
+## Differences from Upstream
+
+Compared to [cloud-mail](https://github.com/maillab/cloud-mail), Nova Mail includes:
+
+- Full rebranding (Nova Mail)
+- Modern UI redesign and icon system
+- GitHub OAuth login and account linking
+- Stronger Turnstile login protection and stability
+- Security hardening
+- Resizable mail layout and other UX improvements
+- PWA branding and loading experience improvements
+
+---
+
+## License
+
+This project is licensed under the MIT License.
+
+Original copyright belongs to [aslost / maillab](https://github.com/maillab/cloud-mail). This repository is a modified and extended version.
+
+---
+
+## Acknowledgements
+
+- [maillab/cloud-mail](https://github.com/maillab/cloud-mail) — original project
+- Cloudflare Workers / D1 / R2 / KV / Turnstile / Workers AI
+- Hono, Vue 3, Element Plus, Drizzle, Resend, and other open-source projects
+
+---
+
+## Feedback
+
+Questions or suggestions? Please open a GitHub Issue.
