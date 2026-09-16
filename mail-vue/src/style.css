@@ -143,6 +143,12 @@ button, input, select, textarea {
     --vt-y: 50%;
     --vt-duration: 520ms;
     --vt-easing: ease-out;
+    --nova-surface: #ffffff;
+    --nova-surface-muted: #f7f8fa;
+    --nova-divider: #e8ebef;
+    --nova-hover: #f3f7fc;
+    --nova-selected: #eaf3ff;
+    --nova-shadow: 0 10px 32px rgba(23, 35, 52, .08);
 }
 
 .dark {
@@ -171,6 +177,12 @@ button, input, select, textarea {
     --secondary-text-color: #A3A6AD;
     --message-block-color: rgba(30, 30, 30, 0.2);
     --el-border-color: #414243 !important;
+    --nova-surface: #17191d;
+    --nova-surface-muted: #1d2025;
+    --nova-divider: #2c3037;
+    --nova-hover: #202833;
+    --nova-selected: #17385f;
+    --nova-shadow: 0 10px 32px rgba(0, 0, 0, .22);
 }
 
 /* Shared Nova Mail surface language.  Component styles keep the existing behavior. */

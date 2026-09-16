@@ -970,15 +970,15 @@ function loadData() {
 
 :deep(.email-row) {
   display: flex;
-  padding: 10px 12px;
+  padding: 9px 14px;
   justify-content: space-between;
   box-shadow: none;
   cursor: pointer;
   align-items: center;
   position: relative;
   transition: background .16s ease, transform .16s ease;
-  height: 64px;
-  border-bottom: 1px solid var(--light-border-color);
+  height: 76px;
+  border-bottom: 1px solid var(--nova-divider);
   @media (max-width: 1366px) {
     height: 76px;
   }
@@ -993,7 +993,7 @@ function loadData() {
       height: 132px;
     }
   }
-  &:hover { background: var(--email-hover-background); }
+  &:hover { background: var(--nova-hover); }
   .user-info {
     display: flex;
     flex-wrap: wrap;
@@ -1032,8 +1032,8 @@ function loadData() {
 
   .checkbox {
     display: flex;
-    padding-left: 15px;
-    padding-right: 20px;
+    padding-left: 2px;
+    padding-right: 12px;
     justify-content: center;
   }
 
@@ -1060,7 +1060,7 @@ function loadData() {
   .title {
     flex: 1;
     display: grid;
-    grid-template-columns: 240px 1fr;
+    grid-template-columns: minmax(130px, 36%) minmax(0, 1fr);
     @media (max-width: 1366px) {
       padding-right: 15px;
     }
@@ -1193,7 +1193,7 @@ function loadData() {
         white-space: nowrap;
         text-overflow: ellipsis;
         padding-left: 10px;
-        color: var(--email-scroll-content-color);
+        color: var(--regular-text-color);
         @media (max-width: 1366px) {
           padding-left: 0;
           margin-top: 0;
@@ -1205,7 +1205,8 @@ function loadData() {
 
   .email-right {
     text-align: right;
-    font-size: 12px;
+    font-size: 11px;
+    color: var(--regular-text-color);
     white-space: nowrap;
     display: flex;
     padding-left: 15px;
@@ -1222,7 +1223,7 @@ function loadData() {
   }
 
   &:hover {
-    background-color: var(--email-hover-background);
+    background-color: var(--nova-hover);
     z-index: 0;
   }
 
@@ -1273,17 +1274,17 @@ function loadData() {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
-  min-height: 52px;
+  min-height: 48px;
   gap: 12px;
-  padding: 8px 16px;
-  box-shadow: var(--header-actions-border);
+  padding: 7px 14px;
+  box-shadow: inset 0 -1px 0 var(--nova-divider);
 
   .header-left {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     position: relative;
-    column-gap: 20px;
+    column-gap: 14px;
     row-gap: 8px;
     padding-left: 2px;
     color: var(--el-text-color-primary);;

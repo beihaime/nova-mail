@@ -277,12 +277,12 @@ const handleDelete = () => {
 }
 
 .header-actions {
-  min-height: 52px;
-  padding: 10px 18px;
+  min-height: 48px;
+  padding: 7px 18px;
   display: flex;
   align-items: center;
   gap: 10px;
-  border-bottom: 1px solid var(--light-border-color);
+  border-bottom: 1px solid var(--nova-divider);
   font-size: 18px;
   .star {
     display: flex;
@@ -294,7 +294,7 @@ const handleDelete = () => {
     cursor: pointer;
     width: 34px;
     height: 34px;
-    border-radius: 9px;
+    border-radius: 8px;
     padding: 7px;
     &:hover { background: var(--base-fill); }
   }
@@ -308,9 +308,9 @@ const handleDelete = () => {
 
 .container {
   font-size: 14px;
-  max-width: 980px;
+  max-width: 1180px;
   margin: 0 auto;
-  padding: 28px 36px 40px;
+  padding: 26px clamp(24px, 4vw, 54px) 44px;
   @media (max-width: 1023px) {
     padding: 20px 18px 32px;
   }
@@ -320,7 +320,7 @@ const handleDelete = () => {
     line-height: 1.28;
     font-weight: 700;
     letter-spacing: -.02em;
-    margin-bottom: 22px;
+    margin-bottom: 18px;
   }
 
   .htm-scrollbar {
@@ -335,7 +335,7 @@ const handleDelete = () => {
       margin-bottom: 30px;
       border: 1px solid var(--light-border-color);
       padding: 14px;
-      border-radius: 6px;
+      border-radius: 10px;
       width: fit-content;
       .att-box {
         min-width: min(410px,calc(100vw - 60px));
@@ -405,18 +405,17 @@ const handleDelete = () => {
     }
 
     .email-info {
-
-      border: 1px solid var(--light-border-color);
-      border-radius: 12px;
-      background: var(--extra-light-fill);
-      margin-bottom: 24px;
-      padding: 16px;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      margin-bottom: 22px;
+      padding: 0;
       @media (max-width: 1024px) {
         margin-bottom: 15px;
       }
       .date {
         color: var(--regular-text-color);
-        margin-bottom: 6px;
+        margin: 3px 0 8px;
       }
 
       .email-msg {
@@ -427,7 +426,7 @@ const handleDelete = () => {
 
       .send {
         display: flex;
-        margin-bottom: 6px;
+        margin-bottom: 5px;
 
         .send-name {
           color: var(--regular-text-color);

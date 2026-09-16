@@ -158,13 +158,9 @@ router.afterEach((to) => {
     }
 
     const uiStore = useUiStore()
-    if (to.meta.menu) {
-        if (['content', 'email', 'send'].includes(to.meta.name)) {
-            uiStore.accountShow = window.innerWidth > 767;
-        } else {
-            uiStore.accountShow = false
-        }
-    }
+    // The account picker is opened from the message-list toolbar. Keeping it
+    // closed by default preserves the desktop reading pane on every route.
+    if (to.meta.menu) uiStore.accountShow = false
 
     if (window.innerWidth < 1025) {
         uiStore.asideShow = false

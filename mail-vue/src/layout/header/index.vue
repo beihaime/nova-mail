@@ -365,31 +365,32 @@ function formatName(email) {
   font-size: 12px;
   display: grid;
   height: 100%;
-  gap: 16px;
-  grid-template-columns: auto minmax(220px, 610px) auto 1fr;
+  gap: 12px;
+  padding: 0 14px;
+  grid-template-columns: minmax(92px, auto) minmax(220px, 1fr) auto auto;
 }
 
 .header.not-send {
-  grid-template-columns: auto minmax(220px, 610px) 1fr;
+  grid-template-columns: minmax(92px, auto) minmax(220px, 1fr) auto;
 }
 
 .search-shell {
-  height: 44px;
+  height: 38px;
   align-self: center;
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 12px;
+  padding: 0 11px;
   color: var(--regular-text-color);
-  background: var(--extra-light-fill);
-  border: 1px solid var(--light-border);
-  border-radius: 13px;
+  background: transparent;
+  border: 1px solid var(--nova-divider);
+  border-radius: 10px;
   transition: border-color .16s ease, box-shadow .16s ease;
   img { width: 18px; height: 18px; opacity: .68; }
   input { width: 100%; min-width: 0; color: inherit; }
   input::placeholder { color: var(--regular-text-color); opacity: .92; }
-  &:focus-within { border-color: var(--el-color-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--el-color-primary) 14%, transparent); }
-  kbd { padding: 2px 7px; white-space: nowrap; font-size: 12px; color: var(--regular-text-color); background: var(--base-fill); border-radius: 6px; }
+  &:focus-within { border-color: var(--el-color-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--el-color-primary) 12%, transparent); }
+  kbd { padding: 2px 6px; white-space: nowrap; font-size: 11px; color: var(--regular-text-color); background: var(--base-fill); border-radius: 5px; }
 }
 
 .writer-box {
@@ -400,9 +401,9 @@ function formatName(email) {
   margin-left: 2px;
 
   .writer {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
     color: #ffffff;
     background: var(--el-color-primary);
     transition: filter .16s ease, transform .16s ease;
@@ -447,9 +448,9 @@ function formatName(email) {
 
   .icon-item {
     align-self: center;
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -481,13 +482,13 @@ function formatName(email) {
     .avatar-text {
       background: var(--el-bg-color);
       color: var(--el-text-color-primary);
-      height: 34px;
-      width: 34px;
+      height: 33px;
+      width: 33px;
       display: flex;
       justify-content: center;
       align-items: center;
-      border-radius: 10px;
-      border: 1px solid var(--dark-border);
+      border-radius: 50%;
+      border: 1px solid var(--nova-divider);
     }
 
     .setting-icon {

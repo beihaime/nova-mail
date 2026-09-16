@@ -39,33 +39,33 @@
         </div>
         <el-menu-item @click="router.push({name: 'analysis'})" index="analysis" v-perm="'analysis:query'"
                       :class="route.meta.name === 'analysis' ? 'choose-item' : ''">
-          <Icon icon="fluent:data-pie-20-regular" width="24" height="24" />
-          <span class="menu-name" style="margin-left: 13px">{{$t('analytics')}}</span>
+          <img src="@/icons/svg/history.svg" alt="" />
+          <span class="menu-name">{{$t('analytics')}}</span>
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'user'})" index="setting" v-perm="'user:query'"
                       :class="route.meta.name === 'user' ? 'choose-item' : ''">
-          <Icon icon="si:user-alt-2-line" width="20" height="20" />
-          <span class="menu-name" style="margin-left: 16px">{{$t('allUsers')}}</span>
+          <img src="@/icons/svg/users.svg" alt="" />
+          <span class="menu-name">{{$t('allUsers')}}</span>
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'all-email'})" index="all-email" v-perm="'all-email:query'"
                       :class="route.meta.name === 'all-email' ? 'choose-item' : ''">
-          <Icon icon="fluent:mail-list-28-regular" width="22" height="22" />
-          <span class="menu-name" style="margin-left: 15px">{{$t('allMail')}}</span>
+          <img src="@/icons/svg/mail-unread.svg" alt="" />
+          <span class="menu-name">{{$t('allMail')}}</span>
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'role'})" index="setting" v-perm="'role:query'"
                       :class="route.meta.name === 'role' ? 'choose-item' : ''">
-          <Icon icon="fluent:lock-closed-16-regular" width="22" height="22" />
-          <span class="menu-name" style="margin-left: 15px">{{$t('permissions')}}</span>
+          <img src="@/icons/svg/lock.svg" alt="" />
+          <span class="menu-name">{{$t('permissions')}}</span>
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'reg-key'})" index="reg-key" v-perm="'reg-key:query'"
                       :class="route.meta.name === 'reg-key' ? 'choose-item' : ''">
-          <Icon icon="fluent:fingerprint-20-filled" width="22" height="22" />
-          <span class="menu-name" style="margin-left: 15px">{{$t('inviteCode')}}</span>
+          <img src="@/icons/svg/label-nav.svg" alt="" />
+          <span class="menu-name">{{$t('inviteCode')}}</span>
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'sys-setting'})" index="sys-setting" v-perm="'setting:query'"
                       :class="route.meta.name === 'sys-setting' ? 'choose-item' : ''">
-          <Icon icon="eos-icons:system-ok-outlined" width="18" height="18" style="margin-left: 2px" />
-          <span class="menu-name" style="margin-left: 17px">{{$t('SystemSettings')}}</span>
+          <img src="@/icons/svg/settings-top.svg" alt="" />
+          <span class="menu-name">{{$t('SystemSettings')}}</span>
         </el-menu-item>
       </el-menu>
     </div>
@@ -75,7 +75,6 @@
 <script setup>
 import router from "@/router/index.js";
 import { useRoute } from "vue-router";
-import {Icon} from "@iconify/vue";
 import {useSettingStore} from "@/store/setting.js";
 import {useUiStore} from "@/store/ui.js";
 
@@ -89,8 +88,8 @@ const openCompose = () => uiStore.writerRef?.open()
 <style lang="scss" scoped>
 
 .title {
-  margin: 16px 14px 10px;
-  height: 42px;
+  margin: 12px 14px 8px;
+  height: 38px;
   border-radius: 12px;
   display: flex;
   position: relative;
@@ -123,25 +122,25 @@ const openCompose = () => uiStore.writerRef?.open()
   }
 
 }
-.brand-mark { width: 24px; height: 24px; }
-.compose { margin: 8px 14px 4px; width: calc(100% - 28px); height: 42px; border-radius: 11px; color: #fff; background: var(--el-color-primary); display: flex; gap: 10px; align-items: center; justify-content: center; cursor: pointer; font-weight: 650; transition: filter .16s ease, transform .16s ease; }
+.brand-mark { width: 25px; height: 25px; }
+.compose { margin: 6px 14px 4px; width: calc(100% - 28px); height: 40px; border-radius: 10px; color: #fff; background: var(--el-color-primary); display: flex; gap: 9px; align-items: center; justify-content: center; cursor: pointer; font-weight: 650; transition: filter .16s ease, transform .16s ease; }
 .compose:hover { filter: brightness(.94); }
 .compose:active { transform: scale(.98); }
 .compose img { width: 18px; height: 18px; filter: brightness(0) invert(1); }
 
 
 .manage-title {
-  margin-top: 10px;
+  margin-top: 8px;
   padding-left: 24px;
   color: var(--secondary-text-color);
   font-size: 12px;
 }
 
 .el-menu-item {
-  margin: 2px 10px !important;
-  border-radius: 10px;
-  height: 40px;
-  padding: 10px 12px !important;
+  margin: 1px 10px !important;
+  border-radius: 9px;
+  height: 38px;
+  padding: 9px 12px !important;
 }
 
 .choose-item {
@@ -178,7 +177,7 @@ const openCompose = () => uiStore.writerRef?.open()
 
 .el-menu {
   border-right: 0;
-  width: 250px;
+  width: 232px;
 }
 
 :deep(.el-divider__text) {

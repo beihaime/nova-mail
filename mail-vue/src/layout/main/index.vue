@@ -91,6 +91,9 @@ function showNotice(data) {
 }
 
 onMounted(() => {
+  // Accounts remain available from the list toolbar, but should not permanently
+  // consume a desktop column in the mail workspace.
+  if (isDesktop.value) uiStore.accountShow = false
   window.addEventListener('resize', handleResize)
   handleResize()
 })
@@ -101,12 +104,7 @@ onBeforeUnmount(() => {
 
 const handleResize = () => {
   isDesktop.value = window.innerWidth >= 1024
-  if (['content','email','send'].includes(route.meta.name)) {
-    if (innerWidth !==  window.innerWidth) {
-      innerWidth = window.innerWidth;
-      uiStore.accountShow = window.innerWidth >= 767;
-    }
-  }
+  if (innerWidth !== window.innerWidth) innerWidth = window.innerWidth
 }
 
 </script>
@@ -154,19 +152,29 @@ const handleResize = () => {
 }
 
 
-.main-box-show {
-  display: grid;
-  grid-template-columns: 260px  1fr;
-  height: calc(100% - 60px);
-  @media (max-width: 767px) {
-    grid-template-columns: 1fr;
-  }
-}
-
+.main-box-show,
 .main-box-hide {
+  position: relative;
   display: grid;
   grid-template-columns: 1fr;
   height: calc(100% - 60px);
+}
+
+.block-show {
+  inset: 0;
+  z-index: 10;
+  background: rgba(12, 18, 28, .18);
+  backdrop-filter: blur(1px);
+}
+
+.show {
+  position: absolute;
+  z-index: 11;
+  inset: 0 auto 0 0;
+  width: min(320px, 88vw);
+  background: var(--el-bg-color);
+  border-right: 1px solid var(--light-border);
+  box-shadow: 18px 0 42px rgba(15, 23, 42, .14);
 }
 
 
@@ -176,7 +184,7 @@ const handleResize = () => {
 
 .desktop-mail-workspace {
   display: grid;
-  grid-template-columns: minmax(340px, 38%) minmax(0, 1fr);
+  grid-template-columns: minmax(390px, 41%) minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
   height: 100%;
