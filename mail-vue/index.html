@@ -3,10 +3,15 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <meta name="theme-color" content="#F1F1F1" id="theme-color-meta">
-  <meta name="description" content="Nova Mail 是一个 Serverless 响应式邮箱服务，支持邮件发送，可部署到 Novaflare 平台，降低服务器成本。Nova Mail is a serverless responsive email service that supports email sending and can be deployed on Novaflare to reduce server costs.">
+  <meta name="theme-color" content="#F6F8FC" id="theme-color-meta">
+  <meta name="description" content="Nova Mail — your mail, your rules.">
+  <meta name="application-name" content="Nova Mail">
+  <meta name="apple-mobile-web-app-title" content="Nova Mail">
+  <meta name="apple-mobile-web-app-capable" content="yes">
   <title>Nova Mail</title>
   <link rel="icon" href="/src/icons/svg/brand-mark.svg" type="image/svg+xml">
+  <link rel="icon" href="/icons/nova-mail-192.png" sizes="192x192" type="image/png">
+  <link rel="apple-touch-icon" href="/icons/nova-mail-192.png">
   <!-- Explicit rendering prevents the API script from racing Vue's lifecycle. -->
   <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
   <script>
@@ -20,7 +25,7 @@
     }
     const metaTag = document.getElementById('theme-color-meta');
     const isMobile =  !window.matchMedia("(pointer: fine) and (hover: hover)").matches;
-    metaTag.setAttribute('content', isDark ? (isMobile ? '#141414' : '#000000') : (isMobile ? '#191A23' : '#F1F1F1'));
+    metaTag.setAttribute('content', isDark ? (isMobile ? '#141414' : '#000000') : '#F6F8FC');
   </script>
 </head>
 <style>
@@ -131,7 +136,7 @@
 <body>
 <div id="loading-first" >
   <div class="loading-icon">
-    <img class="loading-image" src="/mail-pwa.png" alt="Nova Mail">
+    <img class="loading-image" src="/icons/nova-mail-192.png" alt="Nova Mail">
     <div class="loading-progress" aria-hidden="true"></div>
   </div>
 </div>

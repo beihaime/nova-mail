@@ -18,16 +18,45 @@ export default defineConfig(({mode}) => {
         plugins: [vue(),
             VitePWA({
                 injectRegister: 'script-defer',
+                includeAssets: [
+                    'icons/nova-mail-192.png',
+                    'icons/nova-mail-512.png',
+                    'icons/nova-mail-maskable-192.png',
+                    'icons/nova-mail-maskable-512.png',
+                ],
                 manifest: {
-                    name: env.VITE_PWA_NAME,
-                    short_name: env.VITE_PWA_NAME,
-                    background_color: '#FFFFFF',
-                    theme_color: '#FFFFFF',
+                    name: 'Nova Mail',
+                    short_name: 'Nova Mail',
+                    description: 'Nova Mail — your mail, your rules.',
+                    start_url: '/',
+                    scope: '/',
+                    display: 'standalone',
+                    background_color: '#F6F8FC',
+                    theme_color: '#F6F8FC',
                     icons: [
                         {
-                            src: 'mail-pwa.png',
+                            src: '/icons/nova-mail-192.png',
                             sizes: '192x192',
                             type: 'image/png',
+                            purpose: 'any',
+                        },
+                        {
+                            src: '/icons/nova-mail-512.png',
+                            sizes: '512x512',
+                            type: 'image/png',
+                            purpose: 'any',
+                        },
+                        {
+                            src: '/icons/nova-mail-maskable-192.png',
+                            sizes: '192x192',
+                            type: 'image/png',
+                            purpose: 'maskable',
+                        },
+                        {
+                            src: '/icons/nova-mail-maskable-512.png',
+                            sizes: '512x512',
+                            type: 'image/png',
+                            purpose: 'maskable',
                         }
                     ],
                 },
@@ -37,6 +66,8 @@ export default defineConfig(({mode}) => {
                     runtimeCaching: [],
                     navigateFallback: null,
                     cleanupOutdatedCaches: true,
+                    clientsClaim: true,
+                    skipWaiting: true,
                 }
             }),
             AutoImport({
