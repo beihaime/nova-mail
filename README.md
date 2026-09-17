@@ -1,223 +1,185 @@
-<p align="center">
-  <img src="mail-vue/src/icons/svg/brand-app-dark.svg" width="80" alt="Nova Mail" />
-  <h1 align="center">Nova Mail</h1>
-  <p align="center">A simple, responsive self-hosted email service on Cloudflare</p>
-  <p align="center">
-    <a href="doc/README.CN.md">简体中文</a> | English
-  </p>
-  <p align="center">
-    <a href="https://mail.beihaime.com" target="_blank">Live Demo</a> ·
-    <a href="#deployment">Deployment</a> ·
-    <a href="#features">Features</a>
-  </p>
-</p>
+# Nova Mail
 
-<p align="center">
-  <img src="https://img.shields.io/badge/license-MIT-green" alt="License" />
-  <img src="https://img.shields.io/badge/platform-Cloudflare%20Workers-orange" alt="Platform" />
-  <img src="https://img.shields.io/badge/frontend-Vue3-brightgreen" alt="Vue3" />
-  <img src="https://img.shields.io/badge/backend-Hono-blue" alt="Hono" />
-</p>
+Nova Mail is a modern web mail client based on the open-source [cloud-mail](https://github.com/maillab/cloud-mail) project. It keeps the original Cloudflare-based mail workflow while providing a cleaner interface, multi-address account management, and integrated OAuth authentication.
 
----
+## Preview
 
-## Introduction
+### Login
 
-Nova Mail is a self-hosted email service designed to run on **Cloudflare Workers**.  
-With just one domain, you can create multiple email addresses, send and receive messages, handle attachments, and manage users through an admin panel with permission control.
+![Nova Mail Login](doc/demo/loginDemo.png)
 
-This project is a fork and rebrand of [maillab/cloud-mail](https://github.com/maillab/cloud-mail), with a focus on improved UI experience, login security, and authentication.
+### Mail interface
 
-**Live Demo**: [https://mail.beihaime.com](https://mail.beihaime.com)
-
----
+![Nova Mail Mail View](doc/demo/webview.png)
 
 ## Features
 
-### Core
+- Responsive desktop and mobile mail interface
+- Light and dark themes with Nova Mail branding and PWA support
+- Inbox, sent mail, drafts, starred mail, archive, spam, trash, folders, and search
+- Multiple email addresses per Nova Mail account with address switching and a dedicated address-management page
+- Compose, reply, forward, mark read/unread, star, delete, archive, attachments, and email printing
+- Sanitized rich HTML email rendering and plain-text email support
+- GitHub OAuth login and account linking
+- Google OAuth/OIDC login and account linking
+- Cloudflare Turnstile verification for protected account operations
+- Admin user and mailbox management with roles and permissions
+- Cloudflare Email Workers receiving, Resend sending/status webhooks, and R2 attachment storage
+- Optional Telegram forwarding, webhook forwarding, verification-code extraction with Workers AI, and analytics
+- English and Simplified Chinese localization
 
-- **Low-cost deployment**: Runs entirely on Cloudflare Workers + D1 + R2 + KV — almost no extra server cost
-- **Send & receive email**: Integrated with Resend for sending (bulk, inline images, attachments); receive via Cloudflare Email Routing
-- **Attachments**: Store and download files with Cloudflare R2
-- **Multi-mailbox mode**: One user can bind multiple email addresses
-- **Responsive design**: Works on desktop and most mobile browsers; PWA supported
+## Tech stack
 
-### Admin & Security
+### Frontend
 
-- **Admin panel**: User management, email management, RBAC permission control and resource limits
-- **CAPTCHA**: Cloudflare Turnstile to prevent bulk registration and brute-force login
-- **GitHub login**: GitHub OAuth login and account linking
-- **Security hardening**: JWT secrets, server-side Turnstile verification, login protection, etc.
+- Vue 3 and Vite
+- Vue Router and Pinia
+- Element Plus
+- Iconify and the Nova Mail SVG icon assets
+- DOMPurify for email HTML sanitization
+- `vite-plugin-pwa`
 
-### Extensions
+### Backend and infrastructure
 
-- **Email push**: Forward received emails to a Telegram bot or other email providers
-- **Open API**: Batch create users and query emails with multiple conditions
-- **Verification code recognition**: Auto-detect codes in emails via Workers AI
-- **Data visualization**: System stats and email growth charts with ECharts
-- **Personalization**: Custom site title, login background, transparency, etc.
-- **i18n**: Multi-language support
+- Cloudflare Workers with Hono
+- Cloudflare D1 for application data
+- Cloudflare KV for sessions, temporary OAuth grants, and cached settings
+- Cloudflare R2 for attachments and stored objects
+- Cloudflare Email Workers for inbound email handling
+- Resend for outbound email and delivery webhooks
+- Cloudflare Turnstile for bot verification
+- Cloudflare Workers AI for optional verification-code extraction
+- Drizzle ORM and Postal MIME
 
----
-
-## Tech Stack
-
-| Layer          | Technology              |
-|----------------|-------------------------|
-| Platform       | Cloudflare Workers      |
-| Backend        | Hono                    |
-| ORM            | Drizzle                 |
-| Frontend       | Vue 3 + Vite            |
-| UI Library     | Element Plus            |
-| State          | Pinia                   |
-| Email Sending  | Resend                  |
-| Database       | Cloudflare D1           |
-| Object Storage | Cloudflare R2           |
-| Cache          | Cloudflare KV           |
-| AI             | Cloudflare Workers AI   |
-| CAPTCHA        | Cloudflare Turnstile    |
-
----
-
-## Project Structure
+## Project structure
 
 ```text
-nova-mail
-├── mail-worker/                 # Cloudflare Workers backend
-│   ├── src/
-│   │   ├── api/                 # API layer
-│   │   ├── dao/                 # Data access layer
-│   │   ├── email/               # Email receive & processing
-│   │   ├── entity/              # Database entities
-│   │   ├── security/            # Auth & permissions
-│   │   ├── service/             # Business logic
-│   │   ├── hono/                # Middleware & error handling
-│   │   └── index.js             # Entry point
-│   ├── wrangler.toml            # Workers config
-│   └── package.json
-│
-├── mail-vue/                    # Vue 3 frontend
-│   ├── src/
-│   │   ├── components/          # Shared components
-│   │   ├── views/               # Pages
-│   │   ├── layout/              # Layout
-│   │   ├── store/               # Pinia stores
-│   │   ├── router/              # Router
-│   │   ├── request/             # API requests
-│   │   └── icons/               # Icon system
+nova-mail/
+├── mail-vue/                  # Vue frontend
+│   ├── src/components/        # Shared UI components
+│   ├── src/layout/            # Application shell and header/sidebar
+│   ├── src/router/            # Vue Router routes
+│   ├── src/store/             # Pinia stores
+│   ├── src/views/             # Mail, settings, login, preview, and admin views
+│   ├── src/icons/             # Nova Mail SVG icon system
+│   ├── public/                # Static assets and PWA icons
 │   ├── package.json
 │   └── vite.config.js
-│
-├── doc/                         # Docs & demo assets
-├── cn.md                        # Chinese README
-├── en.md                        # English README
+├── mail-worker/               # Cloudflare Worker backend
+│   ├── src/api/               # HTTP API routes
+│   ├── src/service/           # Authentication, mail, OAuth, storage, and settings logic
+│   ├── src/entity/            # D1/Drizzle entities
+│   ├── src/email/             # Cloudflare Email Worker handler
+│   ├── src/security/          # Authentication and permission middleware
+│   ├── src/hono/              # Hono application setup
+│   ├── src/index.js           # Worker entry point
+│   ├── wrangler.toml          # Production Worker configuration
+│   ├── wrangler-dev.toml      # Local development configuration
+│   └── package.json
+├── doc/demo/                  # README screenshots
+├── LICENSE
 └── README.md
 ```
 
----
-
-## Getting Started
+## Development
 
 ### Requirements
 
-- Node.js 18+
+- Node.js 18 or newer
 - pnpm
-- Cloudflare account (Workers, D1, KV, R2, optional AI)
+- A Cloudflare account for Worker/D1/KV development
 
-### Local Development
+The repository contains separate frontend and Worker packages. Install dependencies in each package:
 
 ```bash
-# Clone the repository
 git clone https://github.com/beihaime/nova-mail.git
 cd nova-mail
 
-# Install backend dependencies
-cd mail-worker
-pnpm install
-
-# Install frontend dependencies
-cd ../mail-vue
-pnpm install
-
-# Start frontend dev server
-pnpm dev
-
-# Start Workers dev environment (separate terminal)
-cd ../mail-worker
-pnpm dev
+pnpm --dir mail-vue install
+pnpm --dir mail-worker install
 ```
 
-### Deploy to Cloudflare
+Start the frontend development server:
 
-1. Create a D1 database, KV namespace, and R2 bucket (if you need attachments) in Cloudflare
-2. Update bindings in `mail-worker/wrangler.toml`
-3. Set required secrets:
+```bash
+pnpm --dir mail-vue dev
+```
+
+Start the Worker development environment in a second terminal:
+
+```bash
+pnpm --dir mail-worker dev
+```
+
+The frontend package also provides:
+
+```bash
+pnpm --dir mail-vue build    # production frontend build
+pnpm --dir mail-vue preview  # preview the built frontend
+```
+
+The Worker package provides `dev`, `start`, `deploy`, and `test` scripts. The `test` script is the repository's Wrangler deployment configuration for the test environment; review `wrangler-test.toml` before using it.
+
+## Configuration
+
+Cloudflare bindings and non-secret variables are defined in `mail-worker/wrangler.toml` and its environment-specific variants. Common settings include:
+
+- `domain`: allowed mail domains
+- `admin`: administrator email address
+- `TURNSTILE_HOSTNAME`: hostname expected by Turnstile verification
+- `ai_model`: optional Workers AI model
+
+Configure secrets with Wrangler. Never commit their values:
 
 ```bash
 cd mail-worker
 pnpm wrangler secret put jwt_secret
 pnpm wrangler secret put TURNSTILE_SECRET_KEY
-# If using Resend
-pnpm wrangler secret put RESEND_API_KEY
+pnpm wrangler secret put GITHUB_CLIENT_SECRET
+pnpm wrangler secret put GOOGLE_CLIENT_SECRET
+pnpm wrangler secret put resend_webhook_secret
 ```
 
-4. Deploy:
+The corresponding public/provider configuration is managed through the existing settings flow and `GOOGLE_CLIENT_ID`/`GITHUB_CLIENT_ID` may be supplied as Worker environment variables where applicable. OAuth client secrets are server-side only.
+
+### OAuth callback URLs
+
+The Worker callback paths are:
+
+```text
+https://<your-domain>/api/oauth/github/callback
+https://<your-domain>/api/oauth/google/callback
+```
+
+Register the exact deployed URLs in the GitHub and Google provider consoles. For the current deployment, the Google callback is:
+
+```text
+https://mail.beihaime.com/api/oauth/google/callback
+```
+
+Google login requests only the OpenID Connect identity scopes (`openid`, `email`, and `profile`). Nova Mail does not place provider access tokens in the browser or in the repository.
+
+## Deployment
+
+The production configuration uses a Cloudflare Worker with Static Assets. The frontend build output is written to the Worker asset directory configured in `mail-worker/wrangler.toml`.
+
+Build and deploy from the Worker directory:
 
 ```bash
+cd mail-worker
 pnpm deploy
 ```
 
-Frontend static assets are published together with the Worker via the `[assets]` config in `wrangler.toml`.
+Before deployment, review the selected Wrangler configuration, D1 and KV bindings, Static Assets directory, custom domain, and required secrets. Database initialization and versioned schema setup are handled by the existing Worker initialization routes; do not recreate or reset a production D1 database.
 
-For more detailed deployment steps, refer to the upstream project docs and adjust according to this repository’s `wrangler.toml`.
+Inbound mail is handled by the Worker Email handler, while outbound delivery and delivery-status events use the configured Resend integration. Attachments are authorized against the owning user before R2 objects are served.
 
----
+## Upstream & credits
 
-## Configuration (Optional)
-
-You can set the following in the `[vars]` section of `wrangler.toml`:
-
-| Variable             | Description                                              |
-|----------------------|----------------------------------------------------------|
-| `domain`             | Allowed email domains, e.g. `["example.com"]`            |
-| `admin`              | Admin email address                                      |
-| `TURNSTILE_HOSTNAME` | Hostname for Turnstile verification (`mail.beihaime.com`) |
-| `ai_model`           | Workers AI model (optional)                              |
-
-JWT and Turnstile secrets must be set with `wrangler secret` — do not put them in the config file.
-
----
-
-## Differences from Upstream
-
-Compared to [cloud-mail](https://github.com/maillab/cloud-mail), Nova Mail includes:
-
-- Full rebranding (Nova Mail)
-- Modern UI redesign and icon system
-- GitHub OAuth login and account linking
-- Stronger Turnstile login protection and stability
-- Security hardening
-- Resizable mail layout and other UX improvements
-- PWA branding and loading experience improvements
-
----
+Nova Mail is based on [maillab/cloud-mail](https://github.com/maillab/cloud-mail). The upstream project and its original authors remain credited under the original license. Nova Mail adds its own branding and frontend, authentication, and security-related changes on top of that codebase.
 
 ## License
 
 This project is licensed under the MIT License.
 
-Original copyright belongs to [aslost / maillab](https://github.com/maillab/cloud-mail). This repository is a modified and extended version.
-
----
-
-## Acknowledgements
-
-- [maillab/cloud-mail](https://github.com/maillab/cloud-mail) — original project
-- Cloudflare Workers / D1 / R2 / KV / Turnstile / Workers AI
-- Hono, Vue 3, Element Plus, Drizzle, Resend, and other open-source projects
-
----
-
-## Feedback
-
-Questions or suggestions? Please open a GitHub Issue.
+See [LICENSE](LICENSE) for details. The repository retains the original copyright notice and the Nova Mail modification copyright notice.
