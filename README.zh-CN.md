@@ -1,19 +1,51 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/beihaime/nova-mail/main/mail-vue/src/icons/svg/brand-app-dark.svg" alt="Nova Mail" width="96" />
+  <img
+    src="https://raw.githubusercontent.com/beihaime/nova-mail/main/mail-vue/src/icons/svg/brand-app-dark.svg"
+    alt="Nova Mail"
+    width="96"
+  />
+
+  <h1>Nova Mail</h1>
+
+  <p>
+    <a href="README.md">English</a> · <b>简体中文</b>
+  </p>
+
+  <p>
+    一个基于 Cloudflare 构建的现代化 Web 邮件客户端。
+  </p>
+
+  <p>
+    <a href="LICENSE">
+      <img src="https://img.shields.io/github/license/beihaime/nova-mail?style=flat" alt="MIT License">
+    </a>
+    <a href="https://github.com/beihaime/nova-mail/stargazers">
+      <img src="https://img.shields.io/github/stars/beihaime/nova-mail?style=flat" alt="GitHub stars">
+    </a>
+    <a href="https://github.com/beihaime/nova-mail/network/members">
+      <img src="https://img.shields.io/github/forks/beihaime/nova-mail?style=flat" alt="GitHub forks">
+    </a>
+    <a href="https://github.com/beihaime/nova-mail/issues">
+      <img src="https://img.shields.io/github/issues/beihaime/nova-mail?style=flat" alt="GitHub issues">
+    </a>
+    <a href="https://github.com/beihaime/nova-mail/commits/main/">
+      <img src="https://img.shields.io/github/last-commit/beihaime/nova-mail?style=flat" alt="Last commit">
+    </a>
+  </p>
+
+  <p>
+    <a href="https://vuejs.org/">
+      <img src="https://img.shields.io/badge/Vue-3-42b883?style=flat&logo=vuedotjs&logoColor=white" alt="Vue 3">
+    </a>
+    <a href="https://developers.cloudflare.com/workers/">
+      <img src="https://img.shields.io/badge/Cloudflare-Workers-f38020?style=flat&logo=cloudflare&logoColor=white" alt="Cloudflare Workers">
+    </a>
+    <a href="https://pnpm.io/">
+      <img src="https://img.shields.io/badge/package%20manager-pnpm-f69220?style=flat&logo=pnpm&logoColor=white" alt="pnpm">
+    </a>
+  </p>
 </div>
 
-# Nova Mail
-
-[English](README.md) | 简体中文
-
-[![MIT License](https://img.shields.io/github/license/beihaime/nova-mail?style=flat)](LICENSE)
-[![GitHub stars](https://img.shields.io/github/stars/beihaime/nova-mail?style=flat)](https://github.com/beihaime/nova-mail/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/beihaime/nova-mail?style=flat)](https://github.com/beihaime/nova-mail/network/members)
-[![GitHub issues](https://img.shields.io/github/issues/beihaime/nova-mail?style=flat)](https://github.com/beihaime/nova-mail/issues)
-[![Last commit](https://img.shields.io/github/last-commit/beihaime/nova-mail?style=flat)](https://github.com/beihaime/nova-mail/commits/main/)
-[![Vue 3](https://img.shields.io/badge/Vue-3-42b883?style=flat&logo=vuedotjs&logoColor=white)](https://vuejs.org/)
-[![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-f38020?style=flat&logo=cloudflare&logoColor=white)](https://developers.cloudflare.com/workers/)
-[![pnpm](https://img.shields.io/badge/package%20manager-pnpm-f69220?style=flat&logo=pnpm&logoColor=white)](https://pnpm.io/)
 
 Nova Mail 是一个现代化 Web 邮件客户端，基于开源项目 [maillab/cloud-mail](https://github.com/maillab/cloud-mail) 开发。它保留了原项目基于 Cloudflare 的邮件处理流程，并加入 Nova Mail 品牌、前端 UI、多地址管理、OAuth 集成以及认证和安全相关改进。
 
