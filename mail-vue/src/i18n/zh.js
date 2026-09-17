@@ -138,6 +138,7 @@ const zh = {
     welcomeBack: '欢迎回来',
     createAccount: '创建账户',
     loginTagline: '私密邮箱，简洁而美好。',
+    quietTagline: '更安静的连接方式。',
     loginTitle: '输入账号信息以开始使用邮箱系统',
     regTitle: '输入账号密码以开始注册邮箱系统',
     confirmPwd: '确认密码',

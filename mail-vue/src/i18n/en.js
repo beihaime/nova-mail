@@ -138,6 +138,7 @@ const en = {
     welcomeBack: 'Welcome back',
     createAccount: 'Create your account',
     loginTagline: 'Private email, beautifully simple.',
+    quietTagline: 'A quieter way to connect.',
     loginTitle: 'Sign in to your account to access email',
     regTitle: 'Sign up for an account to use email',
     confirmPwd: 'Confirm password',

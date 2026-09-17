@@ -6,12 +6,13 @@
       <div class="login-mountain login-mountain-near"></div>
     </div>
     <header class="login-brand">
-      <img :src="uiStore.dark ? brandDark : brandLight" alt="Nova Mail" />
+      <img :src="brandMark" alt="Nova Mail" />
       <div>
         <strong>Nova Mail</strong>
         <span>{{ $t('loginTagline') }}</span>
       </div>
     </header>
+    <div class="login-quiet-tagline">{{ $t('quietTagline') }}</div>
     <div class="form-wrapper">
       <div class="container">
         <span class="form-title">{{ show === 'login' ? $t('welcomeBack') : $t('createAccount') }}</span>
@@ -183,8 +184,7 @@ import {loginUserInfo} from "@/request/my.js";
 import {permsToRouter} from "@/perm/perm.js";
 import {useI18n} from "vue-i18n";
 import {githubOauthComplete, oauthBindUser, oauthLinuxDoLogin, oauthGoogleLogin} from "@/request/ouath.js";
-import brandLight from '@/icons/svg/brand-app-light.svg'
-import brandDark from '@/icons/svg/brand-app-dark.svg'
+import brandMark from '@/icons/svg/brand-mark.svg'
 
 const {t} = useI18n();
 const accountStore = useAccountStore();
@@ -926,12 +926,22 @@ function submitRegister() {
 }
 
 .login-copyright { position: fixed; z-index: 5; left: 34px; bottom: 24px; color: rgba(255,255,255,.72); font-size: 12px; }
+.login-quiet-tagline { position: fixed; z-index: 5; left: 34px; top: 150px; color: rgba(255,255,255,.86); font-size: 14px; letter-spacing: .12em; }
 
 @media (max-width: 767px) {
   .login-brand { top: 22px; left: 22px; }
   .login-copyright { left: 22px; bottom: 14px; }
+  .login-quiet-tagline { left: 24px; top: 118px; font-size: 12px; letter-spacing: .1em; }
   .form-wrapper { top: 84px; right: 16px; bottom: 48px; left: 16px; width: auto; }
   .login-scene { opacity: .72; }
+  .container { padding: 28px 24px 30px; height: fit-content; min-height: 0; border-radius: 30px; background: rgba(232,243,255,.78); box-shadow: 0 18px 50px rgba(30,80,140,.16); }
+  :global(.dark) .container { background: rgba(20,28,43,.82); }
+  .form-title { font-size: 32px !important; letter-spacing: -.03em; }
+  .form-desc { font-size: 15px; }
+  .container .el-input { height: 52px; margin-bottom: 16px; font-size: 16px; }
+  .container .el-input :deep(.el-input__inner) { height: 50px; font-size: 16px; }
+  .container .btn { height: 54px; border-radius: 12px; font-size: 16px; }
+  .oauth-divider { margin: 20px 0 16px; }
 }
 
 
