@@ -1,14 +1,14 @@
 <template>
   <div class="box mail-reader">
     <div class="header-actions">
-      <AppIcon class="icon" name="back" :size="20" @click="handleBack"/>
-      <AppIcon v-perm="'email:delete'" class="icon" name="delete-outline" :size="18" @click="handleDelete"/>
+      <AppIcon class="icon" name="back" :size="20" title="Back" aria-label="Back" @click="handleBack"/>
+      <AppIcon v-perm="'email:delete'" class="icon" name="delete-outline" :size="18" title="Delete" aria-label="Delete email" @click="handleDelete"/>
       <span class="star" v-if="emailStore.contentData.showStar">
-        <AppIcon class="icon" @click="changeStar" v-if="email.isStar" name="star-filled" :size="20"/>
-        <AppIcon class="icon" @click="changeStar" v-else name="star-outline" :size="19"/>
+        <AppIcon class="icon" @click="changeStar" v-if="email.isStar" name="star-filled" :size="20" title="Unstar" aria-label="Unstar email"/>
+        <AppIcon class="icon" @click="changeStar" v-else name="star-outline" :size="19" title="Star" aria-label="Star email"/>
       </span>
-      <AppIcon class="icon" v-if="emailStore.contentData.showReply" v-perm="'email:send'"  @click="openReply" name="reply" :size="21" />
-      <AppIcon class="icon" v-if="emailStore.contentData.showReply" v-perm="'email:send'"  @click="openForward" name="forward" :size="20" />
+      <AppIcon class="icon" v-if="emailStore.contentData.showReply" v-perm="'email:send'"  @click="openReply" name="reply" :size="21" title="Reply" aria-label="Reply" />
+      <AppIcon class="icon" v-if="emailStore.contentData.showReply" v-perm="'email:send'"  @click="openForward" name="forward" :size="20" title="Forward" aria-label="Forward" />
       <AppIcon class="icon" name="print" :size="19" title="Print" aria-label="Print email" @click="printEmail" />
     </div>
     <div></div>
@@ -19,17 +19,27 @@
         </div>
         <div class="content">
           <div class="email-info">
-            <div>
-              <div class="send"><span class="send-source">{{$t('from')}}</span>
-                <div class="send-name">
-                  <span class="send-name-title">{{ email.name }}</span>
-                  <span><{{ email.sendEmail }}></span>
+            <div class="message-meta">
+              <div class="sender-avatar" aria-hidden="true">
+                <img v-if="senderAvatar && !senderAvatarFailed" :src="senderAvatar" alt="" @error="senderAvatarFailed = true" />
+                <span v-else>{{ senderInitial }}</span>
+              </div>
+              <div class="sender-details">
+                <div class="sender-line">
+                  <strong>{{ email.name || email.sendEmail }}</strong>
+                  <span v-if="email.sendEmail">&lt;{{ email.sendEmail }}&gt;</span>
+                </div>
+                <button class="recipient-toggle" type="button" @click="showMetadata = !showMetadata">
+                  {{ $t('to') }} {{ recipientLabel }} <span aria-hidden="true">⌄</span>
+                </button>
+                <div v-if="showMetadata" class="message-details">
+                  <div><b>{{ $t('from') }}</b><span>{{ email.name || '—' }} &lt;{{ email.sendEmail || '—' }}&gt;</span></div>
+                  <div><b>{{ $t('recipient') }}</b><span>{{ recipientLabel }}</span></div>
+                  <div v-if="formatAddressList(email.cc)"><b>Cc</b><span>{{ formatAddressList(email.cc) }}</span></div>
+                  <div v-if="formatAddressList(email.bcc)"><b>Bcc</b><span>{{ formatAddressList(email.bcc) }}</span></div>
                 </div>
               </div>
-              <div class="receive"><span class="source">{{$t('recipient')}}</span><span class="receive-email">{{  formateReceive(email.recipient) }}</span></div>
-              <div class="date">
-                <div>{{ formatDetailDate(email.createTime) }}</div>
-              </div>
+              <time class="message-date">{{ formatDetailDate(email.createTime) }}</time>
             </div>
             <el-alert v-if="email.status === 3" :closable="false" :title="toMessage(email.message)" class="email-msg" type="error" show-icon />
             <el-alert v-if="email.status === 4" :closable="false" :title="$t('complained')" class="email-msg" type="warning" show-icon />
@@ -63,13 +73,13 @@
               </div>
             </div>
           </div>
+          <div v-if="emailStore.contentData.showReply" class="reader-bottom-actions">
+            <button v-perm="'email:send'" type="button" @click="openReply"><AppIcon name="reply" :size="17" />{{ $t('reply') }}</button>
+            <button v-perm="'email:send'" type="button" @click="openForward"><AppIcon name="forward" :size="17" />{{ $t('forward') }}</button>
+          </div>
         </div>
       </div>
     </el-scrollbar>
-    <div v-if="emailStore.contentData.showReply" class="mobile-message-actions">
-      <button v-perm="'email:send'" @click="openReply"><AppIcon name="reply" :size="18" />{{ $t('reply') }}</button>
-      <button v-perm="'email:send'" @click="openForward"><AppIcon name="forward" :size="18" />{{ $t('forward') }}</button>
-    </div>
     <el-image-viewer
         v-if="showPreview"
         :url-list="srcList"
@@ -112,10 +122,21 @@ const email = computed(() => emailStore.contentData.email || {
 })
 const showPreview = ref(false)
 const srcList = reactive([])
+const showMetadata = ref(false)
+const senderAvatarFailed = ref(false)
+
+const senderAvatar = computed(() => email.value.avatar || email.value.avatarUrl || email.value.senderAvatar || '')
+const senderInitial = computed(() => (email.value.name || email.value.sendEmail || '?').trim().charAt(0).toUpperCase())
+const recipientLabel = computed(() => formatAddressList(email.value.recipient) || '—')
 
 const { t } = useI18n()
 watch(() => accountStore.currentAccountId, () => {
   handleBack()
+})
+
+watch(() => email.value.emailId, () => {
+  senderAvatarFailed.value = false
+  showMetadata.value = false
 })
 
 let readRequesting = false
@@ -211,9 +232,20 @@ function isImage(filename) {
 }
 
 function formateReceive(recipient) {
-  if (!recipient) return ''
-  recipient = JSON.parse(recipient)
-  return recipient.map(item => item.address).join(', ')
+  return formatAddressList(recipient)
+}
+
+function formatAddressList(value) {
+  if (!value) return ''
+  let addresses = value
+  if (typeof value === 'string') {
+    try { addresses = JSON.parse(value) } catch { return value }
+  }
+  if (!Array.isArray(addresses)) return String(addresses)
+  return addresses.map(item => {
+    if (typeof item === 'string') return item
+    return item.name ? `${item.name} <${item.address}>` : item.address
+  }).filter(Boolean).join(', ')
 }
 
 function changeStar() {
@@ -304,7 +336,9 @@ const handleDelete = () => {
     height: 34px;
     border-radius: 8px;
     padding: 7px;
+    transition: background-color .15s ease, transform .15s ease;
     &:hover { background: var(--base-fill); }
+    &:active { transform: scale(.94); }
   }
 
 }
@@ -329,7 +363,8 @@ const handleDelete = () => {
     line-height: 1.28;
     font-weight: 700;
     letter-spacing: -.02em;
-    margin-bottom: 18px;
+    max-width: 1100px;
+    margin-bottom: 24px;
   }
 
   .htm-scrollbar {
@@ -475,6 +510,47 @@ const handleDelete = () => {
   }
 }
 
+.message-meta {
+  max-width: 1100px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 26px;
+}
+
+.sender-avatar {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  color: var(--el-color-primary);
+  background: var(--nova-selected);
+  font-size: 16px;
+  font-weight: 700;
+  img { width: 100%; height: 100%; object-fit: cover; }
+}
+
+.sender-details { min-width: 0; flex: 1; text-align: left; }
+.sender-line { display: flex; align-items: baseline; flex-wrap: wrap; gap: 5px; min-width: 0; line-height: 1.35; }
+.sender-line strong { color: var(--el-text-color-primary); font-size: 15px; font-weight: 680; }
+.sender-line span { color: var(--regular-text-color); font-size: 13px; overflow-wrap: anywhere; }
+.recipient-toggle { display: inline-flex; align-items: center; gap: 5px; margin-top: 4px; padding: 0; color: var(--regular-text-color); font-size: 12px; cursor: pointer; text-align: left; }
+.recipient-toggle:hover { color: var(--el-color-primary); }
+.message-date { flex: 0 0 auto; padding-top: 2px; color: var(--regular-text-color); font-size: 12px; white-space: nowrap; }
+.message-details { display: grid; gap: 4px; margin-top: 9px; padding: 9px 11px; border: 1px solid var(--nova-divider); border-radius: 8px; color: var(--regular-text-color); font-size: 12px; }
+.message-details div { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 8px; }
+.message-details b { color: var(--el-text-color-primary); font-weight: 600; }
+.message-details span { overflow-wrap: anywhere; }
+
+.htm-scrollbar { max-width: 1100px; overflow-x: auto; }
+.email-text { max-width: 100%; overflow-wrap: anywhere; line-height: 1.65; }
+.reader-bottom-actions { display: flex; gap: 10px; max-width: 1100px; padding: 28px 0 18px; }
+.reader-bottom-actions button { min-height: 34px; display: inline-flex; align-items: center; gap: 7px; padding: 0 14px; color: var(--el-text-color-primary); border: 1px solid var(--light-border); border-radius: 9px; background: transparent; cursor: pointer; font-size: 13px; font-weight: 600; }
+.reader-bottom-actions button:hover { background: var(--base-fill); border-color: var(--el-color-primary); }
+
 .shadow-html::after  {
   content: "";
   position: absolute;
@@ -501,9 +577,13 @@ const handleDelete = () => {
 
 @media (max-width: 767px) {
   .scrollbar { height: calc(100% - 112px); }
-  .mobile-message-actions { position: absolute; z-index: 2; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px 14px max(12px, env(safe-area-inset-bottom)); background: color-mix(in srgb, var(--el-bg-color) 94%, transparent); border-top: 1px solid var(--light-border-color); backdrop-filter: blur(16px); }
-  .mobile-message-actions button { height: 36px; display: inline-flex; gap: 7px; align-items: center; justify-content: center; color: var(--el-text-color-primary); border: 1px solid var(--light-border); border-radius: 10px; font-weight: 600; cursor: pointer; }
-  .mobile-message-actions img { width: 17px; height: 17px; }
+  .message-meta { gap: 10px; margin-bottom: 20px; }
+  .sender-avatar { width: 36px; height: 36px; flex-basis: 36px; font-size: 14px; }
+  .sender-line strong { font-size: 14px; }
+  .sender-line span { font-size: 12px; }
+  .message-date { font-size: 11px; }
+  .reader-bottom-actions { padding: 24px 0 14px; }
+  .reader-bottom-actions button { flex: 1; justify-content: center; }
 }
 
 
@@ -531,7 +611,7 @@ const handleDelete = () => {
   body.nova-mail-printing .el-header,
   body.nova-mail-printing .mobile-nav,
   body.nova-mail-printing .mail-reader > .header-actions,
-  body.nova-mail-printing .mail-reader .mobile-message-actions,
+  body.nova-mail-printing .mail-reader .reader-bottom-actions,
   body.nova-mail-printing .el-image-viewer {
     display: none !important;
   }
@@ -556,6 +636,8 @@ const handleDelete = () => {
   }
 
   body.nova-mail-printing .mail-reader .email-title { color: #111 !important; }
+  body.nova-mail-printing .mail-reader .message-details { display: grid !important; color: #111 !important; }
+  body.nova-mail-printing .mail-reader .recipient-toggle { display: none !important; }
   body.nova-mail-printing .mail-reader .shadow-html { zoom: 1 !important; }
   body.nova-mail-printing .mail-reader .att .opt-icon { display: none !important; }
 }
