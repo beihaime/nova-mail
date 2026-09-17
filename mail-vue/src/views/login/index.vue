@@ -962,19 +962,24 @@ function submitRegister() {
 }
 
 @media (max-width: 767px) {
+  #login-box { min-height: 100dvh; height: auto; overflow-y: auto; padding: 126px 16px 56px; box-sizing: border-box; }
   .login-brand { top: 22px; left: 22px; }
   .login-copyright { left: 22px; bottom: 14px; }
-  .login-quiet-tagline { left: 24px; top: 118px; font-size: 12px; letter-spacing: .1em; }
-  .form-wrapper { top: 84px; right: 16px; bottom: 48px; left: 16px; width: auto; }
+  .login-quiet-tagline { left: 24px; top: 94px; font-size: 12px; letter-spacing: .1em; }
+  .form-wrapper { position: relative; top: auto; right: auto; bottom: auto; left: auto; width: 100%; max-width: 420px; margin: 0 auto; }
   .login-scene { opacity: .72; }
-  .container { padding: 28px 24px 30px; height: fit-content; min-height: 0; border-radius: 30px; background: rgba(232,243,255,.78); box-shadow: 0 18px 50px rgba(30,80,140,.16); }
+  .container { width: 100%; padding: 24px; height: auto; min-height: 0; border-radius: 28px; background: rgba(232,243,255,.78); box-shadow: 0 18px 50px rgba(30,80,140,.16); }
   :global(.dark) .container { background: rgba(20,28,43,.82); }
-  .form-title { font-size: 32px !important; letter-spacing: -.03em; }
-  .form-desc { font-size: 15px; }
-  .container .el-input { height: 52px; margin-bottom: 16px; font-size: 16px; }
-  .container .el-input :deep(.el-input__inner) { height: 50px; font-size: 16px; }
-  .container .btn { height: 54px; border-radius: 12px; font-size: 16px; }
-  .oauth-divider { margin: 20px 0 16px; }
+  .form-title { font-size: 24px !important; line-height: 1.2; letter-spacing: -.02em; }
+  .form-desc { margin-top: 4px; margin-bottom: 18px; font-size: 14px; line-height: 1.4; }
+  .container .el-input { width: 100%; min-width: 0; height: 50px; margin-bottom: 14px; font-size: 16px; }
+  .container .el-input :deep(.el-input__wrapper) { min-width: 0; width: 100%; }
+  .container .el-input :deep(.el-input__inner) { min-width: 0; width: 100%; height: 48px; font-size: 16px; }
+  .container .email-input :deep(.el-input__wrapper) { min-width: 0; }
+  .container :deep(.el-input-group__append) { flex: 0 0 auto; min-width: 116px; max-width: 45%; padding-left: 6px !important; padding-right: 4px !important; white-space: nowrap; }
+  .container .btn { width: 100%; min-width: 0; height: 50px; border-radius: 11px; font-size: 15px; }
+  .oauth-divider { margin: 16px 0 12px; }
+  .switch { margin-top: 18px; }
 }
 
 
