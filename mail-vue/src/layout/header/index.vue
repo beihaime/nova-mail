@@ -307,12 +307,13 @@ function formatName(email) {
 
   .account-dropdown-head {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 10px;
     padding: 12px 15px 10px;
     strong, span { display: block; }
     strong { font-size: 14px; color: var(--el-text-color-primary); font-weight: 680; }
     span { margin-top: 2px; font-size: 12px; color: var(--regular-text-color); }
+    > div:not(.account-dropdown-avatar) { align-self: flex-start; min-width: 0; text-align: left; }
   }
 
   .account-dropdown-avatar {
@@ -320,10 +321,10 @@ function formatName(email) {
     border-radius: 50%; color: var(--el-color-primary); background: var(--nova-selected);
     border: 1px solid color-mix(in srgb, var(--el-color-primary) 18%, var(--nova-divider)); font-weight: 700;
   }
-  .address-section-label { display: block; color: var(--regular-text-color); font-size: 11px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; }
+  .address-section-label { display: block; align-self: flex-start; width: 100%; color: var(--regular-text-color); font-size: 11px; font-weight: 650; letter-spacing: .08em; text-align: left; text-transform: uppercase; }
   .address-section { display: flex; flex: 1 1 auto; min-height: 0; flex-direction: column; padding-top: 11px; }
   .address-section-label { padding: 1px 15px 8px; }
-  .address-list { padding: 0 7px 7px; max-height: min(360px, calc(100vh - 285px)); overflow: auto; }
+  .address-list { padding: 0 15px 7px; max-height: min(360px, calc(100vh - 285px)); overflow: auto; }
   .address-option {
     width: 100%; height: 43px; display: flex; align-items: center; gap: 8px; padding: 0 10px;
     text-align: left; color: var(--el-text-color-primary); border-radius: 8px; cursor: pointer;
