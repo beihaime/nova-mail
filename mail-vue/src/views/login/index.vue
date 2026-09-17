@@ -104,16 +104,6 @@
           <el-button class="btn" style="margin: 0" type="primary" @click="submitRegister" :loading="registerLoading"
           >{{ $t('regBtn') }}
           </el-button>
-          <div class="oauth-divider"><span>{{ $t('orContinueWith') }}</span></div>
-          <el-button class="btn github-login" @click="startGithubLogin">
-            <Icon icon="codicon:github-inverted" width="18" height="18" style="margin-right: 10px" />
-            {{ $t('continueWithGithub') }}
-          </el-button>
-          <el-button v-for="p in oauthProviders" :key="p.key" class="btn" style="margin-top: 10px" @click="oauthLogin(p.key)">
-            <el-avatar v-if="p.iconType === 'image'" :src="p.icon" :size="18" style="margin-right: 10px" />
-            <Icon v-else :icon="p.icon" width="18" height="18" style="margin-right: 10px" />
-            {{ p.label }}
-          </el-button>
         </div>
         <template v-if="settingStore.settings.register === 0">
           <div class="switch" @click="show = 'register'" v-if="show === 'login'">{{ $t('noAccount') }}
