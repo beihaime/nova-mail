@@ -6,8 +6,9 @@
     </div>
     <label class="search-shell">
       <AppIcon name="search" :size="18" />
-      <input :placeholder="$t('searchMail')" type="search" />
-      <kbd>⌘ K</kbd>
+      <input v-model="keyword" :placeholder="$t('searchMail')" type="search" @keydown="handleKeydown" />
+      <button v-if="keyword" class="search-clear" type="button" :aria-label="$t('clearSearch')" @click="clear">×</button>
+      <kbd v-else>⌘ K</kbd>
     </label>
     <div class="toolbar">
       <div v-if="uiStore.dark" class="sun-icon icon-item" @click="openDark($event)">
@@ -86,6 +87,7 @@ import {setExtend} from "@/utils/day.js"
 import {accountList} from "@/request/account.js";
 import {useAccountStore} from "@/store/account.js";
 import {useEmailStore} from "@/store/email.js";
+import {useMailSearch} from "@/composables/use-mail-search.js";
 
 const {t} = useI18n();
 const route = useRoute();
@@ -94,6 +96,7 @@ const userStore = useUserStore();
 const uiStore = useUiStore();
 const accountStore = useAccountStore();
 const emailStore = useEmailStore();
+const {keyword, clear, handleKeydown} = useMailSearch();
 const logoutLoading = ref(false)
 const userInfoShow = ref(false)
 const userinfoRef = ref({})
@@ -388,6 +391,8 @@ function formatName(email) {
   :global(.dark .search-shell .app-icon) { filter: var(--nova-ui-icon-filter); opacity: 1; }
   input { width: 100%; min-width: 0; color: inherit; }
   input::placeholder { color: var(--regular-text-color); opacity: .92; }
+  .search-clear { flex: 0 0 auto; width: 22px; height: 22px; border-radius: 50%; color: var(--regular-text-color); font-size: 17px; line-height: 20px; cursor: pointer; }
+  .search-clear:hover { color: var(--el-text-color-primary); background: var(--nova-hover); }
   &:focus-within { border-color: var(--el-color-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--el-color-primary) 12%, transparent); }
   kbd { padding: 2px 6px; white-space: nowrap; font-size: 11px; color: var(--regular-text-color); background: var(--base-fill); border-radius: 5px; }
 }

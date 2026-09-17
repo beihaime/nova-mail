@@ -143,7 +143,7 @@
                        :showUserInfo="showUserInfo"
                        :type="type"/>
       <div class="empty" v-if="noLoading && emailList.length === 0 && !loading">
-        <el-empty :image-size="isMobile ? 120 : null" :description="$t('noMessagesFound')"/>
+        <el-empty :image-size="isMobile ? 120 : null" :description="$t(loadError ? 'searchFailed' : (props.searching ? 'noSearchResults' : 'noMessagesFound'))"/>
       </div>
     </div>
     <el-dropdown
@@ -300,6 +300,10 @@ const props = defineProps({
   showUnread: {
     type: Boolean,
     default: false
+  },
+  searching: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -309,6 +313,7 @@ const settingStore = useSettingStore()
 const uiStore = useUiStore();
 const emailStore = useEmailStore();
 const loading = ref(false);
+const loadError = ref(false);
 const followLoading = ref(false);
 const noLoading = ref(false);
 const emailList = reactive([])
@@ -827,6 +832,7 @@ function getEmailList(refresh = false) {
   } else {
     followLoading.value = !refresh;
   }
+  loadError.value = false;
   let start = Date.now();
 
   props.getEmailList(emailId, queryParam.size).then(async data => {
@@ -857,6 +863,10 @@ function getEmailList(refresh = false) {
     followLoading.value = data.list.length >= queryParam.size;
 
     total.value = data.total;
+  }).catch(error => {
+    loadError.value = true;
+    noLoading.value = true;
+    console.error(error);
   }).finally(() => {
     loading.value = false
     reqLock = false

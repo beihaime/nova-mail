@@ -24,11 +24,37 @@ import account from "../entity/account";
 import { att } from '../entity/att';
 import telegramService from './telegram-service';
 
+const MAX_SEARCH_LENGTH = 200;
+
+function normalizeSearchKeyword(value) {
+	return String(value || '').trim().slice(0, MAX_SEARCH_LENGTH);
+}
+
+function emailKeywordFilters(keyword) {
+	if (!keyword) return [];
+
+	// Escape LIKE metacharacters so a user-entered '%' or '_' remains a literal
+	// search term. The value is still bound through Drizzle's SQL parameters.
+	const escaped = keyword.replace(/[\\%_]/g, '\\$&');
+	const pattern = `%${escaped}%`;
+	const like = (column) => sql`lower(coalesce(${column}, '')) LIKE lower(${pattern}) ESCAPE '\\'`;
+
+	return [or(
+		like(email.name),
+		like(email.sendEmail),
+		like(email.subject),
+		like(email.text),
+		like(email.content),
+		like(email.toEmail),
+		like(email.recipient)
+	)];
+}
+
 const emailService = {
 
 	async list(c, params, userId) {
 
-		let { emailId, type, accountId, size, timeSort, allReceive, full } = params;
+		let { emailId, type, accountId, size, timeSort, allReceive, full, keyword } = params;
 
 		size = Number(size);
 		type = Number(type);
@@ -37,6 +63,7 @@ const emailService = {
 		accountId = Number(accountId);
 		allReceive = Number(allReceive);
 		full = Number(full);
+		keyword = normalizeSearchKeyword(keyword);
 
 		if (isNaN(type)) {
 			type = 0;
@@ -65,8 +92,8 @@ const emailService = {
 			allReceive = accountRow.allReceive;
 		}
 
-		const filters = this.emailListFilters({ userId, accountId, type, allReceive, emailId, timeSort });
-		const countFilters = this.emailListFilters({ userId, accountId, type, allReceive, withCursor: false });
+		const filters = this.emailListFilters({ userId, accountId, type, allReceive, emailId, timeSort, keyword });
+		const countFilters = this.emailListFilters({ userId, accountId, type, allReceive, withCursor: false, keyword });
 		const columns = full ? emailListColumns : emailBriefColumns;
 
 		const query = orm(c)
@@ -113,7 +140,8 @@ const emailService = {
 				eq(email.userId, userId),
 				eq(email.type, type),
 				eq(email.isDel, isDel.NORMAL),
-				allReceive ? undefined : eq(email.accountId, accountId)
+				allReceive ? undefined : eq(email.accountId, accountId),
+				...emailKeywordFilters(keyword)
 			))
 			.orderBy(desc(email.emailId)).limit(1).get();
 
@@ -155,7 +183,7 @@ const emailService = {
 		return list;
 	},
 
-	emailListFilters({ userId, accountId, type, allReceive, emailId, timeSort, withCursor = true }) {
+	emailListFilters({ userId, accountId, type, allReceive, emailId, timeSort, keyword, withCursor = true }) {
 		const conditions = [
 			eq(email.userId, userId),
 			eq(email.type, type),
@@ -168,6 +196,7 @@ const emailService = {
 		if (withCursor && emailId) {
 			conditions.push(timeSort ? gt(email.emailId, emailId) : lt(email.emailId, emailId));
 		}
+		conditions.push(...emailKeywordFilters(keyword));
 		return conditions;
 	},
 
