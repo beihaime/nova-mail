@@ -20,7 +20,7 @@
         <AppIcon name="notifications" :size="20" />
       </div>
       <el-dropdown ref="userinfoRef" @visible-change="e => userInfoShow = e" :teleported="false" popper-class="detail-dropdown">
-        <div class="avatar" @click="openAccountSwitcher" >
+        <div class="avatar" @click.stop="openAccountSwitcher" >
           <img v-if="currentAvatar" class="avatar-image" :src="currentAvatar" alt="" @error="handleAvatarError" />
           <div v-else class="avatar-text">
             <div>{{ formatName(currentAccount.email || userStore.user.email) }}</div>
@@ -175,7 +175,11 @@ function userInfoHide() {
 
 function openAccountSwitcher() {
   if (window.innerWidth < 768) {
-    uiStore.accountShow = true
+    // The mobile account list used to open alongside this dropdown. Keep the
+    // profile interaction single-owned by the account popover; the full
+    // address-management page remains available through Manage addresses.
+    uiStore.accountShow = false
+    userInfoHide()
     return
   }
   userInfoHide()
