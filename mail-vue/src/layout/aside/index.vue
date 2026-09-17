@@ -6,7 +6,7 @@
         <div>{{settingStore.settings.title}}</div>
       </div>
       <button v-perm="'email:send'" class="compose" @click="openCompose">
-        <AppIcon name="compose" :size="18" /> <span>{{ $t('compose') }}</span>
+         <span>{{ $t('compose') }}</span>
       </button>
       <el-menu :collapse="false" style="margin-top: 14px">
         <el-menu-item @click="router.push({name: 'email'})" index="email"
@@ -144,22 +144,6 @@ const openCompose = () => uiStore.writerRef?.open()
   flex-shrink: 0;
 }
 
-.compose {
-  margin: 6px 14px 4px;
-  width: calc(100% - 28px);
-  height: 42px;
-  border-radius: 10px;
-  color: #fff;
-  background: var(--el-color-primary);
-  display: flex;
-  gap: 9px;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  font-weight: 650;
-  transition: filter .16s ease, transform .16s ease;
-}
-
 .compose:hover {
   filter: brightness(.94);
 }
@@ -167,12 +151,6 @@ const openCompose = () => uiStore.writerRef?.open()
 .compose:active {
   transform: scale(.98);
 }
-
-.compose :deep(.app-icon) {
-  width: 19px;
-  height: 19px;
-}
-
 
 .manage-title {
   margin-top: 8px;
