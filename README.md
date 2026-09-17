@@ -1,11 +1,16 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/beihaime/nova-mail/main/mail-vue/src/icons/svg/brand-app-dark.svg" alt="Nova Mail" width="96" />
-</div>
+  <img
+    src="https://raw.githubusercontent.com/beihaime/nova-mail/main/mail-vue/src/icons/svg/brand-app-dark.svg"
+    alt="Nova Mail"
+    width="96"
+  />
 
-# Nova Mail
+  <h1>Nova Mail</h1>
 
-English | [简体中文](README.zh-CN.md)
-
+  <p>
+    <b>English</b> · <a href="README.zh-CN.md">简体中文</a>
+  </p>
+  
 [![MIT License](https://img.shields.io/github/license/beihaime/nova-mail?style=flat)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/beihaime/nova-mail?style=flat)](https://github.com/beihaime/nova-mail/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/beihaime/nova-mail?style=flat)](https://github.com/beihaime/nova-mail/network/members)
@@ -14,6 +19,8 @@ English | [简体中文](README.zh-CN.md)
 [![Vue 3](https://img.shields.io/badge/Vue-3-42b883?style=flat&logo=vuedotjs&logoColor=white)](https://vuejs.org/)
 [![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-f38020?style=flat&logo=cloudflare&logoColor=white)](https://developers.cloudflare.com/workers/)
 [![pnpm](https://img.shields.io/badge/package%20manager-pnpm-f69220?style=flat&logo=pnpm&logoColor=white)](https://pnpm.io/)
+
+</div>
 
 Nova Mail is a modern web mail client based on the open-source [cloud-mail](https://github.com/maillab/cloud-mail) project. It keeps the original Cloudflare-based mail workflow while providing a cleaner interface, multi-address account management, and integrated OAuth authentication.
 
