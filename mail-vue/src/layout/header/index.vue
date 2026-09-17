@@ -39,10 +39,6 @@
                 <span>{{ $t('accountLabel') }}</span>
               </div>
             </div>
-            <div class="primary-address">
-              <span>{{ $t('primaryAddress') }}</span>
-              <button @click="copyEmail(primaryAddress)">{{ primaryAddress }}</button>
-            </div>
             <div class="address-section">
               <div class="address-section-label">{{ $t('mailAddresses') }}</div>
               <div class="address-list" v-if="accounts.length">
@@ -216,24 +212,6 @@ onMounted(() => {
   })
 })
 
-async function copyEmail(email) {
-  try {
-    await navigator.clipboard.writeText(email);
-    ElMessage({
-      message: t('copySuccessMsg'),
-      type: 'success',
-      plain: true,
-    })
-  } catch (err) {
-    console.error(`${t('copyFailMsg')}:`, err);
-    ElMessage({
-      message: t('copyFailMsg'),
-      type: 'error',
-      plain: true,
-    })
-  }
-}
-
 function changeLang(lang) {
   setExtend(lang === 'en' ? 'en' : 'zh-cn')
   settingStore.lang = lang
@@ -312,6 +290,7 @@ function formatName(email) {
 
 :deep(.el-popper.is-pure) {
   border: 1px solid var(--nova-divider);
+  background: var(--nova-surface);
   border-radius: 14px;
   box-shadow: 0 14px 34px color-mix(in srgb, #101828 14%, transparent);
   overflow: hidden;
@@ -330,26 +309,23 @@ function formatName(email) {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 15px 16px 12px;
+    padding: 12px 15px 10px;
     strong, span { display: block; }
     strong { font-size: 14px; color: var(--el-text-color-primary); font-weight: 680; }
     span { margin-top: 2px; font-size: 12px; color: var(--regular-text-color); }
   }
 
   .account-dropdown-avatar {
-    width: 34px; height: 34px; display: grid; place-items: center; flex: 0 0 34px;
+    width: 38px; height: 38px; display: grid; place-items: center; flex: 0 0 38px;
     border-radius: 50%; color: var(--el-color-primary); background: var(--nova-selected);
     border: 1px solid color-mix(in srgb, var(--el-color-primary) 18%, var(--nova-divider)); font-weight: 700;
   }
-  .primary-address { padding: 0 16px 14px; border-bottom: 1px solid var(--nova-divider); }
-  .primary-address span, .address-section-label { display: block; color: var(--regular-text-color); font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-  .primary-address button { display: block; max-width: 100%; padding: 5px 0 0; color: var(--el-text-color-primary); font-size: 13px; font-weight: 560; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
-  .primary-address button:hover { color: var(--el-color-primary); }
+  .address-section-label { display: block; color: var(--regular-text-color); font-size: 11px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; }
   .address-section { display: flex; flex: 1 1 auto; min-height: 0; flex-direction: column; padding-top: 11px; }
-  .address-section-label { padding: 0 16px 6px; }
+  .address-section-label { padding: 1px 15px 8px; }
   .address-list { padding: 0 7px 7px; max-height: min(360px, calc(100vh - 285px)); overflow: auto; }
   .address-option {
-    width: 100%; height: 42px; display: flex; align-items: center; gap: 9px; padding: 0 9px;
+    width: 100%; height: 43px; display: flex; align-items: center; gap: 8px; padding: 0 10px;
     text-align: left; color: var(--el-text-color-primary); border-radius: 8px; cursor: pointer;
     transition: background-color .14s ease;
     .address-email { min-width: 0; flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
