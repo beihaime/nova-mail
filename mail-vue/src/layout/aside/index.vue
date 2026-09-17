@@ -2,7 +2,7 @@
   <el-scrollbar class="scroll">
     <div>
       <div class="title" >
-        <AppIcon class="brand-mark" name="brand-app" :size="28" />
+        <AppIcon class="brand-mark" name="brand-app" :size="44" />
         <div>{{settingStore.settings.title}}</div>
       </div>
       <button v-perm="'email:send'" class="compose" @click="openCompose">
@@ -101,23 +101,27 @@ const openCompose = () => uiStore.writerRef?.open()
 
 .title {
   margin: 12px 14px 8px;
-  height: 38px;
+  height: 48px;
   border-radius: 12px;
   display: flex;
   position: relative;
-  font-size: 16px;
-  font-weight: bold;
+
+  font-size: 19px;
+  font-weight: 700;
+
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: 8px;
+
   color: var(--el-text-color-primary);
   max-width: 240px;
   padding: 0 10px;
+
   > div {
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
-    max-width: calc(240px - 20px - 30px);
+    max-width: calc(240px - 20px - 44px);
   }
 
   :deep(.el-icon) {
@@ -132,13 +136,42 @@ const openCompose = () => uiStore.writerRef?.open()
     right: 8px;
     color: #ffffff;
   }
-
 }
-.brand-mark { width: 28px; height: 28px; }
-.compose { margin: 6px 14px 4px; width: calc(100% - 28px); height: 40px; border-radius: 10px; color: #fff; background: var(--el-color-primary); display: flex; gap: 9px; align-items: center; justify-content: center; cursor: pointer; font-weight: 650; transition: filter .16s ease, transform .16s ease; }
-.compose:hover { filter: brightness(.94); }
-.compose:active { transform: scale(.98); }
-.compose :deep(.app-icon) { width: 18px; height: 18px; }
+
+.brand-mark {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+}
+
+.compose {
+  margin: 6px 14px 4px;
+  width: calc(100% - 28px);
+  height: 42px;
+  border-radius: 10px;
+  color: #fff;
+  background: var(--el-color-primary);
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-weight: 650;
+  transition: filter .16s ease, transform .16s ease;
+}
+
+.compose:hover {
+  filter: brightness(.94);
+}
+
+.compose:active {
+  transform: scale(.98);
+}
+
+.compose :deep(.app-icon) {
+  width: 19px;
+  height: 19px;
+}
 
 
 .manage-title {
