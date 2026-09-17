@@ -23,18 +23,23 @@ function base64Decode(value) {
 }
 
 function isTrustedAuthentication(domain, authResults) {
-	if (!domain || !authResults) return false;
-	const value = String(authResults).toLowerCase();
-	// Require all three aligned authentication mechanisms. The From header alone
-	// is never sufficient to unlock a brand logo.
-	return /\bspf\s*=\s*pass\b/.test(value)
-		&& /\bdkim\s*=\s*pass\b/.test(value)
-		&& /\bdmarc\s*=\s*pass\b/.test(value)
-		&& (!value.includes('header.from=') || value.includes(`header.from=${domain}`));
+	// Authentication-Results, ARC-Authentication-Results and Received-SPF are
+	// part of the raw message and can be supplied by the sender. The Email Worker
+	// currently has no trusted verifier-produced binding for these headers, so
+	// they must not unlock a brand logo. Keep this gate closed until SPF/DKIM and
+	// DMARC are verified by a trusted ingress service and stored with provenance.
+	return false;
 }
 
 function validDomain(value) {
-	const domain = String(value || '').trim().toLowerCase().replace(/\.$/, '');
+	const raw = String(value || '').trim();
+	if (!raw || /[/?#%\\\s]/.test(raw) || raw.includes('@') || raw.includes(':')) return '';
+	let domain = '';
+	try {
+		domain = new URL(`https://${raw}`).hostname.toLowerCase().replace(/\.$/, '');
+	} catch {
+		return '';
+	}
 	return domain.length <= 253 && /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/.test(domain)
 		? domain
 		: '';
