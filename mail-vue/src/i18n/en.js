@@ -199,6 +199,8 @@ const en = {
     addEmailVerification: 'Add Email Verification',
     about: 'About',
     version: 'Version',
+    storageUsage: 'Storage',
+    storageUsageUnavailable: 'Usage unavailable',
     community: 'Community',
     changeTitle: 'Change Title',
     addResendTokenDesc: 'Input to add; leave empty to delete',

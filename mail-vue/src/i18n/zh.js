@@ -199,6 +199,8 @@ const zh = {
     addEmailVerification: '添加验证',
     about: '关于',
     version: '版本',
+    storageUsage: '存储空间',
+    storageUsageUnavailable: '用量暂不可用',
     community: '交流',
     changeTitle: '修改标题',
     addResendTokenDesc: '输入内容添加，不填则删除',

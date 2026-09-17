@@ -284,10 +284,6 @@ function switchDark(nextIsDark, root) {
   uiStore.dark = nextIsDark
 }
 
-function openSend() {
-  uiStore.writerRef.open()
-}
-
 function changeAside() {
   uiStore.asideShow = !uiStore.asideShow
 }
@@ -403,35 +399,6 @@ function formatName(email) {
   kbd { padding: 2px 6px; white-space: nowrap; font-size: 11px; color: var(--regular-text-color); background: var(--base-fill); border-radius: 5px; }
 }
 
-.writer-box {
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-left: 2px;
-
-  .writer {
-    width: 34px;
-    height: 34px;
-    border-radius: 9px;
-    color: #ffffff;
-    background: var(--el-color-primary);
-    transition: filter .16s ease, transform .16s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    .writer-text {
-      margin-left: 15px;
-      font-size: 14px;
-      font-weight: bold;;
-    }
-  }
-  &:hover .writer { filter: brightness(.94); }
-  &:active .writer { transform: scale(.96); }
-  .app-icon { width: 18px; height: 18px; }
-}
-
 .header-btn {
   display: inline-flex;
   align-items: center;
@@ -516,7 +483,6 @@ function formatName(email) {
   .header { height: auto; min-height: 58px; padding: 8px 12px; gap: 8px; grid-template-columns: auto 1fr auto; }
   .header.not-send { grid-template-columns: auto 1fr; }
   .search-shell { display: none; }
-  .writer-box { margin-left: 0; }
   .toolbar .notice { display: none; }
   .toolbar .setting-icon { display: none; }
   .toolbar .avatar { margin-left: 2px; }

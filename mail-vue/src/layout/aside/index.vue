@@ -70,6 +70,16 @@
       </el-menu>
     </div>
   </el-scrollbar>
+  <footer class="aside-footer">
+    <div class="storage-usage">
+      <AppIcon name="folder-nav" :size="17" />
+      <div>
+        <span>{{ $t('storageUsage') }}</span>
+        <small>{{ $t('storageUsageUnavailable') }}</small>
+      </div>
+    </div>
+    <div class="aside-version">Nova Mail · v{{ appVersion }}</div>
+  </footer>
 </template>
 
 <script setup>
@@ -77,10 +87,12 @@ import router from "@/router/index.js";
 import { useRoute } from "vue-router";
 import {useSettingStore} from "@/store/setting.js";
 import {useUiStore} from "@/store/ui.js";
+import packageInfo from '../../../package.json'
 
 const settingStore = useSettingStore();
 const route = useRoute();
 const uiStore = useUiStore();
+const appVersion = packageInfo.version
 const openCompose = () => uiStore.writerRef?.open()
 
 </script>
@@ -186,6 +198,14 @@ const openCompose = () => uiStore.writerRef?.open()
 }
 
 .scroll {
-
+  height: calc(100% - 82px);
 }
+
+.aside-footer { padding: 8px 18px 14px; color: var(--secondary-text-color); }
+.storage-usage { display: flex; align-items: flex-start; gap: 9px; padding: 10px 0 11px; border-top: 1px solid var(--light-border); }
+.storage-usage > .app-icon { flex: 0 0 auto; opacity: .72; }
+.storage-usage div { min-width: 0; display: grid; gap: 2px; }
+.storage-usage span { font-size: 11px; font-weight: 600; color: var(--regular-text-color); }
+.storage-usage small { font-size: 10px; line-height: 1.35; color: var(--secondary-text-color); }
+.aside-version { padding-top: 9px; border-top: 1px solid var(--light-border); font-size: 10px; text-align: center; opacity: .72; }
 </style>

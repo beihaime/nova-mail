@@ -1360,4 +1360,34 @@ ul {
   margin: 0;
 }
 
+/* Compact desktop mail rows: keep the list dense and columns stable while
+   preserving the existing virtual-list item height (48px). */
+@media (min-width: 768px) {
+  :deep(.email-row:not(.all-email)) {
+    display: grid;
+    grid-template-columns: 24px 30px minmax(0, 1fr) 82px;
+    align-items: center;
+    gap: 8px;
+    height: 48px;
+    min-height: 48px;
+    padding: 4px 14px;
+  }
+  :deep(.email-row:not(.all-email) .checkbox) { padding: 0; }
+  :deep(.email-row:not(.all-email) .pc-star) { width: 30px; justify-content: center; }
+  :deep(.email-row:not(.all-email) .title) {
+    display: grid;
+    grid-template-columns: minmax(130px, 30%) minmax(0, 1fr) !important;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+  :deep(.email-row:not(.all-email) .email-sender) { min-width: 0; }
+  :deep(.email-row:not(.all-email) .email-text) { min-width: 0; display: block; }
+  :deep(.email-row:not(.all-email) .email-subject) { min-width: 0; display: inline-flex; max-width: 100%; }
+  :deep(.email-row:not(.all-email) .email-content) { display: inline; padding-left: 6px; }
+  :deep(.email-row:not(.all-email) .email-right) { display: block; padding-left: 0; text-align: right; }
+  :deep(.email-row:not(.all-email) .email-time) { padding-right: 0; }
+  :deep(.email-row:not(.all-email) .user-info) { display: none; }
+}
+
 </style>

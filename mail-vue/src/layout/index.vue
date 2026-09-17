@@ -27,6 +27,7 @@
     </button>
     <button v-perm="'email:send'" class="mobile-compose" @click="writerRef?.open()">
       <AppIcon name="compose" :size="20" />
+      <span>{{ $t('compose') }}</span>
     </button>
     <button :class="{active: route.name === 'star'}" @click="router.push({name: 'star'})">
       <AppIcon name="starred-nav" :size="19" /><span>{{ $t('starred') }}</span>
@@ -160,7 +161,8 @@ onBeforeUnmount(() => {
   .mobile-nav button :deep(.app-icon) { width: 19px; height: 19px; opacity: .75; }
   .mobile-nav button.active { color: var(--el-color-primary); font-weight: 650; }
   .mobile-nav button.active :deep(.app-icon) { opacity: 1; }
-  .mobile-nav .mobile-compose { place-self: center; width: 46px; height: 46px; min-height: 46px; border-radius: 50%; background: var(--el-color-primary); box-shadow: 0 4px 12px color-mix(in srgb, var(--el-color-primary) 35%, transparent); transform: translateY(-9px); }
-  .mobile-nav .mobile-compose :deep(.app-icon) { width: 21px; height: 21px; opacity: 1; }
+  .mobile-nav .mobile-compose { place-self: center; width: 100%; height: 48px; min-height: 48px; border-radius: 10px; color: var(--el-color-primary); background: transparent; box-shadow: none; transform: none; }
+  .mobile-nav .mobile-compose :deep(.app-icon) { width: 19px; height: 19px; opacity: 1; }
+  .mobile-nav .mobile-compose span { font-size: 10px; font-weight: 650; }
 }
 </style>

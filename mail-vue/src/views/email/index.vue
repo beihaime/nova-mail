@@ -14,6 +14,7 @@
                :time-sort="params.timeSort"
                :email-read="emailRead"
                :show-unread="true"
+               :show-account-icon="false"
                actionLeft="4px"
                @jump="jumpContent"
   >
