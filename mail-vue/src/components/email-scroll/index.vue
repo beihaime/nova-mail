@@ -1453,4 +1453,134 @@ ul {
   }
 }
 
+/* Mobile rows use one stable two-column layout. The checkbox owns the first
+   column; all message content stays together in the second column so the
+   avatar, sender, time, subject and preview cannot drift apart. */
+@media (max-width: 767px) {
+  :deep(.email-row:not(.all-email)) {
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr);
+    column-gap: 8px;
+    align-items: start;
+    height: 83px;
+    min-height: 83px;
+    padding: 8px 12px;
+    box-sizing: border-box;
+  }
+
+  :deep(.email-row:not(.all-email) > .checkbox) {
+    grid-column: 1;
+    grid-row: 1;
+    width: 18px;
+    height: 18px;
+    align-self: start;
+    justify-content: flex-start;
+    padding: 0;
+    margin-top: 2px;
+  }
+
+  /* The desktop star column is hidden on touch layouts; the inline star in
+     the sender header remains available when starring is enabled. */
+  :deep(.email-row:not(.all-email) > :nth-child(2)) {
+    display: none;
+  }
+
+  :deep(.email-row:not(.all-email) > .title) {
+    grid-column: 2;
+    grid-row: 1;
+    width: 100%;
+    min-width: 0;
+    display: block;
+    padding: 0;
+  }
+
+  :deep(.email-row:not(.all-email) .email-sender) {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    line-height: 28px;
+  }
+
+  :deep(.email-row:not(.all-email) .email-sender > div:first-child:empty) {
+    display: none;
+  }
+
+  :deep(.email-row:not(.all-email) .name) {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 6px;
+  }
+
+  :deep(.email-row:not(.all-email) .name > span:first-child) {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  :deep(.email-row:not(.all-email) .name .sender-avatar) {
+    width: 28px !important;
+    height: 28px !important;
+    flex: 0 0 28px !important;
+  }
+
+  :deep(.email-row:not(.all-email) .name > span:first-child > :last-child) {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  :deep(.email-row:not(.all-email) .phone-time) {
+    min-width: max-content;
+    padding: 0;
+    color: var(--secondary-text-color);
+    font-size: 12px;
+    line-height: 28px;
+    white-space: nowrap;
+  }
+
+  :deep(.email-row:not(.all-email) .email-text) {
+    display: block;
+    min-width: 0;
+    width: 100%;
+    margin-top: 2px;
+    overflow: hidden;
+  }
+
+  :deep(.email-row:not(.all-email) .email-subject),
+  :deep(.email-row:not(.all-email) .email-content) {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  :deep(.email-row:not(.all-email) .email-subject) {
+    line-height: 20px;
+  }
+
+  :deep(.email-row:not(.all-email) .email-content) {
+    margin-top: 1px;
+    padding-left: 0;
+    color: var(--regular-text-color);
+    font-size: 13px;
+    line-height: 20px;
+  }
+
+  :deep(.email-row:not(.all-email) > .email-right) {
+    display: none;
+  }
+}
+
 </style>
