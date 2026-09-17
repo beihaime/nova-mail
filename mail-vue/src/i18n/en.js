@@ -201,6 +201,7 @@ const en = {
     version: 'Version',
     storageUsage: 'Storage',
     storageUsageUnavailable: 'Usage unavailable',
+    manageAddressesDesc: 'Manage the email addresses connected to your account.',
     community: 'Community',
     changeTitle: 'Change Title',
     addResendTokenDesc: 'Input to add; leave empty to delete',

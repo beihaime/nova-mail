@@ -42,6 +42,16 @@ const routes = [
                 }
             },
             {
+                path: '/settings/addresses',
+                name: 'addresses',
+                component: () => import('@/views/addresses/index.vue'),
+                meta: {
+                    title: 'manageAddresses',
+                    name: 'addresses',
+                    menu: true
+                }
+            },
+            {
                 path: '/starred',
                 name: 'star',
                 component: () => import('@/views/star/index.vue'),

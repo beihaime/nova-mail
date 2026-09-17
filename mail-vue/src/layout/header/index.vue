@@ -196,7 +196,7 @@ function selectAccount(account) {
 
 function openManageAddresses() {
   userinfoRef.value.handleClose()
-  uiStore.accountShow = true
+  router.push({ name: 'addresses' })
 }
 
 async function loadAccounts() {

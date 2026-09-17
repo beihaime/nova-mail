@@ -1,11 +1,18 @@
 <template>
-  <div class="account-box">
+  <div class="account-box" :class="{ 'address-page': pageMode }">
+    <div v-if="pageMode" class="address-page-intro">
+      <div>
+        <h1>{{ $t('manageAddresses') }}</h1>
+        <p>{{ $t('manageAddressesDesc') }}</p>
+      </div>
+    </div>
     <div class="account-switcher-identity">
       <div class="account-switcher-avatar">{{ primaryAddress?.[0]?.toUpperCase() }}</div>
       <div><strong>{{ userStore.user.name || primaryAddress }}</strong><span>{{ $t('accountLabel') }}</span></div>
       <small>{{ $t('primaryAddress') }} · {{ primaryAddress }}</small>
     </div>
     <div class="head-opt">
+      <span v-if="pageMode" class="address-page-action-label">{{ $t('addAccount') }}</span>
       <AppIcon v-perm="'account:add'" class="icon add" name="add" :size="21" @click="add"/>
       <AppIcon class="icon refresh" name="refresh" :size="18" @click="refresh"/>
     </div>
@@ -154,6 +161,8 @@ import {useI18n} from "vue-i18n";
 import {AccountAllReceiveEnum} from "@/enums/account-enum.js";
 
 const {t} = useI18n();
+const props = defineProps({ pageMode: { type: Boolean, default: false } })
+const pageMode = computed(() => props.pageMode)
 const userStore = useUserStore();
 const accountStore = useAccountStore();
 const settingStore = useSettingStore();
@@ -656,6 +665,49 @@ path[fill="#ffdda1"] {
   .item-choose {
     background: var(--choose-account-background);
   }
+
+  &.address-page {
+    height: 100%;
+    border-right: 0 !important;
+    overflow: hidden auto;
+    background: var(--el-bg-color);
+
+    .address-page-intro {
+      display: flex;
+      align-items: center;
+      min-height: 86px;
+      padding: 22px 28px 15px;
+      border-bottom: 1px solid var(--nova-divider);
+      h1 { margin: 0; color: var(--el-text-color-primary); font-size: 24px; line-height: 1.2; font-weight: 700; }
+      p { margin: 7px 0 0; color: var(--regular-text-color); font-size: 13px; }
+    }
+    .address-page-action-label { margin-right: auto; color: var(--el-text-color-primary); font-size: 13px; font-weight: 650; }
+    .account-switcher-identity { display: none; }
+
+    .head-opt {
+      max-width: 1040px;
+      height: 48px;
+      margin: 0 auto;
+      padding: 0 28px;
+      box-shadow: none;
+      border-bottom: 1px solid var(--nova-divider);
+    }
+
+    .scrollbar {
+      height: calc(100% - 134px);
+      max-width: 1040px;
+      margin: 0 auto;
+      padding-top: 12px;
+    }
+
+    .item {
+      margin: 0 28px 8px;
+      padding: 11px 14px;
+      border: 1px solid var(--nova-divider);
+      box-shadow: none;
+      .account { margin-bottom: 11px; }
+    }
+  }
 }
 
 
@@ -685,6 +737,14 @@ path[fill="#ffdda1"] {
   width: 100px;
   opacity: 0;
   pointer-events: none;
+}
+
+@media (max-width: 767px) {
+  .account-box.address-page .address-page-intro { min-height: 82px; padding: 18px 16px 13px; }
+  .account-box.address-page .address-page-intro h1 { font-size: 21px; }
+  .account-box.address-page .head-opt { padding: 0 16px; }
+  .account-box.address-page .scrollbar { height: calc(100% - 130px); padding-top: 10px; }
+  .account-box.address-page .item { margin: 0 12px 8px; }
 }
 
 :deep(.el-pagination .el-select) {
