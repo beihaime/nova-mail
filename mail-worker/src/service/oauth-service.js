@@ -113,54 +113,6 @@ const oauthService = {
 		return await this.saveAndLogin(c, userInfo)
 	},
 
-	async googleLogin(c, params) {
-
-		const { code, redirectUri } = params;
-		assertSafeRedirectUri(c, redirectUri);
-
-		const setting = await settingService.query(c);
-		this.assertEnabled(setting, 'googleSwitch');
-
-		const reqParams = new URLSearchParams()
-		reqParams.append('client_id', setting.googleClientId)
-		reqParams.append('client_secret', setting.googleClientSecret)
-		reqParams.append('code', code)
-		reqParams.append('redirect_uri', redirectUri)
-		reqParams.append('grant_type', 'authorization_code')
-
-		const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
-			method: "POST",
-			headers: { "Content-Type": "application/x-www-form-urlencoded" },
-			body: reqParams.toString()
-		});
-
-		if (!tokenRes.ok) {
-			throw new BizError(tokenRes.statusText);
-		}
-
-		const token = await tokenRes.json();
-
-		const userRes = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
-			headers: {
-				Authorization: 'Bearer ' + token.access_token
-			}
-		});
-
-		if (!userRes.ok) {
-			throw new BizError(userRes.statusText);
-		}
-
-		const userInfo = await userRes.json();
-
-		userInfo.oauthUserId = String(userInfo.sub);
-		userInfo.username = userInfo.email;
-		userInfo.name = userInfo.name;
-		userInfo.avatar = userInfo.picture;
-		userInfo.platform = 'google';
-
-		return await this.saveAndLogin(c, userInfo);
-	},
-
 	async saveAndLogin(c, userInfo) {
 
 		const oauthRow = await this.saveUser(c, userInfo);

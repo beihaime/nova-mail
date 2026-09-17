@@ -178,7 +178,7 @@ import {cvtR2Url} from "@/utils/convert.js";
 import {loginUserInfo} from "@/request/my.js";
 import {permsToRouter} from "@/perm/perm.js";
 import {useI18n} from "vue-i18n";
-import {githubOauthComplete, oauthBindUser, oauthLinuxDoLogin, oauthGoogleLogin} from "@/request/ouath.js";
+import {githubOauthComplete, googleOauthComplete, oauthBindUser, oauthLinuxDoLogin} from "@/request/ouath.js";
 import brandMark from '@/icons/svg/brand-mark.svg'
 
 const {t} = useI18n();
@@ -204,7 +204,7 @@ const oauthProvider = computed(() => {
 
 const oauthProviders = computed(() => {
   const allProviders = [
-    { key: 'google', label: 'Google', icon: 'devicon:google', iconType: 'iconify' },
+    { key: 'google', label: t('continueWithGoogle'), icon: 'devicon:google', iconType: 'iconify' },
     { key: 'linuxdo', label: 'LinuxDo', icon: '/image/linuxdo.webp', iconType: 'image' },
   ]
   return allProviders.filter(p => settingStore.settings[p.key + 'Switch'] === 0)
@@ -297,6 +297,11 @@ const getEmailName = (email) => {
 }
 
 function oauthLogin(provider) {
+  if (provider === 'google') {
+    const apiBase = (import.meta.env.VITE_BASE_URL || '/api').replace(/\/$/, '')
+    window.location.assign(`${apiBase}/oauth/google/login`)
+    return
+  }
   const clientId = settingStore.settings[provider + 'ClientId']
   const redirectUri = encodeURIComponent(window.location.origin + '/login')
   sessionStorage.setItem('oauthProvider', provider)
@@ -309,7 +314,6 @@ function oauthLogin(provider) {
 
 const loginFns = {
   linuxdo: oauthLinuxDoLogin,
-  google: oauthGoogleLogin,
 }
 
 oauthGetUser();
@@ -332,6 +336,23 @@ async function oauthGetUser() {
       return
     }
     const messageKey = githubStatus === 'unlinked' ? 'githubNotLinked' : 'githubLoginFailed'
+    ElMessage({ message: t(messageKey), type: 'warning', plain: true })
+    return
+  }
+  const googleStatus = params.get('google')
+  if (googleStatus) {
+    window.history.replaceState({}, '', window.location.origin + window.location.pathname)
+    if (googleStatus === 'complete' && grant) {
+      oauthLoading.value = true
+      try {
+        const data = await googleOauthComplete(grant)
+        await saveToken(data.token)
+      } catch {
+        oauthLoading.value = false
+      }
+      return
+    }
+    const messageKey = googleStatus === 'unlinked' ? 'googleNotLinked' : googleStatus === 'denied' ? 'googleAuthorizationCancelled' : 'googleLoginFailed'
     ElMessage({ message: t(messageKey), type: 'warning', plain: true })
     return
   }

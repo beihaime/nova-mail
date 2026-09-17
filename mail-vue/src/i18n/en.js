@@ -379,12 +379,20 @@ const en = {
     connect: 'Connect',
     disconnect: 'Disconnect',
     connectGithubDesc: 'Connect your GitHub account',
+    connectGoogleDesc: 'Connect your Google account',
     continueWithGithub: 'Continue with GitHub',
+    continueWithGoogle: 'Continue with Google',
     orContinueWith: 'or',
     githubNotLinked: 'This GitHub account is not linked to a Nova Mail account. Sign in with your password, then connect it in Settings.',
     githubLoginFailed: 'GitHub sign-in could not be completed. Please try again.',
     githubDisconnected: 'GitHub account disconnected',
     disconnectGithubConfirm: 'Disconnect this GitHub account? You will no longer be able to sign in with it.',
+    googleNotLinked: 'This Google account is not linked to a Nova Mail account. Sign in with your password, then connect it in Settings.',
+    googleLoginFailed: 'Google sign-in could not be completed. Please try again.',
+    googleAuthorizationCancelled: 'Google authorization was cancelled.',
+    googleDisconnected: 'Google account disconnected',
+    googleConnected: 'Google account connected successfully',
+    disconnectGoogleConfirm: 'Disconnect this Google account? You will no longer be able to sign in with it.',
 }
 
 export default en

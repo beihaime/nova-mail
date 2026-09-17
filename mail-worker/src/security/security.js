@@ -15,7 +15,9 @@ const publicRoutes = new Set([
 	'POST /webhooks',
 	'POST /public/genToken',
 	'POST /oauth/linuxDo/login',
-	'POST /oauth/google/login',
+	'GET /oauth/google/login',
+	'GET /oauth/google/callback',
+	'POST /oauth/google/complete',
 	'GET /oauth/github/login',
 	'GET /oauth/github/callback',
 	'POST /oauth/github/complete'

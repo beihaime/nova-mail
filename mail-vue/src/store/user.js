@@ -1,12 +1,14 @@
 import { defineStore } from 'pinia'
 import {loginUserInfo} from "@/request/my.js";
-import {githubConnectedAccount} from "@/request/ouath.js";
+import {githubConnectedAccount, googleConnectedAccount} from "@/request/ouath.js";
 
 export const useUserStore = defineStore('user', {
     state: () => ({
         user: {},
         githubAvatar: '',
         githubConnected: false,
+        googleAvatar: '',
+        googleConnected: false,
         refreshList: 0,
     }),
     actions: {
@@ -29,6 +31,18 @@ export const useUserStore = defineStore('user', {
             } catch {
                 this.githubConnected = false
                 this.githubAvatar = ''
+                return { connected: false }
+            }
+        },
+        async refreshGoogleAccount() {
+            try {
+                const account = await googleConnectedAccount()
+                this.googleConnected = Boolean(account?.connected)
+                this.googleAvatar = account?.connected && account?.avatarUrl ? account.avatarUrl : ''
+                return account
+            } catch {
+                this.googleConnected = false
+                this.googleAvatar = ''
                 return { connected: false }
             }
         }

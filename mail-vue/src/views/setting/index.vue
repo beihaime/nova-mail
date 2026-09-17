@@ -52,6 +52,26 @@
         <el-button v-if="githubAccount.connected" @click="disconnectGithub" :loading="githubLoading">{{$t('disconnect')}}</el-button>
         <el-button v-else type="primary" @click="connectGithub" :loading="githubLoading">{{$t('connect')}}</el-button>
       </div>
+      <div class="connected-account-row">
+        <div class="connected-account-details">
+          <el-avatar
+            v-if="googleAccount.connected && googleAccount.avatarUrl"
+            :src="googleAccount.avatarUrl"
+            :size="32"
+            @error="handleGoogleAvatarError"
+          />
+          <span v-else class="provider-mark google-mark" aria-hidden="true">
+            <Icon icon="devicon:google" width="18" height="18" />
+          </span>
+          <div>
+            <div class="provider-name">Google</div>
+            <div class="provider-status" v-if="googleAccount.connected">{{ googleAccount.email }} · {{$t('connected')}}</div>
+            <div class="provider-status" v-else>{{$t('connectGoogleDesc')}}</div>
+          </div>
+        </div>
+        <el-button v-if="googleAccount.connected" @click="disconnectGoogle" :loading="googleLoading">{{$t('disconnect')}}</el-button>
+        <el-button v-else type="primary" @click="connectGoogle" :loading="googleLoading">{{$t('connect')}}</el-button>
+      </div>
     </div>
     <div class="language">
       <div class="title">{{$t('language')}}</div>
@@ -88,23 +108,27 @@ import {onMounted, reactive, ref, defineOptions} from 'vue'
 import {resetPassword, userDelete} from "@/request/my.js";
 import {useUserStore} from "@/store/user.js";
 import router from "@/router/index.js";
+import {useRoute} from "vue-router";
 import {accountSetName} from "@/request/account.js";
 import {useAccountStore} from "@/store/account.js";
 import {useI18n} from "vue-i18n";
 import {useSettingStore} from "@/store/setting.js";
-import {connectGithubAccount, disconnectGithubAccount, githubConnectedAccount} from '@/request/ouath.js';
+import {connectGithubAccount, disconnectGithubAccount, githubConnectedAccount, connectGoogleAccount, disconnectGoogleAccount, googleConnectedAccount} from '@/request/ouath.js';
 import {Icon} from '@iconify/vue';
 
 const { t } = useI18n()
 const accountStore = useAccountStore()
 const settingStore = useSettingStore()
 const userStore = useUserStore();
+const route = useRoute();
 const setPwdLoading = ref(false)
 const setNameShow = ref(false)
 const accountName = ref(null)
 const langSelect = ref(settingStore.lang)
 const githubLoading = ref(false)
 const githubAccount = reactive({ connected: false, login: '', avatarUrl: '' })
+const googleLoading = ref(false)
+const googleAccount = reactive({ connected: false, email: '', avatarUrl: '' })
 
 defineOptions({
   name: 'setting'
@@ -116,6 +140,14 @@ onMounted(async () => {
     Object.assign(githubAccount, account)
     userStore.githubConnected = Boolean(account?.connected)
     userStore.githubAvatar = account?.connected && account?.avatarUrl ? account.avatarUrl : ''
+    const google = await googleConnectedAccount()
+    Object.assign(googleAccount, google)
+    userStore.googleConnected = Boolean(google?.connected)
+    userStore.googleAvatar = google?.connected && google?.avatarUrl ? google.avatarUrl : ''
+    const status = route.query.google
+    if (status === 'connected') ElMessage({ message: t('googleConnected'), type: 'success', plain: true })
+    if (status === 'failed') ElMessage({ message: t('googleLoginFailed'), type: 'warning', plain: true })
+    if (status === 'denied') ElMessage({ message: t('googleAuthorizationCancelled'), type: 'warning', plain: true })
   } catch {
     // The endpoint can be unavailable until the non-destructive migration runs.
   }
@@ -130,6 +162,41 @@ async function connectGithub() {
   } finally {
     githubLoading.value = false
   }
+}
+
+async function connectGoogle() {
+  if (googleLoading.value) return
+  googleLoading.value = true
+  try {
+    const { authorizeUrl } = await connectGoogleAccount()
+    window.location.assign(authorizeUrl)
+  } finally {
+    googleLoading.value = false
+  }
+}
+
+function handleGoogleAvatarError() {
+  googleAccount.avatarUrl = ''
+  userStore.googleAvatar = ''
+}
+
+function disconnectGoogle() {
+  ElMessageBox.confirm(t('disconnectGoogleConfirm'), {
+    confirmButtonText: t('disconnect'),
+    cancelButtonText: t('cancel'),
+    type: 'warning',
+  }).then(async () => {
+    googleLoading.value = true
+    try {
+      await disconnectGoogleAccount()
+      Object.assign(googleAccount, { connected: false, email: '', avatarUrl: '' })
+      userStore.googleConnected = false
+      userStore.googleAvatar = ''
+      ElMessage({ message: t('googleDisconnected'), type: 'success', plain: true })
+    } finally {
+      googleLoading.value = false
+    }
+  })
 }
 
 function handleGithubAvatarError() {
@@ -395,6 +462,17 @@ function submitPwd() {
       background: var(--el-fill-color);
       color: var(--el-text-color-primary);
     }
+
+    .provider-mark {
+      width: 32px;
+      height: 32px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--el-fill-color);
+    }
+
+    .google-mark { background: var(--el-bg-color); }
 
     .provider-name { font-weight: 600; }
     .provider-status { color: var(--el-text-color-secondary); font-size: 13px; margin-top: 2px; }

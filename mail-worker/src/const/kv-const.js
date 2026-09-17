@@ -7,6 +7,8 @@ const KvConst = {
 	OAUTH_BIND: 'oauth-bind:',
 	OAUTH_GITHUB_STATE: 'oauth-github-state:',
 	OAUTH_GITHUB_COMPLETE: 'oauth-github-complete:',
+	OAUTH_GOOGLE_STATE: 'oauth-google-state:',
+	OAUTH_GOOGLE_COMPLETE: 'oauth-google-complete:',
 	RATE_LIMIT: 'rate-limit:'
 }
 

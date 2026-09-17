@@ -21,7 +21,7 @@
       </div>
       <el-dropdown ref="userinfoRef" @visible-change="e => userInfoShow = e" :teleported="false" popper-class="detail-dropdown">
         <div class="avatar" @click="openAccountSwitcher" >
-          <img v-if="userStore.githubAvatar" class="avatar-image" :src="userStore.githubAvatar" alt="" @error="handleGithubAvatarError" />
+          <img v-if="currentAvatar" class="avatar-image" :src="currentAvatar" alt="" @error="handleAvatarError" />
           <div v-else class="avatar-text">
             <div>{{ formatName(currentAccount.email || userStore.user.email) }}</div>
           </div>
@@ -34,7 +34,7 @@
         <template #dropdown>
           <div class="user-details">
             <div class="account-dropdown-head">
-              <img v-if="userStore.githubAvatar" class="account-dropdown-avatar account-dropdown-avatar-image" :src="userStore.githubAvatar" alt="" @error="handleGithubAvatarError" />
+              <img v-if="currentAvatar" class="account-dropdown-avatar account-dropdown-avatar-image" :src="currentAvatar" alt="" @error="handleAvatarError" />
               <div v-else class="account-dropdown-avatar">{{ formatName(primaryAddress) }}</div>
               <div>
                 <strong>{{ accountDisplayName }}</strong>
@@ -102,6 +102,7 @@ const accounts = ref([])
 const currentAccount = computed(() => accountStore.currentAccount || {})
 const primaryAddress = computed(() => userStore.user.email || currentAccount.value.email || '')
 const accountDisplayName = computed(() => userStore.user.name || formatName(primaryAddress.value))
+const currentAvatar = computed(() => userStore.githubAvatar || userStore.googleAvatar)
 
 const accountCount = computed(() => {
   return userStore.user.role.accountCount
@@ -213,10 +214,12 @@ onMounted(() => {
     accounts.value = []
   })
   userStore.refreshGithubAccount()
+  userStore.refreshGoogleAccount()
 })
 
-function handleGithubAvatarError() {
-  userStore.githubAvatar = ''
+function handleAvatarError() {
+  if (userStore.githubAvatar) userStore.githubAvatar = ''
+  else userStore.googleAvatar = ''
 }
 
 function changeLang(lang) {
