@@ -112,7 +112,10 @@ defineOptions({
 
 onMounted(async () => {
   try {
-    Object.assign(githubAccount, await githubConnectedAccount())
+    const account = await githubConnectedAccount()
+    Object.assign(githubAccount, account)
+    userStore.githubConnected = Boolean(account?.connected)
+    userStore.githubAvatar = account?.connected && account?.avatarUrl ? account.avatarUrl : ''
   } catch {
     // The endpoint can be unavailable until the non-destructive migration runs.
   }
@@ -133,6 +136,7 @@ function handleGithubAvatarError() {
   // The connection is still valid if GitHub temporarily declines the avatar
   // request. Fall back to the provider mark instead of a broken image.
   githubAccount.avatarUrl = ''
+  userStore.githubAvatar = ''
 }
 
 function disconnectGithub() {
@@ -145,6 +149,8 @@ function disconnectGithub() {
     try {
       await disconnectGithubAccount()
       Object.assign(githubAccount, { connected: false, login: '', avatarUrl: '' })
+      userStore.githubConnected = false
+      userStore.githubAvatar = ''
       ElMessage({ message: t('githubDisconnected'), type: 'success', plain: true })
     } finally {
       githubLoading.value = false

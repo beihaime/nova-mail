@@ -21,7 +21,8 @@
       </div>
       <el-dropdown ref="userinfoRef" @visible-change="e => userInfoShow = e" :teleported="false" popper-class="detail-dropdown">
         <div class="avatar" @click="openAccountSwitcher" >
-          <div class="avatar-text">
+          <img v-if="userStore.githubAvatar" class="avatar-image" :src="userStore.githubAvatar" alt="" @error="handleGithubAvatarError" />
+          <div v-else class="avatar-text">
             <div>{{ formatName(currentAccount.email || userStore.user.email) }}</div>
           </div>
           <div class="account-summary">
@@ -33,7 +34,8 @@
         <template #dropdown>
           <div class="user-details">
             <div class="account-dropdown-head">
-              <div class="account-dropdown-avatar">{{ formatName(primaryAddress) }}</div>
+              <img v-if="userStore.githubAvatar" class="account-dropdown-avatar account-dropdown-avatar-image" :src="userStore.githubAvatar" alt="" @error="handleGithubAvatarError" />
+              <div v-else class="account-dropdown-avatar">{{ formatName(primaryAddress) }}</div>
               <div>
                 <strong>{{ accountDisplayName }}</strong>
                 <span>{{ $t('accountLabel') }}</span>
@@ -210,7 +212,12 @@ onMounted(() => {
   loadAccounts().catch(() => {
     accounts.value = []
   })
+  userStore.refreshGithubAccount()
 })
+
+function handleGithubAvatarError() {
+  userStore.githubAvatar = ''
+}
 
 function changeLang(lang) {
   setExtend(lang === 'en' ? 'en' : 'zh-cn')
@@ -321,6 +328,7 @@ function formatName(email) {
     border-radius: 50%; color: var(--el-color-primary); background: var(--nova-selected);
     border: 1px solid color-mix(in srgb, var(--el-color-primary) 18%, var(--nova-divider)); font-weight: 700;
   }
+  .account-dropdown-avatar-image { display: block; object-fit: cover; border: 0; }
   .address-section-label { display: block; align-self: flex-start; width: 100%; color: var(--regular-text-color); font-size: 11px; font-weight: 650; letter-spacing: .08em; text-align: left; text-transform: uppercase; }
   .address-section { display: flex; flex: 1 1 auto; min-height: 0; flex-direction: column; padding-top: 11px; }
   .address-section-label { padding: 1px 15px 8px; }
@@ -432,6 +440,14 @@ function formatName(email) {
       align-items: center;
       border-radius: 50%;
       border: 1px solid var(--nova-divider);
+    }
+
+    .avatar-image {
+      width: 33px;
+      height: 33px;
+      flex: 0 0 33px;
+      border-radius: 50%;
+      object-fit: cover;
     }
 
     .setting-icon {
