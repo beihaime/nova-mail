@@ -33,8 +33,17 @@ const dbInit = {
 		await this.v3_2DB(c);
 		await this.v3_3DB(c);
 		await this.v3_4DB(c);
+		await this.v3_5DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
+	},
+
+	async v3_5DB(c) {
+		try {
+			await c.env.db.prepare(`ALTER TABLE email ADD COLUMN auth_results TEXT NOT NULL DEFAULT '';`).run();
+		} catch (e) {
+			console.warn(`跳过邮件认证字段：${e.message}`);
+		}
 	},
 
 	async v3_4DB(c) {

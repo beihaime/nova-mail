@@ -70,6 +70,7 @@
                   <div v-else></div>
                   <span class="name">
                     <span>
+                      <SenderAvatar :email="item" :size="28" />
                       <div class="unread" v-if="isMobile && (item.unread === EmailUnreadEnum.UNREAD && showUnread) "/>
                       <slot name="name" :email="item"> {{ item.name }}</slot>
                     </span>
@@ -250,6 +251,7 @@ import {useI18n} from "vue-i18n";
 import {EmailUnreadEnum} from "@/enums/email-enum.js";
 import { UseVirtualList } from '@vueuse/components'
 import { useScroll } from '@vueuse/core'
+import SenderAvatar from '@/components/sender-avatar/index.vue'
 
 const props = defineProps({
   getEmailList: Function,
@@ -1105,6 +1107,9 @@ function loadData() {
         }
 
         > span:first-child {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
           overflow: hidden;
           white-space: nowrap;
           text-overflow: ellipsis;

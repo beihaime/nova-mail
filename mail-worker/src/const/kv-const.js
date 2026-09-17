@@ -9,7 +9,8 @@ const KvConst = {
 	OAUTH_GITHUB_COMPLETE: 'oauth-github-complete:',
 	OAUTH_GOOGLE_STATE: 'oauth-google-state:',
 	OAUTH_GOOGLE_COMPLETE: 'oauth-google-complete:',
-	RATE_LIMIT: 'rate-limit:'
+	RATE_LIMIT: 'rate-limit:',
+	BRAND_LOGO: 'brand-logo:'
 }
 
 export default KvConst;

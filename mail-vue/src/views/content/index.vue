@@ -20,10 +20,7 @@
         <div class="content">
           <div class="email-info">
             <div class="message-meta">
-              <div class="sender-avatar" aria-hidden="true">
-                <img v-if="senderAvatar && !senderAvatarFailed" :src="senderAvatar" alt="" @error="senderAvatarFailed = true" />
-                <span v-else>{{ senderInitial }}</span>
-              </div>
+              <SenderAvatar :email="email" :size="40" />
               <div class="sender-details">
                 <div class="sender-line">
                   <strong>{{ email.name || email.sendEmail }}</strong>
@@ -107,6 +104,7 @@ import {allEmailDelete} from "@/request/all-email.js";
 import {useUiStore} from "@/store/ui.js";
 import {useI18n} from "vue-i18n";
 import {EmailUnreadEnum} from "@/enums/email-enum.js";
+import SenderAvatar from '@/components/sender-avatar/index.vue'
 
 const uiStore = useUiStore();
 const settingStore = useSettingStore();
@@ -123,10 +121,6 @@ const email = computed(() => emailStore.contentData.email || {
 const showPreview = ref(false)
 const srcList = reactive([])
 const showMetadata = ref(false)
-const senderAvatarFailed = ref(false)
-
-const senderAvatar = computed(() => email.value.avatar || email.value.avatarUrl || email.value.senderAvatar || '')
-const senderInitial = computed(() => (email.value.name || email.value.sendEmail || '?').trim().charAt(0).toUpperCase())
 const recipientLabel = computed(() => formatAddressList(email.value.recipient) || '—')
 
 const { t } = useI18n()
@@ -135,7 +129,6 @@ watch(() => accountStore.currentAccountId, () => {
 })
 
 watch(() => email.value.emailId, () => {
-  senderAvatarFailed.value = false
   showMetadata.value = false
 })
 

@@ -121,6 +121,7 @@ export async function email(message, env, ctx) {
 			inReplyTo: email.inReplyTo,
 			relation: email.references,
 			messageId: email.messageId,
+			authResults: extractAuthResults(email.headers),
 			userId: account ? account.userId : 0,
 			accountId: account ? account.accountId : 0,
 			isDel: isDel.DELETE,
@@ -200,6 +201,16 @@ export async function email(message, env, ctx) {
 		console.error('邮件接收异常: ', e);
 		throw e
 	}
+}
+
+function extractAuthResults(headers = []) {
+	if (!Array.isArray(headers)) return '';
+	return headers
+		.filter(header => ['authentication-results', 'arc-authentication-results', 'received-spf'].includes(String(header?.key || '').toLowerCase()))
+		.map(header => String(header.value || '').replace(/[\r\n]+/g, ' ').trim())
+		.filter(Boolean)
+		.join('\n')
+		.slice(0, 8192);
 }
 
 function checkBlock(blackSubjectStr, blackContentStr, blackFromStr, email) {
