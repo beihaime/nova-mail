@@ -99,6 +99,38 @@ const openCompose = () => uiStore.writerRef?.open()
 
 <style lang="scss" scoped>
 
+.compose {
+  margin: 6px 14px 4px;
+  width: calc(100% - 28px);
+  height: 42px;
+
+  border: none;
+  border-radius: 10px;
+
+  color: #fff;
+  background: var(--el-color-primary);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  cursor: pointer;
+  font-weight: 650;
+
+  transition:
+    filter .16s ease,
+    transform .16s ease;
+}
+
+.compose:hover {
+  filter: brightness(.94);
+}
+
+.compose:active {
+  transform: scale(.98);
+}
+
+
 .title {
   margin: 12px 14px 8px;
   height: 48px;
@@ -144,13 +176,6 @@ const openCompose = () => uiStore.writerRef?.open()
   flex-shrink: 0;
 }
 
-.compose:hover {
-  filter: brightness(.94);
-}
-
-.compose:active {
-  transform: scale(.98);
-}
 
 .manage-title {
   margin-top: 8px;

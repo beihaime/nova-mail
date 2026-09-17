@@ -1375,8 +1375,16 @@ ul {
     min-height: 48px;
     padding: 4px 14px;
   }
-  :deep(.email-row:not(.all-email) .checkbox) { padding: 0; }
-  :deep(.email-row:not(.all-email) .pc-star) { width: 30px; justify-content: center; }
+
+  :deep(.email-row:not(.all-email) .checkbox) {
+    padding: 0;
+  }
+
+  :deep(.email-row:not(.all-email) .pc-star) {
+    width: 30px;
+    justify-content: center;
+  }
+
   :deep(.email-row:not(.all-email) .title) {
     display: grid;
     grid-template-columns: minmax(130px, 30%) minmax(0, 1fr) !important;
@@ -1384,13 +1392,60 @@ ul {
     gap: 10px;
     min-width: 0;
   }
-  :deep(.email-row:not(.all-email) .email-sender) { min-width: 0; }
-  :deep(.email-row:not(.all-email) .email-text) { min-width: 0; display: block; }
-  :deep(.email-row:not(.all-email) .email-subject) { min-width: 0; display: inline-flex; max-width: 100%; }
-  :deep(.email-row:not(.all-email) .email-content) { display: inline; padding-left: 6px; }
-  :deep(.email-row:not(.all-email) .email-right) { display: block; padding-left: 0; text-align: right; }
-  :deep(.email-row:not(.all-email) .email-time) { padding-right: 0; }
-  :deep(.email-row:not(.all-email) .user-info) { display: none; }
+
+  :deep(.email-row:not(.all-email) .email-sender) {
+    min-width: 0;
+  }
+
+  :deep(.email-row:not(.all-email) .email-text) {
+    min-width: 0;
+    width: 100%;
+    overflow: hidden;
+
+    display: grid;
+    grid-template-columns: minmax(0, 45%) minmax(0, 1fr);
+    align-items: center;
+  }
+
+  :deep(.email-row:not(.all-email) .email-subject) {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+
+    display: flex;
+    align-items: center;
+  }
+
+  :deep(.email-row:not(.all-email) .subject-text) {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  :deep(.email-row:not(.all-email) .email-content) {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    padding-left: 6px;
+  }
+
+  :deep(.email-row:not(.all-email) .email-right) {
+    display: block;
+    padding-left: 0;
+    text-align: right;
+  }
+
+  :deep(.email-row:not(.all-email) .email-time) {
+    padding-right: 0;
+  }
+
+  :deep(.email-row:not(.all-email) .user-info) {
+    display: none;
+  }
 }
 
 </style>
