@@ -2,7 +2,7 @@
   <div :class="accountShow && hasPerm('account:query') ? 'main-box-show' : 'main-box-hide'">
     <div :class="accountShow && hasPerm('account:query') ? 'block-show' : 'block-hide'" @click="uiStore.accountShow = false"></div>
     <account  :class="accountShow && hasPerm('account:query') ? 'show' : 'hide'" />
-    <div v-if="isDesktopReading" ref="workspaceRef" class="desktop-mail-workspace" :style="workspaceStyle">
+    <div v-if="isDesktopReading" ref="workspaceRef" class="desktop-mail-workspace" :class="{ 'reader-expanded': uiStore.readerExpanded }" :style="workspaceStyle">
       <EmailPane class="desktop-message-list" />
       <div
           class="mail-splitter"
@@ -75,6 +75,10 @@ watch(() => uiStore.changeNotice, () => {
 
 watch(() => uiStore.changePreview, () => {
   showNotice(uiStore.previewData)
+})
+
+watch(() => route.name, (name) => {
+  if (name !== 'content') uiStore.readerExpanded = false
 })
 
 function showNotice(data) {
@@ -255,6 +259,15 @@ function resetPaneWidth() {
 
 .desktop-message-list { min-width: 0; }
 .desktop-reading-pane { min-width: 0; }
+
+.desktop-mail-workspace.reader-expanded {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.desktop-mail-workspace.reader-expanded .desktop-message-list,
+.desktop-mail-workspace.reader-expanded .mail-splitter {
+  display: none;
+}
 
 .mail-splitter {
   position: relative;

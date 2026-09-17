@@ -90,7 +90,10 @@
                         </slot>
                       </span>
                     </span>
-                    <span class="email-content">{{ item.listText || item.text || '\u200B' }}</span>
+                    <!-- Keep list previews sourced from the list payload only.  The
+                         detail `text` field is populated when a message is opened
+                         and must never leak back into a row. -->
+                    <span v-if="item.listText" class="email-content">{{ item.listText }}</span>
                   </div>
                   <div class="user-info" v-if="showUserInfo">
                     <div class="user">

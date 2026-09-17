@@ -4,6 +4,7 @@ export const useUiStore = defineStore('ui', {
     state: () => ({
         asideShow: window.innerWidth > 1024,
         accountShow: false,
+        readerExpanded: false,
         backgroundLoading: true,
         changeNotice: 0,
         writerRef: null,

@@ -3,6 +3,9 @@
     <div class="header-actions">
       <AppIcon class="icon" name="back" :size="20" @click="handleBack"/>
       <AppIcon v-perm="'email:delete'" class="icon" name="delete-outline" :size="18" @click="handleDelete"/>
+      <button class="reader-expand" type="button" :aria-label="uiStore.readerExpanded ? 'Collapse reader' : 'Expand reader'" @click="uiStore.readerExpanded = !uiStore.readerExpanded">
+        <AppIcon class="icon" name="fullscreen" :size="19" :class="{ 'is-expanded': uiStore.readerExpanded }" />
+      </button>
       <span class="star" v-if="emailStore.contentData.showStar">
         <AppIcon class="icon" @click="changeStar" v-if="email.isStar" name="star-filled" :size="20"/>
         <AppIcon class="icon" @click="changeStar" v-else name="star-outline" :size="19"/>
@@ -298,6 +301,18 @@ const handleDelete = () => {
     padding: 7px;
     &:hover { background: var(--base-fill); }
   }
+
+  .reader-expand {
+    display: inline-flex;
+    padding: 0;
+    color: inherit;
+    cursor: pointer;
+  }
+  .reader-expand .is-expanded { transform: rotate(180deg); }
+}
+
+@media (max-width: 1023px) {
+  .reader-expand { display: none !important; }
 }
 
 
