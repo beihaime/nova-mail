@@ -1009,6 +1009,7 @@ function loadData() {
     }
   }
   &:hover { background: var(--nova-hover); }
+  &:active { background: var(--nova-selected); }
   .user-info {
     display: flex;
     flex-wrap: wrap;
@@ -1024,7 +1025,7 @@ function loadData() {
       overflow: hidden;
       white-space: nowrap;
       text-overflow: ellipsis;
-      transition: all 300ms;
+      transition: color var(--nova-motion-base) var(--nova-motion-ease), opacity var(--nova-motion-base) var(--nova-motion-ease);
       line-height: 12px;
       max-width: 300px;
       min-width: 0;

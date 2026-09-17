@@ -77,14 +77,14 @@ onBeforeUnmount(() => {
   height: 100%;
   z-index: 100;
   transform: translateX(-100%);
-  transition: all 100ms ease;
+  transition: transform var(--nova-motion-base) var(--nova-motion-ease), box-shadow var(--nova-motion-base) var(--nova-motion-ease);
 }
 
 .aside-show {
   -webkit-box-shadow: var(--aside-right-border);
   box-shadow: var(--aside-right-border);
   transform: translateX(0);
-  transition: all 100ms ease;
+  transition: transform var(--nova-motion-base) var(--nova-motion-ease), box-shadow var(--nova-motion-base) var(--nova-motion-ease);
   z-index: 101;
   @media (max-width: 1025px) {
     position: fixed;
@@ -98,7 +98,7 @@ onBeforeUnmount(() => {
 
 .el-aside {
   width: auto;
-  transition: all 100ms ease;
+  transition: transform var(--nova-motion-base) var(--nova-motion-ease), box-shadow var(--nova-motion-base) var(--nova-motion-ease);
 }
 
 .layout {
@@ -142,7 +142,8 @@ onBeforeUnmount(() => {
   height: 100vh;
   background: rgba(0, 0, 0, 0.4);
   z-index: 99;
-  transition: all 0.3s;
+  transition: opacity var(--nova-motion-base) var(--nova-motion-ease), background-color var(--nova-motion-base) var(--nova-motion-ease);
+  opacity: 1;
 }
 
 .overlay-hide {
@@ -174,7 +175,7 @@ onBeforeUnmount(() => {
     background: transparent;
     box-shadow: 0 6px 16px color-mix(in srgb, var(--el-color-primary) 30%, transparent);
     transform: translateY(-6px);
-    transition: transform .16s ease, box-shadow .16s ease;
+    transition: transform var(--nova-motion-fast) var(--nova-motion-ease), box-shadow var(--nova-motion-fast) var(--nova-motion-ease), filter var(--nova-motion-fast) var(--nova-motion-ease);
   }
   .mobile-nav .mobile-compose:hover,
   .mobile-nav .mobile-compose:focus-visible {
@@ -182,6 +183,7 @@ onBeforeUnmount(() => {
     box-shadow: 0 8px 20px color-mix(in srgb, var(--el-color-primary) 38%, transparent);
     transform: translateY(-7px);
   }
+  .mobile-nav .mobile-compose:active { transform: translateY(-6px) scale(.94); filter: brightness(.98); }
   .mobile-nav .mobile-compose :deep(.app-icon) {
     width: 50px;
     height: 50px;

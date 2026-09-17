@@ -151,6 +151,10 @@ button, input, select, textarea {
     --nova-shadow: 0 10px 32px rgba(23, 35, 52, .08);
     --nova-ui-icon-filter: none;
     --nova-ui-icon-filter-hover: none;
+    --nova-motion-fast: 140ms;
+    --nova-motion-base: 180ms;
+    --nova-motion-slow: 240ms;
+    --nova-motion-ease: cubic-bezier(.2, .8, .2, 1);
 }
 
 .dark {
@@ -188,6 +192,40 @@ button, input, select, textarea {
     /* The UI SVGs are raster-backed assets, so they cannot inherit currentColor. */
     --nova-ui-icon-filter: brightness(0) invert(78%);
     --nova-ui-icon-filter-hover: brightness(0) invert(92%);
+}
+
+/* Keep the product responsive without making routine mail actions feel animated. */
+button:not(:disabled),
+.el-button:not(.is-disabled) {
+    transition: background-color var(--nova-motion-fast) var(--nova-motion-ease),
+                border-color var(--nova-motion-fast) var(--nova-motion-ease),
+                color var(--nova-motion-fast) var(--nova-motion-ease),
+                box-shadow var(--nova-motion-fast) var(--nova-motion-ease),
+                transform var(--nova-motion-fast) var(--nova-motion-ease);
+}
+
+@keyframes nova-view-in {
+    from { opacity: 0; transform: translate3d(8px, 0, 0); }
+    to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes nova-popover-in {
+    from { opacity: 0; transform: translate3d(0, -6px, 0) scale(.98); }
+    to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@keyframes nova-fade-scale-in {
+    from { opacity: 0; transform: scale(.9); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: .01ms !important;
+    }
 }
 
 /* Shared Nova Mail surface language.  Component styles keep the existing behavior. */

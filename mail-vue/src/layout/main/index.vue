@@ -123,18 +123,18 @@ const handleResize = () => {
     background: #000000;
     opacity: 0.6;
     z-index: 10;
-    transition: all 300ms;
+    transition: opacity var(--nova-motion-base) var(--nova-motion-ease), background-color var(--nova-motion-base) var(--nova-motion-ease);
   }
 }
 
 .block-hide {
   position: fixed;
   pointer-events: none;
-  transition: all 300ms;
+  transition: opacity var(--nova-motion-base) var(--nova-motion-ease), background-color var(--nova-motion-base) var(--nova-motion-ease);
 }
 
 .show {
-  transition: all 100ms;
+  animation: nova-popover-in var(--nova-motion-base) var(--nova-motion-ease) both;
   @media (max-width: 767px) {
     position: fixed;
     z-index: 100;
@@ -143,7 +143,7 @@ const handleResize = () => {
 }
 
 .hide {
-  transition: all 100ms;
+  transition: opacity var(--nova-motion-base) var(--nova-motion-ease), transform var(--nova-motion-base) var(--nova-motion-ease);
   position: fixed;
   transform: translateX(-100%);
   opacity: 0;
@@ -182,6 +182,7 @@ const handleResize = () => {
 
 .main-view {
   background: var(--el-bg-color);
+  animation: nova-view-in var(--nova-motion-base) var(--nova-motion-ease) both;
 }
 
 .desktop-mail-workspace {
@@ -191,6 +192,7 @@ const handleResize = () => {
   min-height: 0;
   height: 100%;
   background: var(--el-bg-color);
+  animation: nova-view-in var(--nova-motion-base) var(--nova-motion-ease) both;
 }
 
 .desktop-message-list { min-width: 0; }

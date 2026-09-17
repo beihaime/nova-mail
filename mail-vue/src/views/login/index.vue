@@ -686,6 +686,7 @@ function submitRegister() {
   display: flex;
   align-items: center;
   justify-content: center;
+  animation: nova-login-card-in 300ms var(--nova-motion-ease) 60ms both;
   @media (max-width: 767px) {
     width: 100%;
   }
@@ -924,6 +925,7 @@ function submitRegister() {
   display: flex;
   align-items: center;
   gap: 12px;
+  animation: nova-login-brand-in 300ms var(--nova-motion-ease) both;
 
   color: #334155;
   text-shadow: none;
@@ -948,6 +950,16 @@ function submitRegister() {
     color: #64748b;
     opacity: 1;
   }
+}
+
+@keyframes nova-login-brand-in {
+  from { opacity: 0; transform: translate3d(0, -4px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes nova-login-card-in {
+  from { opacity: 0; transform: translate3d(0, 10px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 
 .login-copyright { position: fixed; z-index: 5; left: 34px; bottom: 24px; color: rgba(255,255,255,.72); font-size: 12px; }

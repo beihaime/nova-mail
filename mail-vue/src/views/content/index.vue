@@ -307,6 +307,7 @@ const handleDelete = () => {
   height: 100%;
   overflow: hidden;
   position: relative;
+  animation: nova-view-in var(--nova-motion-base) var(--nova-motion-ease) both;
 }
 
 .header-actions {
