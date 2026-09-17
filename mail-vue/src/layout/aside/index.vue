@@ -222,14 +222,14 @@ const openCompose = () => uiStore.writerRef?.open()
 /* Most navigation assets are embedded monochrome PNGs inside their SVG files.
  * Keep the active brand/blue icon untouched, while lifting inactive icons only
  * in dark mode so they remain readable without changing the light theme. */
-:global(.dark) :deep(.el-menu-item:not(.choose-item) .app-icon) {
+:global(.dark .el-menu-item:not(.choose-item) .app-icon) {
   filter: var(--nova-ui-icon-filter);
   opacity: 1;
 }
-:global(.dark) :deep(.el-menu-item:not(.choose-item):hover .app-icon) {
+:global(.dark .el-menu-item:not(.choose-item):hover .app-icon) {
   filter: var(--nova-ui-icon-filter-hover);
 }
-:global(.dark) .storage-usage > .app-icon {
+:global(.dark .storage-usage > .app-icon) {
   filter: var(--nova-ui-icon-filter);
   opacity: 1;
 }
