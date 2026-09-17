@@ -913,15 +913,42 @@ function submitRegister() {
   display: flex;
   align-items: center;
   gap: 12px;
-  color: #fff;
-  text-shadow: 0 1px 12px rgba(15,23,42,.24);
-  img { width: 38px; height: 38px; object-fit: contain; }
-  strong { display: block; font-size: 18px; letter-spacing: -.02em; }
-  span { display: block; margin-top: 3px; font-size: 12px; opacity: .82; }
+
+  color: #334155;
+  text-shadow: none;
+
+  img {
+    width: 38px;
+    height: 38px;
+    object-fit: contain;
+  }
+
+  strong {
+    display: block;
+    font-size: 18px;
+    letter-spacing: -.02em;
+    color: #334155;
+  }
+
+  span {
+    display: block;
+    margin-top: 3px;
+    font-size: 12px;
+    color: #64748b;
+    opacity: 1;
+  }
 }
 
 .login-copyright { position: fixed; z-index: 5; left: 34px; bottom: 24px; color: rgba(255,255,255,.72); font-size: 12px; }
-.login-quiet-tagline { position: fixed; z-index: 5; left: 34px; top: 150px; color: rgba(255,255,255,.86); font-size: 14px; letter-spacing: .12em; }
+.login-quiet-tagline {
+  position: fixed;
+  z-index: 5;
+  left: 34px;
+  top: 150px;
+  color: #475569;
+  font-size: 14px;
+  letter-spacing: .12em;
+}
 
 @media (max-width: 767px) {
   .login-brand { top: 22px; left: 22px; }
