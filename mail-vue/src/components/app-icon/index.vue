@@ -2,6 +2,7 @@
   <img
       class="app-icon"
       :class="{ 'is-decorative': decorative }"
+      :data-icon-name="resolvedName"
       :src="source"
       :alt="label || ''"
       :width="size"

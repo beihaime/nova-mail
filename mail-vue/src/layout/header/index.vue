@@ -385,6 +385,7 @@ function formatName(email) {
   border-radius: 10px;
   transition: border-color .16s ease, box-shadow .16s ease;
   .app-icon { opacity: .68; }
+  :global(.dark) & .app-icon { filter: var(--nova-ui-icon-filter); opacity: 1; }
   input { width: 100%; min-width: 0; color: inherit; }
   input::placeholder { color: var(--regular-text-color); opacity: .92; }
   &:focus-within { border-color: var(--el-color-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--el-color-primary) 12%, transparent); }
@@ -428,6 +429,15 @@ function formatName(email) {
 
   .icon-item:hover {
     background: var(--base-fill);
+  }
+
+  :global(.dark) .icon-item .app-icon {
+    filter: var(--nova-ui-icon-filter);
+    opacity: 1;
+  }
+
+  :global(.dark) .icon-item:hover .app-icon {
+    filter: var(--nova-ui-icon-filter-hover);
   }
 
   .notice { margin-right: 4px; }
