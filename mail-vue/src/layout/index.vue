@@ -25,9 +25,9 @@
     <button @click="uiStore.asideShow = true">
       <AppIcon name="folder-nav" :size="19" /><span>{{ $t('folders') }}</span>
     </button>
-    <button v-perm="'email:send'" class="mobile-compose" @click="writerRef?.open()">
-      <AppIcon name="compose" :size="20" />
-      <span>{{ $t('compose') }}</span>
+    <button v-perm="'email:send'" class="mobile-compose" :aria-label="$t('compose')" @click="writerRef?.open()">
+      <AppIcon name="mail-action" :size="50" />
+      <span class="mobile-compose-label">{{ $t('compose') }}</span>
     </button>
     <button :class="{active: route.name === 'star'}" @click="router.push({name: 'star'})">
       <AppIcon name="starred-nav" :size="19" /><span>{{ $t('starred') }}</span>
@@ -163,8 +163,31 @@ onBeforeUnmount(() => {
   .mobile-nav button.active :deep(.app-icon) { opacity: 1; }
   :global(.dark .mobile-nav button:not(.active) .app-icon) { filter: var(--nova-ui-icon-filter); opacity: 1; }
   :global(.dark .mobile-nav button:not(.active):hover .app-icon) { filter: var(--nova-ui-icon-filter-hover); }
-  .mobile-nav .mobile-compose { place-self: center; width: 100%; height: 48px; min-height: 48px; border-radius: 10px; color: var(--el-color-primary); background: transparent; box-shadow: none; transform: none; }
-  .mobile-nav .mobile-compose :deep(.app-icon) { width: 19px; height: 19px; opacity: 1; }
-  .mobile-nav .mobile-compose span { font-size: 10px; font-weight: 650; }
+  .mobile-nav .mobile-compose {
+    place-self: center;
+    width: 52px;
+    height: 52px;
+    min-height: 52px;
+    padding: 0;
+    border-radius: 999px;
+    color: #fff;
+    background: transparent;
+    box-shadow: 0 6px 16px color-mix(in srgb, var(--el-color-primary) 30%, transparent);
+    transform: translateY(-6px);
+    transition: transform .16s ease, box-shadow .16s ease;
+  }
+  .mobile-nav .mobile-compose:hover,
+  .mobile-nav .mobile-compose:focus-visible {
+    background: transparent;
+    box-shadow: 0 8px 20px color-mix(in srgb, var(--el-color-primary) 38%, transparent);
+    transform: translateY(-7px);
+  }
+  .mobile-nav .mobile-compose :deep(.app-icon) {
+    width: 50px;
+    height: 50px;
+    opacity: 1;
+    filter: none !important;
+  }
+  .mobile-nav .mobile-compose-label { display: none; }
 }
 </style>
