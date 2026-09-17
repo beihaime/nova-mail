@@ -1,28 +1,23 @@
 import axios from "axios";
 import router from "@/router";
-import {ElMessage} from "element-plus";
-import i18n from '@/i18n';
+import i18n from "@/i18n/index.js";
+import {useSettingStore} from "@/store/setting.js";
 
-const http = {}
+let http = axios.create({
+    baseURL: import.meta.env.VITE_BASE_URL
+});
 
-const service = axios.create({
-    timeout: 60000
-})
-
-service.interceptors.request.use(config => {
-    config.headers.Authorization = localStorage.getItem('token')
+http.interceptors.request.use(config => {
+    const { lang } = useSettingStore();
+    config.headers.Authorization = `${localStorage.getItem('token')}`
+    config.headers['accept-language'] = lang
     return config
-}, error => {
-    console.log(error)
-    return Promise.reject(error);
 })
 
-service.interceptors.response.use(
-    response => {
+http.interceptors.response.use((res) => {
 
         return new Promise((resolve, reject) => {
 
-            const res = response
             const noMsg = res.config.noMsg;
             const data = res.data
 
@@ -65,7 +60,7 @@ service.interceptors.response.use(
                 ElMessage({
                     dangerouslyUseHTMLString: true,
                     message: data.message,
-                    type: 'warning',
+                    type: 'error',
                     plain: true,
                     grouping: true,
                     repeatNum: -4,
@@ -80,17 +75,11 @@ service.interceptors.response.use(
                     repeatNum: -4,
                 })
                 reject(data)
-            }  else {
-                resolve(data.data)
             }
-
+            resolve(data.data)
         })
-
     },
-
-    error => {
-
-        console.log(error)
+    (error) => {
 
         if (error.status === 429) {
             ElMessage({
@@ -100,14 +89,18 @@ service.interceptors.response.use(
                 grouping: true,
                 repeatNum: -4,
             })
-        } else if (error.status === 403) {
-            ElMessage({
-                message: i18n.global.t('permissionAlertMsg'),
-                type: 'warning',
-                plain: true,
-                grouping: true,
-                repeatNum: -4,
-            })
+            return Promise.reject(error)
+        }
+
+        if (error.status === 403) {
+            location.reload();
+            return;
+        }
+
+        const noMsg = error.config.noMsg;
+
+        if (noMsg) {
+            return Promise.reject(error)
         } else if (error.message.includes('Network Error')) {
             ElMessage({
                 message: i18n.global.t('networkErrorMsg'),
@@ -116,15 +109,15 @@ service.interceptors.response.use(
                 grouping: true,
                 repeatNum: -4,
             })
-        } else if (error.message.includes('timeout')) {
+        } else if (error.code === 'ECONNABORTED') {
             ElMessage({
                 message: i18n.global.t('timeoutErrorMsg'),
                 type: 'error',
                 plain: true,
-                grouping: true,
-                repeatNum: -4,
+                grouping: true
             })
-        } else if (error.message.includes('Request failed with status code')) {
+            ElMessage.error('')
+        } else if (error.response) {
             ElMessage({
                 message: i18n.global.t('serverBusyErrorMsg'),
                 type: 'error',
@@ -145,3 +138,4 @@ service.interceptors.response.use(
     })
 
 export default http
+
