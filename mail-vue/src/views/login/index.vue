@@ -2,8 +2,6 @@
   <div id="login-box" :class="{ 'has-custom-background': background }" :style="background" v-loading="oauthLoading" element-loading-text="登录中...">
     <div class="login-scene" aria-hidden="true">
       <div class="login-sky-glow"></div>
-      <div class="login-mountain login-mountain-far"></div>
-      <div class="login-mountain login-mountain-near"></div>
     </div>
     <header class="login-brand">
       <img :src="brandMark" alt="Nova Mail" />

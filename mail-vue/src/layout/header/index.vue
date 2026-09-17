@@ -9,11 +9,6 @@
       <input :placeholder="$t('searchMail')" type="search" />
       <kbd>⌘ K</kbd>
     </label>
-      <div v-perm="'email:send'" class="writer-box" @click="openSend">
-        <div class="writer">
-        <AppIcon name="compose" :size="18" />
-      </div>
-    </div>
     <div class="toolbar">
       <div v-if="uiStore.dark" class="sun-icon icon-item" @click="openDark($event)">
         <AppIcon name="theme-toggle" :size="20" />
@@ -382,7 +377,7 @@ function formatName(email) {
   height: 100%;
   gap: 12px;
   padding: 0 14px;
-  grid-template-columns: minmax(92px, auto) minmax(220px, 1fr) auto auto;
+  grid-template-columns: minmax(92px, auto) minmax(220px, 1fr) auto;
 }
 
 .header.not-send {
