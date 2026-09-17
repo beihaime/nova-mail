@@ -17,7 +17,11 @@ export default {
 			return app.fetch(req, env, ctx);
 		}
 
-		 if (['/static/','/attachments/'].some(p => url.pathname.startsWith(p))) {
+		 // Private mail attachments must only be served by the authenticated /api/oss/* route.
+		 if (url.pathname.startsWith('/attachments/')) {
+			 return new Response('Not found', { status: 404, headers: { 'Cache-Control': 'no-store' } });
+		 }
+		 if (url.pathname.startsWith('/static/')) {
 			 return await kvObjService.toObjResp( { env }, url.pathname.substring(1));
 		 }
 

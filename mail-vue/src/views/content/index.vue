@@ -43,7 +43,7 @@
             <el-alert v-if="email.status === 5" :closable="false" :title="$t('delayed')" class="email-msg" type="warning" show-icon />
           </div>
           <el-scrollbar class="htm-scrollbar" :class="!email.attList?.length ? 'bottom-distance' : ''">
-            <ShadowHtml class="shadow-html" :html="formatImage(email.content)" v-if="email.content" />
+            <ShadowHtml class="shadow-html" :html="renderedContent" v-if="email.content" />
             <pre v-else class="email-text" >{{email.text}}</pre>
           </el-scrollbar>
           <div class="att" v-if="email.attList?.length > 0">
@@ -63,9 +63,7 @@
                 <div class="att-size">{{ formatBytes(att.size) }}</div>
                 <div class="opt-icon att-icon">
                   <Icon v-if="isImage(att.filename)" icon="hugeicons:view" width="22" height="22" @click="showImage(att.key)"/>
-                  <a :href="cvtR2Url(att.key)" download>
-                    <AppIcon name="download-outline" :size="22" />
-                  </a>
+                  <AppIcon name="download-outline" :size="22" @click="downloadAttachment(att)" />
                 </div>
               </div>
             </div>
@@ -81,7 +79,7 @@
         v-if="showPreview"
         :url-list="srcList"
         show-progress
-        @close="showPreview = false"
+        @close="closePreview"
     />
   </div>
 </template>
@@ -97,7 +95,7 @@ import {useAccountStore} from "@/store/account.js";
 import {formatDetailDate} from "@/utils/day.js";
 import {starAdd, starCancel} from "@/request/star.js";
 import {getExtName, formatBytes} from "@/utils/file-utils.js";
-import {cvtR2Url,toOssDomain} from "@/utils/convert.js";
+import {fetchPrivateAttachment, resolvePrivateMailImages} from '@/utils/private-attachments.js'
 import {getIconByName} from "@/utils/icon-utils.js";
 import {useSettingStore} from "@/store/setting.js";
 import {allEmailDelete} from "@/request/all-email.js";
@@ -120,6 +118,8 @@ const email = computed(() => emailStore.contentData.email || {
 })
 const showPreview = ref(false)
 const srcList = reactive([])
+const renderedContent = ref('')
+let previewUrl = null
 const showMetadata = ref(false)
 const recipientLabel = computed(() => formatAddressList(email.value.recipient) || '—')
 
@@ -131,6 +131,15 @@ watch(() => accountStore.currentAccountId, () => {
 watch(() => email.value.emailId, () => {
   showMetadata.value = false
 })
+
+watch(() => [email.value.emailId, email.value.content, settingStore.settings.r2Domain], async (_value, _old, onCleanup) => {
+  let cancelled = false
+  onCleanup(() => { cancelled = true })
+  renderedContent.value = ''
+  if (!email.value.content) return
+  const html = await resolvePrivateMailImages(email.value.content, settingStore.settings.r2Domain)
+  if (!cancelled) renderedContent.value = html
+}, { immediate: true })
 
 let readRequesting = false
 
@@ -173,6 +182,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  closePreview()
   emailStore.contentData.showUnread = false;
   readRequesting = false
   window.removeEventListener('keydown', handleKeyDown);
@@ -206,18 +216,38 @@ function toMessage(message) {
   return  message ? JSON.parse(message).message : '';
 }
 
-function formatImage(content) {
-  content = content || '';
-  const domain = settingStore.settings.r2Domain;
-  return  content.replace(/{{domain}}/g, toOssDomain(domain) + '/');
+async function showImage(key) {
+  if (!isImage(key)) return;
+  try {
+    const blob = await fetchPrivateAttachment(key)
+    closePreview()
+    previewUrl = URL.createObjectURL(blob)
+    srcList.push(previewUrl)
+    showPreview.value = true
+  } catch {
+    ElMessage.error(t('reqFailErrorMsg'))
+  }
 }
 
-function showImage(key) {
-  if (!isImage(key)) return;
-  const url = cvtR2Url(key)
+function closePreview() {
+  showPreview.value = false
   srcList.length = 0
-  srcList.push(url)
-  showPreview.value = true
+  if (previewUrl) URL.revokeObjectURL(previewUrl)
+  previewUrl = null
+}
+
+async function downloadAttachment(att) {
+  try {
+    const blob = await fetchPrivateAttachment(att.key, false)
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = att.filename || 'attachment'
+    link.click()
+    setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  } catch {
+    ElMessage.error(t('reqFailErrorMsg'))
+  }
 }
 
 function isImage(filename) {

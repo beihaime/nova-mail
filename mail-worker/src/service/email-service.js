@@ -292,8 +292,6 @@ const emailService = {
 
 		const { resendTokens, r2Domain, send, domainList } = await settingService.query(c);
 
-		let { imageDataList, html } = await attService.toImageUrlHtml(c, content);
-
 		//判断是否关闭发件功能
 		if (send === settingConst.send.CLOSE) {
 			throw new BizError(t('disabledSend'), 403);
@@ -363,6 +361,8 @@ const emailService = {
 		if (!useCloudflareEmail && !resendToken && !allInternal) {
 			throw new BizError(t('noSendProvider'));
 		}
+		// Only resolve user-supplied object keys after sender ownership and send permission checks.
+		let { imageDataList, html } = await attService.toImageUrlHtml(c, content, userId);
 
 		//没有发件人名字自动截取
 		if (!name) {

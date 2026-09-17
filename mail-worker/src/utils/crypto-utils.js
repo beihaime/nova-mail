@@ -74,6 +74,10 @@ const saltHashUtils = {
 		return legacy === storedHash;
 	},
 
+	isLegacyPasswordHash(storedHash) {
+		return typeof storedHash === 'string' && /^[A-Za-z0-9+/]{43}=$/.test(storedHash);
+	},
+
 	genRandomPwd(length = 12) {
 		const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 		const bytes = new Uint8Array(length);

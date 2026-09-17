@@ -20,6 +20,9 @@ import { toUtc } from '../utils/date-uitil';
 import { t } from '../i18n/i18n.js';
 import verifyRecordService from './verify-record-service';
 import rateLimitUtils from '../utils/rate-limit-utils';
+import orm from '../entity/orm';
+import user from '../entity/user';
+import { and, eq } from 'drizzle-orm';
 
 const loginService = {
 
@@ -230,8 +233,20 @@ const loginService = {
 			throw new BizError(t('isBanUser'));
 		}
 
-		if (!await cryptoUtils.verifyPassword(password, userRow.salt, userRow.password) && !noVerifyPwd) {
+		if (!noVerifyPwd && !await cryptoUtils.verifyPassword(password, userRow.salt, userRow.password)) {
 			throw new BizError(t('IncorrectPwd'));
+		}
+		if (!noVerifyPwd && cryptoUtils.isLegacyPasswordHash(userRow.password)) {
+			const { salt, hash } = await cryptoUtils.hashPassword(password);
+			const upgraded = await orm(c).update(user).set({ password: hash, salt })
+				.where(and(eq(user.userId, userRow.userId), eq(user.password, userRow.password)))
+				.returning({ userId: user.userId }).get();
+			if (!upgraded) {
+				// A concurrent password change invalidates the credentials we just checked.
+				throw new BizError(t('IncorrectPwd'));
+			}
+			userRow.password = hash;
+			userRow.salt = salt;
 		}
 
 		return await this.createSession(c, userRow);
