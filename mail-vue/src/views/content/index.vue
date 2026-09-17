@@ -1,5 +1,5 @@
 <template>
-  <div class="box">
+  <div class="box mail-reader">
     <div class="header-actions">
       <AppIcon class="icon" name="back" :size="20" @click="handleBack"/>
       <AppIcon v-perm="'email:delete'" class="icon" name="delete-outline" :size="18" @click="handleDelete"/>
@@ -9,6 +9,7 @@
       </span>
       <AppIcon class="icon" v-if="emailStore.contentData.showReply" v-perm="'email:send'"  @click="openReply" name="reply" :size="21" />
       <AppIcon class="icon" v-if="emailStore.contentData.showReply" v-perm="'email:send'"  @click="openForward" name="forward" :size="20" />
+      <AppIcon class="icon" name="print" :size="19" title="Print" aria-label="Print email" @click="printEmail" />
     </div>
     <div></div>
     <el-scrollbar class="scrollbar">
@@ -178,6 +179,13 @@ function openReply() {
 
 function openForward() {
   uiStore.writerRef.openForward(email.value)
+}
+
+function printEmail() {
+  const cleanup = () => document.body.classList.remove('nova-mail-printing')
+  document.body.classList.add('nova-mail-printing')
+  window.addEventListener('afterprint', cleanup, { once: true })
+  window.print()
 }
 
 function toMessage(message) {
@@ -499,4 +507,56 @@ const handleDelete = () => {
 }
 
 
+</style>
+
+<style lang="scss">
+@media print {
+  @page { margin: 16mm; }
+
+  body.nova-mail-printing,
+  body.nova-mail-printing #app,
+  body.nova-mail-printing .layout,
+  body.nova-mail-printing .main-container,
+  body.nova-mail-printing .el-main,
+  body.nova-mail-printing .main-box-hide,
+  body.nova-mail-printing .mail-reader {
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  body.nova-mail-printing .aside,
+  body.nova-mail-printing .el-header,
+  body.nova-mail-printing .mobile-nav,
+  body.nova-mail-printing .mail-reader > .header-actions,
+  body.nova-mail-printing .mail-reader .mobile-message-actions,
+  body.nova-mail-printing .el-image-viewer {
+    display: none !important;
+  }
+
+  body.nova-mail-printing .mail-reader .el-scrollbar,
+  body.nova-mail-printing .mail-reader .el-scrollbar__wrap,
+  body.nova-mail-printing .mail-reader .el-scrollbar__view,
+  body.nova-mail-printing .mail-reader .htm-scrollbar,
+  body.nova-mail-printing .mail-reader .content-box,
+  body.nova-mail-printing .mail-reader .content-html {
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  body.nova-mail-printing .mail-reader .container {
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    color: #111 !important;
+  }
+
+  body.nova-mail-printing .mail-reader .email-title { color: #111 !important; }
+  body.nova-mail-printing .mail-reader .shadow-html { zoom: 1 !important; }
+  body.nova-mail-printing .mail-reader .att .opt-icon { display: none !important; }
+}
 </style>
