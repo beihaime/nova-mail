@@ -932,13 +932,6 @@ function submitRegister() {
   width: 180px;
 }
 
-:global(html.dark) #login-box:not(.has-custom-background) .login-scene {
-  background:none;
-}
-:global(html.dark) #login-box:not(.has-custom-background) .login-sky-glow,
-:global(html.dark) #login-box:not(.has-custom-background) .login-mountain {
-  display:none;
-}
 #login-box {
   position: relative;
   min-height:100%;
@@ -1036,7 +1029,7 @@ function submitRegister() {
   .form-wrapper { position: relative; top: auto; right: auto; bottom: auto; left: auto; width: 100%; max-width: 420px; margin: 0 auto; }
   .login-scene { opacity: .72; }
   .container { width: 100%; padding: 24px; height: auto; min-height: 0; border-radius: 28px; background: rgba(232,243,255,.78); box-shadow: 0 18px 50px rgba(30,80,140,.16); }
-  :global(.dark) .container { background: rgba(20,28,43,.82); }
+  :global(html.dark #login-box div.container) { background: rgba(20,28,43,.82); }
   .form-title { font-size: 24px !important; line-height: 1.2; letter-spacing: -.02em; }
   .form-desc { margin-top: 4px; margin-bottom: 18px; font-size: 14px; line-height: 1.4; }
   .container .el-input { width: 100%; min-width: 0; height: 50px; margin-bottom: 14px; font-size: 16px; }
@@ -1164,7 +1157,7 @@ function submitRegister() {
   transform: scale(.96);
 }
 
-:global(html.dark) .login-theme-toggle {
+:global(html.dark .login-theme-toggle) {
   color: #f2f2f7;
   background: rgba(28, 28, 30, .66);
   border-color: rgba(255, 255, 255, .12);
@@ -1182,7 +1175,12 @@ function submitRegister() {
 
 /* Dark login scene tuning */
 
-:global(html.dark) #login-box:not(.has-custom-background) .login-scene {
+/* Dark fallback while login-dark.png decodes (and if it fails to load). */
+:global(html.dark #login-box:not(.has-custom-background)) {
+  background-color: #081426;
+}
+
+:global(html.dark #login-box:not(.has-custom-background) .login-scene) {
   background:
     linear-gradient(
       rgba(4, 12, 28, .10),
@@ -1190,33 +1188,34 @@ function submitRegister() {
     );
 }
 
-:global(html.dark) #login-box:not(.has-custom-background) .login-sky-glow,
-:global(html.dark) #login-box:not(.has-custom-background) .login-mountain {
+:global(html.dark #login-box:not(.has-custom-background) .login-sky-glow),
+:global(html.dark #login-box:not(.has-custom-background) .login-mountain) {
   opacity: 0;
 }
 
-:global(html.dark) .container {
+:global(html.dark #login-box .container) {
   background: rgba(16, 23, 35, .76);
   border-color: rgba(255, 255, 255, .10);
   box-shadow: 0 20px 55px rgba(0, 0, 0, .24);
   backdrop-filter: blur(20px) saturate(1.08);
 }
 
-:global(html.dark) .login-brand,
-:global(html.dark) .login-quiet-tagline,
-:global(html.dark) .login-copyright {
+:global(html.dark .login-brand),
+:global(html.dark .login-quiet-tagline),
+:global(html.dark .login-copyright) {
   color: rgba(242, 242, 247, .94);
 }
 
+:global(html.dark .login-brand strong) {
+  color: #f2f2f7;
+}
+
+:global(html.dark .login-brand span) {
+  color: #a1a1aa;
+}
+
+:global(html.dark .login-quiet-tagline) {
+  color: #d1d5db;
+}
+
 </style>
-:global(html.dark) .login-brand strong {
-color:#f2f2f7;
-}
-
-:global(html.dark) .login-brand span {
-color:#a1a1aa;
-}
-
-:global(html.dark) .login-quiet-tagline {
-color:#d1d5db;
-}
