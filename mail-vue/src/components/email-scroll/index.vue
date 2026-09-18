@@ -1881,7 +1881,7 @@ ul {
     min-width: 0;
 
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: 0.7fr 0.95fr 1.45fr 0.9fr;
     align-items: center;
     gap: 4px;
 
@@ -1893,7 +1893,7 @@ ul {
     width: 100%;
     min-width: 0;
     height: 32px;
-    padding: 0 4px;
+    padding: 0 2px;
     box-sizing: border-box;
 
     border: 0;
@@ -1911,7 +1911,7 @@ ul {
   }
 
   .mobile-filters button.active {
-    padding-inline: 4px;
+    padding-inline: 2px;
 
     color: var(--el-color-primary);
     background: var(--nova-selected);
