@@ -10,7 +10,8 @@ import { computed, ref, watch } from 'vue'
 
 const props = defineProps({
   email: { type: Object, default: () => ({}) },
-  size: { type: [Number, String], default: 40 }
+  size: { type: [Number, String], default: 40 },
+  preferLogo: { type: Boolean, default: true }
 })
 
 const failed = ref(false)
@@ -18,8 +19,12 @@ const logoLoaded = ref(false)
 const avatarStyle = computed(() => ({ width: `${props.size}px`, height: `${props.size}px`, flex: `0 0 ${props.size}px` }))
 const initial = computed(() => (props.email?.name || props.email?.sendEmail || '?').trim().charAt(0).toUpperCase())
 const logoUrl = computed(() => {
+  if (!props.preferLogo) return ''
+
   const id = Number(props.email?.emailId)
-  return Number.isSafeInteger(id) && id > 0 ? `/api/email/brand-avatar?emailId=${encodeURIComponent(id)}` : ''
+  return Number.isSafeInteger(id) && id > 0
+    ? `/api/email/brand-avatar?emailId=${encodeURIComponent(id)}`
+    : ''
 })
 
 watch(() => props.email?.emailId, () => { failed.value = false; logoLoaded.value = false })

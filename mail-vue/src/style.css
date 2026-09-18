@@ -315,3 +315,24 @@ html[data-theme-to="light"]::view-transition-old(root) {
     display: none !important;
   }
 }
+
+
+/* Dark action icon visibility */
+html.dark .header-actions .app-icon:not(.preserve-color),
+html.dark .header-actions img.app-icon:not(.preserve-color) {
+  filter: brightness(0) invert(82%) !important;
+  opacity: .88;
+}
+
+html.dark .header-actions .iconify {
+  color: #D1D1D6;
+}
+
+@media (max-width: 767px) {
+  html.dark .mobile-search .app-icon:not(.preserve-color),
+  html.dark .mobile-row-star .app-icon:not(.preserve-color),
+  html.dark .mobile-nav button:not(.active) .app-icon:not(.preserve-color) {
+    filter: brightness(0) invert(82%) !important;
+    opacity: .82;
+  }
+}
