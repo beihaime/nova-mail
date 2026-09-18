@@ -20,7 +20,7 @@
       <section class="content-shell">
         <header class="toolbar">
           <button class="mobile-menu" @click="mobileMenu = true"><span>☰</span></button>
-          <label class="search"><img src="@/icons/svg/search.svg" alt="" /><input placeholder="Search emails, senders, or keywords…" /><kbd>⌘ K</kbd></label>
+          <label class="search"><img src="@/icons/svg/search.svg" alt="" /><input placeholder="Search emails, senders, or keywords…" /></label>
           <div class="toolbar-actions"><button @click="dark = !dark"><img :src="dark ? themeLight : themeDark" alt="Theme" /></button><button><img src="@/icons/svg/settings-top.svg" alt="Settings" /></button><button class="avatar">N</button><span class="account"><b>Nolan⌄</b><small>nolan@beihai.me</small></span></div>
         </header>
 

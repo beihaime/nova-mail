@@ -8,7 +8,7 @@
       <AppIcon name="search" :size="18" />
       <input v-model="keyword" :placeholder="$t('searchMail')" type="search" @keydown="handleKeydown" />
       <button v-if="keyword" class="search-clear" type="button" :aria-label="$t('clearSearch')" @click="clear">×</button>
-      <kbd v-else>⌘ K</kbd>
+
     </label>
     <div class="toolbar">
       <div v-if="uiStore.dark" class="sun-icon icon-item" @click="openDark($event)">
