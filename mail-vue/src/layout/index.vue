@@ -20,16 +20,16 @@
   </el-container>
   <nav v-if="route.name !== 'content'" class="mobile-nav" aria-label="Mail navigation">
     <button :class="{active: route.name === 'email'}" @click="router.push({name: 'email'})">
-      <AppIcon name="inbox" :size="19" /><span>{{ $t('inbox') }}</span>
+      <AppIcon name="inbox" :size="24" /><span>{{ $t('inbox') }}</span>
     </button>
     <button @click="uiStore.asideShow = true">
-      <AppIcon name="folder-nav" :size="19" /><span>{{ $t('folders') }}</span>
+      <AppIcon name="folder-nav" :size="24" /><span>{{ $t('folders') }}</span>
     </button>
     <button :class="{active: route.name === 'star'}" @click="router.push({name: 'star'})">
-      <AppIcon name="starred-nav" :size="19" /><span>{{ $t('starred') }}</span>
+      <AppIcon name="starred-nav" :size="24" /><span>{{ $t('starred') }}</span>
     </button>
     <button :class="{active: route.name === 'setting'}" @click="router.push({name: 'setting'})">
-      <AppIcon name="settings-top" :size="19" /><span>{{ $t('settings') }}</span>
+      <AppIcon name="settings-top" :size="24" /><span>{{ $t('settings') }}</span>
     </button>
   </nav>
   <button
@@ -39,7 +39,7 @@
       :aria-label="$t('compose')"
       @click="writerRef?.open()"
   >
-    <Icon icon="solar:pen-2-linear" width="26" height="26" />
+    <Icon icon="solar:pen-2-linear" width="24" height="24" />
   </button>
   <writer ref="writerRef" />
 </template>
@@ -177,7 +177,7 @@ onBeforeUnmount(() => {
 .mobile-nav { display: none; }
 
 @media (max-width: 767px) {
-  .layout.has-mobile-nav { padding-bottom: 66px; }
+  .layout.has-mobile-nav { padding-bottom: 72px; }
   .main-container { min-height: 0; }
   .mobile-nav { position: fixed; z-index: 20; display: grid; grid-template-columns: repeat(5, 1fr); align-items: end; padding: 7px 10px max(8px, env(safe-area-inset-bottom)); left: 0; right: 0; bottom: 0; min-height: 66px; background: color-mix(in srgb, var(--el-bg-color) 92%, transparent); border-top: 1px solid var(--light-border); backdrop-filter: blur(18px); }
   .mobile-nav button { min-width: 0; min-height: 48px; display: grid; place-items: center; gap: 2px; color: var(--regular-text-color); cursor: pointer; font-size: 10px; }
@@ -224,11 +224,11 @@ onBeforeUnmount(() => {
 
 @media (max-width: 767px) {
   .layout.has-mobile-nav {
-    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
   }
 
   .el-header {
-    height: calc(56px + env(safe-area-inset-top, 0px));
+    height: calc(72px + env(safe-area-inset-top, 0px));
     padding-top: env(safe-area-inset-top, 0px);
     border-bottom: 0;
     background: var(--nova-surface);
@@ -245,7 +245,7 @@ onBeforeUnmount(() => {
     grid-template-columns: repeat(4, 1fr);
     align-items: center;
 
-    height: calc(64px + env(safe-area-inset-bottom, 0px));
+    height: calc(72px + env(safe-area-inset-bottom, 0px));
     min-height: 0;
 
     padding:
@@ -260,19 +260,27 @@ onBeforeUnmount(() => {
 
   .mobile-nav button {
     min-width: 0;
-    min-height: 54px;
+    min-height: 0;
 
     display: grid;
     place-items: center;
-    gap: 1px;
+    gap: 3px;
 
     color: var(--regular-text-color);
-    font-size: 11px;
+    font-size: 14px;
+    line-height: 1.1;
+  }
+
+  .mobile-nav button span {
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
 
   .mobile-nav button :deep(.app-icon) {
-    width: 20px;
-    height: 20px;
+    width: 24px;
+    height: 24px;
     opacity: .72;
   }
 
@@ -289,30 +297,35 @@ onBeforeUnmount(() => {
     position: fixed;
     z-index: 21;
 
-    right: 18px;
+    right: 16px;
     bottom: calc(
-      64px +
+      72px +
       env(safe-area-inset-bottom, 0px) +
       16px
     );
 
-    width: 58px;
-    height: 58px;
+    width: 56px;
+    height: 56px;
 
     display: grid;
     place-items: center;
 
     padding: 0;
     border: 0;
-    border-radius: 50%;
+    border-radius: 18px;
 
     color: #fff;
     background: var(--el-color-primary);
     cursor: pointer;
 
+    /* Gmail Android keeps the FAB almost flat: a soft ambient shadow only. */
     box-shadow:
-      0 7px 18px
-      color-mix(in srgb, var(--el-color-primary) 28%, transparent);
+      0 2px 6px
+      color-mix(in srgb, var(--el-color-primary) 22%, transparent);
+
+    transition:
+      transform var(--nova-motion-fast) var(--nova-motion-ease),
+      box-shadow var(--nova-motion-fast) var(--nova-motion-ease);
   }
 
   .mobile-compose-fab :deep(.iconify) {
@@ -320,8 +333,19 @@ onBeforeUnmount(() => {
     opacity: 1;
   }
 
+  .mobile-compose-fab:hover,
+  .mobile-compose-fab:focus-visible {
+    box-shadow:
+      0 3px 8px
+      color-mix(in srgb, var(--el-color-primary) 26%, transparent);
+  }
+
   .mobile-compose-fab:active {
     transform: scale(.94);
+  }
+
+  :global(.dark .mobile-compose-fab) {
+    box-shadow: 0 2px 6px rgba(0, 0, 0, .34);
   }
 }
 

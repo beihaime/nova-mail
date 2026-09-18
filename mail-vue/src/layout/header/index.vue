@@ -306,8 +306,8 @@ function formatName(email) {
 @media (max-width: 767px) {
   .header,
   .header.not-send {
-    height: 56px;
-    min-height: 56px;
+    height: 72px;
+    min-height: 72px;
 
     padding: 0 12px 0 10px;
     gap: 0;
@@ -383,14 +383,14 @@ function formatName(email) {
   }
 
   .toolbar .avatar .avatar-text {
-    width: 36px;
-    height: 36px;
+    width: 40px;
+    height: 40px;
   }
 
   .toolbar .avatar .avatar-image {
-    width: 36px;
-    height: 36px;
-    flex: 0 0 36px;
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
   }
 
   .toolbar .avatar .account-summary {
@@ -637,12 +637,23 @@ function formatName(email) {
 }
 
 @media (max-width: 767px) {
-  .header { height: auto; min-height: 58px; padding: 8px 12px; gap: 8px; grid-template-columns: auto 1fr auto; }
-  .header.not-send { grid-template-columns: auto 1fr; }
+  .header {
+    height: 72px;
+    min-height: 72px;
+    padding: 0 12px 0 10px;
+    gap: 0;
+    align-items: center;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .header.not-send { grid-template-columns: minmax(0, 1fr) auto; }
   .search-shell { display: none; }
   .toolbar .notice { display: none; }
   .toolbar .setting-icon { display: none; }
   .toolbar .avatar { margin-left: 2px; }
+  /* 40px avatar, 44px tap target — Gmail Android app-bar proportions. */
+  .toolbar .avatar .avatar-text { width: 40px; height: 40px; }
+  .toolbar .avatar .avatar-image { width: 40px; height: 40px; flex: 0 0 40px; }
+  .toolbar .icon-item { width: 44px; height: 44px; }
   .toolbar .avatar .account-summary { display: none; }
   .breadcrumb-item { font-size: 16px; }
 }

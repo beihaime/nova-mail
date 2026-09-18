@@ -1851,15 +1851,16 @@ ul {
   }
 
   .mobile-search {
-    height: 44px;
+    height: 56px;
     margin: 0 16px 8px;
-    padding: 0 14px;
+    padding: 0 18px;
 
     display: flex;
     align-items: center;
     gap: 10px;
 
-    border-radius: 14px;
+    /* Gmail Android search pill. */
+    border-radius: 28px;
 
     color: var(--mobile-secondary);
     background: var(--nova-surface-muted);
@@ -1891,10 +1892,11 @@ ul {
   /* ---------- Filters ---------- */
 
   .mobile-filter-bar {
-    height: 46px;
+    height: 44px;
     min-width: 0;
 
-    padding: 0 8px 6px 16px;
+    /* Tighter than before: the 40px tabs own the row. */
+    padding: 2px 6px 2px 12px;
 
     display: flex;
     align-items: center;
@@ -1918,7 +1920,7 @@ ul {
   .mobile-filters button {
     width: 100%;
     min-width: 0;
-    height: 32px;
+    height: 40px;
     padding: 0 2px;
     box-sizing: border-box;
 
@@ -1946,10 +1948,10 @@ ul {
   }
 
   .mobile-tool-button {
-    flex: 0 0 32px;
+    flex: 0 0 40px;
 
-    width: 32px;
-    height: 32px;
+    width: 40px;
+    height: 40px;
     padding: 0;
 
     display: grid;
