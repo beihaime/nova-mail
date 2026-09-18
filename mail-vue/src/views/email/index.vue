@@ -1,9 +1,5 @@
 <template>
   <div class="mail-list-page">
-    <label class="mobile-mail-search">
-      <img src="@/icons/svg/search.svg" alt="" />
-      <input type="search" :placeholder="$t('searchMail')" />
-    </label>
   <emailScroll ref="scroll"
                :cancel-success="cancelStar"
                :star-success="addStar"
@@ -16,6 +12,7 @@
                :show-unread="true"
                actionLeft="4px"
                @jump="jumpContent"
+               @mobile-sort="changeTimeSort"
   >
     <template #first>
       <Icon class="icon" @click="changeTimeSort" icon="material-symbols-light:timer-arrow-down-outline"
@@ -163,11 +160,7 @@ function getEmailList(emailId, size) {
 .mobile-mail-search { display: none; }
 
 @media (max-width: 767px) {
-  .mail-list-page { display: grid; grid-template-rows: auto 1fr; }
-  .mobile-mail-search { height: 38px; margin: 0 12px 8px; padding: 0 11px; display: flex; align-items: center; gap: 8px; border: 1px solid var(--light-border); border-radius: 10px; color: var(--regular-text-color); background: var(--extra-light-fill); }
-  .mobile-mail-search img { width: 15px; height: 15px; opacity: .68; }
-  .mobile-mail-search input { min-width: 0; flex: 1; color: inherit; }
-  .mobile-mail-search input::placeholder { color: inherit; }
+  .mail-list-page { display: block; }
 }
 .icon {
   cursor: pointer;

@@ -185,6 +185,32 @@ button, input, select, textarea {
     --nova-shadow: 0 10px 32px rgba(0, 0, 0, .22);
 }
 
+@media (max-width: 767px) {
+    :root {
+        --nova-surface: #ffffff;
+        --nova-surface-muted: #f2f2f7;
+        --nova-divider: #e5e5ea;
+        --nova-selected: #e5f1ff;
+        --mobile-primary: #1c1c1e;
+        --mobile-secondary: #636366;
+        --mobile-tertiary: #8e8e93;
+    }
+    :root.dark {
+        --nova-surface: #111111;
+        --nova-surface-muted: #1c1c1e;
+        --nova-divider: #2c2c2e;
+        --nova-selected: #17385f;
+        --mobile-primary: #f2f2f7;
+        --mobile-secondary: #aeaeb2;
+        --mobile-tertiary: #8e8e93;
+    }
+    html, html.dark, body, #app { background: var(--nova-surface); }
+    .dark .mobile-nav button:not(.active) .app-icon,
+    .dark .mobile-search .app-icon,
+    .dark .mobile-tool-button .app-icon,
+    .dark .mobile-row-star .app-icon { filter: brightness(0) invert(1); }
+}
+
 /* Shared Nova Mail surface language.  Component styles keep the existing behavior. */
 .el-button { border-radius: 10px; font-weight: 600; }
 .el-button--primary { box-shadow: 0 1px 2px rgba(10, 132, 255, .2); }

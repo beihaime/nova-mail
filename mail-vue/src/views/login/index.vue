@@ -1,16 +1,29 @@
 <template>
   <div id="login-box" :style=" background ? 'background: var(--el-bg-color)' : ''" v-loading="oauthLoading" element-loading-text="登录中...">
-    <div id="background-wrap" v-if="!settingStore.settings.background">
+    <div id="background-wrap" class="login-background" v-if="!settingStore.settings.background">
       <div class="x1 cloud"></div>
       <div class="x2 cloud"></div>
       <div class="x3 cloud"></div>
       <div class="x4 cloud"></div>
       <div class="x5 cloud"></div>
     </div>
-    <div v-else :style="background"></div>
+    <div v-else class="login-background" :style="background"></div>
+    <button class="login-theme-toggle" type="button" :aria-label="uiStore.dark ? $t('lightMode') : $t('darkMode')" @click="toggleTheme">
+      <Icon :icon="uiStore.dark ? 'mingcute:sun-fill' : 'solar:moon-linear'" width="21" height="21" />
+    </button>
     <div class="form-wrapper">
+      <div class="login-brand">
+        <AppIcon name="brand-mark" :size="56" />
+        <div>
+          <strong>{{ settingStore.settings.title || 'Nova Mail' }}</strong>
+          <span>{{ $t('loginSlogan') }}</span>
+        </div>
+      </div>
       <div class="container">
-        <span class="form-title">{{ settingStore.settings.title }}</span>
+        <span class="form-title">
+          <span class="desktop-form-title">{{ settingStore.settings.title }}</span>
+          <span class="mobile-form-title">{{ show === 'login' ? $t('welcomeBack') : $t('createAccount') }}</span>
+        </span>
         <span class="form-desc" v-if="show === 'login'">{{ $t('loginTitle') }}</span>
         <span class="form-desc" v-else>{{ $t('regTitle') }}</span>
         <div v-show="show === 'login'">
@@ -126,6 +139,7 @@
         </template>
       </div>
     </div>
+    <footer class="login-footer">© 2026 {{ settingStore.settings.title || 'Nova Mail' }}</footer>
     <el-dialog class="bind-dialog" v-model="showBindForm"  title="注册邮箱" >
       <div class="bind-container">
         <el-input :class="!hideLoginDomain ? 'email-input' : ''" v-model="bindForm.email" type="text" :placeholder="$t('emailAccount')" autocomplete="off" @keyup.enter="bind">
@@ -160,7 +174,7 @@
         </el-button>
       </div>
     </el-dialog>
-    <a v-show="settingStore.settings.projectLink" class="github" href="https://github.com/maillab/cloud-mail">
+    <a v-show="settingStore.settings.projectLink" class="github" href="https://github.com/beihaime/nova-mail">
       <Icon icon="mingcute:github-line" color="#1890ff" width="20" height="20" />
     </a>
   </div>
@@ -341,6 +355,13 @@ const background = computed(() => {
     'background-position': 'center'
   } : ''
 })
+
+function toggleTheme() {
+  const nextIsDark = !uiStore.dark
+  document.documentElement.setAttribute('class', nextIsDark ? 'dark' : '')
+  document.getElementById('theme-color-meta')?.setAttribute('content', nextIsDark ? '#111111' : '#FFFFFF')
+  uiStore.dark = nextIsDark
+}
 
 const openSelect = () => {
   mySelect.value.toggleMenu()
@@ -726,6 +747,13 @@ function submitRegister() {
   padding: 0 15px;
 }
 
+@media (max-width: 767px) {
+  html.dark #login-box { background: linear-gradient(155deg, #071c3e 0%, #102c59 48%, #08192f 100%); }
+  html.dark #login-box::after { background: linear-gradient(180deg, rgba(2, 12, 29, .48), rgba(3, 14, 31, .65)); }
+  html.dark #background-wrap { opacity: .22; filter: saturate(.75) brightness(.65); }
+  html.dark .container { background: color-mix(in srgb, #131b2a 78%, transparent); border-color: rgba(255, 255, 255, .13); box-shadow: 0 15px 38px rgba(0, 0, 0, .28); }
+}
+
 .no-autofill-pwd {
   .el-input__inner {
     -webkit-text-security: disc !important;
@@ -942,10 +970,142 @@ function submitRegister() {
   grid-template-columns: 1fr;
 }
 
+.login-brand,
+.login-footer,
+.login-theme-toggle,
+.mobile-form-title { display: none; }
+
 
 #background-wrap {
   height: 100%;
   z-index: 0;
+}
+
+.login-background {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background-position: center center !important;
+  background-size: cover !important;
+}
+
+@media (max-width: 767px) {
+  #login-box {
+    min-height: 100dvh;
+    height: auto;
+    display: flex;
+    flex-direction: column;
+    overflow-x: clip;
+    background: linear-gradient(155deg, #dcecff 0%, #eff7ff 48%, #d7e8fc 100%);
+  }
+
+  #login-box::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background: linear-gradient(180deg, rgba(247, 251, 255, .46), rgba(237, 246, 255, .2));
+  }
+
+  .login-theme-toggle {
+    position: fixed;
+    z-index: 12;
+    top: calc(14px + env(safe-area-inset-top, 0px));
+    right: 16px;
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    color: var(--el-text-color-primary);
+    border: 1px solid color-mix(in srgb, var(--el-text-color-primary) 14%, transparent);
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--el-bg-color) 54%, transparent);
+    backdrop-filter: blur(14px);
+    cursor: pointer;
+  }
+
+  .form-wrapper {
+    position: relative;
+    z-index: 2;
+    width: 100%;
+    min-height: 0;
+    height: auto;
+    display: block;
+    padding: clamp(32px, 6dvh, 64px) 16px 0;
+  }
+
+  .login-brand {
+    max-width: 420px;
+    margin: 0 auto 26px;
+    padding: 0 8px;
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    color: var(--el-text-color-primary);
+  }
+  .login-brand :deep(.app-icon) { filter: drop-shadow(0 4px 10px color-mix(in srgb, var(--el-color-primary) 25%, transparent)); }
+  .login-brand strong, .login-brand span { display: block; }
+  .login-brand strong { font-size: 30px; line-height: 1.1; font-weight: 650; letter-spacing: -.035em; }
+  .login-brand span { margin-top: 4px; color: var(--form-desc-color); font-size: 16px; }
+
+  .container {
+    width: 100%;
+    max-width: 420px;
+    height: auto;
+    min-height: 0;
+    margin: 0 auto;
+    padding: 24px;
+    border: 1px solid color-mix(in srgb, var(--el-text-color-primary) 13%, transparent);
+    border-radius: 28px;
+    background: color-mix(in srgb, var(--el-bg-color) 76%, transparent);
+    box-shadow: 0 12px 34px color-mix(in srgb, #14213d 16%, transparent);
+    backdrop-filter: blur(20px) saturate(1.05);
+  }
+  .container .form-title { font-size: 23px !important; font-weight: 650; letter-spacing: -.02em; }
+  .container .desktop-form-title { display: none; }
+  .container .mobile-form-title { display: inline; }
+  .container .form-desc { margin: 6px 0 20px; font-size: 14px; line-height: 1.4; }
+  .container .el-input { height: 54px; margin-bottom: 12px; }
+  .container .el-input :deep(.el-input__wrapper),
+  .container .email-input :deep(.el-input__wrapper) { height: 54px; border-radius: 14px; background: color-mix(in srgb, var(--el-bg-color) 78%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--el-text-color-primary) 11%, transparent) inset !important; }
+  .container .email-input :deep(.el-input__wrapper) { border-radius: 14px 0 0 14px; }
+  .container :deep(.el-input-group__append) { height: 54px; border-radius: 0 14px 14px 0; background: color-mix(in srgb, var(--el-bg-color) 78%, transparent); }
+  .container .btn { height: 54px; border-radius: 14px; font-weight: 600; }
+  .container .login-turnstile { min-height: 65px; margin: 2px 0 12px; }
+  .container .turnstile-unavailable { margin: 2px 0 12px; }
+  .container .oauth-divider { margin: 18px 0 14px; }
+  .container .github-login { margin: 0; }
+  .container .switch { margin-top: 18px; font-size: 14px; }
+
+  .login-footer {
+    position: relative;
+    z-index: 2;
+    display: block;
+    margin-top: auto;
+    padding: 18px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+    color: color-mix(in srgb, var(--el-text-color-primary) 58%, transparent);
+    text-align: center;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 767px) and (max-height: 780px) {
+  .form-wrapper { padding-top: calc(22px + env(safe-area-inset-top, 0px)); }
+  .login-brand { margin-bottom: 18px; }
+  .login-brand :deep(.app-icon) { width: 48px; height: 48px; }
+  .login-brand strong { font-size: 27px; }
+  .login-brand span { display: none; }
+  .container { padding: 20px; border-radius: 24px; }
+  .container .form-desc { margin-bottom: 16px; }
+  .container .el-input { height: 52px; margin-bottom: 10px; }
+  .container .el-input :deep(.el-input__wrapper),
+  .container .email-input :deep(.el-input__wrapper),
+  .container :deep(.el-input-group__append),
+  .container .btn { height: 52px; }
+  .container .oauth-divider { margin: 14px 0 10px; }
+  .container .switch { margin-top: 14px; }
+  .login-footer { padding-top: 12px; }
 }
 
 @keyframes animateCloud {

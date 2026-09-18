@@ -26,7 +26,7 @@
 Nova Mail 是一个可部署在 **Cloudflare Workers** 上的自托管邮箱服务。  
 只需一个域名，即可创建多个邮箱地址，支持收发邮件、附件、管理后台与权限控制。
 
-本项目基于 [maillab/cloud-mail](https://github.com/maillab/cloud-mail) 进行二次开发与品牌重塑，重点优化了界面体验、登录安全与身份认证。
+本项目基于原上游项目进行二次开发与品牌重塑，重点优化了界面体验、登录安全与身份认证。
 
 **在线演示**：[https://mail.beihaime.com](https://mail.beihaime.com)
 
@@ -190,7 +190,7 @@ JWT 与 Turnstile 密钥请通过 `wrangler secret` 设置，不要写入配置�
 
 ## 与原项目的主要差异
 
-相比 [cloud-mail](https://github.com/maillab/cloud-mail)，Nova Mail 主要做了以下改进：
+相比原上游项目，Nova Mail 主要做了以下改进：
 
 - 完整品牌重塑（Nova Mail）
 - 现代化 UI 重设计与图标系统
@@ -206,13 +206,13 @@ JWT 与 Turnstile 密钥请通过 `wrangler secret` 设置，不要写入配置�
 
 本项目基于 MIT 许可证开源。
 
-原项目版权归 [aslost / maillab](https://github.com/maillab/cloud-mail) 所有，本仓库在其基础上进行修改与扩展。
+原项目版权归 aslost / maillab 所有，本仓库在其基础上进行修改与扩展。
 
 ---
 
 ## 致谢
 
-- [maillab/cloud-mail](https://github.com/maillab/cloud-mail) — 原始项目
+- 原上游项目
 - Cloudflare Workers / D1 / R2 / KV / Turnstile / Workers AI
 - Hono、Vue 3、Element Plus、Drizzle、Resend 等开源项目
 

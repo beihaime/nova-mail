@@ -17,9 +17,11 @@
     <div class="toolbar">
       <div v-if="uiStore.dark" class="sun-icon icon-item" @click="openDark($event)">
         <AppIcon name="theme-toggle" :size="20" />
+        <Icon class="mobile-theme-icon" icon="mingcute:sun-fill" width="23" height="23" />
       </div>
       <div v-else class="dark-icon icon-item" @click="openDark($event)">
         <AppIcon name="theme-toggle" :size="20" />
+        <Icon class="mobile-theme-icon" icon="solar:moon-linear" width="23" height="23" />
       </div>
       <div class="notice icon-item" @click="openNotice">
         <AppIcon name="notifications" :size="20" />
@@ -284,8 +286,8 @@ function openDark(e) {
 function switchDark(nextIsDark, root) {
   root.setAttribute('class', nextIsDark ? 'dark' : '')
   const metaTag = document.getElementById('theme-color-meta');
-  const isMobile =  !window.matchMedia("(pointer: fine) and (hover: hover)").matches;
-  metaTag.setAttribute('content', nextIsDark ? (isMobile ? '#141414' : '#000000') : (isMobile ? '#191A23' : '#F1F1F1'));
+  const isMobile = window.matchMedia('(max-width: 767px)').matches;
+  metaTag?.setAttribute('content', isMobile ? (nextIsDark ? '#111111' : '#FFFFFF') : (nextIsDark ? '#000000' : '#F1F1F1'));
   uiStore.dark = nextIsDark
 }
 
@@ -384,6 +386,7 @@ function formatName(email) {
   padding: 0 14px;
   grid-template-columns: minmax(92px, auto) minmax(220px, 1fr) auto auto;
 }
+.mobile-theme-icon { display: none; }
 
 .header.not-send {
   grid-template-columns: minmax(92px, auto) minmax(220px, 1fr) auto;
@@ -518,15 +521,24 @@ function formatName(email) {
 }
 
 @media (max-width: 767px) {
-  .header { height: auto; min-height: 58px; padding: 8px 12px; gap: 8px; grid-template-columns: auto 1fr auto; }
-  .header.not-send { grid-template-columns: auto 1fr; }
+  .header, .header.not-send { height: 56px; min-height: 56px; padding: 0 16px; gap: 0; grid-template-columns: minmax(0, 1fr) auto; background: var(--nova-surface); }
+  .header-btn { gap: 8px; }
+  .header-btn :deep(.hamburger) { width: 22px; height: 22px; }
+  .header-btn :deep(> div) { width: 44px; height: 44px; padding: 0 !important; display: grid; place-items: center; }
   .search-shell { display: none; }
-  .writer-box { margin-left: 0; }
+  .writer-box { display: none; }
+  .toolbar { gap: 0; align-items: center; }
+  .toolbar .icon-item { width: 44px; height: 44px; }
+  .toolbar .icon-item :deep(.app-icon) { width: 23px; height: 23px; }
+  .toolbar .icon-item :deep(.app-icon) { display: none; }
+  .toolbar .mobile-theme-icon { display: block; color: var(--mobile-primary); }
   .toolbar .notice { display: none; }
   .toolbar .setting-icon { display: none; }
-  .toolbar .avatar { margin-left: 2px; }
+  .toolbar .el-dropdown { width: 44px; height: 44px; display: grid; place-items: center; }
+  .toolbar .avatar { margin: 0; width: 44px; height: 44px; justify-content: center; }
+  .toolbar .avatar .avatar-text { width: 36px; height: 36px; }
   .toolbar .avatar .account-summary { display: none; }
-  .breadcrumb-item { font-size: 16px; }
+  .breadcrumb-item { font-size: 20px; font-weight: 600; }
 }
 
 .el-tooltip__trigger:first-child:focus-visible {
