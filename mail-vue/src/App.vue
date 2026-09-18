@@ -8,13 +8,20 @@ import { useI18n } from "vue-i18n";
 import { watch, onMounted, onBeforeUnmount } from "vue";
 import {useSettingStore} from "@/store/setting.js";
 import {useUiStore} from "@/store/ui.js";
+import {applyDocumentLocale} from "@/i18n/locale.js";
 const settingStore = useSettingStore()
 const uiStore = useUiStore()
 import zhCn from 'element-plus/es/locale/lang/zh-cn';
 import('@/icons/index.js')
 const { locale } = useI18n()
-locale.value = settingStore.lang
-watch(() => settingStore.lang, () => locale.value = settingStore.lang)
+
+function syncLocale() {
+  locale.value = settingStore.lang
+  applyDocumentLocale(settingStore.lang)
+}
+
+syncLocale()
+watch(() => settingStore.lang, syncLocale)
 
 // Nova theme preference
 const systemTheme = window.matchMedia('(prefers-color-scheme: dark)')
