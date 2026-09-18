@@ -274,10 +274,7 @@ function openDark(e) {
 }
 
 function switchDark(nextIsDark, root) {
-  root.setAttribute('class', nextIsDark ? 'dark' : '')
-  const metaTag = document.getElementById('theme-color-meta');
-  metaTag?.setAttribute('content', nextIsDark ? '#141414' : '#FFFFFF');
-  uiStore.dark = nextIsDark
+  uiStore.setThemeMode(nextIsDark ? 'dark' : 'light')
 }
 
 function changeAside() {

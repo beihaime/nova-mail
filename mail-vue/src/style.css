@@ -358,3 +358,28 @@ html.dark .mobile-tool-button .iconify {
 html.dark .mobile-nav button.active .app-icon:not(.preserve-color) {
   opacity: 1;
 }
+
+
+/* Nova desktop dark action visibility */
+@media (min-width: 768px) {
+  html.dark .email-container > .header-actions .app-icon {
+    filter: brightness(0) invert(88%) !important;
+    opacity: .92 !important;
+  }
+
+  html.dark .email-container > .header-actions .iconify,
+  html.dark .mail-reader > .header-actions .iconify {
+    color: #D1D1D6 !important;
+    opacity: .92 !important;
+  }
+
+  html.dark .mail-reader > .header-actions .app-icon:not(.preserve-color) {
+    filter: brightness(0) invert(88%) !important;
+    opacity: .92 !important;
+  }
+
+  html.dark .mail-reader > .header-actions .star-active-icon {
+    color: var(--el-color-primary) !important;
+    opacity: 1 !important;
+  }
+}

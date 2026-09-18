@@ -743,29 +743,44 @@ const accountShow = computed(() => {
   return uiStore.accountShow && settingStore.settings.manyEmail === 0
 })
 
+function syncStarState(email, value) {
+  const nextValue = value ? 1 : 0
+
+  email.isStar = nextValue
+
+  const detail = emailStore.detailMap[email.emailId]
+  if (detail) {
+    detail.isStar = nextValue
+  }
+
+  const current = emailStore.contentData.email
+  if (current?.emailId === email.emailId) {
+    current.isStar = nextValue
+  }
+}
+
 function starChange(email) {
-
   if (!email.isStar) {
+    if (!props.allowStar) return
 
-    if (!props.allowStar) return;
+    syncStarState(email, 1)
 
-    email.isStar = 1;
     props.starAdd(email.emailId).then(() => {
-      email.isStar = 1;
+      syncStarState(email, 1)
       props.starSuccess(email)
     }).catch(e => {
       console.error(e)
-      email.isStar = 0
+      syncStarState(email, 0)
     })
   } else {
+    syncStarState(email, 0)
 
-    email.isStar = 0;
     props.starCancel(email.emailId).then(() => {
-      email.isStar = 0;
+      syncStarState(email, 0)
       props.cancelSuccess?.(email)
     }).catch(e => {
       console.error(e)
-      email.isStar = 1;
+      syncStarState(email, 1)
     })
   }
 }

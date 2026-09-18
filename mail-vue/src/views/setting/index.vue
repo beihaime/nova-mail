@@ -73,6 +73,29 @@
         <el-button v-else type="primary" @click="connectGoogle" :loading="googleLoading">{{$t('connect')}}</el-button>
       </div>
     </div>
+
+    <div class="appearance">
+      <div class="title">{{ appearanceTitle }}</div>
+
+      <div class="theme-options">
+        <button
+          v-for="option in themeOptions"
+          :key="option.value"
+          type="button"
+          class="theme-option"
+          :class="{ active: uiStore.themeMode === option.value }"
+          @click="uiStore.setThemeMode(option.value)"
+        >
+          <span
+            class="theme-preview"
+            :class="`theme-preview-${option.value}`"
+            aria-hidden="true"
+          ></span>
+          <span>{{ option.label }}</span>
+        </button>
+      </div>
+    </div>
+
     <div class="language">
       <div class="title">{{$t('language')}}</div>
       <el-select
@@ -104,7 +127,7 @@
   </div>
 </template>
 <script setup>
-import {onMounted, reactive, ref, defineOptions} from 'vue'
+import {onMounted, reactive, ref, computed, defineOptions} from 'vue'
 import {resetPassword, userDelete} from "@/request/my.js";
 import {useUserStore} from "@/store/user.js";
 import router from "@/router/index.js";
@@ -113,12 +136,14 @@ import {accountSetName} from "@/request/account.js";
 import {useAccountStore} from "@/store/account.js";
 import {useI18n} from "vue-i18n";
 import {useSettingStore} from "@/store/setting.js";
+import {useUiStore} from "@/store/ui.js";
 import {connectGithubAccount, disconnectGithubAccount, githubConnectedAccount, connectGoogleAccount, disconnectGoogleAccount, googleConnectedAccount} from '@/request/ouath.js';
 import {Icon} from '@iconify/vue';
 
 const { t } = useI18n()
 const accountStore = useAccountStore()
 const settingStore = useSettingStore()
+const uiStore = useUiStore()
 const userStore = useUserStore();
 const route = useRoute();
 const setPwdLoading = ref(false)
@@ -129,6 +154,21 @@ const githubLoading = ref(false)
 const githubAccount = reactive({ connected: false, login: '', avatarUrl: '' })
 const googleLoading = ref(false)
 const googleAccount = reactive({ connected: false, email: '', avatarUrl: '' })
+
+const themeOptions = computed(() => {
+  const zh = settingStore.lang === 'zh'
+
+  return [
+    { value: 'light', label: zh ? '浅色' : 'Light' },
+    { value: 'dark', label: zh ? '深色' : 'Dark' },
+    { value: 'system', label: zh ? '跟随系统' : 'System' },
+  ]
+})
+
+const appearanceTitle = computed(() =>
+  settingStore.lang === 'zh' ? '外观' : 'Appearance'
+)
+
 
 defineOptions({
   name: 'setting'
@@ -485,4 +525,82 @@ function submitPwd() {
     gap: 20px;
   }
 }
+
+  /* ---------- Appearance ---------- */
+  .appearance {
+    margin-bottom: 34px;
+  }
+
+  .theme-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 14px;
+  }
+
+  .theme-option {
+    min-width: 112px;
+    min-height: 42px;
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    padding: 7px 12px;
+    border: 1px solid var(--nova-divider);
+    border-radius: 10px;
+    color: var(--el-text-color-primary);
+    background: var(--nova-surface-muted);
+    cursor: pointer;
+  }
+
+  .theme-option:hover {
+    border-color: color-mix(
+      in srgb,
+      var(--el-color-primary) 55%,
+      var(--nova-divider)
+    );
+  }
+
+  .theme-option.active {
+    color: var(--el-color-primary);
+    border-color: var(--el-color-primary);
+    background: var(--nova-selected);
+  }
+
+  .theme-preview {
+    width: 22px;
+    height: 22px;
+    flex: 0 0 22px;
+    border: 1px solid var(--nova-divider);
+    border-radius: 50%;
+  }
+
+  .theme-preview-light {
+    background: #fff;
+  }
+
+  .theme-preview-dark {
+    background: #17191d;
+  }
+
+  .theme-preview-system {
+    background: linear-gradient(
+      90deg,
+      #fff 0 50%,
+      #17191d 50% 100%
+    );
+  }
+
+  @media (max-width: 767px) {
+    .theme-options {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .theme-option {
+      min-width: 0;
+      justify-content: center;
+      padding-inline: 7px;
+    }
+  }
+
 </style>

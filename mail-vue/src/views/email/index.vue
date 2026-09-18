@@ -76,7 +76,17 @@ function changeTimeSort() {
 }
 
 function jumpContent(email) {
-  emailStore.contentData.email = emailStore.toContentEmail(email)
+  const contentEmail = emailStore.toContentEmail(email)
+
+  // detailMap may have been populated before a recent star toggle.
+  // The currently visible list row is authoritative here.
+  contentEmail.isStar = email.isStar ? 1 : 0
+
+  if (emailStore.detailMap[email.emailId]) {
+    emailStore.detailMap[email.emailId].isStar = contentEmail.isStar
+  }
+
+  emailStore.contentData.email = contentEmail
   emailStore.contentData.delType = 'logic'
   emailStore.contentData.showUnread = true
   emailStore.contentData.showStar = true

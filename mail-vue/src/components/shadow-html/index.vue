@@ -76,7 +76,7 @@ function updateContent() {
                     'Hiragino Sans GB', 'Microsoft YaHei', '微软雅黑', Arial, sans-serif;
         font-size: 14px;
         line-height: 1.5;
-        color: #13181D;
+        color: var(--el-text-color-primary, #13181D);
         word-break: break-word;
       }
 
@@ -95,7 +95,8 @@ function updateContent() {
       }
 
       .shadow-content {
-        background: #FFFFFF;
+        background: transparent;
+        color: inherit;
         width: fit-content;
         height: fit-content;
         min-width: 100%;

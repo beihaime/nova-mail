@@ -16,16 +16,40 @@
   <!-- Explicit rendering prevents the API script from racing Vue's lifecycle. -->
   <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
   <script>
-    const uiStoreStr =  localStorage.getItem('ui')
-    let isDark = false
-    if (uiStoreStr) {
-      const uiStore =  JSON.parse(uiStoreStr)
-      isDark = uiStore.dark
+    (() => {
+      let isDark = false
+
+      try {
+        const uiStoreStr = localStorage.getItem('ui')
+        const uiStore = uiStoreStr ? JSON.parse(uiStoreStr) : {}
+
+        const mode = ['light', 'dark', 'system'].includes(uiStore.themeMode)
+          ? uiStore.themeMode
+          : (uiStore.dark ? 'dark' : 'light')
+
+        const systemDark = window.matchMedia(
+          '(prefers-color-scheme: dark)'
+        ).matches
+
+        isDark =
+          mode === 'dark' ||
+          (mode === 'system' && systemDark)
+      } catch {
+        isDark = window.matchMedia(
+          '(prefers-color-scheme: dark)'
+        ).matches
+      }
+
       const root = document.documentElement
-      root.setAttribute('class', isDark ? 'dark' : '');
-    }
-    const metaTag = document.getElementById('theme-color-meta');
-    metaTag.setAttribute('content', isDark ? '#141414' : '#FFFFFF');
+      root.classList.toggle('dark', isDark)
+      root.style.colorScheme = isDark ? 'dark' : 'light'
+
+      const metaTag = document.getElementById('theme-color-meta')
+      metaTag?.setAttribute(
+        'content',
+        isDark ? '#141414' : '#FFFFFF'
+      )
+    })()
   </script>
 </head>
 <style>

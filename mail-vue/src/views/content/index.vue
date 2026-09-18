@@ -4,7 +4,16 @@
       <AppIcon class="icon" name="back" :size="20" title="Back" aria-label="Back" @click="handleBack"/>
       <AppIcon v-perm="'email:delete'" class="icon" name="delete-outline" :size="18" title="Delete" aria-label="Delete email" @click="handleDelete"/>
       <span class="star" v-if="emailStore.contentData.showStar">
-        <AppIcon class="icon" @click="changeStar" v-if="email.isStar" name="star-filled" :size="20" title="Unstar" aria-label="Unstar email"/>
+        <Icon
+          v-if="email.isStar"
+          class="icon star-active-icon"
+          icon="solar:star-bold"
+          width="20"
+          height="20"
+          title="Unstar"
+          aria-label="Unstar email"
+          @click="changeStar"
+        />
         <AppIcon class="icon" @click="changeStar" v-else name="star-outline" :size="19" title="Star" aria-label="Star email"/>
       </span>
       <AppIcon class="icon" v-if="emailStore.contentData.showReply" v-perm="'email:send'"  @click="openReply" name="reply" :size="21" title="Reply" aria-label="Reply" />
@@ -271,28 +280,51 @@ function formatAddressList(value) {
   }).filter(Boolean).join(', ')
 }
 
+function setReaderStarState(value) {
+  const nextValue = value ? 1 : 0
+  const emailId = email.value.emailId
+
+  email.value.isStar = nextValue
+
+  if (emailStore.detailMap[emailId]) {
+    emailStore.detailMap[emailId].isStar = nextValue
+  }
+}
+
 function changeStar() {
+  const emailId = email.value.emailId
+
   if (email.value.isStar) {
-    email.value.isStar = 0;
-    starCancel(email.value.emailId).then(() => {
-      email.value.isStar = 0;
-      emailStore.cancelStarEmailId = email.value.emailId
-      setTimeout(() => emailStore.cancelStarEmailId = 0)
-      emailStore.starScroll?.deleteEmail([email.value.emailId])
+    setReaderStarState(0)
+
+    starCancel(emailId).then(() => {
+      setReaderStarState(0)
+      emailStore.cancelStarEmailId = emailId
+      setTimeout(() => {
+        if (emailStore.cancelStarEmailId === emailId) {
+          emailStore.cancelStarEmailId = 0
+        }
+      })
+      emailStore.starScroll?.deleteEmail([emailId])
     }).catch((e) => {
       console.error(e)
-      email.value.isStar = 1;
+      setReaderStarState(1)
     })
   } else {
-    email.value.isStar = 1;
-    starAdd(email.value.emailId).then(() => {
-      email.value.isStar = 1;
-      emailStore.addStarEmailId = email.value.emailId
-      setTimeout(() => emailStore.addStarEmailId = 0)
+    setReaderStarState(1)
+
+    starAdd(emailId).then(() => {
+      setReaderStarState(1)
+      emailStore.addStarEmailId = emailId
+      setTimeout(() => {
+        if (emailStore.addStarEmailId === emailId) {
+          emailStore.addStarEmailId = 0
+        }
+      })
       emailStore.starScroll?.addItem(email.value)
     }).catch((e) => {
       console.error(e)
-      email.value.isStar = 0;
+      setReaderStarState(0)
     })
   }
 }
@@ -610,6 +642,12 @@ const handleDelete = () => {
   .reader-bottom-actions button { flex: 1; justify-content: center; }
 }
 
+
+
+/* Nova reader active star */
+.header-actions .star-active-icon {
+  color: var(--el-color-primary) !important;
+}
 
 </style>
 
