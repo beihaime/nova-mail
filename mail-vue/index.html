@@ -3,7 +3,12 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-  <meta name="theme-color" content="#FFFFFF" id="theme-color-meta">
+    <meta
+            id="theme-color-meta"
+            name="theme-color"
+            content="#FFFFFF"
+    />
+    <meta name="color-scheme" content="light dark">
   <meta name="description" content="Nova Mail — your mail, your rules.">
   <meta name="application-name" content="Nova Mail">
   <meta name="apple-mobile-web-app-title" content="Nova Mail">
@@ -15,67 +20,139 @@
   <link rel="apple-touch-icon" href="/icons/nova-mail-192.png">
   <!-- Explicit rendering prevents the API script from racing Vue's lifecycle. -->
   <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
-  <script>
-    (() => {
-      let isDark = false
+    <script>
+        (() => {
 
-      try {
-        const uiStoreStr = localStorage.getItem('ui')
-        const uiStore = uiStoreStr ? JSON.parse(uiStoreStr) : {}
+            let isDark = false
+            let mode = 'system'
 
-        const mode = ['light', 'dark', 'system'].includes(uiStore.themeMode)
-          ? uiStore.themeMode
-          : (uiStore.dark ? 'dark' : 'light')
 
-        const systemDark = window.matchMedia(
-          '(prefers-color-scheme: dark)'
-        ).matches
+            try {
 
-        isDark =
-          mode === 'dark' ||
-          (mode === 'system' && systemDark)
-      } catch {
-        isDark = window.matchMedia(
-          '(prefers-color-scheme: dark)'
-        ).matches
-      }
+                const uiStoreStr =
+                    localStorage.getItem('ui')
 
-      const root = document.documentElement
-      root.classList.toggle('dark', isDark)
-      root.style.colorScheme = isDark ? 'dark' : 'light'
-        window.__NOVA_INITIAL_THEME__ = {
-            dark: isDark,
-            mode
-        }
+                const uiStore =
+                    uiStoreStr
+                        ? JSON.parse(uiStoreStr)
+                        : {}
 
-      const metaTag = document.getElementById('theme-color-meta')
-      metaTag?.setAttribute(
-        'content',
-        isDark ? '#141414' : '#FFFFFF'
-      )
-    })()
-  </script>
+
+                mode =
+                    ['light','dark','system']
+                        .includes(uiStore.themeMode)
+
+                        ? uiStore.themeMode
+
+                        : (
+                            uiStore.dark
+                                ? 'dark'
+                                : 'system'
+                        )
+
+
+                const systemDark =
+                    window.matchMedia(
+                        '(prefers-color-scheme: dark)'
+                    ).matches
+
+
+                isDark =
+                    mode === 'dark' ||
+                    (
+                        mode === 'system'
+                        &&
+                        systemDark
+                    )
+
+
+            } catch {
+
+
+                mode='system'
+
+
+                isDark =
+                    window.matchMedia(
+                        '(prefers-color-scheme: dark)'
+                    ).matches
+
+            }
+
+
+
+            const root =
+                document.documentElement
+
+
+            root.classList.toggle(
+                'dark',
+                isDark
+            )
+
+
+            root.style.colorScheme =
+                isDark
+                    ? 'dark'
+                    : 'light'
+
+
+
+            window.__NOVA_INITIAL_THEME__ = {
+
+                dark:isDark,
+
+                mode
+
+            }
+
+
+
+            const metaTag =
+                document.getElementById(
+                    'theme-color-meta'
+                )
+
+
+            metaTag?.setAttribute(
+                'content',
+                isDark
+                    ? '#141414'
+                    : '#FFFFFF'
+            )
+
+
+        })()
+    </script>
 </head>
 <style>
-  html {
-    background: #FFFFFF;
-  }
-  .dark {
-    background: #141414;
-  }
-  #loading-first {
-    position: fixed;
-    left: 0;
-    top: 0;
-    height: 100%;
-    width: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 500;
-    background: var(--el-bg-color);
-  }
+    html {
+        background:#FFFFFF;
+    }
 
+    html.dark {
+        background:#141414;
+    }
+
+    body {
+        background:inherit;
+    }
+    #loading-first {
+        position: fixed;
+        left: 0;
+        top: 0;
+        height: 100%;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 500;
+        background:#ffffff;
+    }
+
+    html.dark #loading-first {
+        background:#141414;
+    }
   .loading-hide {
     pointer-events: none;
     opacity: 0;

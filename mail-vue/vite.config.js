@@ -24,16 +24,15 @@ export default defineConfig(({mode}) => {
                     'icons/nova-mail-maskable-192.png',
                     'icons/nova-mail-maskable-512.png',
                 ],
-                manifest: {
-                    name: 'Nova Mail',
-                    short_name: 'Nova Mail',
-                    description: 'Nova Mail — your mail, your rules.',
-                    start_url: '/',
-                    scope: '/',
-                    display: 'standalone',
-
-                    background_color: '#FFFFFF',
-                    theme_color: '#FFFFFF',
+                manifest:{
+                    name:'Nova Mail',
+                    short_name:'Nova Mail',
+                    description:'Nova Mail — your mail, your rules.',
+                    start_url:'/',
+                    scope:'/',
+                    display:'standalone',
+                    background_color:'#141414',
+                    theme_color:'#141414',
 
                     icons: [
                         {

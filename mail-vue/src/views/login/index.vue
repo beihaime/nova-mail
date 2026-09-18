@@ -12,16 +12,16 @@
     </header>
 
     <button
-      class="login-theme-toggle"
-      type="button"
-      :aria-label="uiStore.dark ? 'Switch to light mode' : 'Switch to dark mode'"
-      :title="uiStore.dark ? 'Light mode' : 'Dark mode'"
-      @click="toggleLoginTheme"
+        class="login-theme-toggle"
+        type="button"
+        :aria-label="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
+        :title="isDark ? 'Light mode' : 'Dark mode'"
+        @click="toggleLoginTheme"
     >
       <Icon
-        :icon="uiStore.dark ? 'solar:sun-2-linear' : 'solar:moon-linear'"
-        width="21"
-        height="21"
+          :icon="isDark ? 'solar:sun-2-linear' : 'solar:moon-linear'"
+          width="21"
+          height="21"
       />
     </button>
 
@@ -192,6 +192,20 @@ const userStore = useUserStore();
 const uiStore = useUiStore();
 const settingStore = useSettingStore();
 const route = useRoute();
+const isDark = computed(() => {
+  if (uiStore.themeMode === 'dark') {
+    return true
+  }
+
+  if (uiStore.themeMode === 'system') {
+    return window.matchMedia(
+        '(prefers-color-scheme: dark)'
+    ).matches
+  }
+
+  return false
+})
+
 const loginLoading = ref(false)
 const bindLoading = ref(false)
 const oauthLoading = ref(false);
@@ -199,9 +213,10 @@ const showBindForm = ref(false);
 const show = ref('login')
 
 function toggleLoginTheme() {
-  uiStore.setThemeMode(uiStore.dark ? 'light' : 'dark')
+  uiStore.setThemeMode(
+      isDark.value ? 'light' : 'dark'
+  )
 }
-
 const oauthKeys = ['linuxdo', 'google']
 
 const oauthProvider = computed(() => {
@@ -278,31 +293,41 @@ window.loadBefore = (e) => {
 
 const loginOpacity = computed(() => {
   const opacity = settingStore.settings.loginOpacity
-  return uiStore.dark ? `rgba(0, 0, 0, ${opacity})` : `rgba(255, 255, 255, ${opacity})`
+
+  return isDark.value
+      ? `rgba(0,0,0,${opacity})`
+      : `rgba(255,255,255,${opacity})`
 })
 
 const hideLoginDomain = computed(() => settingStore.settings.loginDomain === 1)
 
 const background = computed(() => {
+
+  // 用户自定义背景优先
   if (settingStore.settings.background) {
     return {
-      'background-image': `url(${cvtR2Url(settingStore.settings.background)})`,
+      'background-image':
+          `url(${cvtR2Url(settingStore.settings.background)})`,
       'background-repeat': 'no-repeat',
       'background-size': 'cover',
       'background-position': 'center'
     }
   }
 
-  if (document.documentElement.classList.contains('dark')) {
+
+  // 深色登录背景
+  if (isDark.value) {
     return {
-      'background-image': "url('/image/login-dark.png')",
+      'background-image':
+          "url('/image/login-dark.png')",
       'background-repeat': 'no-repeat',
       'background-size': 'cover',
       'background-position': 'center center'
     }
   }
 
-  return ''
+
+  return {}
 })
 
 const openSelect = () => {
@@ -907,18 +932,17 @@ function submitRegister() {
   width: 180px;
 }
 
-
+:global(html.dark) #login-box:not(.has-custom-background) .login-scene {
+  background:none;
+}
+:global(html.dark) #login-box:not(.has-custom-background) .login-sky-glow,
+:global(html.dark) #login-box:not(.has-custom-background) .login-mountain {
+  display:none;
+}
 #login-box {
   position: relative;
-  min-height: 100%;
-  background: linear-gradient(145deg, #dbeafe 0%, #93c5fd 48%, #dbeafe 100%);
-  font: 100% Arial, sans-serif;
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  overflow-x: hidden;
-  display: grid;
-  grid-template-columns: 1fr;
+  min-height:100%;
+  background:#dbeafe;
 }
 
 .login-scene {
@@ -1157,9 +1181,6 @@ function submitRegister() {
 }
 
 /* Dark login scene tuning */
-:global(html.dark) #login-box:not(.has-custom-background) {
-  background-color: #081426;
-}
 
 :global(html.dark) #login-box:not(.has-custom-background) .login-scene {
   background:
@@ -1188,3 +1209,14 @@ function submitRegister() {
 }
 
 </style>
+:global(html.dark) .login-brand strong {
+color:#f2f2f7;
+}
+
+:global(html.dark) .login-brand span {
+color:#a1a1aa;
+}
+
+:global(html.dark) .login-quiet-tagline {
+color:#d1d5db;
+}

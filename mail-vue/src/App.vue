@@ -19,10 +19,6 @@ watch(() => settingStore.lang, () => locale.value = settingStore.lang)
 // Nova theme preference
 const systemTheme = window.matchMedia('(prefers-color-scheme: dark)')
 
-if (!['light', 'dark', 'system'].includes(uiStore.themeMode)) {
-  uiStore.themeMode = uiStore.dark ? 'dark' : 'light'
-}
-
 uiStore.applyTheme()
 
 function handleSystemThemeChange() {

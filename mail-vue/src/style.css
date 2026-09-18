@@ -149,7 +149,7 @@ button, input, select, textarea {
     --nova-hover: #f3f7fc;
     --nova-selected: #eaf3ff;
     --nova-shadow: 0 10px 32px rgba(23, 35, 52, .08);
-   --nova-overlay: rgba(0, 0, 0, .45);
+    --nova-overlay: rgba(0,0,0,.45);
     --nova-ui-icon-filter: none;
     --nova-ui-icon-filter-hover: none;
     --nova-motion-fast: 140ms;
@@ -190,7 +190,7 @@ button, input, select, textarea {
     --nova-hover: #202833;
     --nova-selected: #17385f;
     --nova-shadow: 0 10px 32px rgba(0, 0, 0, .22);
-   --nova-overlay: rgba(0, 0, 0, .65);
+    --nova-overlay: rgba(0,0,0,.25);
     /* The UI SVGs are raster-backed assets, so they cannot inherit currentColor. */
     --nova-ui-icon-filter: brightness(0) invert(78%);
     --nova-ui-icon-filter-hover: brightness(0) invert(92%);
