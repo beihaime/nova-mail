@@ -6,6 +6,9 @@ keep_vars = true
 [observability]
 enabled = true
 
+# IMPORTANT: Replace database_id / kv id with your own Cloudflare resources.
+# Do not commit real production secrets. Use `wrangler secret put` for jwt_secret,
+# TURNSTILE_SECRET_KEY, OAuth client secrets, etc.
 [[d1_databases]]
 binding = "db"
 database_name = "email"

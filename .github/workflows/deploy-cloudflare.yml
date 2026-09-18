@@ -1,4 +1,4 @@
-name: 🚀 Deploy cloud-mail to Cloudflare Workers
+name: 🚀 Deploy Nova Mail to Cloudflare Workers
 
 on:
   push:
@@ -9,12 +9,12 @@ on:
   workflow_dispatch:
 
 jobs:
-  Deploy-cloud-mail:
+  Deploy-nova-mail:
     name: 🏗️ Build and Deploy
     runs-on: ubuntu-latest
 
     env:
-      NAME: ${{ secrets.NAME || vars.NAME || 'cloud-mail' }}
+      NAME: ${{ secrets.NAME || vars.NAME || 'nova-mail' }}
       CUSTOM_DOMAIN: ${{ secrets.CUSTOM_DOMAIN || vars.CUSTOM_DOMAIN }}
       DOMAIN: ${{ secrets.DOMAIN || vars.DOMAIN }}
       ADMIN: ${{ secrets.ADMIN || vars.ADMIN }}
