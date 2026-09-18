@@ -744,11 +744,11 @@ function close() {
           color: var(--el-color-primary);
         }
 
-        :global(html.dark) .att-add {
+        html.dark & .att-add {
           color: #D1D1D6;
         }
 
-        :global(html.dark) .att-add:hover {
+        html.dark & .att-add:hover {
           color: var(--el-color-primary);
         }
 

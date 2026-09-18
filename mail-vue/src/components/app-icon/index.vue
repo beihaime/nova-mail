@@ -88,15 +88,15 @@ const source = computed(() => assets[`../../icons/svg/${resolvedName.value}.svg`
 }
 
 /* Monochrome PNG icons are drawn dark; invert them for dark theme. */
-:global(html.dark) .app-icon:not(.preserve-color) {
+:global(html.dark .app-icon:not(.preserve-color)) {
   filter: var(--nova-ui-icon-filter);
 }
 
-:global(html.dark) .app-icon:not(.preserve-color):hover {
+:global(html.dark .app-icon:not(.preserve-color):hover) {
   filter: var(--nova-ui-icon-filter-hover);
 }
 
-:global(html.dark) .app-icon.preserve-color {
+:global(html.dark .app-icon.preserve-color) {
   filter: none;
 }
 </style>
