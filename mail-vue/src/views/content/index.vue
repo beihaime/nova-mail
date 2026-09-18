@@ -83,8 +83,8 @@
                 <el-alert v-if="message.status === 5" :closable="false" :title="$t('delayed')" class="email-msg" type="warning" show-icon />
 
                 <el-scrollbar class="htm-scrollbar" :class="!message.attachments?.length ? 'bottom-distance' : ''">
-                  <ShadowHtml class="shadow-html" :html="renderedBodies[message.id]" v-if="renderedBodies[message.id]" />
-                  <pre v-else class="email-text">{{ message.text }}</pre>
+                  <ShadowHtml v-if="bodyFor(message)" class="shadow-html" :html="bodyFor(message)" />
+                  <pre v-else-if="message.text" class="email-text">{{ message.text }}</pre>
                 </el-scrollbar>
 
                 <div class="att" v-if="message.attachments?.length > 0">
@@ -193,6 +193,8 @@ const thread = computed(() => buildThreadMessages(
 const expandedMessages = reactive({})
 const metadataMessages = reactive({})
 const renderedBodies = reactive({})
+// message id -> raw content the resolved body was produced from.
+const resolvedSources = {}
 
 function isMessageExpanded(message) {
   return !!expandedMessages[message.id]
@@ -220,20 +222,47 @@ function collapsedPreview(message) {
   return text.length > 160 ? `${text.slice(0, 160)}…` : text
 }
 
+/**
+ * HTML rendered for a message.
+ *
+ * Falls back to the raw `content` until the async image resolution finishes, so
+ * the body is never blank while (or if) resolution is pending — the reader
+ * shows `email.content` exactly like it did before the thread rewrite.
+ */
+function bodyFor(message) {
+  return renderedBodies[message.id] || message.content || ''
+}
+
 async function resolveThreadBodies() {
   const domain = settingStore.settings.r2Domain
+
   for (const message of thread.value.messages) {
-    if (renderedBodies[message.id] !== undefined) continue
-    renderedBodies[message.id] = ''
-    if (!message.content) continue
-    renderedBodies[message.id] = await resolvePrivateMailImages(message.content, domain)
+    const source = message.content || ''
+
+    // Nothing to render, or this exact content is already resolved.
+    if (!source || resolvedSources[message.id] === source) continue
+
+    resolvedSources[message.id] = source
+
+    try {
+      renderedBodies[message.id] = await resolvePrivateMailImages(source, domain)
+    } catch (error) {
+      console.error(error)
+      // Keep the raw content so the message still renders.
+      renderedBodies[message.id] = source
+    }
   }
 }
 
 let lastThreadMessageId = ''
 
 watch(
-    () => thread.value.messages.map(message => message.id).join('|'),
+    // Re-run when a message joins/leaves AND when its body arrives: the list is
+    // first filled with brief rows (no content), the full rows come later with
+    // the same ids.
+    () => thread.value.messages
+        .map(message => `${message.id}:${(message.content || '').length}:${(message.text || '').length}`)
+        .join('|'),
     () => {
       const messages = thread.value.messages
       const latest = messages[messages.length - 1]
@@ -751,6 +780,12 @@ const handleDelete = () => {
 
 .thread-message.is-mine.is-expanded {
   border-color: color-mix(in srgb, var(--el-color-primary) 34%, var(--nova-divider));
+}
+
+/* Newest message stands out even while collapsed. */
+.thread-message.is-latest:not(.is-expanded) {
+  border-color: var(--light-border);
+  background: var(--el-bg-color);
 }
 
 .message-head {

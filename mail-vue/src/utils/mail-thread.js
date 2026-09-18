@@ -2,8 +2,12 @@
  * Conversation-thread helpers.
  *
  * Nova Mail stores one row per message (`email` table) and has no thread
- * endpoint, so a conversation is assembled on the client from the messages that
- * share a normalised subject.
+ * endpoint, so a conversation is assembled on the client out of the messages
+ * that share a normalised subject and/or are linked by their Message-ID /
+ * In-Reply-To headers.
+ *
+ * The original email object is preserved on every thread message (see
+ * `toThreadMessage`), so `email.content`, `email.attList` etc. keep working.
  */
 
 // "Re:", "RE :", "Re[2]:", "Fwd:", "Fw:", "回复：", "答复:", "转发：", "转寄:"
@@ -24,12 +28,33 @@ export function threadSubjectKey(subject) {
         .toLowerCase()
 }
 
-/** Map a raw email row onto the shape used by the thread UI. */
+/** Raw email id used to dedupe/sort messages. */
+function messageId(raw) {
+    return Number(raw?.emailId ?? raw?.id) || 0
+}
+
+function messageKey(raw) {
+    return String(messageId(raw) || raw?.localId || '')
+}
+
+/** Header id (Message-ID) for reply-chain matching, angle brackets stripped. */
+function headerId(value) {
+    return String(value || '').trim().replace(/^<|>$/g, '')
+}
+
+/**
+ * Map a raw email row onto a thread message.
+ *
+ * Every original field is kept (`...raw`) so downstream code that expects
+ * `content`, `attList`, `cc`, … keeps working; only the display helpers are
+ * added/overridden on top.
+ */
 export function toThreadMessage(raw) {
-    const emailId = Number(raw?.emailId ?? raw?.id) || 0
+    const emailId = messageId(raw)
 
     return {
-        id: String(emailId || raw?.localId || ''),
+        ...raw,
+        id: messageKey(raw),
         emailId,
         localId: raw?.localId || '',
         subject: raw?.subject || '',
@@ -64,8 +89,28 @@ function messageOrder(message) {
     return Number.isFinite(parsed) ? parsed : Number.MAX_SAFE_INTEGER
 }
 
+/** True when the row may join the conversation (same account, identifiable). */
+function isCandidate(primary, raw) {
+    if (!raw) return false
+    if (!messageId(raw) && !raw.localId) return false
+
+    // Never merge conversations that belong to different accounts.
+    if (
+        primary?.accountId != null &&
+        raw.accountId != null &&
+        raw.accountId !== primary.accountId
+    ) return false
+
+    return true
+}
+
 /**
  * Build the ordered message list of the conversation `primary` belongs to.
+ *
+ * Grouping uses, in order:
+ *  1. the normalised subject (Re:/Fwd: stripped), and
+ *  2. the Message-ID / In-Reply-To reply graph, expanded until it stops growing
+ *     (covers replies whose subject was edited).
  *
  * @param {object} primary currently opened email
  * @param {object[]} pool other already-loaded emails (e.g. the store detailMap)
@@ -73,39 +118,65 @@ function messageOrder(message) {
  * @returns {object[]} messages oldest → newest
  */
 export function buildThreadMessages(primary, pool = [], extra = []) {
-    const messages = new Map()
     const key = threadSubjectKey(primary?.subject)
+    const collected = new Map()
 
-    const add = (raw) => {
-        const emailId = Number(raw?.emailId) || 0
-        if (!emailId && !raw?.localId) return
+    const others = Array.isArray(pool) ? pool : []
 
-        const id = String(emailId || raw.localId)
-        if (messages.has(id)) return
+    const push = (raw) => {
+        const id = messageKey(raw)
+        if (!id || collected.has(id)) return false
 
-        messages.set(id, toThreadMessage(raw))
+        collected.set(id, raw)
+        return true
     }
 
+    // Seed with the message the reader opened.
+    push(primary)
+
+    // 1) Same normalised subject.
     if (key) {
-        for (const item of pool) {
-            if (!item) continue
-            // Never merge conversations that belong to different accounts.
-            if (
-                primary?.accountId != null &&
-                item.accountId != null &&
-                item.accountId !== primary.accountId
-            ) continue
-            if (threadSubjectKey(item.subject) !== key) continue
-            add(item)
-        }
-
-        for (const item of extra) {
-            if (threadSubjectKey(item?.subject) !== key) continue
-            add(item)
+        for (const raw of [...others, ...extra]) {
+            if (!isCandidate(primary, raw)) continue
+            if (threadSubjectKey(raw.subject) !== key) continue
+            push(raw)
         }
     }
 
-    add(primary)
+    // 2) Reply graph — grow until no new message can be linked.
+    let grew = true
+    while (grew) {
+        grew = false
 
-    return [...messages.values()].sort((a, b) => messageOrder(a) - messageOrder(b))
+        const knownMessageIds = new Set()
+        const knownReplyTargets = new Set()
+
+        for (const raw of collected.values()) {
+            const id = headerId(raw.messageId)
+            if (id) knownMessageIds.add(id)
+
+            const inReplyTo = headerId(raw.inReplyTo)
+            if (inReplyTo) knownReplyTargets.add(inReplyTo)
+        }
+
+        for (const raw of [...others, ...extra]) {
+            if (!isCandidate(primary, raw)) continue
+            if (collected.has(messageKey(raw))) continue
+
+            const id = headerId(raw.messageId)
+            const inReplyTo = headerId(raw.inReplyTo)
+
+            const linksBack = id && knownReplyTargets.has(id)
+            const repliedTo = inReplyTo && knownMessageIds.has(inReplyTo)
+
+            if (linksBack || repliedTo) {
+                push(raw)
+                grew = true
+            }
+        }
+    }
+
+    return [...collected.values()]
+        .map(toThreadMessage)
+        .sort((a, b) => messageOrder(a) - messageOrder(b))
 }

@@ -5,7 +5,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import DOMPurify from 'dompurify'
 
 const props = defineProps({
@@ -18,6 +18,16 @@ const props = defineProps({
 const container = ref(null)
 const contentBox = ref(null)
 let shadowRoot = null
+let resizeObserver = null
+let observedWidth = 0
+
+/** Re-scale when the host box gets a real size (e.g. a collapsed card expands). */
+function handleResize() {
+  const width = contentBox.value?.offsetWidth || 0
+  if (width === observedWidth) return
+  observedWidth = width
+  autoScale()
+}
 
 const allowedStyleProperties = new Set([
   'background', 'background-color', 'border', 'border-bottom', 'border-collapse',
@@ -137,6 +147,20 @@ onMounted(() => {
   shadowRoot = container.value.attachShadow({ mode: 'open' })
   updateContent()
   autoScale()
+
+  // A message can mount while collapsed (display:none), where offsetWidth is 0
+  // and autoScale bails out. Re-scale once it actually gets laid out, e.g. when
+  // a thread message is expanded.
+  observedWidth = contentBox.value?.offsetWidth || 0
+  if (typeof ResizeObserver !== 'undefined') {
+    resizeObserver = new ResizeObserver(handleResize)
+    resizeObserver.observe(contentBox.value)
+  }
+})
+
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect()
+  resizeObserver = null
 })
 
 watch(() => props.html, () => {
