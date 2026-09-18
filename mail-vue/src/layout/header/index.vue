@@ -4,7 +4,7 @@
       <hanburger @click="changeAside"></hanburger>
       <span class="breadcrumb-item">{{ $t(route.meta.title) }}</span>
     </div>
-    <label class="search-shell">
+    <label class="search-shell desktop-search-only">
       <AppIcon name="search" :size="18" />
       <input v-model="keyword" :placeholder="$t('searchMail')" type="search" @keydown="handleKeydown" />
       <button v-if="keyword" class="search-clear" type="button" :aria-label="$t('clearSearch')" @click="clear">×</button>
@@ -416,6 +416,23 @@ function formatName(email) {
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
+  }
+}
+
+
+
+/* Mobile uses the Inbox search field instead of the desktop header search. */
+@media (max-width: 767px) {
+  .header > .search-shell {
+    display: none !important;
+  }
+}
+
+
+
+@media (max-width: 767px) {
+  .desktop-search-only {
+    display: none !important;
   }
 }
 

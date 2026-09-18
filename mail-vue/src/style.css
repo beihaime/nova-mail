@@ -278,3 +278,40 @@ html[data-theme-to="light"]::view-transition-old(root) {
     from { clip-path: circle(var(--vt-end-radius, 0px) at var(--vt-x) var(--vt-y)); }
     to   { clip-path: circle(0px at var(--vt-x) var(--vt-y)); }
 }
+
+/* Mobile dark-mode icon normalization */
+@media (max-width: 767px) {
+  html.dark {
+    --mobile-primary: #f2f2f7;
+    --mobile-secondary: #aeaeb2;
+    --mobile-tertiary: #8e8e93;
+  }
+
+  html.dark .mobile-nav button {
+    color: var(--mobile-secondary);
+  }
+
+  html.dark .mobile-nav button.active {
+    color: var(--el-color-primary);
+  }
+
+  html.dark .mobile-nav button:not(.active) .app-icon,
+  html.dark .mobile-search .app-icon,
+  html.dark .mobile-tool-button .app-icon,
+  html.dark .mobile-row-star .app-icon {
+    filter: brightness(0) invert(1) !important;
+    opacity: .72;
+  }
+
+  html.dark .mobile-nav button.active .app-icon {
+    opacity: 1;
+  }
+}
+
+/* Mobile Inbox has its own search field. */
+@media (max-width: 767px) {
+  .el-header .search-shell,
+  .header .search-shell {
+    display: none !important;
+  }
+}
