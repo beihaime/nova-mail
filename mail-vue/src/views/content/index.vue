@@ -85,7 +85,7 @@
 
                   <el-scrollbar class="htm-scrollbar" :class="!message.attachments?.length ? 'bottom-distance' : ''">
                     <ShadowHtml v-if="bodyFor(message)" class="shadow-html" :html="bodyFor(message)" />
-                    <pre v-else-if="message.text" class="email-text">{{ message.text }}</pre>
+                    <div v-else-if="message.text" class="email-text" v-html="quotedBody(message.text)"></div>
                   </el-scrollbar>
 
                   <!-- Never leave the body silently blank: show why + retry. -->
@@ -157,6 +157,7 @@ import {useI18n} from "vue-i18n";
 import {EmailUnreadEnum} from "@/enums/email-enum.js";
 import SenderAvatar from '@/components/sender-avatar/index.vue'
 import {buildThreadMessages} from '@/utils/mail-thread.js'
+import {quotedTextToHtml} from '@/utils/quoted-text.js'
 
 const uiStore = useUiStore();
 const settingStore = useSettingStore();
@@ -228,6 +229,23 @@ function recipientLabelFor(message) {
 function collapsedPreview(message) {
   const text = String(message.text || '').replace(/\s+/g, ' ').trim()
   return text.length > 160 ? `${text.slice(0, 160)}…` : text
+}
+
+// Plain-text bodies are parsed into quote-aware markup (see utils/quoted-text).
+// Cached per body so re-renders (expand/collapse, thread updates) stay cheap.
+const quotedBodyCache = new Map()
+
+function quotedBody(text) {
+  const key = String(text || '')
+  let html = quotedBodyCache.get(key)
+
+  if (html === undefined) {
+    html = quotedTextToHtml(key)
+    if (quotedBodyCache.size > 60) quotedBodyCache.clear()
+    quotedBodyCache.set(key, html)
+  }
+
+  return html
 }
 
 /**
@@ -992,6 +1010,27 @@ const handleDelete = () => {
   white-space: pre-wrap;
   word-break: break-word;
   margin: 0;
+}
+
+/* Gmail-style quoted-reply hierarchy for plain-text bodies. Same idea as the
+   `blockquote` rules in the HTML (ShadowHtml) path: every level owns its line,
+   nesting accumulates on its own, and the line spans that level's content.
+   `:deep()` is required because this markup comes from `v-html`. */
+.email-text :deep(.quote-block) {
+  margin: 6px 0 0 8px;
+  padding-left: 12px;
+  border-left: 2px solid var(--nova-quote-line);
+}
+
+.email-text :deep(.quote-header) {
+  color: var(--regular-text-color);
+}
+
+@media (max-width: 767px) {
+  .email-text :deep(.quote-block) {
+    margin-left: 4px;
+    padding-left: 8px;
+  }
 }
 
 .bottom-distance {

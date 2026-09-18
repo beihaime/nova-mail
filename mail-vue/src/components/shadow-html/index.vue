@@ -117,6 +117,34 @@ function updateContent() {
         height: auto !important;
       }
 
+      /* Gmail-style quoted-reply hierarchy.
+         Every quote level owns its own line; because each nested level is also
+         a blockquote (or .quote-block), the indent accumulates by itself and the
+         line always spans the full height of that level's content. */
+      blockquote,
+      .nova-quoted,
+      .quote-block {
+        margin: 6px 0 0 8px;
+        padding: 0 0 0 12px;
+        border-left: 2px solid var(--nova-quote-line, #c7cdd4);
+      }
+
+      /* Keep the first line flush with the top of the line (no collapsed gap). */
+      blockquote > :first-child,
+      .nova-quoted > :first-child,
+      .quote-block > :first-child {
+        margin-top: 0;
+      }
+
+      @media (max-width: 767px) {
+        blockquote,
+        .nova-quoted,
+        .quote-block {
+          margin-left: 4px;
+          padding-left: 8px;
+        }
+      }
+
     </style>
     <div class="shadow-content">
       ${cleanedHtml}
