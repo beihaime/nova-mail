@@ -31,3 +31,7 @@ git-tools.js
 mail-worker/.dev.vars
 *.backup
 *.bak-*
+
+# Local-only scratch: headless-Chrome harnesses, screenshots, profiles
+.nova-test/
+.nova-verify/
