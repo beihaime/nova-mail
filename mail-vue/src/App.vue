@@ -27,6 +27,14 @@ function handleSystemThemeChange() {
   }
 }
 
+// Installed PWAs (e.g. Android Chrome) can re-sample the status bar colour when
+// the app returns to the foreground, so re-apply the theme to keep it in sync.
+function handleVisibilityChange() {
+  if (document.visibilityState === 'visible') {
+    uiStore.applyTheme()
+  }
+}
+
 watch(
   () => uiStore.themeMode,
   () => uiStore.applyTheme()
@@ -38,6 +46,7 @@ onMounted(() => {
   } else {
     systemTheme.addListener(handleSystemThemeChange)
   }
+  document.addEventListener('visibilitychange', handleVisibilityChange)
 })
 
 onBeforeUnmount(() => {
@@ -46,5 +55,6 @@ onBeforeUnmount(() => {
   } else {
     systemTheme.removeListener(handleSystemThemeChange)
   }
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
 </script>

@@ -24,6 +24,10 @@ export default defineConfig(({mode}) => {
                     'icons/nova-mail-maskable-192.png',
                     'icons/nova-mail-maskable-512.png',
                 ],
+                // Install/launch defaults only: the manifest is static, so it cannot
+                // follow the in-app theme. Runtime status-bar colour is driven by the
+                // <meta name="theme-color"> tag, which applyTheme() keeps in sync with
+                // the effective light/dark theme (#FFFFFF / #141414).
                 manifest:{
                     name:'Nova Mail',
                     short_name:'Nova Mail',

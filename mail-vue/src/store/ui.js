@@ -112,6 +112,10 @@ export const useUiStore = defineStore('ui', {
                 document.getElementById(
                     'theme-color-meta'
                 )
+                ||
+                document.querySelector(
+                    'meta[name="theme-color"]'
+                )
 
 
             metaTag?.setAttribute(
@@ -119,6 +123,20 @@ export const useUiStore = defineStore('ui', {
                 effectiveDark
                     ? '#141414'
                     :'#FFFFFF'
+            )
+
+
+            const statusBarMeta =
+                document.getElementById(
+                    'apple-status-bar-meta'
+                )
+
+
+            statusBarMeta?.setAttribute(
+                'content',
+                effectiveDark
+                    ? 'black'
+                    :'default'
             )
 
         },

@@ -14,6 +14,15 @@
   <meta name="apple-mobile-web-app-title" content="Nova Mail">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
+    <!-- iOS standalone status bar: only `default` (light) / `black` / `black-translucent`
+         are supported, and iOS reads it at launch. `theme-color` stays the runtime
+         source of truth; this is kept in sync with the saved theme so the next
+         launch matches, and defaults to `default` before the script runs. -->
+    <meta
+            id="apple-status-bar-meta"
+            name="apple-mobile-web-app-status-bar-style"
+            content="default"
+    />
   <title>Nova Mail</title>
   <link rel="icon" href="/src/icons/svg/brand-mark.svg" type="image/svg+xml">
   <link rel="icon" href="/icons/nova-mail-192.png" sizes="192x192" type="image/png">
@@ -112,6 +121,10 @@
                 document.getElementById(
                     'theme-color-meta'
                 )
+                ||
+                document.querySelector(
+                    'meta[name="theme-color"]'
+                )
 
 
             metaTag?.setAttribute(
@@ -119,6 +132,20 @@
                 isDark
                     ? '#141414'
                     : '#FFFFFF'
+            )
+
+
+            const statusBarMeta =
+                document.getElementById(
+                    'apple-status-bar-meta'
+                )
+
+
+            statusBarMeta?.setAttribute(
+                'content',
+                isDark
+                    ? 'black'
+                    : 'default'
             )
 
 
