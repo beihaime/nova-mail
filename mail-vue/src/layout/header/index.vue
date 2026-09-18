@@ -6,29 +6,24 @@
     </div>
     <label class="search-shell">
       <AppIcon name="search" :size="18" />
-      <input :placeholder="$t('searchMail')" type="search" />
-      <kbd>⌘ K</kbd>
+      <input v-model="keyword" :placeholder="$t('searchMail')" type="search" @keydown="handleKeydown" />
+      <button v-if="keyword" class="search-clear" type="button" :aria-label="$t('clearSearch')" @click="clear">×</button>
+      <kbd v-else>⌘ K</kbd>
     </label>
-      <div v-perm="'email:send'" class="writer-box" @click="openSend">
-        <div class="writer">
-        <AppIcon name="compose" :size="18" />
-      </div>
-    </div>
     <div class="toolbar">
       <div v-if="uiStore.dark" class="sun-icon icon-item" @click="openDark($event)">
         <AppIcon name="theme-toggle" :size="20" />
-        <Icon class="mobile-theme-icon" icon="mingcute:sun-fill" width="23" height="23" />
       </div>
       <div v-else class="dark-icon icon-item" @click="openDark($event)">
         <AppIcon name="theme-toggle" :size="20" />
-        <Icon class="mobile-theme-icon" icon="solar:moon-linear" width="23" height="23" />
       </div>
       <div class="notice icon-item" @click="openNotice">
         <AppIcon name="notifications" :size="20" />
       </div>
       <el-dropdown ref="userinfoRef" @visible-change="e => userInfoShow = e" :teleported="false" popper-class="detail-dropdown">
-        <div class="avatar" @click="openAccountSwitcher" >
-          <div class="avatar-text">
+        <div class="avatar" @click.stop="openAccountSwitcher" >
+          <img v-if="currentAvatar" class="avatar-image" :src="currentAvatar" alt="" @error="handleAvatarError" />
+          <div v-else class="avatar-text">
             <div>{{ formatName(currentAccount.email || userStore.user.email) }}</div>
           </div>
           <div class="account-summary">
@@ -40,15 +35,12 @@
         <template #dropdown>
           <div class="user-details">
             <div class="account-dropdown-head">
-              <div class="account-dropdown-avatar">{{ formatName(primaryAddress) }}</div>
+              <img v-if="currentAvatar" class="account-dropdown-avatar account-dropdown-avatar-image" :src="currentAvatar" alt="" @error="handleAvatarError" />
+              <div v-else class="account-dropdown-avatar">{{ formatName(primaryAddress) }}</div>
               <div>
                 <strong>{{ accountDisplayName }}</strong>
                 <span>{{ $t('accountLabel') }}</span>
               </div>
-            </div>
-            <div class="primary-address">
-              <span>{{ $t('primaryAddress') }}</span>
-              <button @click="copyEmail(primaryAddress)">{{ primaryAddress }}</button>
             </div>
             <div class="address-section">
               <div class="address-section-label">{{ $t('mailAddresses') }}</div>
@@ -95,6 +87,7 @@ import {setExtend} from "@/utils/day.js"
 import {accountList} from "@/request/account.js";
 import {useAccountStore} from "@/store/account.js";
 import {useEmailStore} from "@/store/email.js";
+import {useMailSearch} from "@/composables/use-mail-search.js";
 
 const {t} = useI18n();
 const route = useRoute();
@@ -103,6 +96,7 @@ const userStore = useUserStore();
 const uiStore = useUiStore();
 const accountStore = useAccountStore();
 const emailStore = useEmailStore();
+const {keyword, clear, handleKeydown} = useMailSearch();
 const logoutLoading = ref(false)
 const userInfoShow = ref(false)
 const userinfoRef = ref({})
@@ -111,6 +105,7 @@ const accounts = ref([])
 const currentAccount = computed(() => accountStore.currentAccount || {})
 const primaryAddress = computed(() => userStore.user.email || currentAccount.value.email || '')
 const accountDisplayName = computed(() => userStore.user.name || formatName(primaryAddress.value))
+const currentAvatar = computed(() => userStore.githubAvatar || userStore.googleAvatar)
 
 const accountCount = computed(() => {
   return userStore.user.role.accountCount
@@ -183,7 +178,11 @@ function userInfoHide() {
 
 function openAccountSwitcher() {
   if (window.innerWidth < 768) {
-    uiStore.accountShow = true
+    // The mobile account list used to open alongside this dropdown. Keep the
+    // profile interaction single-owned by the account popover; the full
+    // address-management page remains available through Manage addresses.
+    uiStore.accountShow = false
+    userInfoHide()
     return
   }
   userInfoHide()
@@ -203,7 +202,7 @@ function selectAccount(account) {
 
 function openManageAddresses() {
   userinfoRef.value.handleClose()
-  uiStore.accountShow = true
+  router.push({ name: 'addresses' })
 }
 
 async function loadAccounts() {
@@ -221,24 +220,13 @@ onMounted(() => {
   loadAccounts().catch(() => {
     accounts.value = []
   })
+  userStore.refreshGithubAccount()
+  userStore.refreshGoogleAccount()
 })
 
-async function copyEmail(email) {
-  try {
-    await navigator.clipboard.writeText(email);
-    ElMessage({
-      message: t('copySuccessMsg'),
-      type: 'success',
-      plain: true,
-    })
-  } catch (err) {
-    console.error(`${t('copyFailMsg')}:`, err);
-    ElMessage({
-      message: t('copyFailMsg'),
-      type: 'error',
-      plain: true,
-    })
-  }
+function handleAvatarError() {
+  if (userStore.githubAvatar) userStore.githubAvatar = ''
+  else userStore.googleAvatar = ''
 }
 
 function changeLang(lang) {
@@ -286,13 +274,9 @@ function openDark(e) {
 function switchDark(nextIsDark, root) {
   root.setAttribute('class', nextIsDark ? 'dark' : '')
   const metaTag = document.getElementById('theme-color-meta');
-  const isMobile = window.matchMedia('(max-width: 767px)').matches;
-  metaTag?.setAttribute('content', isMobile ? (nextIsDark ? '#111111' : '#FFFFFF') : (nextIsDark ? '#000000' : '#F1F1F1'));
+  const isMobile =  !window.matchMedia("(pointer: fine) and (hover: hover)").matches;
+  metaTag.setAttribute('content', nextIsDark ? (isMobile ? '#141414' : '#000000') : (isMobile ? '#191A23' : '#F1F1F1'));
   uiStore.dark = nextIsDark
-}
-
-function openSend() {
-  uiStore.writerRef.open()
 }
 
 function changeAside() {
@@ -323,6 +307,7 @@ function formatName(email) {
 
 :deep(.el-popper.is-pure) {
   border: 1px solid var(--nova-divider);
+  background: var(--nova-surface);
   border-radius: 14px;
   box-shadow: 0 14px 34px color-mix(in srgb, #101828 14%, transparent);
   overflow: hidden;
@@ -336,31 +321,31 @@ function formatName(email) {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  animation: nova-popover-in var(--nova-motion-base) var(--nova-motion-ease) both;
 
   .account-dropdown-head {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 10px;
-    padding: 15px 16px 12px;
+    padding: 12px 15px 10px;
     strong, span { display: block; }
     strong { font-size: 14px; color: var(--el-text-color-primary); font-weight: 680; }
     span { margin-top: 2px; font-size: 12px; color: var(--regular-text-color); }
+    > div:not(.account-dropdown-avatar) { align-self: flex-start; min-width: 0; text-align: left; }
   }
 
   .account-dropdown-avatar {
-    width: 34px; height: 34px; display: grid; place-items: center; flex: 0 0 34px;
+    width: 38px; height: 38px; display: grid; place-items: center; flex: 0 0 38px;
     border-radius: 50%; color: var(--el-color-primary); background: var(--nova-selected);
     border: 1px solid color-mix(in srgb, var(--el-color-primary) 18%, var(--nova-divider)); font-weight: 700;
   }
-  .primary-address { padding: 0 16px 14px; border-bottom: 1px solid var(--nova-divider); }
-  .primary-address span, .address-section-label { display: block; color: var(--regular-text-color); font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-  .primary-address button { display: block; max-width: 100%; padding: 5px 0 0; color: var(--el-text-color-primary); font-size: 13px; font-weight: 560; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
-  .primary-address button:hover { color: var(--el-color-primary); }
+  .account-dropdown-avatar-image { display: block; object-fit: cover; border: 0; }
+  .address-section-label { display: block; align-self: flex-start; width: 100%; color: var(--regular-text-color); font-size: 11px; font-weight: 650; letter-spacing: .08em; text-align: left; text-transform: uppercase; }
   .address-section { display: flex; flex: 1 1 auto; min-height: 0; flex-direction: column; padding-top: 11px; }
-  .address-section-label { padding: 0 16px 6px; }
-  .address-list { padding: 0 7px 7px; max-height: min(360px, calc(100vh - 285px)); overflow: auto; }
+  .address-section-label { padding: 1px 15px 8px; }
+  .address-list { padding: 0 15px 7px; max-height: min(360px, calc(100vh - 285px)); overflow: auto; }
   .address-option {
-    width: 100%; height: 42px; display: flex; align-items: center; gap: 9px; padding: 0 9px;
+    width: 100%; height: 43px; display: flex; align-items: center; gap: 8px; padding: 0 10px;
     text-align: left; color: var(--el-text-color-primary); border-radius: 8px; cursor: pointer;
     transition: background-color .14s ease;
     .address-email { min-width: 0; flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -384,9 +369,8 @@ function formatName(email) {
   height: 100%;
   gap: 12px;
   padding: 0 14px;
-  grid-template-columns: minmax(92px, auto) minmax(220px, 1fr) auto auto;
+  grid-template-columns: minmax(92px, auto) minmax(220px, 1fr) auto;
 }
-.mobile-theme-icon { display: none; }
 
 .header.not-send {
   grid-template-columns: minmax(92px, auto) minmax(220px, 1fr) auto;
@@ -405,39 +389,13 @@ function formatName(email) {
   border-radius: 10px;
   transition: border-color .16s ease, box-shadow .16s ease;
   .app-icon { opacity: .68; }
+  :global(.dark .search-shell .app-icon) { filter: var(--nova-ui-icon-filter); opacity: 1; }
   input { width: 100%; min-width: 0; color: inherit; }
   input::placeholder { color: var(--regular-text-color); opacity: .92; }
+  .search-clear { flex: 0 0 auto; width: 22px; height: 22px; border-radius: 50%; color: var(--regular-text-color); font-size: 17px; line-height: 20px; cursor: pointer; animation: nova-fade-scale-in var(--nova-motion-fast) var(--nova-motion-ease) both; }
+  .search-clear:hover { color: var(--el-text-color-primary); background: var(--nova-hover); }
   &:focus-within { border-color: var(--el-color-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--el-color-primary) 12%, transparent); }
   kbd { padding: 2px 6px; white-space: nowrap; font-size: 11px; color: var(--regular-text-color); background: var(--base-fill); border-radius: 5px; }
-}
-
-.writer-box {
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-left: 2px;
-
-  .writer {
-    width: 34px;
-    height: 34px;
-    border-radius: 9px;
-    color: #ffffff;
-    background: var(--el-color-primary);
-    transition: filter .16s ease, transform .16s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    .writer-text {
-      margin-left: 15px;
-      font-size: 14px;
-      font-weight: bold;;
-    }
-  }
-  &:hover .writer { filter: brightness(.94); }
-  &:active .writer { transform: scale(.96); }
-  .app-icon { width: 18px; height: 18px; }
 }
 
 .header-btn {
@@ -479,6 +437,15 @@ function formatName(email) {
     background: var(--base-fill);
   }
 
+  :global(.dark .toolbar .icon-item .app-icon) {
+    filter: var(--nova-ui-icon-filter);
+    opacity: 1;
+  }
+
+  :global(.dark .toolbar .icon-item:hover .app-icon) {
+    filter: var(--nova-ui-icon-filter-hover);
+  }
+
   .notice { margin-right: 4px; }
 
   .avatar {
@@ -496,6 +463,14 @@ function formatName(email) {
       align-items: center;
       border-radius: 50%;
       border: 1px solid var(--nova-divider);
+    }
+
+    .avatar-image {
+      width: 33px;
+      height: 33px;
+      flex: 0 0 33px;
+      border-radius: 50%;
+      object-fit: cover;
     }
 
     .setting-icon {
@@ -521,24 +496,14 @@ function formatName(email) {
 }
 
 @media (max-width: 767px) {
-  .header, .header.not-send { height: 56px; min-height: 56px; padding: 0 16px; gap: 0; grid-template-columns: minmax(0, 1fr) auto; background: var(--nova-surface); }
-  .header-btn { gap: 8px; }
-  .header-btn :deep(.hamburger) { width: 22px; height: 22px; }
-  .header-btn :deep(> div) { width: 44px; height: 44px; padding: 0 !important; display: grid; place-items: center; }
+  .header { height: auto; min-height: 58px; padding: 8px 12px; gap: 8px; grid-template-columns: auto 1fr auto; }
+  .header.not-send { grid-template-columns: auto 1fr; }
   .search-shell { display: none; }
-  .writer-box { display: none; }
-  .toolbar { gap: 0; align-items: center; }
-  .toolbar .icon-item { width: 44px; height: 44px; }
-  .toolbar .icon-item :deep(.app-icon) { width: 23px; height: 23px; }
-  .toolbar .icon-item :deep(.app-icon) { display: none; }
-  .toolbar .mobile-theme-icon { display: block; color: var(--mobile-primary); }
   .toolbar .notice { display: none; }
   .toolbar .setting-icon { display: none; }
-  .toolbar .el-dropdown { width: 44px; height: 44px; display: grid; place-items: center; }
-  .toolbar .avatar { margin: 0; width: 44px; height: 44px; justify-content: center; }
-  .toolbar .avatar .avatar-text { width: 36px; height: 36px; }
+  .toolbar .avatar { margin-left: 2px; }
   .toolbar .avatar .account-summary { display: none; }
-  .breadcrumb-item { font-size: 20px; font-weight: 600; }
+  .breadcrumb-item { font-size: 16px; }
 }
 
 .el-tooltip__trigger:first-child:focus-visible {

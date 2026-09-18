@@ -25,23 +25,17 @@
     <button @click="uiStore.asideShow = true">
       <AppIcon name="folder-nav" :size="19" /><span>{{ $t('folders') }}</span>
     </button>
-<<<<<<< HEAD
     <button v-perm="'email:send'" class="mobile-compose" :aria-label="$t('compose')" @click="writerRef?.open()">
       <AppIcon name="mail-action" :size="50" />
       <span class="mobile-compose-label">{{ $t('compose') }}</span>
     </button>
-=======
->>>>>>> codex/mobile-nova-polish
     <button :class="{active: route.name === 'star'}" @click="router.push({name: 'star'})">
       <AppIcon name="starred-nav" :size="19" /><span>{{ $t('starred') }}</span>
     </button>
-    <button :class="{active: route.name === 'setting'}" @click="router.push({name: 'setting'})">
+    <button @click="router.push({name: 'setting'})">
       <AppIcon name="settings-top" :size="19" /><span>{{ $t('settings') }}</span>
     </button>
   </nav>
-  <button v-if="route.name === 'email'" v-perm="'email:send'" class="mobile-compose-fab" :aria-label="$t('compose')" @click="writerRef?.open()">
-    <AppIcon name="compose" :size="24" />
-  </button>
   <writer ref="writerRef" />
 </template>
 
@@ -161,14 +155,12 @@ onBeforeUnmount(() => {
 .mobile-nav { display: none; }
 
 @media (max-width: 767px) {
-  .layout.has-mobile-nav { padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px)); }
+  .layout.has-mobile-nav { padding-bottom: 66px; }
   .main-container { min-height: 0; }
-  .el-header { height: 56px; border-bottom: 0; background: var(--nova-surface); }
-  .mobile-nav { position: fixed; z-index: 20; display: grid; grid-template-columns: repeat(4, 1fr); align-items: center; padding: 4px 10px env(safe-area-inset-bottom, 0px); left: 0; right: 0; bottom: 0; height: calc(60px + env(safe-area-inset-bottom, 0px)); background: var(--nova-surface); border-top: 1px solid var(--nova-divider); }
-  .mobile-nav button { min-width: 0; min-height: 52px; display: grid; place-items: center; gap: 0; color: var(--regular-text-color); cursor: pointer; font-size: 11px; }
+  .mobile-nav { position: fixed; z-index: 20; display: grid; grid-template-columns: repeat(5, 1fr); align-items: end; padding: 7px 10px max(8px, env(safe-area-inset-bottom)); left: 0; right: 0; bottom: 0; min-height: 66px; background: color-mix(in srgb, var(--el-bg-color) 92%, transparent); border-top: 1px solid var(--light-border); backdrop-filter: blur(18px); }
+  .mobile-nav button { min-width: 0; min-height: 48px; display: grid; place-items: center; gap: 2px; color: var(--regular-text-color); cursor: pointer; font-size: 10px; }
   .mobile-nav button :deep(.app-icon) { width: 19px; height: 19px; opacity: .75; }
   .mobile-nav button.active { color: var(--el-color-primary); font-weight: 650; }
-<<<<<<< HEAD
   .mobile-nav button.active :deep(.app-icon) { opacity: 1; }
   :global(.dark .mobile-nav button:not(.active) .app-icon) { opacity: 1; }
   .mobile-nav .mobile-compose {
@@ -198,15 +190,5 @@ onBeforeUnmount(() => {
     filter: none !important;
   }
   .mobile-nav .mobile-compose-label { display: none; }
-=======
-  .mobile-nav button.active :deep(.app-icon) { opacity: 1; filter: brightness(0) saturate(100%) invert(43%) sepia(93%) saturate(3364%) hue-rotate(192deg) brightness(102%); }
-  .mobile-compose-fab { position: fixed; z-index: 21; right: 20px; bottom: calc(60px + env(safe-area-inset-bottom, 0px) + 16px); width: 56px; height: 56px; display: grid; place-items: center; border-radius: 50%; background: var(--el-color-primary); box-shadow: 0 5px 15px color-mix(in srgb, var(--el-color-primary) 30%, transparent); cursor: pointer; }
-  .mobile-compose-fab :deep(.app-icon) { filter: brightness(0) invert(1); }
-}
-.mobile-compose-fab { display: none; }
-@media (max-width: 767px) { .mobile-compose-fab { display: grid; } }
-@media (max-width: 767px) and (display-mode: standalone) {
-  .layout { padding-top: env(safe-area-inset-top, 0px); background: var(--nova-surface); }
->>>>>>> codex/mobile-nova-polish
 }
 </style>
