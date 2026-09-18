@@ -1,5 +1,7 @@
 const en = {
     inbox: 'Inbox',
+    unreadMail: 'Unread',
+    withAttachments: 'Attachments',
     compose: 'Compose',
     searchMail: 'Search emails, senders, or keywords…',
     folders: 'Folders',

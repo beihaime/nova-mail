@@ -4,7 +4,7 @@
       <hanburger @click="changeAside"></hanburger>
       <span class="breadcrumb-item">{{ $t(route.meta.title) }}</span>
     </div>
-    <label class="search-shell">
+    <label class="search-shell desktop-search-only">
       <AppIcon name="search" :size="18" />
       <input v-model="keyword" :placeholder="$t('searchMail')" type="search" @keydown="handleKeydown" />
       <button v-if="keyword" class="search-clear" type="button" :aria-label="$t('clearSearch')" @click="clear">×</button>
@@ -13,9 +13,11 @@
     <div class="toolbar">
       <div v-if="uiStore.dark" class="sun-icon icon-item" @click="openDark($event)">
         <AppIcon name="theme-toggle" :size="20" />
+        <Icon class="mobile-theme-icon" icon="mingcute:sun-fill" width="23" height="23" />
       </div>
       <div v-else class="dark-icon icon-item" @click="openDark($event)">
         <AppIcon name="theme-toggle" :size="20" />
+        <Icon class="mobile-theme-icon" icon="solar:moon-linear" width="23" height="23" />
       </div>
       <div class="notice icon-item" @click="openNotice">
         <AppIcon name="notifications" :size="20" />
@@ -302,6 +304,138 @@ function formatName(email) {
 .detail-dropdown {
   color: var(--el-text-color-primary) !important;
 }
+
+
+/* Mobile Header v2.
+   Desktop behavior, mail search, OAuth avatars and account switching remain
+   owned by the stable implementation above. */
+.mobile-theme-icon {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .header,
+  .header.not-send {
+    height: 56px;
+    min-height: 56px;
+
+    padding: 0 12px 0 10px;
+    gap: 0;
+
+    grid-template-columns: minmax(0, 1fr) auto;
+
+    background: var(--nova-surface);
+  }
+
+  .header-btn {
+    min-width: 0;
+    gap: 6px;
+  }
+
+  .header-btn :deep(> div) {
+    width: 44px;
+    height: 44px;
+
+    padding: 0 !important;
+
+    display: grid;
+    place-items: center;
+  }
+
+  .search-shell {
+    display: none;
+  }
+
+  .toolbar {
+    gap: 0;
+    align-items: center;
+  }
+
+  .toolbar .icon-item {
+    width: 44px;
+    height: 44px;
+  }
+
+  /* Keep desktop AppIcon exactly as-is; replace it only visually on phones. */
+  .toolbar .sun-icon :deep(.app-icon),
+  .toolbar .dark-icon :deep(.app-icon) {
+    display: none;
+  }
+
+  .toolbar .mobile-theme-icon {
+    display: block;
+    color: var(--mobile-primary);
+  }
+
+  .toolbar .notice {
+    display: none;
+  }
+
+  .toolbar .setting-icon {
+    display: none;
+  }
+
+  .toolbar .el-dropdown {
+    width: 44px;
+    height: 44px;
+
+    display: grid;
+    place-items: center;
+  }
+
+  .toolbar .avatar {
+    width: 44px;
+    height: 44px;
+
+    margin: 0;
+
+    justify-content: center;
+  }
+
+  .toolbar .avatar .avatar-text {
+    width: 36px;
+    height: 36px;
+  }
+
+  .toolbar .avatar .avatar-image {
+    width: 36px;
+    height: 36px;
+    flex: 0 0 36px;
+  }
+
+  .toolbar .avatar .account-summary {
+    display: none;
+  }
+
+  .breadcrumb-item {
+    min-width: 0;
+
+    font-size: 20px;
+    font-weight: 600;
+
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+}
+
+
+
+/* Mobile uses the Inbox search field instead of the desktop header search. */
+@media (max-width: 767px) {
+  .header > .search-shell {
+    display: none !important;
+  }
+}
+
+
+
+@media (max-width: 767px) {
+  .desktop-search-only {
+    display: none !important;
+  }
+}
+
 </style>
 <style lang="scss" scoped>
 

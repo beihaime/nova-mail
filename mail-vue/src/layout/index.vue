@@ -25,17 +25,22 @@
     <button @click="uiStore.asideShow = true">
       <AppIcon name="folder-nav" :size="19" /><span>{{ $t('folders') }}</span>
     </button>
-    <button v-perm="'email:send'" class="mobile-compose" :aria-label="$t('compose')" @click="writerRef?.open()">
-      <AppIcon name="mail-action" :size="50" />
-      <span class="mobile-compose-label">{{ $t('compose') }}</span>
-    </button>
     <button :class="{active: route.name === 'star'}" @click="router.push({name: 'star'})">
       <AppIcon name="starred-nav" :size="19" /><span>{{ $t('starred') }}</span>
     </button>
-    <button @click="router.push({name: 'setting'})">
+    <button :class="{active: route.name === 'setting'}" @click="router.push({name: 'setting'})">
       <AppIcon name="settings-top" :size="19" /><span>{{ $t('settings') }}</span>
     </button>
   </nav>
+  <button
+      v-if="route.name === 'email'"
+      v-perm="'email:send'"
+      class="mobile-compose-fab"
+      :aria-label="$t('compose')"
+      @click="writerRef?.open()"
+  >
+    <AppIcon name="mail-action" :size="56" />
+  </button>
   <writer ref="writerRef" />
 </template>
 
@@ -191,4 +196,125 @@ onBeforeUnmount(() => {
   }
   .mobile-nav .mobile-compose-label { display: none; }
 }
+
+
+/* Mobile UI v2 shell.
+   This intentionally comes last so desktop and the proven stable styles above
+   remain untouched. */
+.mobile-compose-fab {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .layout.has-mobile-nav {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .el-header {
+    height: calc(56px + env(safe-area-inset-top, 0px));
+    padding-top: env(safe-area-inset-top, 0px);
+    border-bottom: 0;
+    background: var(--nova-surface);
+  }
+
+  .mobile-nav {
+    position: fixed;
+    z-index: 20;
+    left: 0;
+    right: 0;
+    bottom: 0;
+
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    align-items: center;
+
+    height: calc(64px + env(safe-area-inset-bottom, 0px));
+    min-height: 0;
+
+    padding:
+      4px
+      10px
+      env(safe-area-inset-bottom, 0px);
+
+    background: var(--nova-surface);
+    border-top: 1px solid var(--nova-divider);
+    backdrop-filter: none;
+  }
+
+  .mobile-nav button {
+    min-width: 0;
+    min-height: 54px;
+
+    display: grid;
+    place-items: center;
+    gap: 1px;
+
+    color: var(--regular-text-color);
+    font-size: 11px;
+  }
+
+  .mobile-nav button :deep(.app-icon) {
+    width: 20px;
+    height: 20px;
+    opacity: .72;
+  }
+
+  .mobile-nav button.active {
+    color: var(--el-color-primary);
+    font-weight: 650;
+  }
+
+  .mobile-nav button.active :deep(.app-icon) {
+    opacity: 1;
+  }
+
+  .mobile-compose-fab {
+    position: fixed;
+    z-index: 21;
+
+    right: 18px;
+    bottom: calc(
+      64px +
+      env(safe-area-inset-bottom, 0px) +
+      16px
+    );
+
+    width: 58px;
+    height: 58px;
+
+    display: grid;
+    place-items: center;
+
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+
+    background: transparent;
+    cursor: pointer;
+
+    filter:
+      drop-shadow(
+        0 7px 10px
+        color-mix(in srgb, var(--el-color-primary) 30%, transparent)
+      );
+  }
+
+  .mobile-compose-fab :deep(.app-icon) {
+    width: 56px;
+    height: 56px;
+    opacity: 1;
+    filter: none !important;
+  }
+
+  .mobile-compose-fab:active {
+    transform: scale(.94);
+  }
+}
+
+@media (max-width: 767px) and (display-mode: standalone) {
+  .layout {
+    background: var(--nova-surface);
+  }
+}
+
 </style>
