@@ -18,6 +18,9 @@ export const useEmailStore = defineStore('email', {
         sendScroll: null,
         detailMap: {},
         searchKeyword: '',
+        // Replies/forwards sent this session, shown in the conversation thread
+        // immediately without waiting for a list refresh. Not persisted.
+        threadMessages: [],
     }),
     persist: {
         pick: ['contentData'],
@@ -74,6 +77,30 @@ export const useEmailStore = defineStore('email', {
                 if (!list?.length) continue
                 const item = list.find(e => e.emailId === emailId)
                 if (item) item.unread = EmailUnreadEnum.READ
+            }
+        },
+        /**
+         * Show a freshly sent reply/forward inside its conversation thread
+         * straight away, instead of waiting for the list to be refetched.
+         * Expects the email row returned by `POST /email/send`.
+         */
+        appendThreadMessage(email) {
+            if (!email) return
+
+            const emailId = Number(email.emailId) || 0
+            if (emailId && this.threadMessages.some(item => Number(item.emailId) === emailId)) {
+                return
+            }
+
+            this.threadMessages.push({
+                ...email,
+                emailId,
+                attList: email.attList || [],
+                local: true,
+            })
+
+            if (this.threadMessages.length > 50) {
+                this.threadMessages.splice(0, this.threadMessages.length - 50)
             }
         },
     },

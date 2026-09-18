@@ -357,6 +357,10 @@ async function sendEmail() {
 
   show.value = false
 
+  // Captured before resetForm(): the sent reply/forward is inserted into the
+  // open conversation as soon as the API confirms.
+  const sentType = form.sendType
+
   emailSend(form, (e) => {
     percent.value = Math.round((e.loaded * 98) / e.total)
   }).then(emailList => {
@@ -364,6 +368,12 @@ async function sendEmail() {
     emailList.forEach(item => {
       emailStore.sendScroll?.addItem(item)
     })
+
+    // Show the new message in the conversation thread straight away instead of
+    // waiting for the list to be refetched.
+    if ((sentType === 'reply' || sentType === 'forward') && email) {
+      emailStore.appendThreadMessage(email)
+    }
 
     ElNotification({
       title: t('sendSuccessMsg'),

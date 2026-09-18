@@ -12,9 +12,9 @@
           height="20"
           title="Unstar"
           aria-label="Unstar email"
-          @click="changeStar"
+          @click="changeStar(email)"
         />
-        <AppIcon class="icon" @click="changeStar" v-else name="star-outline" :size="19" title="Star" aria-label="Star email"/>
+        <AppIcon class="icon" @click="changeStar(email)" v-else name="star-outline" :size="19" title="Star" aria-label="Star email"/>
       </span>
       <AppIcon class="icon" v-if="emailStore.contentData.showReply" v-perm="'email:send'"  @click="openReply" name="reply" :size="21" title="Reply" aria-label="Reply" />
       <AppIcon class="icon" v-if="emailStore.contentData.showReply" v-perm="'email:send'"  @click="openForward" name="forward" :size="20" title="Forward" aria-label="Forward" />
@@ -24,66 +24,100 @@
     <el-scrollbar class="scrollbar">
       <div class="container">
         <div class="email-title">
-          {{ email.subject }}
+          {{ thread.subject || email.subject }}
         </div>
-        <div class="content">
-          <div class="email-info">
-            <div class="message-meta">
-              <SenderAvatar :email="email" :size="40" />
+        <div class="content thread">
+          <article
+              v-for="(message, index) in thread.messages"
+              :key="message.id"
+              class="thread-message"
+              :class="{
+                'is-expanded': isMessageExpanded(message),
+                'is-latest': index === thread.messages.length - 1,
+                'is-mine': message.isMine
+              }"
+          >
+            <header class="message-head" @click="toggleMessage(message)">
+              <SenderAvatar :email="message" :size="40" />
               <div class="sender-details">
                 <div class="sender-line">
-                  <strong>{{ email.name || email.sendEmail }}</strong>
-                  <span v-if="email.sendEmail">&lt;{{ email.sendEmail }}&gt;</span>
+                  <strong>{{ message.from.name || message.from.email || '—' }}</strong>
+                  <span v-if="message.from.email">&lt;{{ message.from.email }}&gt;</span>
                 </div>
-                <button class="recipient-toggle" type="button" @click="showMetadata = !showMetadata">
-                  {{ $t('to') }} {{ recipientLabel }} <span aria-hidden="true">⌄</span>
+                <button class="recipient-toggle" type="button" @click.stop="toggleMessageMetadata(message)">
+                  {{ $t('to') }} {{ recipientLabelFor(message) }} <span aria-hidden="true">⌄</span>
                 </button>
-                <div v-if="showMetadata" class="message-details">
-                  <div><b>{{ $t('from') }}</b><span>{{ email.name || '—' }} &lt;{{ email.sendEmail || '—' }}&gt;</span></div>
-                  <div><b>{{ $t('recipient') }}</b><span>{{ recipientLabel }}</span></div>
-                  <div v-if="formatAddressList(email.cc)"><b>Cc</b><span>{{ formatAddressList(email.cc) }}</span></div>
-                  <div v-if="formatAddressList(email.bcc)"><b>Bcc</b><span>{{ formatAddressList(email.bcc) }}</span></div>
+                <div v-if="isMetadataOpen(message)" class="message-details">
+                  <div><b>{{ $t('from') }}</b><span>{{ message.from.name || '—' }} &lt;{{ message.from.email || '—' }}&gt;</span></div>
+                  <div><b>{{ $t('recipient') }}</b><span>{{ recipientLabelFor(message) }}</span></div>
+                  <div v-if="formatAddressList(message.cc)"><b>Cc</b><span>{{ formatAddressList(message.cc) }}</span></div>
+                  <div v-if="formatAddressList(message.bcc)"><b>Bcc</b><span>{{ formatAddressList(message.bcc) }}</span></div>
                 </div>
               </div>
-              <time class="message-date">{{ formatDetailDate(email.createTime) }}</time>
-            </div>
-            <el-alert v-if="email.status === 3" :closable="false" :title="toMessage(email.message)" class="email-msg" type="error" show-icon />
-            <el-alert v-if="email.status === 4" :closable="false" :title="$t('complained')" class="email-msg" type="warning" show-icon />
-            <el-alert v-if="email.status === 5" :closable="false" :title="$t('delayed')" class="email-msg" type="warning" show-icon />
-          </div>
-          <el-scrollbar class="htm-scrollbar" :class="!email.attList?.length ? 'bottom-distance' : ''">
-            <ShadowHtml class="shadow-html" :html="renderedContent" v-if="email.content" />
-            <pre v-else class="email-text" >{{email.text}}</pre>
-          </el-scrollbar>
-          <div class="att" v-if="email.attList?.length > 0">
-            <div class="att-title">
-              <span>{{$t('attachments')}}</span>
-              <span>{{$t('attCount',{total: email.attList.length})}}</span>
-            </div>
-            <div class="att-box">
+              <time class="message-date">{{ formatDetailDate(message.date) }}</time>
+              <button
+                  v-if="message.emailId && !message.isMine"
+                  class="message-star"
+                  type="button"
+                  :aria-label="message.isStar ? 'Unstar' : 'Star'"
+                  @click.stop="changeStar(message)"
+              >
+                <Icon v-if="message.isStar" class="star-active-icon" icon="solar:star-bold" width="19" height="19" />
+                <AppIcon v-else name="star-outline" :size="18" />
+              </button>
+            </header>
 
-              <div class="att-item" v-for="att in email.attList" :key="att.attId">
-                <div class="att-icon" @click="showImage(att.key)">
-                  <Icon v-bind="getIconByName(att.filename)" />
-                </div>
-                <div class="att-name" @click="showImage(att.key)">
-                  {{ att.filename }}
-                </div>
-                <div class="att-size">{{ formatBytes(att.size) }}</div>
-                <div class="opt-icon att-icon">
-                  <Icon v-if="isImage(att.filename)" icon="hugeicons:view" width="22" height="22" @click="showImage(att.key)"/>
-                  <AppIcon name="download-outline" :size="22" @click="downloadAttachment(att)" />
+            <button
+                v-if="!isMessageExpanded(message) && collapsedPreview(message)"
+                class="message-preview"
+                type="button"
+                @click="toggleMessage(message)"
+            >
+              {{ collapsedPreview(message) }}
+            </button>
+
+            <el-collapse-transition>
+              <div v-show="isMessageExpanded(message)" class="message-body">
+                <el-alert v-if="message.status === 3" :closable="false" :title="toMessage(message.message)" class="email-msg" type="error" show-icon />
+                <el-alert v-if="message.status === 4" :closable="false" :title="$t('complained')" class="email-msg" type="warning" show-icon />
+                <el-alert v-if="message.status === 5" :closable="false" :title="$t('delayed')" class="email-msg" type="warning" show-icon />
+
+                <el-scrollbar class="htm-scrollbar" :class="!message.attachments?.length ? 'bottom-distance' : ''">
+                  <ShadowHtml class="shadow-html" :html="renderedBodies[message.id]" v-if="renderedBodies[message.id]" />
+                  <pre v-else class="email-text">{{ message.text }}</pre>
+                </el-scrollbar>
+
+                <div class="att" v-if="message.attachments?.length > 0">
+                  <div class="att-title">
+                    <span>{{$t('attachments')}}</span>
+                    <span>{{$t('attCount',{total: message.attachments.length})}}</span>
+                  </div>
+                  <div class="att-box">
+                    <div class="att-item" v-for="att in message.attachments" :key="att.attId || att.key">
+                      <div class="att-icon" @click="showImage(att.key)">
+                        <Icon v-bind="getIconByName(att.filename)" />
+                      </div>
+                      <div class="att-name" @click="showImage(att.key)">
+                        {{ att.filename }}
+                      </div>
+                      <div class="att-size">{{ formatBytes(att.size) }}</div>
+                      <div class="opt-icon att-icon">
+                        <Icon v-if="isImage(att.filename)" icon="hugeicons:view" width="22" height="22" @click="showImage(att.key)"/>
+                        <AppIcon name="download-outline" :size="22" @click="downloadAttachment(att)" />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
-          <Teleport to="body" :disabled="!isMobileReader">
-            <div v-if="emailStore.contentData.showReply" class="reader-bottom-actions">
-              <button v-perm="'email:send'" type="button" @click="openReply"><Icon icon="solar:reply-linear" width="18" height="18" />{{ $t('reply') }}</button>
-              <button v-perm="'email:send'" type="button" @click="openForward"><Icon icon="solar:forward-linear" width="18" height="18" />{{ $t('forward') }}</button>
-            </div>
-          </Teleport>
+            </el-collapse-transition>
+          </article>
         </div>
+        <Teleport to="body" :disabled="!isMobileReader">
+          <div v-if="emailStore.contentData.showReply" class="reader-bottom-actions">
+            <button v-perm="'email:send'" type="button" @click="openReply"><Icon icon="solar:reply-linear" width="18" height="18" />{{ $t('reply') }}</button>
+            <button v-perm="'email:send'" type="button" @click="openForward"><Icon icon="solar:forward-linear" width="18" height="18" />{{ $t('forward') }}</button>
+          </div>
+        </Teleport>
       </div>
     </el-scrollbar>
     <el-image-viewer
@@ -98,7 +132,7 @@
 import ShadowHtml from '@/components/shadow-html/index.vue'
 import {computed, reactive, ref, watch, onMounted, onUnmounted} from "vue";
 import {useRouter} from 'vue-router'
-import {ElMessage, ElMessageBox} from 'element-plus'
+import {ElMessage, ElMessageBox, ElCollapseTransition} from 'element-plus'
 import {emailDelete, emailRead} from "@/request/email.js";
 import {Icon} from "@iconify/vue";
 import {useEmailStore} from "@/store/email.js";
@@ -114,6 +148,7 @@ import {useUiStore} from "@/store/ui.js";
 import {useI18n} from "vue-i18n";
 import {EmailUnreadEnum} from "@/enums/email-enum.js";
 import SenderAvatar from '@/components/sender-avatar/index.vue'
+import {buildThreadMessages} from '@/utils/mail-thread.js'
 
 const uiStore = useUiStore();
 const settingStore = useSettingStore();
@@ -129,7 +164,6 @@ const email = computed(() => emailStore.contentData.email || {
 })
 const showPreview = ref(false)
 const srcList = reactive([])
-const renderedContent = ref('')
 
 // The mobile action bar is teleported to <body> so no transformed ancestor
 // (`.main-view` keeps an identity transform from its enter animation) can turn
@@ -142,26 +176,89 @@ function handleMobileReaderChange(event) {
 }
 
 let previewUrl = null
-const showMetadata = ref(false)
-const recipientLabel = computed(() => formatAddressList(email.value.recipient) || '—')
 
 const { t } = useI18n()
+
+// ---------------------------------------------------------------- conversation
+// The API stores one row per message and exposes no thread endpoint, so the
+// conversation is assembled from every loaded message that shares a normalised
+// subject, plus anything sent from this session (see the email store).
+const thread = computed(() => buildThreadMessages(
+    email.value,
+    Object.values(emailStore.detailMap),
+    emailStore.threadMessages
+))
+
+// Per-message UI state, keyed by message id.
+const expandedMessages = reactive({})
+const metadataMessages = reactive({})
+const renderedBodies = reactive({})
+
+function isMessageExpanded(message) {
+  return !!expandedMessages[message.id]
+}
+
+function toggleMessage(message) {
+  expandedMessages[message.id] = !expandedMessages[message.id]
+}
+
+function isMetadataOpen(message) {
+  return !!metadataMessages[message.id]
+}
+
+function toggleMessageMetadata(message) {
+  metadataMessages[message.id] = !metadataMessages[message.id]
+}
+
+function recipientLabelFor(message) {
+  return formatAddressList(message.recipient) || '—'
+}
+
+/** One-line teaser shown while a message is collapsed. */
+function collapsedPreview(message) {
+  const text = String(message.text || '').replace(/\s+/g, ' ').trim()
+  return text.length > 160 ? `${text.slice(0, 160)}…` : text
+}
+
+async function resolveThreadBodies() {
+  const domain = settingStore.settings.r2Domain
+  for (const message of thread.value.messages) {
+    if (renderedBodies[message.id] !== undefined) continue
+    renderedBodies[message.id] = ''
+    if (!message.content) continue
+    renderedBodies[message.id] = await resolvePrivateMailImages(message.content, domain)
+  }
+}
+
+let lastThreadMessageId = ''
+
+watch(
+    () => thread.value.messages.map(message => message.id).join('|'),
+    () => {
+      const messages = thread.value.messages
+      const latest = messages[messages.length - 1]
+
+      // Drop state for messages that are no longer part of the thread.
+      for (const key of Object.keys(metadataMessages)) {
+        if (!messages.some(message => message.id === key)) delete metadataMessages[key]
+      }
+
+      // Gmail behaviour: when the thread changes (opening a conversation, or a
+      // reply just being sent) expand the newest message and collapse the rest.
+      if (latest && latest.id !== lastThreadMessageId) {
+        for (const key of Object.keys(expandedMessages)) delete expandedMessages[key]
+        expandedMessages[latest.id] = true
+        lastThreadMessageId = latest.id
+      }
+
+      resolveThreadBodies()
+    },
+    { immediate: true }
+)
+
 watch(() => accountStore.currentAccountId, () => {
   handleBack()
 })
-
-watch(() => email.value.emailId, () => {
-  showMetadata.value = false
-})
-
-watch(() => [email.value.emailId, email.value.content, settingStore.settings.r2Domain], async (_value, _old, onCleanup) => {
-  let cancelled = false
-  onCleanup(() => { cancelled = true })
-  renderedContent.value = ''
-  if (!email.value.content) return
-  const html = await resolvePrivateMailImages(email.value.content, settingStore.settings.r2Domain)
-  if (!cancelled) renderedContent.value = html
-}, { immediate: true })
 
 let readRequesting = false
 
@@ -303,25 +400,32 @@ function formatAddressList(value) {
   }).filter(Boolean).join(', ')
 }
 
-function setReaderStarState(value) {
+function setMessageStarState(message, value) {
   const nextValue = value ? 1 : 0
-  const emailId = email.value.emailId
+  const emailId = message.emailId
 
-  email.value.isStar = nextValue
+  message.isStar = nextValue
 
   if (emailStore.detailMap[emailId]) {
     emailStore.detailMap[emailId].isStar = nextValue
   }
+
+  if (email.value.emailId === emailId) {
+    email.value.isStar = nextValue
+  }
 }
 
-function changeStar() {
-  const emailId = email.value.emailId
+function changeStar(message) {
+  const target = message?.emailId ? message : email.value
+  const emailId = target.emailId
 
-  if (email.value.isStar) {
-    setReaderStarState(0)
+  if (!emailId) return
+
+  if (target.isStar) {
+    setMessageStarState(target, 0)
 
     starCancel(emailId).then(() => {
-      setReaderStarState(0)
+      setMessageStarState(target, 0)
       emailStore.cancelStarEmailId = emailId
       setTimeout(() => {
         if (emailStore.cancelStarEmailId === emailId) {
@@ -331,23 +435,23 @@ function changeStar() {
       emailStore.starScroll?.deleteEmail([emailId])
     }).catch((e) => {
       console.error(e)
-      setReaderStarState(1)
+      setMessageStarState(target, 1)
     })
   } else {
-    setReaderStarState(1)
+    setMessageStarState(target, 1)
 
     starAdd(emailId).then(() => {
-      setReaderStarState(1)
+      setMessageStarState(target, 1)
       emailStore.addStarEmailId = emailId
       setTimeout(() => {
         if (emailStore.addStarEmailId === emailId) {
           emailStore.addStarEmailId = 0
         }
       })
-      emailStore.starScroll?.addItem(email.value)
+      emailStore.starScroll?.addItem(email.value.emailId === emailId ? email.value : target)
     }).catch((e) => {
       console.error(e)
-      setReaderStarState(0)
+      setMessageStarState(target, 0)
     })
   }
 }
@@ -624,6 +728,112 @@ const handleDelete = () => {
 .message-details b { color: var(--el-text-color-primary); font-weight: 600; }
 .message-details span { overflow-wrap: anywhere; }
 
+/* Conversation thread (Gmail-style message cards) -------------------------- */
+.thread {
+  max-width: 1100px;
+  gap: 12px;
+}
+
+.thread-message {
+  border: 1px solid var(--nova-divider);
+  border-radius: 14px;
+  background: var(--nova-surface-muted);
+  overflow: hidden;
+  transition:
+    background-color var(--nova-motion-base) var(--nova-motion-ease),
+    border-color var(--nova-motion-base) var(--nova-motion-ease);
+}
+
+.thread-message.is-expanded {
+  background: var(--el-bg-color);
+  border-color: var(--light-border);
+}
+
+.thread-message.is-mine.is-expanded {
+  border-color: color-mix(in srgb, var(--el-color-primary) 34%, var(--nova-divider));
+}
+
+.message-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.thread-message:not(.is-expanded) .message-head:hover {
+  background: var(--nova-hover);
+}
+
+.message-head .sender-details {
+  min-width: 0;
+  flex: 1;
+}
+
+.message-star {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  margin-left: 2px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  opacity: .7;
+  transition:
+    opacity var(--nova-motion-fast) var(--nova-motion-ease),
+    background-color var(--nova-motion-fast) var(--nova-motion-ease);
+}
+
+.message-star:hover {
+  opacity: 1;
+  background: var(--base-fill);
+}
+
+.message-star .star-active-icon {
+  color: var(--el-color-primary);
+}
+
+.message-preview {
+  display: block;
+  width: 100%;
+  padding: 0 16px 14px;
+  border: 0;
+  background: transparent;
+  color: var(--regular-text-color);
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.message-body {
+  padding: 0 16px 18px;
+}
+
+.message-body .email-msg {
+  max-width: 400px;
+  width: fit-content;
+  margin-bottom: 15px;
+}
+
+.message-body .att {
+  margin-top: 18px;
+  margin-bottom: 0;
+}
+
+/* Beat `.container .content .att`'s 30px margins inside a card. */
+.thread-message .message-body .att {
+  margin-top: 18px;
+  margin-bottom: 0;
+}
+
 .htm-scrollbar { max-width: 1100px; overflow-x: auto; }
 .email-text { max-width: 100%; overflow-wrap: anywhere; line-height: 1.65; }
 .reader-bottom-actions { display: flex; gap: 10px; max-width: 1100px; padding: 28px 0 18px; }
@@ -661,6 +871,13 @@ const handleDelete = () => {
   .sender-line strong { font-size: 14px; }
   .sender-line span { font-size: 12px; }
   .message-date { font-size: 11px; }
+
+  /* Conversation cards tighten up on phones. */
+  .thread { gap: 10px; }
+  .thread-message { border-radius: 12px; }
+  .message-head { gap: 10px; padding: 12px; }
+  .message-preview { padding: 0 12px 12px; }
+  .message-body { padding: 0 12px 16px; }
 
   /* Reserve room so the fixed action bar never covers the last lines. */
   .container { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
