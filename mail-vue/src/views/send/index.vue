@@ -5,7 +5,6 @@
                :getEmailList="getEmailList"
                :emailDelete="emailDelete"
                :star-add="starAdd"
-               show-status
                actionLeft="4px"
                :star-cancel="starCancel"
                @jump="jumpContent"

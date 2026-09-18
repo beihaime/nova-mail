@@ -71,14 +71,60 @@
     </div>
   </el-scrollbar>
   <footer class="aside-footer">
-    <div class="storage-usage">
-      <AppIcon name="folder-nav" :size="17" />
-      <div>
-        <span>{{ $t('storageUsage') }}</span>
-        <small>{{ $t('storageUsageUnavailable') }}</small>
+    <div class="send-usage">
+      <AppIcon name="send-action" :size="17" />
+
+      <div class="send-usage-body">
+        <div class="send-usage-head">
+          <span>{{ $t('sendCount') }}</span>
+
+          <strong v-if="sendLimit > 0">
+            {{ sendRemaining }}/{{ sendLimit }}
+          </strong>
+
+          <strong v-else>∞</strong>
+        </div>
+
+        <div
+          v-if="sendLimit > 0 &&
+                settingStore.settings.send !== 1 &&
+                !['ban', 'internal'].includes(sendQuotaType)"
+          class="send-usage-track"
+          role="progressbar"
+          :aria-valuenow="sendRemainingPercent"
+          aria-valuemin="0"
+          aria-valuemax="100"
+        >
+          <span :style="{ width: `${sendRemainingPercent}%` }"></span>
+        </div>
+
+        <small
+          v-if="settingStore.settings.send === 1 ||
+                sendQuotaType === 'ban'"
+        >
+          {{ $t('disabled') }}
+        </small>
+
+        <small v-else-if="sendQuotaType === 'internal'">
+          {{ $t('sendInternal') }}
+        </small>
+
+        <small v-else-if="sendLimit > 0">
+          {{ $t('remainingUses') }}
+          {{ sendRemaining }}
+          ·
+          {{ sendRemainingPercent }}%
+        </small>
+
+        <small v-else>
+          {{ $t('unlimited') }}
+        </small>
       </div>
     </div>
-    <div class="aside-version">Nova Mail · v{{ appVersion }}</div>
+
+    <div class="aside-version">
+      Nova Mail · v{{ appVersion }}
+    </div>
   </footer>
 </template>
 
@@ -87,11 +133,52 @@ import router from "@/router/index.js";
 import { useRoute } from "vue-router";
 import {useSettingStore} from "@/store/setting.js";
 import {useUiStore} from "@/store/ui.js";
+import {useUserStore} from "@/store/user.js";
+import {computed} from "vue";
 import packageInfo from '../../../package.json'
 
 const settingStore = useSettingStore();
 const route = useRoute();
 const uiStore = useUiStore();
+const userStore = useUserStore();
+
+const sendQuotaType = computed(
+  () => userStore.user?.role?.sendType || ''
+)
+
+const sendLimit = computed(
+  () => Math.max(
+    0,
+    Number(userStore.user?.role?.sendCount || 0)
+  )
+)
+
+const sendUsed = computed(
+  () => Math.max(
+    0,
+    Number(userStore.user?.sendCount || 0)
+  )
+)
+
+const sendRemaining = computed(() =>
+  sendLimit.value > 0
+    ? Math.max(0, sendLimit.value - sendUsed.value)
+    : 0
+)
+
+const sendRemainingPercent = computed(() =>
+  sendLimit.value > 0
+    ? Math.max(
+        0,
+        Math.min(
+          100,
+          Math.round(
+            (sendRemaining.value / sendLimit.value) * 100
+          )
+        )
+      )
+    : 100
+)
 const appVersion = packageInfo.version
 const openCompose = () => uiStore.writerRef?.open()
 
@@ -229,9 +316,9 @@ const openCompose = () => uiStore.writerRef?.open()
 :global(.dark .el-menu-item:not(.choose-item):hover .app-icon) {
   filter: var(--nova-ui-icon-filter-hover);
 }
-:global(.dark .storage-usage > .app-icon) {
-  filter: var(--nova-ui-icon-filter);
-  opacity: 1;
+:global(.dark .send-usage > .app-icon) {
+  filter: none !important;
+  opacity: .9;
 }
 
 :deep(.el-menu) {
@@ -252,11 +339,84 @@ const openCompose = () => uiStore.writerRef?.open()
   height: calc(100% - 82px);
 }
 
-.aside-footer { padding: 8px 18px 14px; color: var(--secondary-text-color); }
-.storage-usage { display: flex; align-items: flex-start; gap: 9px; padding: 10px 0 11px; border-top: 1px solid var(--light-border); }
-.storage-usage > .app-icon { flex: 0 0 auto; opacity: .72; }
-.storage-usage div { min-width: 0; display: grid; gap: 2px; }
-.storage-usage span { font-size: 11px; font-weight: 600; color: var(--regular-text-color); }
-.storage-usage small { font-size: 10px; line-height: 1.35; color: var(--secondary-text-color); }
-.aside-version { padding-top: 9px; border-top: 1px solid var(--light-border); font-size: 10px; text-align: center; opacity: .72; }
+.aside-footer {
+  padding: 8px 18px 14px;
+  color: var(--secondary-text-color);
+}
+
+.send-usage {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 10px 0 11px;
+  border-top: 1px solid var(--light-border);
+}
+
+.send-usage > .app-icon {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  opacity: .9;
+}
+
+.send-usage-body {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 5px;
+}
+
+.send-usage-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.send-usage-head span {
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--regular-text-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.send-usage-head strong {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 650;
+  color: var(--regular-text-color);
+}
+
+.send-usage-track {
+  position: relative;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--light-ill);
+}
+
+.send-usage-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--el-color-primary);
+  transition:
+    width var(--nova-motion-base) var(--nova-motion-ease);
+}
+
+.send-usage small {
+  font-size: 10px;
+  line-height: 1.35;
+  color: var(--secondary-text-color);
+}
+
+.aside-version {
+  padding-top: 9px;
+  border-top: 1px solid var(--light-border);
+  font-size: 10px;
+  text-align: center;
+  opacity: .72;
+}
 </style>

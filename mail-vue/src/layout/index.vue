@@ -39,7 +39,7 @@
       :aria-label="$t('compose')"
       @click="writerRef?.open()"
   >
-    <AppIcon name="mail-action" :size="56" />
+    <Icon icon="solar:pen-2-linear" width="26" height="26" />
   </button>
   <writer ref="writerRef" />
 </template>
@@ -53,6 +53,7 @@ import {useUiStore} from "@/store/ui.js";
 import writer from '@/layout/write/index.vue'
 import router from '@/router/index.js'
 import {useRoute} from 'vue-router'
+import {Icon} from '@iconify/vue'
 
 const uiStore = useUiStore();
 const writerRef = ref({})
@@ -289,21 +290,18 @@ onBeforeUnmount(() => {
     border: 0;
     border-radius: 50%;
 
-    background: transparent;
+    color: #fff;
+    background: var(--el-color-primary);
     cursor: pointer;
 
-    filter:
-      drop-shadow(
-        0 7px 10px
-        color-mix(in srgb, var(--el-color-primary) 30%, transparent)
-      );
+    box-shadow:
+      0 7px 18px
+      color-mix(in srgb, var(--el-color-primary) 28%, transparent);
   }
 
-  .mobile-compose-fab :deep(.app-icon) {
-    width: 56px;
-    height: 56px;
+  .mobile-compose-fab :deep(.iconify) {
+    color: #fff;
     opacity: 1;
-    filter: none !important;
   }
 
   .mobile-compose-fab:active {
