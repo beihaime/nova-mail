@@ -180,6 +180,7 @@ import {useUserStore} from "@/store/user.js";
 import {useUiStore} from "@/store/ui.js";
 import {Icon} from "@iconify/vue";
 import {cvtR2Url} from "@/utils/convert.js";
+import {applyThemeTransition} from "@/utils/theme-transition.js";
 import {loginUserInfo} from "@/request/my.js";
 import {permsToRouter} from "@/perm/perm.js";
 import {useI18n} from "vue-i18n";
@@ -212,9 +213,10 @@ const oauthLoading = ref(false);
 const showBindForm = ref(false);
 const show = ref('login')
 
-function toggleLoginTheme() {
-  uiStore.setThemeMode(
-      isDark.value ? 'light' : 'dark'
+function toggleLoginTheme(event) {
+  applyThemeTransition(
+      isDark.value ? 'light' : 'dark',
+      event
   )
 }
 const oauthKeys = ['linuxdo', 'google']

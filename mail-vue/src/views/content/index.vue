@@ -77,10 +77,12 @@
               </div>
             </div>
           </div>
-          <div v-if="emailStore.contentData.showReply" class="reader-bottom-actions">
-            <button v-perm="'email:send'" type="button" @click="openReply"><Icon icon="solar:reply-linear" width="18" height="18" />{{ $t('reply') }}</button>
-            <button v-perm="'email:send'" type="button" @click="openForward"><Icon icon="solar:forward-linear" width="18" height="18" />{{ $t('forward') }}</button>
-          </div>
+          <Teleport to="body" :disabled="!isMobileReader">
+            <div v-if="emailStore.contentData.showReply" class="reader-bottom-actions">
+              <button v-perm="'email:send'" type="button" @click="openReply"><Icon icon="solar:reply-linear" width="18" height="18" />{{ $t('reply') }}</button>
+              <button v-perm="'email:send'" type="button" @click="openForward"><Icon icon="solar:forward-linear" width="18" height="18" />{{ $t('forward') }}</button>
+            </div>
+          </Teleport>
         </div>
       </div>
     </el-scrollbar>
@@ -128,6 +130,17 @@ const email = computed(() => emailStore.contentData.email || {
 const showPreview = ref(false)
 const srcList = reactive([])
 const renderedContent = ref('')
+
+// The mobile action bar is teleported to <body> so no transformed ancestor
+// (`.main-view` keeps an identity transform from its enter animation) can turn
+// `position: fixed` into a containing-block-relative position.
+const mobileReaderQuery = window.matchMedia('(max-width: 767px)')
+const isMobileReader = ref(mobileReaderQuery.matches)
+
+function handleMobileReaderChange(event) {
+  isMobileReader.value = event.matches
+}
+
 let previewUrl = null
 const showMetadata = ref(false)
 const recipientLabel = computed(() => formatAddressList(email.value.recipient) || '—')
@@ -188,6 +201,11 @@ watch(
 onMounted(() => {
   tryMarkRead()
   window.addEventListener('keydown', handleKeyDown);
+  if (mobileReaderQuery.addEventListener) {
+    mobileReaderQuery.addEventListener('change', handleMobileReaderChange)
+  } else {
+    mobileReaderQuery.addListener(handleMobileReaderChange)
+  }
 })
 
 onUnmounted(() => {
@@ -195,6 +213,11 @@ onUnmounted(() => {
   emailStore.contentData.showUnread = false;
   readRequesting = false
   window.removeEventListener('keydown', handleKeyDown);
+  if (mobileReaderQuery.removeEventListener) {
+    mobileReaderQuery.removeEventListener('change', handleMobileReaderChange)
+  } else {
+    mobileReaderQuery.removeListener(handleMobileReaderChange)
+  }
 })
 
 function handleKeyDown(event) {
@@ -638,8 +661,58 @@ const handleDelete = () => {
   .sender-line strong { font-size: 14px; }
   .sender-line span { font-size: 12px; }
   .message-date { font-size: 11px; }
-  .reader-bottom-actions { padding: 24px 0 14px; }
-  .reader-bottom-actions button { flex: 1; justify-content: center; }
+
+  /* Reserve room so the fixed action bar never covers the last lines. */
+  .container { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+
+  /* Gmail-style floating action bar, pinned to the viewport bottom.
+     Teleported to <body>: `.main-view` keeps an identity transform from its
+     enter animation, which would otherwise turn `fixed` into an ancestor-
+     relative position. */
+  .reader-bottom-actions {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+
+    max-width: none;
+    margin: 0;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+    gap: 10px;
+
+    background: color-mix(in srgb, var(--nova-surface) 88%, transparent);
+    border-top: 1px solid var(--nova-divider);
+    box-shadow: 0 -10px 28px rgba(15, 23, 42, .10);
+
+    backdrop-filter: blur(18px) saturate(1.4);
+    -webkit-backdrop-filter: blur(18px) saturate(1.4);
+
+    animation: nova-action-bar-in var(--nova-motion-base) var(--nova-motion-ease) both;
+  }
+
+  .reader-bottom-actions button {
+    flex: 1;
+    justify-content: center;
+    min-height: 44px;
+    padding: 0 18px;
+    border-radius: 999px;
+    border-color: var(--nova-divider);
+    background: var(--nova-surface-muted);
+    font-size: 14px;
+  }
+
+  .reader-bottom-actions button:hover { background: var(--nova-hover); }
+  .reader-bottom-actions button:active { transform: scale(.97); }
+
+  :global(.dark .reader-bottom-actions) {
+    box-shadow: 0 -10px 28px rgba(0, 0, 0, .34);
+  }
+}
+
+@keyframes nova-action-bar-in {
+  from { opacity: 0; transform: translate3d(0, 100%, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 
 
@@ -674,6 +747,7 @@ const handleDelete = () => {
   body.nova-mail-printing .mobile-nav,
   body.nova-mail-printing .mail-reader > .header-actions,
   body.nova-mail-printing .mail-reader .reader-bottom-actions,
+  body.nova-mail-printing .reader-bottom-actions,
   body.nova-mail-printing .el-image-viewer {
     display: none !important;
   }

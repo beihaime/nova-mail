@@ -84,7 +84,7 @@
           type="button"
           class="theme-option"
           :class="{ active: uiStore.themeMode === option.value }"
-          @click="uiStore.setThemeMode(option.value)"
+          @click="selectTheme(option.value, $event)"
         >
           <span
             class="theme-preview"
@@ -139,6 +139,7 @@ import {useSettingStore} from "@/store/setting.js";
 import {useUiStore} from "@/store/ui.js";
 import {connectGithubAccount, disconnectGithubAccount, githubConnectedAccount, connectGoogleAccount, disconnectGoogleAccount, googleConnectedAccount} from '@/request/ouath.js';
 import {Icon} from '@iconify/vue';
+import {applyThemeTransition} from "@/utils/theme-transition.js";
 
 const { t } = useI18n()
 const accountStore = useAccountStore()
@@ -164,6 +165,10 @@ const themeOptions = computed(() => {
     { value: 'system', label: zh ? '跟随系统' : 'System' },
   ]
 })
+
+function selectTheme(mode, event) {
+  applyThemeTransition(mode, event)
+}
 
 const appearanceTitle = computed(() =>
   settingStore.lang === 'zh' ? '外观' : 'Appearance'

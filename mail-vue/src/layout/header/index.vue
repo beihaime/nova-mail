@@ -86,6 +86,7 @@ import {useSettingStore} from "@/store/setting.js";
 import {hasPerm} from "@/perm/perm.js"
 import {useI18n} from "vue-i18n";
 import {setExtend} from "@/utils/day.js"
+import {applyThemeTransition} from "@/utils/theme-transition.js"
 import {accountList} from "@/request/account.js";
 import {useAccountStore} from "@/store/account.js";
 import {useEmailStore} from "@/store/email.js";
@@ -241,40 +242,7 @@ function openNotice() {
 }
 
 function openDark(e) {
-
-  const nextIsDark = !uiStore.dark
-  const root = document.documentElement
-
-  if (!document.startViewTransition) {
-    switchDark(nextIsDark, root);
-    return
-  }
-
-  const x = e.clientX
-  const y = e.clientY
-
-  const maxX = Math.max(x, window.innerWidth - x)
-  const maxY = Math.max(y, window.innerHeight - y)
-  const endRadius = Math.hypot(maxX, maxY)
-
-  // 标记切换目标，供 CSS 选择器使用
-  root.setAttribute('data-theme-to', nextIsDark ? 'dark' : 'light')
-  root.style.setProperty('--vt-x', `${x}px`)
-  root.style.setProperty('--vt-y', `${y}px`)
-  root.style.setProperty('--vt-end-radius', `${endRadius + 10}px`)
-
-  const transition = document.startViewTransition(() => {
-    switchDark(nextIsDark, root);
-  })
-
-  transition.finished.finally(() => {
-    // 清理标记
-    root.removeAttribute('data-theme-to')
-  })
-}
-
-function switchDark(nextIsDark, root) {
-  uiStore.setThemeMode(nextIsDark ? 'dark' : 'light')
+  applyThemeTransition(uiStore.dark ? 'light' : 'dark', e)
 }
 
 function changeAside() {
