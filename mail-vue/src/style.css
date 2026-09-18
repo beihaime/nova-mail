@@ -336,3 +336,25 @@ html.dark .header-actions .iconify {
     opacity: .82;
   }
 }
+
+
+/* Nova dark monochrome icon visibility */
+html.dark .header-actions .app-icon:not(.preserve-color),
+html.dark .toolbar .app-icon:not(.preserve-color),
+html.dark .mobile-search .app-icon:not(.preserve-color),
+html.dark .mobile-tool-button .app-icon:not(.preserve-color),
+html.dark .mobile-row-star .app-icon:not(.preserve-color),
+html.dark .mobile-nav button:not(.active) .app-icon:not(.preserve-color) {
+  filter: brightness(0) invert(1) !important;
+  opacity: .78;
+}
+
+html.dark .header-actions .iconify,
+html.dark .toolbar .iconify,
+html.dark .mobile-tool-button .iconify {
+  color: #D1D1D6 !important;
+}
+
+html.dark .mobile-nav button.active .app-icon:not(.preserve-color) {
+  opacity: 1;
+}

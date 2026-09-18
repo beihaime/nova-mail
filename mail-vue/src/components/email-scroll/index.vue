@@ -115,12 +115,10 @@
                 <AppIcon v-else name="star-outline" :size="18"/>
               </div>
               <div v-if="!showStar"></div>
-              <SenderAvatar
+              <span
                   v-if="type === 'email'"
                   class="mobile-sender-avatar"
-                  :email="item"
-                  :size="40"
-              />
+              >{{ (item.name || item.sendEmail || '?').trim().charAt(0).toUpperCase() }}</span>
               <div class="title" :class="accountShow ? 'title-column' : 'title-column'">
 
                 <div class="email-sender" :style=" (showStatus ? 'gap: 10px;' : '') + ((item.unread === EmailUnreadEnum.UNREAD && showUnread)  ? 'font-weight: bold' : '')">
@@ -137,12 +135,9 @@
                   <div v-else></div>
                   <span class="name">
                     <span>
-                      <SenderAvatar :email="item" :size="28" />
+                      <SenderAvatar v-if="!isPhone" :email="item" :size="28" />
                       <div class="unread" v-if="isMobile && (item.unread === EmailUnreadEnum.UNREAD && showUnread) "/>
                       <slot name="name" :email="item"> {{ item.name }}</slot>
-                    </span>
-                    <span>
-                      <AppIcon v-if="item.isStar" name="star-filled" :size="18"/>
                     </span>
                   </span>
                   <span class="phone-time">{{ item.formatCreateTime }}</span>
@@ -2047,8 +2042,24 @@ ul {
     width: 40px;
     height: 40px;
     min-width: 40px;
+    min-height: 40px;
 
-    display: block;
+    display: grid;
+    place-items: center;
+
+    padding: 0;
+    margin: 0;
+
+    border-radius: 50%;
+    overflow: hidden;
+
+    color: var(--el-color-primary);
+    background: var(--nova-selected);
+
+    font-size: 16px;
+    font-weight: 650;
+    line-height: 1;
+    text-align: center;
   }
 
   .email-container.mobile-selecting
