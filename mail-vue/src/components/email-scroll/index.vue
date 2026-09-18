@@ -1108,6 +1108,10 @@ function loadData() {
 .email-container {
   display: grid;
   grid-template-rows: auto 1fr;
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   padding: 0;
   font-size: 14px;
   color: var(--el-text-color-primary);
@@ -1813,6 +1817,9 @@ ul {
 
   .mobile-inbox-tools {
     display: block;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
     padding-top: 8px;
     background: var(--nova-surface);
   }
@@ -2228,6 +2235,9 @@ ul {
 
   .scroll {
     position: relative;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
   }
 
   .mobile-filter-empty {
