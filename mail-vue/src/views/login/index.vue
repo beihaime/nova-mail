@@ -1,5 +1,5 @@
 <template>
-  <div id="login-box" :class="{ 'has-custom-background': !!settingStore.settings.background }" :style="background" v-loading="oauthLoading" element-loading-text="登录中...">
+  <div id="login-box" :class="{ 'has-custom-background': hasCustomBackground }" :style="background" v-loading="oauthLoading" element-loading-text="登录中...">
     <div class="login-scene" aria-hidden="true">
       <div class="login-sky-glow"></div>
     </div>
@@ -301,21 +301,14 @@ const loginOpacity = computed(() => {
 
 const hideLoginDomain = computed(() => settingStore.settings.loginDomain === 1)
 
+// 自定义背景只在浅色模式展示，深色模式固定使用内置深色背景图
+const hasCustomBackground = computed(
+    () => !isDark.value && !!settingStore.settings.background
+)
+
 const background = computed(() => {
 
-  // 用户自定义背景优先
-  if (settingStore.settings.background) {
-    return {
-      'background-image':
-          `url(${cvtR2Url(settingStore.settings.background)})`,
-      'background-repeat': 'no-repeat',
-      'background-size': 'cover',
-      'background-position': 'center'
-    }
-  }
-
-
-  // 深色登录背景
+  // 深色登录背景优先：切换主题时同步切换背景图
   if (isDark.value) {
     return {
       'background-image':
@@ -327,6 +320,19 @@ const background = computed(() => {
   }
 
 
+  // 浅色模式：优先用户自定义背景
+  if (settingStore.settings.background) {
+    return {
+      'background-image':
+          `url(${cvtR2Url(settingStore.settings.background)})`,
+      'background-repeat': 'no-repeat',
+      'background-size': 'cover',
+      'background-position': 'center'
+    }
+  }
+
+
+  // 默认浅色场景：#login-box 浅色底 + .login-scene 渐变
   return {}
 })
 
