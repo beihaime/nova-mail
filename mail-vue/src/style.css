@@ -315,3 +315,26 @@ html[data-theme-to="light"]::view-transition-old(root) {
     display: none !important;
   }
 }
+
+/* Mobile/PWA viewport containment */
+@media (max-width: 767px) {
+  .layout,
+  .main-container,
+  .el-main,
+  .main-box-hide,
+  .main-box-show,
+  .main-view,
+  .mail-list-page {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .main-container,
+  .el-main,
+  .main-box-hide,
+  .main-box-show {
+    overflow-x: clip !important;
+  }
+}
