@@ -117,7 +117,7 @@ function isCandidate(primary, raw) {
  * @param {object} primary currently opened email
  * @param {object[]} pool other already-loaded emails (e.g. the store detailMap)
  * @param {object[]} extra locally appended messages (just-sent replies/forwards)
- * @returns {object[]} messages oldest → newest
+ * @returns {{subject: string, messages: object[]}} messages oldest → newest
  */
 export function buildThreadMessages(primary, pool = [], extra = []) {
     const key = threadSubjectKey(primary?.subject)
@@ -190,7 +190,10 @@ export function buildThreadMessages(primary, pool = [], extra = []) {
         }
     }
 
-    return [...collected.values()]
-        .map(toThreadMessage)
-        .sort((a, b) => messageOrder(a) - messageOrder(b))
+    return {
+        subject: primary?.subject || '',
+        messages: [...collected.values()]
+            .map(toThreadMessage)
+            .sort((a, b) => messageOrder(a) - messageOrder(b)),
+    }
 }

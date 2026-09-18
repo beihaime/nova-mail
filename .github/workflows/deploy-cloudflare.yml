@@ -206,6 +206,18 @@ jobs:
           sed -i "s|\${D1_DATABASE_ID}|$D1_ID|g" "$CONFIG_FILE"
           echo "✅ Setup completed."
 
+      # The Worker serves the SPA from `./dist` ([assets] in wrangler-*.toml) and
+      # `dist` is gitignored, so the frontend MUST be built before deploying —
+      # otherwise the Worker keeps serving a stale build (e.g. an old reader
+      # bundle), which is exactly how "my fix doesn't show up" happens.
+      - name: 🎨 构建前端 / Build frontend
+        working-directory: ./mail-vue
+        run: |
+          echo "🎨 Building Nova Mail frontend..."
+          pnpm install --frozen-lockfile
+          pnpm run build
+          echo "✅ Frontend built into mail-worker/dist"
+
       - name: 🚀 开始部署 / Start deployment
         id: deploy
         working-directory: ./mail-worker
