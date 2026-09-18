@@ -1880,24 +1880,21 @@ ul {
     flex: 1;
     min-width: 0;
 
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     align-items: center;
-    gap: 6px;
+    gap: 4px;
 
-    overflow-x: auto;
+    overflow: hidden;
     white-space: nowrap;
-    scrollbar-width: none;
-  }
-
-  .mobile-filters::-webkit-scrollbar {
-    display: none;
   }
 
   .mobile-filters button {
-    flex: none;
-
+    width: 100%;
+    min-width: 0;
     height: 32px;
-    padding: 0 12px;
+    padding: 0 4px;
+    box-sizing: border-box;
 
     border: 0;
     border-radius: 999px;
@@ -1905,12 +1902,16 @@ ul {
     color: var(--mobile-secondary);
     background: transparent;
 
-    font-size: 13px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: clip;
+
+    font-size: clamp(10px, 2.9vw, 12px);
     cursor: pointer;
   }
 
   .mobile-filters button.active {
-    padding-inline: 15px;
+    padding-inline: 4px;
 
     color: var(--el-color-primary);
     background: var(--nova-selected);
@@ -1919,10 +1920,10 @@ ul {
   }
 
   .mobile-tool-button {
-    flex: 0 0 36px;
+    flex: 0 0 32px;
 
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
     padding: 0;
 
     display: grid;
