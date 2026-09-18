@@ -10,8 +10,8 @@ export const useUiStore = defineStore('ui', {
         changePreview: 0,
         previewData: {},
         key: 0,
-        dark: false,
-        themeMode: null,
+        dark: window.__NOVA_INITIAL_THEME__?.dark ?? false,
+        themeMode: window.__NOVA_INITIAL_THEME__?.mode ?? 'light',
         asideCount: {
             email: 0,
             send: 0,

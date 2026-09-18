@@ -293,7 +293,7 @@ const background = computed(() => {
     }
   }
 
-  if (uiStore.dark) {
+  if (document.documentElement.classList.contains('dark')) {
     return {
       'background-image': "url('/image/login-dark.png')",
       'background-repeat': 'no-repeat',

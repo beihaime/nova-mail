@@ -43,6 +43,10 @@
       const root = document.documentElement
       root.classList.toggle('dark', isDark)
       root.style.colorScheme = isDark ? 'dark' : 'light'
+        window.__NOVA_INITIAL_THEME__ = {
+            dark: isDark,
+            mode
+        }
 
       const metaTag = document.getElementById('theme-color-meta')
       metaTag?.setAttribute(
