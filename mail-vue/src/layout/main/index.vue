@@ -120,7 +120,7 @@ const handleResize = () => {
     border: 0;
     height: 100%;
     width: 100%;
-    background: #000000;
+    background: var(--nova-overlay);
     opacity: 0.6;
     z-index: 10;
     transition: opacity var(--nova-motion-base) var(--nova-motion-ease), background-color var(--nova-motion-base) var(--nova-motion-ease);
