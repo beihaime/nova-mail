@@ -186,6 +186,11 @@ import {permsToRouter} from "@/perm/perm.js";
 import {useI18n} from "vue-i18n";
 import {githubOauthComplete, googleOauthComplete, oauthBindUser, oauthLinuxDoLogin} from "@/request/ouath.js";
 import brandMark from '@/icons/svg/brand-mark.svg'
+// Imported (not a /public URL) so Vite emits a content-hashed file: replacing the
+// artwork produces a new URL and therefore bypasses any cached copy. Public
+// assets keep a stable URL and were previously served with `immutable`, which
+// kept the old dark background alive for up to 7 days after a swap.
+import loginDarkBackground from '@/assets/login-dark.png'
 
 const {t} = useI18n();
 const accountStore = useAccountStore();
@@ -314,7 +319,7 @@ const background = computed(() => {
   if (isDark.value) {
     return {
       'background-image':
-          "url('/image/login-dark.png')",
+          `url(${loginDarkBackground})`,
       'background-repeat': 'no-repeat',
       'background-size': 'cover',
       'background-position': 'center center'
@@ -1183,7 +1188,7 @@ function submitRegister() {
 
 /* Dark login scene tuning */
 
-/* Dark fallback while login-dark.png decodes (and if it fails to load). */
+/* Dark fallback while the dark artwork decodes (and if it fails to load). */
 :global(html.dark #login-box:not(.has-custom-background)) {
   background-color: #081426;
 }
