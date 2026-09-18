@@ -52,7 +52,6 @@ const PRESERVE_COLOR_ICONS = new Set([
   'inbox',
   'mail-action',
   'more-action',
-  'notifications',
   'profile-avatar',
   'send-action',
   'settings-action',

@@ -19,8 +19,20 @@
         <AppIcon name="theme-toggle" :size="20" />
         <Icon class="mobile-theme-icon" icon="solar:moon-linear" width="23" height="23" />
       </div>
-      <div class="notice icon-item" @click="openNotice">
+      <div
+          class="notice icon-item"
+          role="button"
+          :aria-label="$t('noticeTitle')"
+          :title="$t('noticeTitle')"
+          @click="openNotice"
+      >
         <AppIcon name="notifications" :size="20" />
+        <!-- Data-driven unread dot: nothing renders at 0/null/undefined. -->
+        <span
+            v-if="Number(uiStore.unreadNotifications) > 0"
+            class="notice-dot"
+            aria-hidden="true"
+        ></span>
       </div>
       <el-dropdown ref="userinfoRef" @visible-change="e => userInfoShow = e" :teleported="false" popper-class="detail-dropdown">
         <div class="avatar" @click.stop="openAccountSwitcher" >
@@ -81,7 +93,7 @@ import {logout} from "@/request/login.js";
 import {useUiStore} from "@/store/ui.js";
 import {useUserStore} from "@/store/user.js";
 import {useRoute} from "vue-router";
-import {computed, onMounted, ref} from "vue";
+import {computed, onMounted, ref, watch} from "vue";
 import {useSettingStore} from "@/store/setting.js";
 import {hasPerm} from "@/perm/perm.js"
 import {useI18n} from "vue-i18n";
@@ -225,6 +237,7 @@ onMounted(() => {
   })
   userStore.refreshGithubAccount()
   userStore.refreshGoogleAccount()
+  uiStore.refreshNotifications()
 })
 
 function handleAvatarError() {
@@ -238,8 +251,21 @@ function changeLang(lang) {
 }
 
 function openNotice() {
+  // Opening the announcement clears the unread dot for this visitor.
+  uiStore.markNotificationsRead()
   uiStore.showNotice()
 }
+
+// The dot reflects the configured announcement, so keep it in sync whenever the
+// notice settings arrive or change.
+watch(
+  () => [
+    settingStore.settings.notice,
+    settingStore.settings.noticeTitle,
+    settingStore.settings.noticeContent
+  ],
+  () => uiStore.refreshNotifications()
+)
 
 function openDark(e) {
   applyThemeTransition(uiStore.dark ? 'light' : 'dark', e)
@@ -536,15 +562,32 @@ function formatName(email) {
   }
 
   :global(.dark .toolbar .icon-item .app-icon) {
-    filter: var(--nova-ui-icon-filter);
-    opacity: 1;
+    filter: var(--nova-ui-icon-filter) !important;
+    opacity: 1 !important;
   }
 
   :global(.dark .toolbar .icon-item:hover .app-icon) {
-    filter: var(--nova-ui-icon-filter-hover);
+    filter: var(--nova-ui-icon-filter-hover) !important;
+    opacity: 1 !important;
   }
 
-  .notice { margin-right: 4px; }
+  .notice {
+    position: relative;
+    margin-right: 4px;
+  }
+
+  /* Only rendered when the store reports an unread notification. */
+  .notice-dot {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--el-color-danger);
+    box-shadow: 0 0 0 2px var(--nova-surface);
+    pointer-events: none;
+  }
 
   .avatar {
     display: flex;

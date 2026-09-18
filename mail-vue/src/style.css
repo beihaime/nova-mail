@@ -10,11 +10,16 @@
 html, body {
     width: 100%;
     height: 100%;
+    /* Fill the dynamic viewport on mobile (no gap under the browser chrome)
+       and stop the rubber-band overscroll that reveals the page behind it. */
+    height: 100dvh;
+    overscroll-behavior: none;
 }
 
 #app {
     width: 100%;
     height: 100%;
+    height: 100dvh;
 }
 
 :deep(.el-input__inner:focus) {

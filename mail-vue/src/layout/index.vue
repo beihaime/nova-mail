@@ -146,6 +146,7 @@ onBeforeUnmount(() => {
   left: 0;
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
   background: rgba(0, 0, 0, 0.4);
   z-index: 99;
   transition: opacity var(--nova-motion-base) var(--nova-motion-ease), background-color var(--nova-motion-base) var(--nova-motion-ease);

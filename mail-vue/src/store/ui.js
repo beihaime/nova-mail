@@ -1,4 +1,26 @@
 import { defineStore } from 'pinia'
+import { useSettingStore } from './setting.js'
+
+/**
+ * Notifications are the site announcement (`setting.notice*`), so "unread" is
+ * derived from whether the currently configured announcement has already been
+ * opened. Stored per-browser, like an inbox read marker.
+ */
+const NOTICE_SEEN_KEY = 'nova-notice-seen'
+
+function noticeSignature(settings) {
+    const notice = settings || {}
+
+    // notice === 1 means announcements are switched off.
+    if (!notice || Number(notice.notice) === 1) return ''
+
+    const title = String(notice.noticeTitle || '')
+    const content = String(notice.noticeContent || '')
+
+    if (!title && !content) return ''
+
+    return `${title}::${content}`
+}
 
 export const useUiStore = defineStore('ui', {
 
@@ -35,11 +57,77 @@ export const useUiStore = defineStore('ui', {
             email:0,
             send:0,
             sysEmail:0
-        }
+        },
+
+
+        // Unread notification count. 0 hides the badge/dot entirely.
+        unreadNotifications: 0
     }),
 
 
     actions:{
+
+
+        /**
+         * Recompute the unread notification count from the configured
+         * announcement. Safe with missing/partial settings: anything falsy
+         * resolves to 0, which hides the dot.
+         */
+        refreshNotifications(){
+
+            let signature = ''
+
+            try {
+                signature = noticeSignature(
+                    useSettingStore().settings
+                )
+            } catch {
+                signature = ''
+            }
+
+            if (!signature) {
+                this.unreadNotifications = 0
+                return
+            }
+
+            let seen = null
+
+            try {
+                seen = localStorage.getItem(NOTICE_SEEN_KEY)
+            } catch {
+                seen = null
+            }
+
+            this.unreadNotifications =
+                seen === signature
+                    ? 0
+                    : 1
+        },
+
+
+        /** Called when the notification (announcement) is opened. */
+        markNotificationsRead(){
+
+            let signature = ''
+
+            try {
+                signature = noticeSignature(
+                    useSettingStore().settings
+                )
+            } catch {
+                signature = ''
+            }
+
+            if (signature) {
+                try {
+                    localStorage.setItem(NOTICE_SEEN_KEY, signature)
+                } catch {
+                    // storage unavailable — the badge just stays until reload
+                }
+            }
+
+            this.unreadNotifications = 0
+        },
 
 
         showNotice(){
