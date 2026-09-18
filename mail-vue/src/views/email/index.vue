@@ -1,10 +1,5 @@
 <template>
   <div class="mail-list-page">
-    <label class="mobile-mail-search">
-      <img src="@/icons/svg/search.svg" alt="" />
-      <input v-model="keyword" type="search" :placeholder="$t('searchMail')" @keydown="handleKeydown" />
-      <button v-if="keyword" type="button" class="mobile-search-clear" :aria-label="$t('clearSearch')" @click="clear">×</button>
-    </label>
   <emailScroll ref="scroll"
                :cancel-success="cancelStar"
                :star-success="addStar"
@@ -15,10 +10,9 @@
                :time-sort="params.timeSort"
                :email-read="emailRead"
                :show-unread="true"
-               :show-account-icon="false"
-               :searching="Boolean(keyword)"
                actionLeft="4px"
                @jump="jumpContent"
+               @mobile-sort="changeTimeSort"
   >
     <template #first>
       <Icon class="icon" @click="changeTimeSort" icon="material-symbols-light:timer-arrow-down-outline"
@@ -38,12 +32,11 @@ import {useSettingStore} from "@/store/setting.js";
 import emailScroll from "@/components/email-scroll/index.vue"
 import {emailList, emailDelete, emailLatest, emailRead} from "@/request/email.js";
 import {starAdd, starCancel} from "@/request/star.js";
-import {defineOptions, onMounted, reactive, ref, watch} from "vue";
+import {defineOptions, h, onMounted, reactive, ref, watch} from "vue";
 import {sleep} from "@/utils/time-utils.js";
 import router from "@/router/index.js";
 import {Icon} from "@iconify/vue";
 import { useRoute } from 'vue-router'
-import {useMailSearch} from "@/composables/use-mail-search.js";
 
 defineOptions({
   name: 'email'
@@ -54,19 +47,13 @@ const emailStore = useEmailStore();
 const accountStore = useAccountStore();
 const settingStore = useSettingStore();
 const scroll = ref({})
-const {keyword, clear, handleKeydown} = useMailSearch();
 const params = reactive({
   timeSort: 0,
 })
 
 onMounted(() => {
   emailStore.emailScroll = scroll;
-  emailStore.searchKeyword = String(route.query.q || '').trim();
   latest()
-})
-
-watch(() => route.query.q, () => {
-  if (route.name === 'email') scroll.value?.refreshList()
 })
 
 
@@ -102,7 +89,7 @@ async function latest() {
 
     const latestId = scroll.value.latestEmail?.emailId
 
-    if (!scroll.value.firstLoad && autoRefresh > 1 && !keyword.value) {
+    if (!scroll.value.firstLoad && autoRefresh > 1) {
       try {
         const accountId = accountStore.currentAccountId
         const allReceive = scroll.value.latestEmail?.allReceive
@@ -159,7 +146,7 @@ function getEmailList(emailId, size) {
   const accountId =  accountStore.currentAccountId;
   const allReceive = accountStore.currentAccount.allReceive;
   return emailStore.fetchList(full =>
-    emailList(accountId, allReceive, emailId, params.timeSort, size, 0, full, keyword.value)
+    emailList(accountId, allReceive, emailId, params.timeSort, size, 0, full)
   ).then(data => {
     data.latestEmail.reqAccountId = accountId;
     data.latestEmail.allReceive = allReceive;
@@ -173,12 +160,7 @@ function getEmailList(emailId, size) {
 .mobile-mail-search { display: none; }
 
 @media (max-width: 767px) {
-  .mail-list-page { display: grid; grid-template-rows: auto 1fr; }
-  .mobile-mail-search { height: 38px; margin: 0 12px 8px; padding: 0 11px; display: flex; align-items: center; gap: 8px; border: 1px solid var(--light-border); border-radius: 10px; color: var(--regular-text-color); background: var(--extra-light-fill); }
-  .mobile-mail-search img { width: 15px; height: 15px; opacity: .68; }
-  .mobile-mail-search input { min-width: 0; flex: 1; color: inherit; }
-  .mobile-mail-search input::placeholder { color: inherit; }
-  .mobile-search-clear { flex: 0 0 auto; width: 22px; height: 22px; border-radius: 50%; color: inherit; font-size: 17px; line-height: 20px; cursor: pointer; }
+  .mail-list-page { display: block; }
 }
 .icon {
   cursor: pointer;

@@ -1,5 +1,18 @@
 <template>
-  <div class="email-container">
+  <div class="email-container" :class="{ 'mobile-selecting': mobileSelecting }">
+    <div v-if="type === 'email'" class="mobile-inbox-tools">
+      <label class="mobile-search">
+        <AppIcon name="search" :size="19" />
+        <input v-model.trim="mobileSearch" type="search" :placeholder="$t('searchMail')" />
+      </label>
+      <div class="mobile-filter-bar">
+        <div class="mobile-filters">
+          <button v-for="filter in mobileFilters" :key="filter.key" :class="{ active: mobileFilter === filter.key }" @click="selectMobileFilter(filter.key)">{{ filter.label }}</button>
+        </div>
+        <button class="mobile-tool-button mobile-sort" :aria-label="t('sortByTime')" @click="mobileSortClick"><AppIcon name="sort" :size="20" /></button>
+        <button class="mobile-tool-button" :aria-label="mobileSelecting ? t('cancel') : t('multiSelect')" @click="toggleMobileSelection"><AppIcon name="more-action" :size="20" /></button>
+      </div>
+    </div>
     <div class="header-actions">
       <el-checkbox
           v-model="checkAll"
@@ -28,9 +41,10 @@
     </div>
 
     <div ref="scroll" class="scroll">
+      <div v-if="type === 'email' && isPhone && !loading && emailList.length && !visibleList.some(item => !item.expand)" class="mobile-filter-empty">{{ mobileFilter === 'attachments' && !attachmentDataReady ? $t('checkingAttachments') : $t('noMessagesFound') }}</div>
       <UseVirtualList ref="scrollbarRef"
                         @scroll="onScroll"
-                        :list="list"
+                        :list="visibleList"
                         :options="{ itemHeight: itemHeight, overscan: 15 }"
                         class="virtual"
                         style="height: 100%"
@@ -38,12 +52,16 @@
                         :key="keyCount"
         >
           <template #default="{ data: item, index }" >
-            <div :class="['email-row', props.type, { 'right-checked': item.rightChecked }]"
+            <div :class="['email-row', props.type, { 'right-checked': item.rightChecked, 'is-unread': item.unread === EmailUnreadEnum.UNREAD && showUnread }]"
                  :data-checked="item.checked"
                  @click="jumpDetails(item)"
                  v-if="!item.expand"
                  :key="item.emailId"
                  @contextmenu="handleContextmenu($event, item)"
+                 @pointerdown="startLongPress($event, item)"
+                 @pointerup="stopLongPress"
+                 @pointerleave="stopLongPress"
+                 @pointercancel="stopLongPress"
             >
               <el-checkbox :class=" props.type === 'all-email' ? 'all-email-checkbox' : 'checkbox'"
                            v-model="item.checked"
@@ -54,6 +72,7 @@
                 <AppIcon v-else name="star-outline" :size="18"/>
               </div>
               <div v-if="!showStar"></div>
+              <span v-if="type === 'email'" class="mobile-sender-avatar">{{ (item.name || item.sendEmail || '?').charAt(0).toUpperCase() }}</span>
               <div class="title" :class="accountShow ? 'title-column' : 'title-column'">
 
                 <div class="email-sender" :style=" (showStatus ? 'gap: 10px;' : '') + ((item.unread === EmailUnreadEnum.UNREAD && showUnread)  ? 'font-weight: bold' : '')">
@@ -74,9 +93,7 @@
                       <div class="unread" v-if="isMobile && (item.unread === EmailUnreadEnum.UNREAD && showUnread) "/>
                       <slot name="name" :email="item"> {{ item.name }}</slot>
                     </span>
-                    <span>
-                      <AppIcon v-if="item.isStar" name="star-filled" :size="18"/>
-                    </span>
+                    <span v-if="type !== 'email' || !isPhone"><AppIcon v-if="item.isStar" name="star-filled" :size="18" /></span>
                   </span>
                   <span class="phone-time">{{ item.formatCreateTime }}</span>
                 </div>
@@ -96,6 +113,7 @@
                          and must never leak back into a row. -->
                     <span v-if="item.listText" class="email-content">{{ item.listText }}</span>
                   </div>
+                  <button v-if="type === 'email' && showStar" class="mobile-row-star" :aria-label="t('star')" @click.stop="starChange(item)"><AppIcon :name="item.isStar ? 'star-filled' : 'star-outline'" :size="19" /></button>
                   <div class="user-info" v-if="showUserInfo">
                     <div class="user">
                       <span>
@@ -307,7 +325,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['jump', 'refresh-before', 'delete-draft', 'right-search'])
+const emit = defineEmits(['jump', 'refresh-before', 'delete-draft', 'right-search', 'mobile-sort'])
 const {t} = useI18n()
 const settingStore = useSettingStore()
 const uiStore = useUiStore();
@@ -328,6 +346,18 @@ const latestEmail = ref(null)
 const scrollbarRef = ref(null)
 let reqLock = false
 let isMobile = ref(innerWidth < 1367)
+const isPhone = ref(innerWidth < 768)
+const mobileSearch = ref('')
+const mobileFilter = ref('all')
+const mobileSelecting = ref(false)
+const mobileFilters = computed(() => [
+  { key: 'all', label: t('all') },
+  { key: 'unread', label: t('unreadMail') },
+  { key: 'attachments', label: t('withAttachments') },
+  { key: 'star', label: t('star') }
+])
+let longPressTimer = null
+let longPressTriggered = false
 let skeletonRows = 0
 const timePaddingRight = ref('');
 const keyCount = ref(0);
@@ -385,12 +415,14 @@ onMounted(() => {
 
 onUnmounted(() => {
   clearInterval(timer)
+  clearTimeout(longPressTimer)
 })
 
 getEmailList()
 
 window.onresize = () => {
   isMobile.value = innerWidth < 1367
+  isPhone.value = innerWidth < 768
 }
 
 function onScroll(e) {
@@ -405,12 +437,42 @@ const { arrivedState } = useScroll(scrollbarRef, {
 const list = computed(() => {
   return [...emailList, ...expandList]
 })
+const attachmentDataReady = computed(() => emailList.every(item => !!emailStore.detailMap[item.emailId]))
+const visibleList = computed(() => {
+  if (!isPhone.value || props.type !== 'email') return list.value
+  const query = mobileSearch.value.toLocaleLowerCase()
+  return list.value.filter(item => item.expand || (
+    (mobileFilter.value === 'all' ||
+      (mobileFilter.value === 'unread' && item.unread === EmailUnreadEnum.UNREAD) ||
+      (mobileFilter.value === 'attachments' && !!emailStore.detailMap[item.emailId]?.attList?.length) ||
+      (mobileFilter.value === 'star' && !!item.isStar)) &&
+    (!query || [item.name, item.sendEmail, item.subject, item.listText, item.text].some(value => String(value || '').toLocaleLowerCase().includes(query)))
+  ))
+})
+
+function selectMobileFilter(filter) { mobileFilter.value = filter }
+function mobileSortClick() { emit('mobile-sort') }
+function toggleMobileSelection() {
+  mobileSelecting.value = !mobileSelecting.value
+  if (!mobileSelecting.value) handleCheckAllChange(false)
+}
+function startLongPress(event, item) {
+  if (!isPhone.value || props.type !== 'email' || event.pointerType === 'mouse') return
+  longPressTriggered = false
+  clearTimeout(longPressTimer)
+  longPressTimer = setTimeout(() => {
+    mobileSelecting.value = true
+    item.checked = true
+    longPressTriggered = true
+  }, 500)
+}
+function stopLongPress() { clearTimeout(longPressTimer) }
 
 const itemHeight = computed(() => {
     if (props.type === 'all-email') {
       return isMobile.value ? 132 : 65;
     } else  {
-      return isMobile.value ? 83 : 48;
+      return isPhone.value && props.type === 'email' ? 94 : (isMobile.value ? 83 : 48);
     }
 })
 
@@ -524,6 +586,14 @@ function visibleChange(e) {
 }
 
 const handleContextmenu = (event, email) => {
+
+  if (isPhone.value && props.type === 'email') {
+    event.preventDefault()
+    mobileSelecting.value = true
+    email.checked = true
+    longPressTriggered = true
+    return
+  }
 
   if (props.type === 'draft') {
     return
@@ -789,6 +859,8 @@ function updateCheckStatus() {
 }
 
 function jumpDetails(email) {
+  if (longPressTriggered) { longPressTriggered = false; return }
+  if (isPhone.value && mobileSelecting.value && props.type === 'email') { email.checked = !email.checked; return }
 
   if (dropdownShow.value) {
     dropdownRef.value.handleClose();
@@ -924,6 +996,49 @@ function loadData() {
   color: var(--el-text-color-primary);
   overflow: hidden;
   height: 100%;
+}
+
+.mobile-inbox-tools, .mobile-sender-avatar, .mobile-row-star { display: none; }
+
+@media (max-width: 767px) {
+  .email-container { grid-template-rows: auto minmax(0, 1fr); background: var(--nova-surface); color: var(--mobile-primary); }
+  .email-container.mobile-selecting { grid-template-rows: auto auto minmax(0, 1fr); }
+  .mobile-filter-empty { position: absolute; top: 50%; left: 0; right: 0; text-align: center; color: var(--mobile-tertiary); pointer-events: none; }
+  .scroll { position: relative; }
+  .mobile-inbox-tools { display: block; padding-top: 6px; background: var(--nova-surface); }
+  .mobile-search { height: 44px; margin: 0 16px 8px; padding: 0 14px; display: flex; align-items: center; gap: 10px; border-radius: 12px; color: var(--mobile-secondary); background: var(--nova-surface-muted); }
+  .mobile-search input { flex: 1; width: 0; height: 100%; color: var(--mobile-primary); font-size: 15px; }
+  .mobile-search input::placeholder { color: var(--mobile-secondary); opacity: 1; }
+  .mobile-filter-bar { display: flex; align-items: center; min-width: 0; height: 48px; padding: 0 8px 5px 16px; border-bottom: 1px solid var(--nova-divider); }
+  .mobile-filters { flex: 1; min-width: 0; display: flex; gap: 3px; overflow-x: auto; scrollbar-width: none; white-space: nowrap; }
+  .mobile-filters::-webkit-scrollbar { display: none; }
+  .mobile-filters button { flex: none; height: 32px; padding: 0 12px; border-radius: 16px; color: var(--mobile-secondary); font-size: 13px; cursor: pointer; }
+  .mobile-filters button.active { padding-inline: 14px; color: var(--el-color-primary); background: var(--nova-selected); font-weight: 600; }
+  .mobile-tool-button { flex: 0 0 44px; height: 44px; display: grid; place-items: center; color: var(--mobile-primary); cursor: pointer; }
+  .header-actions { display: none; }
+  .mobile-selecting .header-actions { display: grid; grid-template-columns: 32px 1fr auto; min-height: 48px; padding: 5px 16px; }
+  .mobile-selecting .header-actions .header-left { gap: 12px; }
+  .mobile-selecting .header-actions .header-left > :first-child, .mobile-selecting .header-actions .reload, .mobile-selecting .header-actions .header-right { display: none; }
+  :deep(.email-row.email) { height: 94px; padding: 11px 16px; gap: 12px; border: 0; background: var(--nova-surface); align-items: flex-start; }
+  :deep(.email-row.email)::after { content: ''; position: absolute; bottom: 0; left: 68px; right: 0; height: 1px; background: var(--nova-divider); }
+  :deep(.email-row.email .checkbox) { display: none; }
+  .mobile-selecting :deep(.email-row.email .checkbox) { display: flex; padding: 9px 0 0; flex: 0 0 20px; }
+  :deep(.email-row.email .pc-star) { display: none; }
+  .mobile-sender-avatar { width: 40px; height: 40px; flex: 0 0 40px; display: grid; place-items: center; border-radius: 50%; color: var(--el-color-primary); background: var(--nova-selected); font-size: 17px; font-weight: 600; }
+  :deep(.email-row.email.is-unread)::before { content: ''; position: absolute; left: 4px; top: 28px; width: 7px; height: 7px; border-radius: 50%; background: var(--el-color-primary); }
+  :deep(.email-row.email .title) { min-width: 0; padding: 0; gap: 1px !important; position: relative; }
+  :deep(.email-row.email .title .email-sender) { display: flex; min-width: 0; align-items: baseline; gap: 4px; line-height: 21px; font-size: 16px; font-weight: 500; color: var(--mobile-primary); }
+  :deep(.email-row.email.is-unread .title .email-sender) { font-weight: 600; }
+  :deep(.email-row.email .email-sender > div), :deep(.email-row.email .unread) { display: none; }
+  :deep(.email-row.email .title .email-sender .name) { min-width: 0; flex: 1; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  :deep(.email-row.email .name > span:last-child) { display: none; }
+  :deep(.email-row.email .title .email-sender .phone-time) { flex: none; font-size: 13px; font-weight: 400; color: var(--mobile-tertiary); }
+  :deep(.email-row.email .title .email-text) { display: block; min-width: 0; padding-right: 26px; line-height: 20px; }
+  :deep(.email-row.email .title .email-text .email-subject) { display: block; font-size: 15px; font-weight: 400; color: var(--mobile-primary); text-overflow: ellipsis; }
+  :deep(.email-row.email.is-unread .title .email-text .email-subject) { font-weight: 500; }
+  :deep(.email-row.email .title .email-text .email-content) { display: block; padding: 0; font-size: 14px; color: var(--mobile-secondary); }
+  .mobile-row-star { position: absolute; right: -6px; top: 17px; width: 44px; height: 44px; display: grid; place-items: center; cursor: pointer; }
+  .mobile-row-star :deep(.app-icon) { opacity: .65; }
 }
 
 .scroll {

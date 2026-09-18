@@ -48,7 +48,11 @@ Nova Mail is a modern web mail client based on the open-source [cloud-mail](http
 
 ### Login
 
+<<<<<<< HEAD
 ![Nova Mail Login](doc/demo/loginDemo.png)
+=======
+This project is a fork and rebrand of the original upstream project, with a focus on improved UI experience, login security, and authentication.
+>>>>>>> codex/mobile-nova-polish
 
 ### Mail interface
 
@@ -218,10 +222,59 @@ Inbound mail is handled by the Worker Email handler, while outbound delivery and
 
 ## Upstream & credits
 
+<<<<<<< HEAD
 Nova Mail is based on [maillab/cloud-mail](https://github.com/maillab/cloud-mail). The upstream project and its original authors remain credited under the original license. Nova Mail adds its own branding and frontend, authentication, and security-related changes on top of that codebase.
+=======
+## Configuration (Optional)
+
+You can set the following in the `[vars]` section of `wrangler.toml`:
+
+| Variable             | Description                                              |
+|----------------------|----------------------------------------------------------|
+| `domain`             | Allowed email domains, e.g. `["example.com"]`            |
+| `admin`              | Admin email address                                      |
+| `TURNSTILE_HOSTNAME` | Hostname for Turnstile verification (`mail.beihaime.com`) |
+| `ai_model`           | Workers AI model (optional)                              |
+
+JWT and Turnstile secrets must be set with `wrangler secret` — do not put them in the config file.
+
+---
+
+## Differences from Upstream
+
+Compared to the original upstream project, Nova Mail includes:
+
+- Full rebranding (Nova Mail)
+- Modern UI redesign and icon system
+- GitHub OAuth login and account linking
+- Stronger Turnstile login protection and stability
+- Security hardening
+- Resizable mail layout and other UX improvements
+- PWA branding and loading experience improvements
+
+---
+>>>>>>> codex/mobile-nova-polish
 
 ## License
 
 This project is licensed under the MIT License.
 
+<<<<<<< HEAD
 See [LICENSE](LICENSE) for details. The repository retains the original copyright notice and the Nova Mail modification copyright notice.
+=======
+Original copyright belongs to aslost / maillab. This repository is a modified and extended version.
+
+---
+
+## Acknowledgements
+
+- Original upstream project
+- Cloudflare Workers / D1 / R2 / KV / Turnstile / Workers AI
+- Hono, Vue 3, Element Plus, Drizzle, Resend, and other open-source projects
+
+---
+
+## Feedback
+
+Questions or suggestions? Please open a GitHub Issue.
+>>>>>>> codex/mobile-nova-polish
