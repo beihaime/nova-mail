@@ -67,7 +67,9 @@ export function toThreadMessage(raw) {
         bcc: raw?.bcc || '[]',
         date: raw?.createTime || '',
         content: raw?.content || '',
-        text: raw?.text || '',
+        // Brief list rows drop `text` and expose `listText` instead, so fall
+        // back to it: without this a not-yet-loaded message renders nothing.
+        text: raw?.text || raw?.listText || '',
         attachments: raw?.attList || raw?.attachments || [],
         status: raw?.status,
         message: raw?.message,

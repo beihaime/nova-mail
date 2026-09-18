@@ -292,6 +292,8 @@ const en = {
     timeoutErrorMsg: 'Timeout. Try again later',
     serverBusyErrorMsg: 'Server busy. Please try again later',
     reqFailErrorMsg: 'Request failed. Try again later',
+    bodyLoadFailMsg: 'Message body could not be loaded',
+    retry: 'Retry',
     message: 'Mail',
     language: 'Language',
     totalUserAccount: '{msg}',

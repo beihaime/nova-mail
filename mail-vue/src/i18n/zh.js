@@ -292,6 +292,8 @@ const zh = {
     timeoutErrorMsg: '请求超时，请稍后重试',
     serverBusyErrorMsg: '服务器繁忙，请稍后重试',
     reqFailErrorMsg: '请求失败，请稍后再试',
+    bodyLoadFailMsg: '正文加载失败',
+    retry: '重试',
     message: '邮件详情',
     language: '系统语言',
     totalUserAccount: '{msg} 个',

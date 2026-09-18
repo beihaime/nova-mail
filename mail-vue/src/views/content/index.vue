@@ -88,6 +88,12 @@
                     <pre v-else-if="message.text" class="email-text">{{ message.text }}</pre>
                   </el-scrollbar>
 
+                  <!-- Never leave the body silently blank: show why + retry. -->
+                  <div v-if="!bodyFor(message) && !message.text" class="message-empty">
+                    <span>{{ $t('bodyLoadFailMsg') }}</span>
+                    <button type="button" @click.stop="fetchPrimaryBody">{{ $t('retry') }}</button>
+                  </div>
+
                   <div class="att" v-if="message.attachments?.length > 0">
                     <div class="att-title">
                       <span>{{$t('attachments')}}</span>
@@ -135,7 +141,7 @@ import ShadowHtml from '@/components/shadow-html/index.vue'
 import {computed, reactive, ref, watch, onMounted, onUnmounted} from "vue";
 import {useRouter} from 'vue-router'
 import {ElMessage, ElMessageBox} from 'element-plus'
-import {emailDelete, emailRead} from "@/request/email.js";
+import {emailDelete, emailList, emailRead} from "@/request/email.js";
 import {Icon} from "@iconify/vue";
 import {useEmailStore} from "@/store/email.js";
 import {useAccountStore} from "@/store/account.js";
@@ -257,6 +263,52 @@ async function resolveThreadBodies() {
 }
 
 let lastThreadMessageId = ''
+
+// `content` is only ever delivered by the list's background full fetch
+// (`/email/list?full=1`). That request carries every email's full HTML and can
+// be slow, fail, or simply not cover the opened row — in which case the reader
+// used to stay blank. Fetch just the opened message on demand instead.
+const bodyRequesting = ref(0)
+
+async function fetchPrimaryBody() {
+  const current = email.value
+  const emailId = Number(current?.emailId) || 0
+
+  if (!emailId) return
+  if (current.content || current.text) return
+  if (emailStore.detailMap[emailId]?.content) return
+  if (bodyRequesting.value === emailId) return
+
+  bodyRequesting.value = emailId
+
+  try {
+    const accountId = Number(current.accountId) || accountStore.currentAccountId
+    const allReceive = accountStore.currentAccount?.allReceive
+    const type = Number(current.type) || 0
+
+    // timeSort=0 returns rows with a smaller emailId than the cursor, so
+    // `emailId + 1` includes the target row itself.
+    const data = await emailList(accountId, allReceive, emailId + 1, 0, 1, type, 1)
+    const list = Array.isArray(data) ? data : data?.list
+    const row = (list || []).find(item => Number(item.emailId) === emailId)
+
+    if (row) {
+      emailStore.mergeFullEmail(row)
+    } else {
+      console.warn('Nova Mail: no body returned for email', emailId)
+    }
+  } catch (error) {
+    console.error('Nova Mail: failed to load the message body', error)
+  } finally {
+    bodyRequesting.value = 0
+  }
+}
+
+watch(
+    () => [email.value.emailId, email.value.content, email.value.text],
+    () => fetchPrimaryBody(),
+    { immediate: true }
+)
 
 watch(
     // Re-run when a message joins/leaves AND when its body arrives: the list is
@@ -873,6 +925,32 @@ const handleDelete = () => {
 
 .message-body {
   padding: 0 16px 18px;
+}
+
+/* Body failed / not returned: explain + retry instead of a blank area. */
+.message-empty {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 0 2px;
+  color: var(--regular-text-color);
+  font-size: 13px;
+}
+
+.message-empty button {
+  padding: 4px 12px;
+  border: 1px solid var(--light-border);
+  border-radius: 999px;
+  background: var(--nova-surface-muted);
+  color: var(--el-color-primary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.message-empty button:hover {
+  background: var(--nova-hover);
+  border-color: var(--el-color-primary);
 }
 
 .message-body .email-msg {

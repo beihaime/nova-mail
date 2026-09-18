@@ -80,6 +80,19 @@ export const useEmailStore = defineStore('email', {
             }
         },
         /**
+         * Merge a freshly fetched full email row (with `content`) into the
+         * store so the reader renders its body.
+         */
+        mergeFullEmail(row) {
+            if (!row?.emailId) return
+
+            this.detailMap[row.emailId] = row
+
+            if (Number(this.contentData.email?.emailId) === Number(row.emailId)) {
+                this.contentData.email = row
+            }
+        },
+        /**
          * Show a freshly sent reply/forward inside its conversation thread
          * straight away, instead of waiting for the list to be refetched.
          * Expects the email row returned by `POST /email/send`.
