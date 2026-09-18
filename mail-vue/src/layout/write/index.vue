@@ -453,8 +453,11 @@ function openForward(email) {
     const quotedHtml = email.content
       ? await resolvePrivateMailImages(email.content, settingStore.settings.r2Domain)
       : ''
+    // `.nova-quoted` lets the editor re-skin the quoted mail for dark mode.
     defValue.value = `
+      <div class="nova-quoted">
       ${quotedHtml || `<pre style="font-family: inherit;word-break: break-word;white-space: pre-wrap;margin: 0">${email.text}</pre>`}
+      </div>
     `
     open()
 
@@ -514,8 +517,8 @@ async function openReply(email) {
     <br>
         ${formatDetailDate(email.createTime)} ${email.name} &lt${email.sendEmail}&gt ${t('wrote')}:
     </div>
-    <blockquote class="mceNonEditable" style="margin: 0 0 0 0.8ex;border-left: 1px solid rgb(204,204,204);padding-left: 1ex;">
-      <articl>
+    <blockquote class="mceNonEditable nova-quoted" style="margin: 0 0 0 0.8ex;border-left: 1px solid rgb(204,204,204);padding-left: 1ex;">
+      <article>
           ${quotedHtml || `<pre style="font-family: inherit;word-break: break-word;white-space: pre-wrap;margin: 0">${email.text}</pre>`}
       </article>
     </blockquote>`
