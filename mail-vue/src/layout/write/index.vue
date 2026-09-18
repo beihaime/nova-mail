@@ -47,7 +47,12 @@
         <tinyEditor :def-value="defValue" ref="editor" @change="change" @focus="focusChange" />
         <div class="button-item">
           <div class="att-add" @click="chooseFile">
-            <AppIcon name="attachment" :size="22"/>
+            <Icon
+                class="compose-attachment-icon"
+                icon="solar:paperclip-linear"
+                width="22"
+                height="22"
+            />
           </div>
           <div class="att-clear" @click="clearContent">
             <Icon icon="icon-park-outline:clear-format" width="24" height="24 "/>
@@ -725,6 +730,26 @@ function close() {
 
         .att-add {
           cursor: pointer;
+          color: var(--regular-text-color);
+        }
+
+        .compose-attachment-icon {
+          color: currentColor;
+          transition:
+            color var(--nova-motion-base) var(--nova-motion-ease),
+            opacity var(--nova-motion-base) var(--nova-motion-ease);
+        }
+
+        .att-add:hover {
+          color: var(--el-color-primary);
+        }
+
+        :global(html.dark) .att-add {
+          color: #D1D1D6;
+        }
+
+        :global(html.dark) .att-add:hover {
+          color: var(--el-color-primary);
         }
 
         .att-clear {
