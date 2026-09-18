@@ -135,7 +135,9 @@ function autoScale() {
   const parentWidth = parent.offsetWidth
   const childWidth = shadowContent.scrollWidth
 
-  if (childWidth === 0) return
+  // Never scale to 0 / NaN: a not-yet-laid-out host would otherwise hide the
+  // whole message (zoom: 0).
+  if (childWidth === 0 || parentWidth === 0) return
 
   const scale = parentWidth / childWidth
 

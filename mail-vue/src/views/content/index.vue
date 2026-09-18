@@ -76,40 +76,42 @@
               {{ collapsedPreview(message) }}
             </button>
 
-            <el-collapse-transition>
-              <div v-show="isMessageExpanded(message)" class="message-body">
-                <el-alert v-if="message.status === 3" :closable="false" :title="toMessage(message.message)" class="email-msg" type="error" show-icon />
-                <el-alert v-if="message.status === 4" :closable="false" :title="$t('complained')" class="email-msg" type="warning" show-icon />
-                <el-alert v-if="message.status === 5" :closable="false" :title="$t('delayed')" class="email-msg" type="warning" show-icon />
+            <div class="message-collapse" :class="{ 'is-open': isMessageExpanded(message) }">
+              <div class="message-collapse-inner">
+                <div class="message-body">
+                  <el-alert v-if="message.status === 3" :closable="false" :title="toMessage(message.message)" class="email-msg" type="error" show-icon />
+                  <el-alert v-if="message.status === 4" :closable="false" :title="$t('complained')" class="email-msg" type="warning" show-icon />
+                  <el-alert v-if="message.status === 5" :closable="false" :title="$t('delayed')" class="email-msg" type="warning" show-icon />
 
-                <el-scrollbar class="htm-scrollbar" :class="!message.attachments?.length ? 'bottom-distance' : ''">
-                  <ShadowHtml v-if="bodyFor(message)" class="shadow-html" :html="bodyFor(message)" />
-                  <pre v-else-if="message.text" class="email-text">{{ message.text }}</pre>
-                </el-scrollbar>
+                  <el-scrollbar class="htm-scrollbar" :class="!message.attachments?.length ? 'bottom-distance' : ''">
+                    <ShadowHtml v-if="bodyFor(message)" class="shadow-html" :html="bodyFor(message)" />
+                    <pre v-else-if="message.text" class="email-text">{{ message.text }}</pre>
+                  </el-scrollbar>
 
-                <div class="att" v-if="message.attachments?.length > 0">
-                  <div class="att-title">
-                    <span>{{$t('attachments')}}</span>
-                    <span>{{$t('attCount',{total: message.attachments.length})}}</span>
-                  </div>
-                  <div class="att-box">
-                    <div class="att-item" v-for="att in message.attachments" :key="att.attId || att.key">
-                      <div class="att-icon" @click="showImage(att.key)">
-                        <Icon v-bind="getIconByName(att.filename)" />
-                      </div>
-                      <div class="att-name" @click="showImage(att.key)">
-                        {{ att.filename }}
-                      </div>
-                      <div class="att-size">{{ formatBytes(att.size) }}</div>
-                      <div class="opt-icon att-icon">
-                        <Icon v-if="isImage(att.filename)" icon="hugeicons:view" width="22" height="22" @click="showImage(att.key)"/>
-                        <AppIcon name="download-outline" :size="22" @click="downloadAttachment(att)" />
+                  <div class="att" v-if="message.attachments?.length > 0">
+                    <div class="att-title">
+                      <span>{{$t('attachments')}}</span>
+                      <span>{{$t('attCount',{total: message.attachments.length})}}</span>
+                    </div>
+                    <div class="att-box">
+                      <div class="att-item" v-for="att in message.attachments" :key="att.attId || att.key">
+                        <div class="att-icon" @click="showImage(att.key)">
+                          <Icon v-bind="getIconByName(att.filename)" />
+                        </div>
+                        <div class="att-name" @click="showImage(att.key)">
+                          {{ att.filename }}
+                        </div>
+                        <div class="att-size">{{ formatBytes(att.size) }}</div>
+                        <div class="opt-icon att-icon">
+                          <Icon v-if="isImage(att.filename)" icon="hugeicons:view" width="22" height="22" @click="showImage(att.key)"/>
+                          <AppIcon name="download-outline" :size="22" @click="downloadAttachment(att)" />
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </el-collapse-transition>
+            </div>
           </article>
         </div>
         <Teleport to="body" :disabled="!isMobileReader">
@@ -132,7 +134,7 @@
 import ShadowHtml from '@/components/shadow-html/index.vue'
 import {computed, reactive, ref, watch, onMounted, onUnmounted} from "vue";
 import {useRouter} from 'vue-router'
-import {ElMessage, ElMessageBox, ElCollapseTransition} from 'element-plus'
+import {ElMessage, ElMessageBox} from 'element-plus'
 import {emailDelete, emailRead} from "@/request/email.js";
 import {Icon} from "@iconify/vue";
 import {useEmailStore} from "@/store/email.js";
@@ -846,6 +848,27 @@ const handleDelete = () => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Expand/collapse.
+   Plain CSS `grid-template-rows: 0fr -> 1fr` instead of ElCollapseTransition:
+   that component clamps the body with an inline `max-height: 0` measured from
+   `scrollHeight`, which is 0 while collapsed (`.el-scrollbar` is height:100%),
+   so it never animated and never cleared the clamp — leaving the body blank.
+   The body is always laid out here, just clipped, so it can never get stuck. */
+.message-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--nova-motion-base) var(--nova-motion-ease);
+}
+
+.message-collapse.is-open {
+  grid-template-rows: 1fr;
+}
+
+.message-collapse-inner {
+  overflow: hidden;
+  min-height: 0;
 }
 
 .message-body {

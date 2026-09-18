@@ -125,7 +125,19 @@ export function buildThreadMessages(primary, pool = [], extra = []) {
 
     const push = (raw) => {
         const id = messageKey(raw)
-        if (!id || collected.has(id)) return false
+        if (!id) return false
+
+        const existing = collected.get(id)
+
+        if (existing) {
+            // The list first delivers brief rows (no `content`), the full rows
+            // arrive later with the same id. Keep the richer row so the body and
+            // attachments are never dropped, no matter which one is seen first.
+            if (!existing.content && raw?.content) {
+                collected.set(id, raw)
+            }
+            return false
+        }
 
         collected.set(id, raw)
         return true
