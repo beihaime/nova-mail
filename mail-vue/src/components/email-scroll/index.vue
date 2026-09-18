@@ -111,8 +111,12 @@
                            :disabled="!item.checked && isSelectMax"
                            @click.stop></el-checkbox>
               <div @click.stop="starChange(item)" class="pc-star" v-if="showStar">
-                <AppIcon v-if="item.isStar" name="star-filled" :size="20"/>
-                <AppIcon v-else name="star-outline" :size="18"/>
+                <Icon
+                    :class="['inbox-star-icon', { 'is-active': item.isStar }]"
+                    :icon="item.isStar ? 'solar:star-bold' : 'solar:star-linear'"
+                    width="19"
+                    height="19"
+                />
               </div>
               <div v-if="!showStar"></div>
               <span
@@ -164,9 +168,11 @@
                       :aria-label="t('star')"
                       @click.stop="starChange(item)"
                   >
-                    <AppIcon
-                        :name="item.isStar ? 'star-filled' : 'star-outline'"
-                        :size="19"
+                    <Icon
+                        :class="['inbox-star-icon', { 'is-active': item.isStar }]"
+                        :icon="item.isStar ? 'solar:star-bold' : 'solar:star-linear'"
+                        width="19"
+                        height="19"
                     />
                   </button>
 
@@ -1467,6 +1473,16 @@ function loadData() {
 .pc-star {
   display: flex;
   width: 40px;
+}
+
+.inbox-star-icon {
+  color: var(--regular-text-color);
+  opacity: .9;
+}
+
+.inbox-star-icon.is-active {
+  color: var(--el-color-primary);
+  opacity: 1;
 }
 
 @media (max-width: 1366px) {

@@ -78,8 +78,8 @@
             </div>
           </div>
           <div v-if="emailStore.contentData.showReply" class="reader-bottom-actions">
-            <button v-perm="'email:send'" type="button" @click="openReply"><AppIcon name="reply" :size="17" />{{ $t('reply') }}</button>
-            <button v-perm="'email:send'" type="button" @click="openForward"><AppIcon name="forward" :size="17" />{{ $t('forward') }}</button>
+            <button v-perm="'email:send'" type="button" @click="openReply"><Icon icon="solar:reply-linear" width="18" height="18" />{{ $t('reply') }}</button>
+            <button v-perm="'email:send'" type="button" @click="openForward"><Icon icon="solar:forward-linear" width="18" height="18" />{{ $t('forward') }}</button>
           </div>
         </div>
       </div>
