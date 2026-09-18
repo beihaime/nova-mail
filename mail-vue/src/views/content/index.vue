@@ -17,7 +17,17 @@
         <AppIcon class="icon" @click="changeStar" v-else name="star-outline" :size="19" title="Star" aria-label="Star email"/>
       </span>
       <AppIcon class="icon" v-if="emailStore.contentData.showReply" v-perm="'email:send'"  @click="openReply" name="reply" :size="21" title="Reply" aria-label="Reply" />
-      <AppIcon class="icon" v-if="emailStore.contentData.showReply" v-perm="'email:send'"  @click="openForward" name="forward" :size="20" title="Forward" aria-label="Forward" />
+      <Icon
+          class="icon"
+          v-if="emailStore.contentData.showReply"
+          v-perm="'email:send'"
+          icon="solar:forward-linear"
+          width="21"
+          height="21"
+          title="Forward"
+          aria-label="Forward"
+          @click="openForward"
+      />
       <AppIcon class="icon" name="print" :size="19" title="Print" aria-label="Print email" @click="printEmail" />
     </div>
     <div></div>
