@@ -1,7 +1,43 @@
 import {useUiStore} from "@/store/ui.js";
 
 /**
- * Switch the theme with a circular reveal originating from the click point.
+ * Reveal centre.
+ *
+ * Prefer the centre of the control that triggered the switch: on touch screens a
+ * tap lands noticeably off-centre (and some mobile browsers report 0/0 for
+ * synthetic clicks), which made the reveal look like it started from the wrong
+ * spot. Falls back to the pointer position, then to the viewport centre.
+ *
+ * @param {Event} [event]
+ * @returns {{x: number, y: number}}
+ */
+function resolveRevealOrigin(event) {
+
+    const element =
+        event?.currentTarget ||
+        event?.target
+
+    const rect =
+        typeof element?.getBoundingClientRect === 'function'
+            ? element.getBoundingClientRect()
+            : null
+
+    if (rect && (rect.width || rect.height)) {
+        return {
+            x: rect.left + rect.width / 2,
+            y: rect.top + rect.height / 2
+        }
+    }
+
+    return {
+        x: event?.clientX || window.innerWidth / 2,
+        y: event?.clientY || window.innerHeight / 2
+    }
+}
+
+/**
+ * Switch the theme with a circular reveal originating from the triggering
+ * control (see `resolveRevealOrigin`).
  *
  * The matching `::view-transition-*` CSS lives in `src/style.css`
  * (`html[data-theme-to="..."]` + `--vt-x/--vt-y/--vt-end-radius`).
@@ -40,11 +76,24 @@ export function applyThemeTransition(mode, event) {
         return
     }
 
-    const x = event.clientX
-    const y = event.clientY
+    const origin =
+        resolveRevealOrigin(event)
 
-    const maxX = Math.max(x, window.innerWidth - x)
-    const maxY = Math.max(y, window.innerHeight - y)
+    const width =
+        window.innerWidth
+
+    const height =
+        window.innerHeight
+
+    // Keep the origin inside the viewport so the circle always anchors on screen.
+    const x =
+        Math.min(Math.max(origin.x, 0), width)
+
+    const y =
+        Math.min(Math.max(origin.y, 0), height)
+
+    const maxX = Math.max(x, width - x)
+    const maxY = Math.max(y, height - y)
     const endRadius = Math.hypot(maxX, maxY)
 
     // 标记切换目标，供 CSS 选择器使用
