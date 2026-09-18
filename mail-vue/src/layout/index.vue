@@ -162,8 +162,7 @@ onBeforeUnmount(() => {
   .mobile-nav button :deep(.app-icon) { width: 19px; height: 19px; opacity: .75; }
   .mobile-nav button.active { color: var(--el-color-primary); font-weight: 650; }
   .mobile-nav button.active :deep(.app-icon) { opacity: 1; }
-  :global(.dark .mobile-nav button:not(.active) .app-icon) { filter: var(--nova-ui-icon-filter); opacity: 1; }
-  :global(.dark .mobile-nav button:not(.active):hover .app-icon) { filter: var(--nova-ui-icon-filter-hover); }
+  :global(.dark .mobile-nav button:not(.active) .app-icon) { opacity: 1; }
   .mobile-nav .mobile-compose {
     place-self: center;
     width: 52px;
