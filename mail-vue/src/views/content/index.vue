@@ -78,8 +78,8 @@
             </div>
           </div>
           <div v-if="emailStore.contentData.showReply" class="reader-bottom-actions">
-            <button v-perm="'email:send'" type="button" @click="openReply"><AppIcon class="reader-action-icon" name="reply" :size="17" />{{ $t('reply') }}</button>
-            <button v-perm="'email:send'" type="button" @click="openForward"><AppIcon class="reader-action-icon" name="forward" :size="17" />{{ $t('forward') }}</button>
+            <button v-perm="'email:send'" type="button" @click="openReply"><AppIcon name="reply" :size="17" />{{ $t('reply') }}</button>
+            <button v-perm="'email:send'" type="button" @click="openForward"><AppIcon name="forward" :size="17" />{{ $t('forward') }}</button>
           </div>
         </div>
       </div>
@@ -606,23 +606,6 @@ const handleDelete = () => {
 .reader-bottom-actions { display: flex; gap: 10px; max-width: 1100px; padding: 28px 0 18px; }
 .reader-bottom-actions button { min-height: 34px; display: inline-flex; align-items: center; gap: 7px; padding: 0 14px; color: var(--el-text-color-primary); border: 1px solid var(--light-border); border-radius: 9px; background: transparent; cursor: pointer; font-size: 13px; font-weight: 600; }
 .reader-bottom-actions button:hover { background: var(--base-fill); border-color: var(--el-color-primary); }
-
-:global(html.dark) .reader-bottom-actions button {
-  color: #D1D1D6;
-  background: rgba(255, 255, 255, .018);
-  border-color: var(--light-border);
-}
-
-:global(html.dark) .reader-bottom-actions button:hover {
-  color: #F2F2F7;
-  background: rgba(10, 132, 255, .10);
-  border-color: rgba(10, 132, 255, .55);
-}
-
-:global(html.dark) .reader-action-icon {
-  filter: brightness(0) invert(90%) !important;
-  opacity: .95;
-}
 
 .shadow-html::after  {
   content: "";

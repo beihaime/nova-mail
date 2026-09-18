@@ -47,7 +47,7 @@
         <tinyEditor :def-value="defValue" ref="editor" @change="change" @focus="focusChange" />
         <div class="button-item">
           <div class="att-add" @click="chooseFile">
-            <AppIcon class="attachment-action-icon" name="attachment" :size="22"/>
+            <AppIcon name="attachment" :size="22"/>
           </div>
           <div class="att-clear" @click="clearContent">
             <Icon icon="icon-park-outline:clear-format" width="24" height="24 "/>
@@ -449,9 +449,7 @@ function openForward(email) {
       ? await resolvePrivateMailImages(email.content, settingStore.settings.r2Domain)
       : ''
     defValue.value = `
-      <div class="nova-quoted-mail">
-        ${quotedHtml || `<pre style="font-family: inherit;word-break: break-word;white-space: pre-wrap;margin: 0">${email.text}</pre>`}
-      </div>
+      ${quotedHtml || `<pre style="font-family: inherit;word-break: break-word;white-space: pre-wrap;margin: 0">${email.text}</pre>`}
     `
     open()
 
@@ -507,17 +505,15 @@ async function openReply(email) {
       : ''
     defValue.value = `
     <div></div>
-    <div class="nova-reply-context">
-      <div>
-        <br>
+    <div>
+    <br>
         ${formatDetailDate(email.createTime)} ${email.name} &lt${email.sendEmail}&gt ${t('wrote')}:
-      </div>
-      <blockquote class="mceNonEditable nova-quoted-mail" style="margin: 0 0 0 0.8ex;border-left: 1px solid rgb(90,90,90);padding-left: 1ex;">
-        <article>
+    </div>
+    <blockquote class="mceNonEditable" style="margin: 0 0 0 0.8ex;border-left: 1px solid rgb(204,204,204);padding-left: 1ex;">
+      <articl>
           ${quotedHtml || `<pre style="font-family: inherit;word-break: break-word;white-space: pre-wrap;margin: 0">${email.text}</pre>`}
-        </article>
-      </blockquote>
-    </div>`
+      </article>
+    </blockquote>`
     open(senderAccount)
 
     nextTick(() => {
@@ -806,30 +802,6 @@ function close() {
 
 :deep(.el-input-tag__suffix) {
   padding-right: 4px;
-}
-
-/* Dark compose action visibility */
-.attachment-action-icon {
-  opacity: .84;
-}
-
-.att-add:hover .attachment-action-icon {
-  opacity: 1;
-}
-
-:global(html.dark) .attachment-action-icon {
-  filter: brightness(0) invert(90%) !important;
-  opacity: .95;
-}
-
-:global(html.dark) .att-clear {
-  color: #D1D1D6;
-}
-
-:global(html.dark) .att-add:hover .attachment-action-icon,
-:global(html.dark) .att-clear:hover {
-  color: var(--el-color-primary);
-  opacity: 1;
 }
 
 .icon {

@@ -7,7 +7,6 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
 import DOMPurify from 'dompurify'
-import { useUiStore } from '@/store/ui.js'
 
 const props = defineProps({
   html: {
@@ -18,7 +17,6 @@ const props = defineProps({
 
 const container = ref(null)
 const contentBox = ref(null)
-const uiStore = useUiStore()
 let shadowRoot = null
 
 const allowedStyleProperties = new Set([
@@ -31,107 +29,6 @@ const allowedStyleProperties = new Set([
   'text-decoration', 'vertical-align', 'white-space', 'width', 'word-break', 'word-wrap'
 ])
 
-function parseCssColor(value) {
-  const normalized = String(value || '').trim().toLowerCase()
-
-  // Do not flatten designed backgrounds such as gradients.
-  if (!normalized || /gradient\s*\(/i.test(normalized)) return null
-
-  const tokenMatch = normalized.match(
-    /#[0-9a-f]{3,6}\b|rgba?\([^)]*\)|\bwhite\b|\bblack\b/i
-  )
-
-  if (!tokenMatch) return null
-
-  const token = tokenMatch[0].toLowerCase()
-
-  if (token === 'white') return { r: 255, g: 255, b: 255, a: 1 }
-  if (token === 'black') return { r: 0, g: 0, b: 0, a: 1 }
-
-  if (token.startsWith('#')) {
-    const hex = token.slice(1)
-
-    if (hex.length === 3) {
-      return {
-        r: parseInt(hex[0] + hex[0], 16),
-        g: parseInt(hex[1] + hex[1], 16),
-        b: parseInt(hex[2] + hex[2], 16),
-        a: 1
-      }
-    }
-
-    if (hex.length === 6) {
-      return {
-        r: parseInt(hex.slice(0, 2), 16),
-        g: parseInt(hex.slice(2, 4), 16),
-        b: parseInt(hex.slice(4, 6), 16),
-        a: 1
-      }
-    }
-
-    return null
-  }
-
-  const rgb = token.match(/^rgba?\(([^)]+)\)$/i)
-  if (!rgb) return null
-
-  const parts = rgb[1]
-    .replace(/\//g, ' ')
-    .split(/[,\s]+/)
-    .filter(Boolean)
-
-  if (parts.length < 3) return null
-
-  const channel = (part) => {
-    if (part.endsWith('%')) {
-      return Math.round(Math.max(0, Math.min(100, parseFloat(part))) * 2.55)
-    }
-
-    return Math.max(0, Math.min(255, parseFloat(part)))
-  }
-
-  const r = channel(parts[0])
-  const g = channel(parts[1])
-  const b = channel(parts[2])
-  const a = parts[3] == null
-    ? 1
-    : Math.max(0, Math.min(1, parseFloat(parts[3])))
-
-  if ([r, g, b, a].some(Number.isNaN)) return null
-
-  return { r, g, b, a }
-}
-
-function colorLuma(color) {
-  return (
-    color.r * 0.2126 +
-    color.g * 0.7152 +
-    color.b * 0.0722
-  )
-}
-
-function normalizeDarkStyleValue(property, value) {
-  if (!uiStore.dark) return value
-
-  const color = parseCssColor(value)
-  if (!color || color.a < .5) return value
-
-  const luma = colorLuma(color)
-
-  if (
-    (property === 'background' || property === 'background-color') &&
-    luma >= 235
-  ) {
-    return 'transparent'
-  }
-
-  if (property === 'color' && luma <= 90) {
-    return '#D1D1D6'
-  }
-
-  return value
-}
-
 function sanitizeInlineStyle(style) {
   return style.split(';').map((declaration) => {
     const separator = declaration.indexOf(':')
@@ -141,10 +38,7 @@ function sanitizeInlineStyle(style) {
     const value = declaration.slice(separator + 1).trim()
     const unsafeValue = /(?:expression\s*\(|url\s*\(|@import|javascript:|behavior\s*:|-moz-binding)/i.test(value)
 
-    if (!allowedStyleProperties.has(property) || unsafeValue) return ''
-
-    const safeValue = normalizeDarkStyleValue(property, value)
-    return `${property}: ${safeValue}`
+    return allowedStyleProperties.has(property) && !unsafeValue ? `${property}: ${value}` : ''
   }).filter(Boolean).join('; ')
 }
 
@@ -182,7 +76,7 @@ function updateContent() {
                     'Hiragino Sans GB', 'Microsoft YaHei', '微软雅黑', Arial, sans-serif;
         font-size: 14px;
         line-height: 1.5;
-        color: ${uiStore.dark ? '#D1D1D6' : '#13181D'};
+        color: var(--el-text-color-primary, #13181D);
         word-break: break-word;
       }
 
@@ -245,7 +139,7 @@ onMounted(() => {
   autoScale()
 })
 
-watch(() => [props.html, uiStore.dark], () => {
+watch(() => props.html, () => {
   updateContent()
   autoScale()
 })

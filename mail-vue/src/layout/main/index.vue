@@ -37,8 +37,23 @@ const accountShow = computed(() => {
 
 const isDesktopReading = computed(() => route.name === 'content' && isDesktop.value)
 
-// Normal configured notice popups are intentionally disabled.
- // System Settings preview still uses changePreview below.
+watch(() => uiStore.changeNotice, () => {
+
+  const settings = settingStore.settings
+
+  let data = {
+    notice: settings.notice,
+    noticeWidth: settings.noticeWidth,
+    noticeTitle: settings.noticeTitle,
+    noticeContent: settings.noticeContent,
+    noticeType: settings.noticeType,
+    noticeDuration: settings.noticeDuration,
+    noticePosition: settings.noticePosition,
+    noticeOffset: settings.noticeOffset
+  }
+
+  showNotice(data)
+})
 
 watch(() => uiStore.changePreview, () => {
   showNotice(uiStore.previewData)
