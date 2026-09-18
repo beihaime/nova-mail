@@ -96,10 +96,55 @@ function initEditor() {
     forced_root_block: 'div',
     skin: `${uiStore.dark ? 'oxide-dark' : 'oxide'}`,
     content_css: `/tinymce/css/index.css,${uiStore.dark ? 'dark' : 'default'}`,
-    content_style: `:root {
-         --scrollbar-track-color: ${uiStore.dark ? '#141414' : '#FFFFFF'};
-         --scrollbar-thumb-color: ${uiStore.dark ? '#8D9095' : '#A8ABB2'};
-    }`,
+    content_style: uiStore.dark
+      ? `:root {
+           --scrollbar-track-color: #141414;
+           --scrollbar-thumb-color: #8D9095;
+         }
+
+         html,
+         body,
+         body.mce-content-body {
+           background: #141414 !important;
+           color: #D1D1D6;
+         }
+
+         body.mce-content-body {
+           caret-color: #F2F2F7;
+         }
+
+         .nova-reply-context {
+           color: #AEB3BC;
+         }
+
+         .nova-quoted-mail {
+           color: #BFC4CC !important;
+           background: transparent !important;
+         }
+
+         .nova-quoted-mail [style*="background"] {
+           background: transparent !important;
+           background-color: transparent !important;
+         }
+
+         .nova-quoted-mail [style*="color"] {
+           color: inherit !important;
+         }
+
+         .nova-quoted-mail blockquote {
+           border-color: #4A4D52 !important;
+         }`
+      : `:root {
+           --scrollbar-track-color: #FFFFFF;
+           --scrollbar-thumb-color: #A8ABB2;
+         }
+
+         html,
+         body,
+         body.mce-content-body {
+           background: #FFFFFF;
+           color: #13181D;
+         }`,
     plugins: 'link image advlist lists  emoticons fullscreen  table preview code',
     toolbar: 'bold emoticons forecolor backcolor italic fontsize | alignleft aligncenter alignright alignjustify | outdent indent |  bullist numlist | link image  | table code preview fullscreen',
     toolbar_mode: 'scrolling',
