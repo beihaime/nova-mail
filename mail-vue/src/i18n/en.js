@@ -45,6 +45,8 @@ const en = {
     username: 'Username',
     trustLevel: 'Level',
     password: 'Password',
+    showPassword: 'Show password',
+    hidePassword: 'Hide password',
     delAccount: 'Delete Account',
     delAccountMsg: 'This will permanently delete your account and data. It cannot be reactivated',
     totalReceived: 'Total Received',

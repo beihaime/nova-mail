@@ -57,7 +57,18 @@
               </div>
             </template>
           </el-input>
-          <el-input v-model="form.password" :placeholder="$t('password')" type="password" autocomplete="off" @keyup.enter="submit">
+          <el-input v-model="form.password" :placeholder="$t('password')" :type="showPassword ? 'text' : 'password'" autocomplete="off" @keyup.enter="submit">
+            <template #suffix>
+              <button
+                  type="button"
+                  class="pwd-toggle"
+                  :aria-label="showPassword ? $t('hidePassword') : $t('showPassword')"
+                  :title="showPassword ? $t('hidePassword') : $t('showPassword')"
+                  @click="showPassword = !showPassword"
+              >
+                <AppIcon :name="showPassword ? 'eye' : 'eye-off'" :size="18"/>
+              </button>
+            </template>
           </el-input>
           <el-button class="btn" type="primary" @click="submit" :loading="loginLoading" :disabled="loginLoading"
           >{{ $t('loginBtn') }}
@@ -217,6 +228,8 @@ const bindLoading = ref(false)
 const oauthLoading = ref(false);
 const showBindForm = ref(false);
 const show = ref('login')
+// Password visibility toggle (eye / eye-off), off by default.
+const showPassword = ref(false)
 
 function toggleLoginTheme(event) {
   applyThemeTransition(
@@ -835,6 +848,49 @@ function submitRegister() {
       height: 36px;
     }
   }
+}
+
+/* Show / hide password toggle, rendered inside the password input suffix.
+   Element Plus already right-aligns and vertically centres `.el-input__suffix`,
+   so the input keeps its existing size. */
+.pwd-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  opacity: .75;
+  transition:
+    background-color var(--nova-motion-fast) var(--nova-motion-ease),
+    opacity var(--nova-motion-fast) var(--nova-motion-ease),
+    transform var(--nova-motion-fast) var(--nova-motion-ease);
+}
+
+.pwd-toggle:hover,
+.pwd-toggle:focus-visible {
+  opacity: 1;
+  background: var(--base-fill);
+}
+
+.pwd-toggle:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--el-color-primary-light-5);
+}
+
+.pwd-toggle:active {
+  transform: scale(.9);
+}
+
+/* eye.svg / eye-off.svg are fixed dark raster artwork: the shared AppIcon dark
+   filter inverts them in dark mode, and hover/focus brightens them further. */
+:global(html.dark .pwd-toggle:hover .app-icon),
+:global(html.dark .pwd-toggle:focus-visible .app-icon) {
+  filter: var(--nova-ui-icon-filter-hover) !important;
 }
 
 :deep(.el-select-dropdown__item) {
