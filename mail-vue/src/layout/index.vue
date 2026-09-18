@@ -105,6 +105,21 @@ onBeforeUnmount(() => {
 .el-aside {
   width: auto;
   transition: transform var(--nova-motion-base) var(--nova-motion-ease), box-shadow var(--nova-motion-base) var(--nova-motion-ease);
+  /* Sidebar shell is a fixed flex column: navigation content scrolls, the
+     quota footer is pinned. Previously the scroll region was an arbitrary
+     `calc(100% - 82px)` while the footer measured ~114px tall, so the footer
+     was pushed below the fold (clipped on desktop, scrollable on mobile). */
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+@media (max-width: 1025px) {
+  .el-aside {
+    height: 100dvh;
+    max-height: 100dvh;
+  }
 }
 
 .layout {

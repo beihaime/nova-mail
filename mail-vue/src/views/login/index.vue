@@ -940,6 +940,10 @@ function submitRegister() {
   padding-right: 4px !important;
   background: var(--el-bg-color);
   border-radius: 0 8px 8px 0;
+  /* The username field yields before the domain chip at any width (login,
+     register and the OAuth bind dialog), so "@beihaime.com" is never clipped. */
+  flex: 0 0 auto;
+  max-width: none;
 }
 
 :deep(.el-button+.el-button) {
@@ -1105,7 +1109,37 @@ function submitRegister() {
   .container .el-input :deep(.el-input__wrapper) { min-width: 0; width: 100%; }
   .container .el-input :deep(.el-input__inner) { min-width: 0; width: 100%; height: 48px; font-size: 16px; }
   .container .email-input :deep(.el-input__wrapper) { min-width: 0; }
-  .container :deep(.el-input-group__append) { flex: 0 0 auto; min-width: 116px; max-width: 45%; padding-left: 6px !important; padding-right: 4px !important; white-space: nowrap; }
+  /* Email row on phones: the username field flexes, while the domain picker
+     keeps its natural (content) width so "@beihaime.com" is never truncated.
+     The previous `max-width: 45%` clamped the append below its content width,
+     which pushed the label and the chevron outside the rounded box on narrow
+     screens (320-390px). Applies to every .email-input (login, register and the
+     OAuth bind dialog); the font inherits so it always matches its own input. */
+  .email-input :deep(.el-input-group__append) {
+    flex: 0 0 auto;
+    min-width: 0;
+    max-width: none;
+    padding-left: 8px !important;
+    padding-right: 6px !important;
+    white-space: nowrap;
+  }
+  .email-input :deep(.el-input-group__append > div) {
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
+  }
+  /* The append also hosts the invisible el-select; only lay out the visible
+     label + chevron row as a centred flex line. */
+  .email-input :deep(.el-input-group__append > div > div:not(.select)) {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    white-space: nowrap;
+  }
+  .email-input :deep(.el-input-group__append .setting-icon) {
+    top: 0;
+    flex: 0 0 auto;
+  }
   .container .btn { width: 100%; min-width: 0; height: 50px; border-radius: 11px; font-size: 15px; }
   .oauth-divider { margin: 16px 0 12px; }
   .switch { margin-top: 18px; }

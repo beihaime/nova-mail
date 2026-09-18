@@ -336,12 +336,30 @@ const openCompose = () => uiStore.writerRef?.open()
 }
 
 .scroll {
-  height: calc(100% - 82px);
+  /* Sidebar content: fills the space above the footer and scrolls on its own,
+     so the quota block never moves and never needs the user to scroll. */
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
 }
 
 .aside-footer {
+  flex: 0 0 auto;
   padding: 8px 18px 14px;
   color: var(--secondary-text-color);
+}
+
+@media (max-width: 1025px) {
+  .scroll {
+    overscroll-behavior: contain;
+  }
+
+  .aside-footer {
+    /* Match the scrolling panel instead of the raw --el-bg-color so light/dark
+       stay visually continuous, and clear the phone's home-indicator area. */
+    background: var(--aside-backgound);
+    padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  }
 }
 
 .send-usage {
