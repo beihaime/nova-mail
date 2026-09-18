@@ -136,6 +136,45 @@ function updateContent() {
         margin-top: 0;
       }
 
+      /* Quoted history collapsed by default: "... show quoted content",
+         click to expand (native <details>, Gmail style). The wrapper is added
+         by utils/quoted-text.js before the HTML reaches this shadow root. */
+      details.quote-toggle {
+        margin-top: 10px;
+      }
+
+      details.quote-toggle > summary.quote-toggle-summary {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 3px 0;
+        color: var(--regular-text-color, #5f6368);
+        font-size: 13px;
+        cursor: pointer;
+        list-style: none;
+        user-select: none;
+      }
+
+      details.quote-toggle > summary.quote-toggle-summary::-webkit-details-marker {
+        display: none;
+      }
+
+      details.quote-toggle > summary.quote-toggle-summary::marker {
+        content: '';
+      }
+
+      details.quote-toggle > summary.quote-toggle-summary:hover {
+        color: var(--el-color-primary, #0E70DF);
+      }
+
+      details.quote-toggle[open] > summary.quote-toggle-summary {
+        margin-bottom: 6px;
+      }
+
+      details.quote-toggle > .quote-content {
+        display: block;
+      }
+
       @media (max-width: 767px) {
         blockquote,
         .nova-quoted,

@@ -21,7 +21,7 @@
       <AppIcon class="icon" name="print" :size="19" title="Print" aria-label="Print email" @click="printEmail" />
     </div>
     <div></div>
-    <el-scrollbar class="scrollbar">
+    <el-scrollbar ref="scrollRef" class="scrollbar">
       <div class="container">
         <div class="email-title">
           {{ thread.subject || email.subject }}
@@ -34,25 +34,45 @@
               :class="{
                 'is-expanded': isMessageExpanded(message),
                 'is-latest': index === thread.messages.length - 1,
-                'is-mine': message.isMine
+                'is-mine': message.isMine,
+                'is-new': isNewMessage(message)
               }"
           >
             <header class="message-head" @click="toggleMessage(message)">
-              <SenderAvatar :email="message" :size="40" />
+              <SenderAvatar class="message-avatar" :email="message" :size="40" />
               <div class="sender-details">
+                <!-- Collapsed cards show sender name + email on ONE line; the
+                     email ellipsises instead of wrapping character by character. -->
                 <div class="sender-line">
-                  <strong>{{ message.from.name || message.from.email || '—' }}</strong>
-                  <span v-if="message.from.email">&lt;{{ message.from.email }}&gt;</span>
+                  <strong class="sender-name">{{ message.from.name || message.from.email || '—' }}</strong>
+                  <span v-if="message.from.email" class="sender-email">&lt;{{ message.from.email }}&gt;</span>
                 </div>
-                <button class="recipient-toggle" type="button" @click.stop="toggleMessageMetadata(message)">
-                  {{ $t('to') }} {{ recipientLabelFor(message) }} <span aria-hidden="true">⌄</span>
-                </button>
-                <div v-if="isMetadataOpen(message)" class="message-details">
-                  <div><b>{{ $t('from') }}</b><span>{{ message.from.name || '—' }} &lt;{{ message.from.email || '—' }}&gt;</span></div>
-                  <div><b>{{ $t('recipient') }}</b><span>{{ recipientLabelFor(message) }}</span></div>
-                  <div v-if="formatAddressList(message.cc)"><b>Cc</b><span>{{ formatAddressList(message.cc) }}</span></div>
-                  <div v-if="formatAddressList(message.bcc)"><b>Bcc</b><span>{{ formatAddressList(message.bcc) }}</span></div>
-                </div>
+
+                <!-- Receiver line + header metadata only exist on the expanded
+                     card: a collapsed card must not leak header metadata. -->
+                <template v-if="isMessageExpanded(message)">
+                  <button class="recipient-toggle" type="button" @click.stop="toggleMessageMetadata(message)">
+                    {{ $t('to') }} {{ recipientLabelFor(message) }} <span aria-hidden="true">⌄</span>
+                  </button>
+                  <div v-if="isMetadataOpen(message)" class="message-details" @click.stop>
+                    <div class="detail-row">
+                      <span class="detail-label">{{ $t('from') }}</span>
+                      <span class="detail-value">{{ message.from.name || '—' }} &lt;{{ message.from.email || '—' }}&gt;</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">{{ $t('recipient') }}</span>
+                      <span class="detail-value">{{ recipientLabelFor(message) }}</span>
+                    </div>
+                    <div v-if="formatAddressList(message.cc)" class="detail-row">
+                      <span class="detail-label">Cc</span>
+                      <span class="detail-value">{{ formatAddressList(message.cc) }}</span>
+                    </div>
+                    <div v-if="formatAddressList(message.bcc)" class="detail-row">
+                      <span class="detail-label">Bcc</span>
+                      <span class="detail-value">{{ formatAddressList(message.bcc) }}</span>
+                    </div>
+                  </div>
+                </template>
               </div>
               <time class="message-date">{{ formatDetailDate(message.date) }}</time>
               <button
@@ -67,6 +87,10 @@
               </button>
             </header>
 
+            <!-- Collapsed body: the quote-stripped first paragraph only.
+                 `message.preview` is built in utils/quoted-text.js, so quoted
+                 replies, "On … wrote:" headers and forwarded history can never
+                 reach this line. -->
             <button
                 v-if="!isMessageExpanded(message) && collapsedPreview(message)"
                 class="message-preview"
@@ -76,43 +100,44 @@
               {{ collapsedPreview(message) }}
             </button>
 
-            <div class="message-collapse" :class="{ 'is-open': isMessageExpanded(message) }">
-              <div class="message-collapse-inner">
-                <div class="message-body">
-                  <el-alert v-if="message.status === 3" :closable="false" :title="toMessage(message.message)" class="email-msg" type="error" show-icon />
-                  <el-alert v-if="message.status === 4" :closable="false" :title="$t('complained')" class="email-msg" type="warning" show-icon />
-                  <el-alert v-if="message.status === 5" :closable="false" :title="$t('delayed')" class="email-msg" type="warning" show-icon />
+            <!-- Expanded body. Rendered only while the card is open, so a
+                 collapsed card never contains `message.content` / quote markup. -->
+            <div v-if="isMessageExpanded(message)" class="message-body">
+              <el-alert v-if="message.status === 3" :closable="false" :title="toMessage(message.message)" class="email-msg" type="error" show-icon />
+              <el-alert v-if="message.status === 4" :closable="false" :title="$t('complained')" class="email-msg" type="warning" show-icon />
+              <el-alert v-if="message.status === 5" :closable="false" :title="$t('delayed')" class="email-msg" type="warning" show-icon />
 
-                  <el-scrollbar class="htm-scrollbar" :class="!message.attachments?.length ? 'bottom-distance' : ''">
-                    <ShadowHtml v-if="bodyFor(message)" class="shadow-html" :html="bodyFor(message)" />
-                    <div v-else-if="message.text" class="email-text" v-html="quotedBody(message.text)"></div>
-                  </el-scrollbar>
+              <el-scrollbar class="htm-scrollbar" :class="!message.attachments?.length ? 'bottom-distance' : ''">
+                <!-- HTML path: body with its quoted history wrapped in a
+                     collapsed Gmail-style <details> toggle. -->
+                <ShadowHtml v-if="bodyFor(message)" class="shadow-html" :html="bodyFor(message)" />
+                <!-- Plain-text path: same treatment, rendered from the parser. -->
+                <div v-else-if="message.text" class="email-text" v-html="quotedBody(message.text)"></div>
+              </el-scrollbar>
 
-                  <!-- Never leave the body silently blank: show why + retry. -->
-                  <div v-if="!bodyFor(message) && !message.text" class="message-empty">
-                    <span>{{ $t('bodyLoadFailMsg') }}</span>
-                    <button type="button" @click.stop="fetchPrimaryBody">{{ $t('retry') }}</button>
-                  </div>
+              <!-- Never leave the body silently blank: show why + retry. -->
+              <div v-if="!bodyFor(message) && !message.text" class="message-empty">
+                <span>{{ $t('bodyLoadFailMsg') }}</span>
+                <button type="button" @click.stop="fetchPrimaryBody">{{ $t('retry') }}</button>
+              </div>
 
-                  <div class="att" v-if="message.attachments?.length > 0">
-                    <div class="att-title">
-                      <span>{{$t('attachments')}}</span>
-                      <span>{{$t('attCount',{total: message.attachments.length})}}</span>
+              <div class="att" v-if="message.attachments?.length > 0">
+                <div class="att-title">
+                  <span>{{$t('attachments')}}</span>
+                  <span>{{$t('attCount',{total: message.attachments.length})}}</span>
+                </div>
+                <div class="att-box">
+                  <div class="att-item" v-for="att in message.attachments" :key="att.attId || att.key">
+                    <div class="att-icon" @click="showImage(att.key)">
+                      <Icon v-bind="getIconByName(att.filename)" />
                     </div>
-                    <div class="att-box">
-                      <div class="att-item" v-for="att in message.attachments" :key="att.attId || att.key">
-                        <div class="att-icon" @click="showImage(att.key)">
-                          <Icon v-bind="getIconByName(att.filename)" />
-                        </div>
-                        <div class="att-name" @click="showImage(att.key)">
-                          {{ att.filename }}
-                        </div>
-                        <div class="att-size">{{ formatBytes(att.size) }}</div>
-                        <div class="opt-icon att-icon">
-                          <Icon v-if="isImage(att.filename)" icon="hugeicons:view" width="22" height="22" @click="showImage(att.key)"/>
-                          <AppIcon name="download-outline" :size="22" @click="downloadAttachment(att)" />
-                        </div>
-                      </div>
+                    <div class="att-name" @click="showImage(att.key)">
+                      {{ att.filename }}
+                    </div>
+                    <div class="att-size">{{ formatBytes(att.size) }}</div>
+                    <div class="opt-icon att-icon">
+                      <Icon v-if="isImage(att.filename)" icon="hugeicons:view" width="22" height="22" @click="showImage(att.key)"/>
+                      <AppIcon name="download-outline" :size="22" @click="downloadAttachment(att)" />
                     </div>
                   </div>
                 </div>
@@ -138,10 +163,10 @@
 </template>
 <script setup>
 import ShadowHtml from '@/components/shadow-html/index.vue'
-import {computed, reactive, ref, watch, onMounted, onUnmounted} from "vue";
+import {computed, reactive, ref, watch, nextTick, onMounted, onUnmounted} from "vue";
 import {useRouter} from 'vue-router'
 import {ElMessage, ElMessageBox} from 'element-plus'
-import {emailDelete, emailList, emailRead} from "@/request/email.js";
+import {emailDelete, emailLatest, emailList, emailRead} from "@/request/email.js";
 import {Icon} from "@iconify/vue";
 import {useEmailStore} from "@/store/email.js";
 import {useAccountStore} from "@/store/account.js";
@@ -156,8 +181,8 @@ import {useUiStore} from "@/store/ui.js";
 import {useI18n} from "vue-i18n";
 import {EmailUnreadEnum} from "@/enums/email-enum.js";
 import SenderAvatar from '@/components/sender-avatar/index.vue'
-import {buildThreadMessages} from '@/utils/mail-thread.js'
-import {quotedTextToHtml} from '@/utils/quoted-text.js'
+import {buildThreadMessages, threadSubjectKey} from '@/utils/mail-thread.js'
+import {quotedTextToHtml, wrapHtmlQuotes} from '@/utils/quoted-text.js'
 
 const uiStore = useUiStore();
 const settingStore = useSettingStore();
@@ -173,6 +198,7 @@ const email = computed(() => emailStore.contentData.email || {
 })
 const showPreview = ref(false)
 const srcList = reactive([])
+const scrollRef = ref(null)
 
 // The mobile action bar is teleported to <body> so no transformed ancestor
 // (`.main-view` keeps an identity transform from its enter animation) can turn
@@ -187,6 +213,9 @@ function handleMobileReaderChange(event) {
 let previewUrl = null
 
 const { t } = useI18n()
+
+// Label of the collapsed quoted-reply toggle (Gmail's "..." affordance).
+const quoteLabel = computed(() => `… ${t('showQuotedContent')}`)
 
 // ---------------------------------------------------------------- conversation
 // The API stores one row per message and exposes no thread endpoint, so the
@@ -204,6 +233,11 @@ const metadataMessages = reactive({})
 const renderedBodies = reactive({})
 // message id -> raw content the resolved body was produced from.
 const resolvedSources = {}
+// Fallback for a body whose async image resolution has not finished yet.
+// A plain Map (not reactive) so it can be filled while rendering.
+const wrappedFallback = new Map()
+// message id -> true while the "just arrived" animation plays.
+const arrivingIds = reactive({})
 
 function isMessageExpanded(message) {
   return !!expandedMessages[message.id]
@@ -225,22 +259,34 @@ function recipientLabelFor(message) {
   return formatAddressList(message.recipient) || '—'
 }
 
-/** One-line teaser shown while a message is collapsed. */
+function isNewMessage(message) {
+  return !!arrivingIds[message.id]
+}
+
+/**
+ * One-line teaser shown while a message is collapsed.
+ *
+ * `message.preview` is produced by utils/quoted-text.js and contains the first
+ * paragraph of the *new* text only: quoted replies, "On … wrote:" headers,
+ * forwarded history and raw markup have already been stripped. A collapsed card
+ * therefore never renders `message.content` and never shows quoted history.
+ */
 function collapsedPreview(message) {
-  const text = String(message.text || '').replace(/\s+/g, ' ').trim()
-  return text.length > 160 ? `${text.slice(0, 160)}…` : text
+  return message.preview || ''
 }
 
 // Plain-text bodies are parsed into quote-aware markup (see utils/quoted-text).
-// Cached per body so re-renders (expand/collapse, thread updates) stay cheap.
+// Cached per body + label so re-renders (expand/collapse, thread updates) stay
+// cheap while still following a language switch.
 const quotedBodyCache = new Map()
 
 function quotedBody(text) {
-  const key = String(text || '')
+  const label = quoteLabel.value
+  const key = `${label}\u0000${String(text || '')}`
   let html = quotedBodyCache.get(key)
 
   if (html === undefined) {
-    html = quotedTextToHtml(key)
+    html = quotedTextToHtml(String(text || ''), label)
     if (quotedBodyCache.size > 60) quotedBodyCache.clear()
     quotedBodyCache.set(key, html)
   }
@@ -251,16 +297,30 @@ function quotedBody(text) {
 /**
  * HTML rendered for a message.
  *
- * Falls back to the raw `content` until the async image resolution finishes, so
- * the body is never blank while (or if) resolution is pending — the reader
- * shows `email.content` exactly like it did before the thread rewrite.
+ * `renderedBodies` holds the image-resolved body with its quoted history moved
+ * behind a collapsed `<details>` (Gmail style). Until that async pass finishes
+ * the raw `content` is wrapped synchronously, so the box is never blank and
+ * quotes never flash open.
  */
 function bodyFor(message) {
-  return renderedBodies[message.id] || message.content || ''
+  const resolved = renderedBodies[message.id]
+  if (resolved) return resolved
+
+  const source = message.content || ''
+  if (!source) return ''
+
+  const label = quoteLabel.value
+  const cached = wrappedFallback.get(message.id)
+  if (cached && cached.source === source && cached.label === label) return cached.html
+
+  const html = wrapHtmlQuotes(source, label)
+  wrappedFallback.set(message.id, { source, label, html })
+  return html
 }
 
 async function resolveThreadBodies() {
   const domain = settingStore.settings.r2Domain
+  const label = quoteLabel.value
 
   for (const message of thread.value.messages) {
     const source = message.content || ''
@@ -271,16 +331,51 @@ async function resolveThreadBodies() {
     resolvedSources[message.id] = source
 
     try {
-      renderedBodies[message.id] = await resolvePrivateMailImages(source, domain)
+      const resolved = await resolvePrivateMailImages(source, domain)
+      renderedBodies[message.id] = wrapHtmlQuotes(resolved, label)
     } catch (error) {
       console.error(error)
       // Keep the raw content so the message still renders.
-      renderedBodies[message.id] = source
+      renderedBodies[message.id] = wrapHtmlQuotes(source, label)
     }
   }
 }
 
+// A language switch changes the quote-toggle label: re-wrap every body.
+watch(quoteLabel, () => {
+  for (const key of Object.keys(renderedBodies)) delete renderedBodies[key]
+  for (const key of Object.keys(resolvedSources)) delete resolvedSources[key]
+  wrappedFallback.clear()
+  quotedBodyCache.clear()
+  resolveThreadBodies()
+})
+
 let lastThreadMessageId = ''
+
+// ------------------------------------------------------- realtime thread state
+// This project deploys as a Cloudflare Worker (Hono + D1) and has no Durable
+// Object / WebSocket / SSE channel, so the reader uses a lightweight poll of the
+// existing cursor endpoint `GET /email/latest` instead. It returns full rows
+// with `emailId > cursor`; merging them into the store rebuilds `thread` and the
+// new card appears without any page refresh.
+const REALTIME_INTERVAL = 6000
+const REALTIME_MAX_INTERVAL = 60000
+const REALTIME_FIRST_DELAY = 400
+
+let pollTimer = null
+let pollDelay = REALTIME_INTERVAL
+let pollCursor = 0
+let pollInFlight = false
+let pollStopped = true
+let pollGeneration = 0
+
+// Set right before an incoming message is merged, so the thread watcher knows
+// the newest change is an arrival (and can avoid yanking the reader's scroll).
+let pendingArrivalId = ''
+
+// Dedupe sets: row id / Message-ID / timestamp signature already in the thread.
+const knownIdentities = new Set()
+const knownHeaderIds = new Set()
 
 // `content` is only ever delivered by the list's background full fetch
 // (`/email/list?full=1`). That request carries every email's full HTML and can
@@ -339,17 +434,30 @@ watch(
       const messages = thread.value.messages
       const latest = messages[messages.length - 1]
 
+      // Measured before the DOM updates: were we reading at the bottom already?
+      const atBottom = isScrolledToBottom()
+
       // Drop state for messages that are no longer part of the thread.
       for (const key of Object.keys(metadataMessages)) {
         if (!messages.some(message => message.id === key)) delete metadataMessages[key]
       }
 
-      // Gmail behaviour: when the thread changes (opening a conversation, or a
-      // reply just being sent) expand the newest message and collapse the rest.
+      // Is this change the arrival of a message we just polled in?
+      const isArrival = Boolean(pendingArrivalId) && latest?.id === pendingArrivalId
+      if (isArrival) pendingArrivalId = ''
+
+      // Gmail behaviour: opening a conversation — or sending a reply — expands
+      // the newest message and collapses the rest. A reply that lands while the
+      // reader is up in the history is inserted without stealing the position.
       if (latest && latest.id !== lastThreadMessageId) {
-        for (const key of Object.keys(expandedMessages)) delete expandedMessages[key]
-        expandedMessages[latest.id] = true
+        if (!isArrival || atBottom) {
+          for (const key of Object.keys(expandedMessages)) delete expandedMessages[key]
+          expandedMessages[latest.id] = true
+        }
         lastThreadMessageId = latest.id
+
+        // Keep the reader pinned to the bottom only when they were already there.
+        if (isArrival && atBottom) nextTick(() => scrollToBottom())
       }
 
       resolveThreadBodies()
@@ -360,6 +468,237 @@ watch(
 watch(() => accountStore.currentAccountId, () => {
   handleBack()
 })
+
+// ------------------------------------------------------------------ realtime
+function normalizeHeaderId(value) {
+  return String(value || '').trim().replace(/^<|>$/g, '')
+}
+
+/** Dedupe key: row id first, then Message-ID, then sender+timestamp+subject. */
+function incomingIdentity(raw) {
+  const id = Number(raw?.emailId ?? raw?.id) || 0
+  if (id) return `e:${id}`
+
+  const header = normalizeHeaderId(raw?.messageId)
+  if (header) return `m:${header}`
+
+  const time = String(raw?.createTime || raw?.date || '')
+  return `t:${raw?.sendEmail || ''}|${time}|${threadSubjectKey(raw?.subject)}`
+}
+
+/**
+ * True when a polled row belongs to the open conversation — either it shares
+ * the normalised subject or it links into the reply graph (Message-ID /
+ * In-Reply-To), which covers replies whose subject was edited.
+ */
+function isThreadRow(raw) {
+  const messages = thread.value.messages
+  if (!messages.length) return false
+
+  const key = threadSubjectKey(email.value?.subject)
+  if (key && threadSubjectKey(raw?.subject) === key) return true
+
+  const header = normalizeHeaderId(raw?.messageId)
+  const inReplyTo = normalizeHeaderId(raw?.inReplyTo)
+  if (!header && !inReplyTo) return false
+
+  return messages.some(message => {
+    const messageHeader = normalizeHeaderId(message.messageId)
+    const messageInReplyTo = normalizeHeaderId(message.inReplyTo)
+    if (header && messageInReplyTo && header === messageInReplyTo) return true
+    if (inReplyTo && messageHeader && inReplyTo === messageHeader) return true
+    return false
+  })
+}
+
+/** Seed the dedupe sets and the cursor from everything already in memory. */
+function primeKnownState() {
+  knownIdentities.clear()
+  knownHeaderIds.clear()
+
+  let cursor = pollCursor
+  const rows = [
+    ...thread.value.messages,
+    ...Object.values(emailStore.detailMap),
+    ...emailStore.threadMessages,
+  ]
+
+  for (const raw of rows) {
+    if (!raw) continue
+
+    knownIdentities.add(incomingIdentity(raw))
+
+    const header = normalizeHeaderId(raw?.messageId)
+    if (header) knownHeaderIds.add(header)
+
+    const id = Number(raw?.emailId ?? raw?.id) || 0
+    if (id > cursor) cursor = id
+  }
+
+  pollCursor = cursor
+}
+
+/** A reply that just landed in the open conversation is read on arrival. */
+function markIncomingRead(raw) {
+  const emailId = Number(raw?.emailId) || 0
+  if (!emailId) return
+  if (Number(raw.unread) !== EmailUnreadEnum.UNREAD) return
+
+  raw.unread = EmailUnreadEnum.READ
+  emailStore.markListRead(emailId)
+  emailRead([emailId]).catch(() => {})
+}
+
+/**
+ * Merge freshly polled rows into the thread.
+ *
+ * Duplicates are rejected on three levels — row id, `Message-ID` header and a
+ * sender+timestamp+subject signature — so neither a repeated poll nor a
+ * just-sent local reply can be inserted twice.
+ */
+function ingestIncoming(rows) {
+  if (!rows?.length) return
+
+  let newestId = 0
+
+  for (const raw of rows) {
+    if (!raw) continue
+
+    const emailId = Number(raw?.emailId) || 0
+    if (emailId > pollCursor) pollCursor = emailId
+
+    const identity = incomingIdentity(raw)
+    const header = normalizeHeaderId(raw?.messageId)
+
+    if (knownIdentities.has(identity)) continue
+    if (header && knownHeaderIds.has(header)) continue
+
+    knownIdentities.add(identity)
+    if (header) knownHeaderIds.add(header)
+
+    // Rows from other conversations are ignored: merging them would only bloat
+    // the in-memory detail cache without ever joining this thread.
+    if (!isThreadRow(raw)) continue
+
+    emailStore.mergeFullEmail(raw)
+    markIncomingRead(raw)
+
+    const messageId = String(raw.emailId ?? raw.id)
+    arrivingIds[messageId] = true
+    setTimeout(() => { delete arrivingIds[messageId] }, 2600)
+
+    if (emailId > newestId) newestId = emailId
+  }
+
+  // Announce the newest arrival to the thread watcher (auto-expand + scroll).
+  if (newestId) pendingArrivalId = String(newestId)
+}
+
+async function pollOnce() {
+  if (pollStopped || pollInFlight || document.hidden) return
+
+  const current = email.value
+  if (!current?.emailId) return
+
+  const generation = pollGeneration
+  pollInFlight = true
+
+  try {
+    const accountId = Number(current.accountId) || accountStore.currentAccountId
+    const allReceive = accountStore.currentAccount?.allReceive
+
+    const data = await emailLatest(pollCursor, accountId, allReceive)
+
+    // The view moved on (unmounted or switched account) while we were waiting.
+    if (generation !== pollGeneration || pollStopped) return
+
+    pollDelay = REALTIME_INTERVAL
+    ingestIncoming(Array.isArray(data) ? data : data?.list)
+  } catch (error) {
+    if (error?.code === 401 || error?.code === 403) {
+      stopRealtime()
+      return
+    }
+    // Back off instead of hammering the Worker on a flaky connection.
+    pollDelay = Math.min(pollDelay * 2, REALTIME_MAX_INTERVAL)
+    console.error('Nova Mail: realtime thread poll failed', error)
+  } finally {
+    pollInFlight = false
+  }
+}
+
+function schedulePoll(delay = pollDelay) {
+  if (pollStopped) return
+  if (pollTimer) clearTimeout(pollTimer)
+
+  pollTimer = setTimeout(() => {
+    pollTimer = null
+    pollOnce().finally(() => schedulePoll())
+  }, delay)
+}
+
+/** Start polling for the open conversation. */
+function startRealtime() {
+  if (!pollStopped) return
+  pollStopped = false
+  pollDelay = REALTIME_INTERVAL
+  primeKnownState()
+  schedulePoll(REALTIME_FIRST_DELAY)
+}
+
+/** Stop polling — called on unmount and on auth failure. */
+function stopRealtime() {
+  pollStopped = true
+  pollGeneration++
+  if (pollTimer) {
+    clearTimeout(pollTimer)
+    pollTimer = null
+  }
+}
+
+function handleVisibilityChange() {
+  if (pollStopped) return
+
+  if (document.hidden) {
+    // No point polling a background tab; resume on return.
+    if (pollTimer) {
+      clearTimeout(pollTimer)
+      pollTimer = null
+    }
+    return
+  }
+
+  pollOnce().finally(() => schedulePoll(REALTIME_INTERVAL))
+}
+
+// Switching conversation inside the reader: reset per-thread arrival state but
+// keep the global cursor so older mail is never re-fetched.
+watch(() => Number(email.value?.emailId) || 0, (id, previous) => {
+  if (!id || id === previous) return
+
+  pendingArrivalId = ''
+  for (const key of Object.keys(arrivingIds)) delete arrivingIds[key]
+
+  primeKnownState()
+  if (!pollStopped) schedulePoll(REALTIME_FIRST_DELAY)
+})
+
+function isScrolledToBottom() {
+  const wrap = scrollRef.value?.wrapRef
+  if (!wrap) return true
+  return wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight < 96
+}
+
+function scrollToBottom() {
+  const wrap = scrollRef.value?.wrapRef
+  if (!wrap) return
+
+  if (typeof scrollRef.value?.setScrollTop === 'function') {
+    scrollRef.value.setScrollTop(wrap.scrollHeight, 280)
+  } else {
+    wrap.scrollTop = wrap.scrollHeight
+  }
+}
 
 let readRequesting = false
 
@@ -398,6 +737,8 @@ watch(
 
 onMounted(() => {
   tryMarkRead()
+  startRealtime()
+  document.addEventListener('visibilitychange', handleVisibilityChange)
   window.addEventListener('keydown', handleKeyDown);
   if (mobileReaderQuery.addEventListener) {
     mobileReaderQuery.addEventListener('change', handleMobileReaderChange)
@@ -408,6 +749,8 @@ onMounted(() => {
 
 onUnmounted(() => {
   closePreview()
+  stopRealtime()
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
   emailStore.contentData.showUnread = false;
   readRequesting = false
   window.removeEventListener('keydown', handleKeyDown);
@@ -817,17 +1160,87 @@ const handleDelete = () => {
   img { width: 100%; height: 100%; object-fit: cover; }
 }
 
-.sender-details { min-width: 0; flex: 1; text-align: left; }
-.sender-line { display: flex; align-items: baseline; flex-wrap: wrap; gap: 5px; min-width: 0; line-height: 1.35; }
-.sender-line strong { color: var(--el-text-color-primary); font-size: 15px; font-weight: 680; }
-.sender-line span { color: var(--regular-text-color); font-size: 13px; overflow-wrap: anywhere; }
-.recipient-toggle { display: inline-flex; align-items: center; gap: 5px; margin-top: 4px; padding: 0; color: var(--regular-text-color); font-size: 12px; cursor: pointer; text-align: left; }
+/* Sender block. The avatar must never be compressed and the sender name +
+   email must stay on ONE line, ellipsising instead of wrapping the address
+   character by character on a narrow phone. */
+.sender-details {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-align: left;
+}
+
+.sender-line {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: nowrap;
+  gap: 5px;
+  min-width: 0;
+  line-height: 1.35;
+}
+
+.sender-line .sender-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--el-text-color-primary);
+  font-size: 15px;
+  font-weight: 680;
+}
+
+.sender-line .sender-email {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--regular-text-color);
+  font-size: 13px;
+}
+
+.recipient-toggle { display: inline-flex; align-items: center; gap: 5px; margin-top: 4px; padding: 0; color: var(--regular-text-color); font-size: 12px; cursor: pointer; text-align: left; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .recipient-toggle:hover { color: var(--el-color-primary); }
-.message-date { flex: 0 0 auto; padding-top: 2px; color: var(--regular-text-color); font-size: 12px; white-space: nowrap; }
-.message-details { display: grid; gap: 4px; margin-top: 9px; padding: 9px 11px; border: 1px solid var(--nova-divider); border-radius: 8px; color: var(--regular-text-color); font-size: 12px; }
-.message-details div { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 8px; }
-.message-details b { color: var(--el-text-color-primary); font-weight: 600; }
-.message-details span { overflow-wrap: anywhere; }
+.message-date { flex: 0 0 auto; margin-left: auto; padding-top: 2px; color: var(--regular-text-color); font-size: 12px; white-space: nowrap; }
+
+/* Expanded header metadata: fixed label column, adaptive value column.
+   `overflow-wrap: anywhere` lets a long address break inside itself instead of
+   collapsing to one character per line; `min-width: 0` on every level keeps the
+   value column from being pushed out by the label. */
+.message-details {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  margin-top: 9px;
+  padding: 9px 11px;
+  border: 1px solid var(--nova-divider);
+  border-radius: 8px;
+  color: var(--regular-text-color);
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+.message-details .detail-row {
+  display: grid;
+  grid-template-columns: 56px minmax(120px, 1fr);
+  gap: 8px;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.message-details .detail-label {
+  color: var(--el-text-color-primary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.message-details .detail-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 
 /* Conversation thread (Gmail-style message cards) -------------------------- */
 .thread {
@@ -867,6 +1280,14 @@ const handleDelete = () => {
   padding: 14px 16px;
   cursor: pointer;
   user-select: none;
+  min-width: 0;
+}
+
+/* The avatar is a fixed-size flex item: it must never be squeezed by a long
+   address next to it. */
+.message-head .message-avatar {
+  flex: 0 0 auto;
+  align-self: flex-start;
 }
 
 .thread-message:not(.is-expanded) .message-head:hover {
@@ -875,7 +1296,8 @@ const handleDelete = () => {
 
 .message-head .sender-details {
   min-width: 0;
-  flex: 1;
+  flex: 1 1 auto;
+  overflow: hidden;
 }
 
 .message-star {
@@ -920,29 +1342,51 @@ const handleDelete = () => {
   white-space: nowrap;
 }
 
-/* Expand/collapse.
-   Plain CSS `grid-template-rows: 0fr -> 1fr` instead of ElCollapseTransition:
-   that component clamps the body with an inline `max-height: 0` measured from
-   `scrollHeight`, which is 0 while collapsed (`.el-scrollbar` is height:100%),
-   so it never animated and never cleared the clamp — leaving the body blank.
-   The body is always laid out here, just clipped, so it can never get stuck. */
-.message-collapse {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows var(--nova-motion-base) var(--nova-motion-ease);
-}
-
-.message-collapse.is-open {
-  grid-template-rows: 1fr;
-}
-
-.message-collapse-inner {
-  overflow: hidden;
-  min-height: 0;
-}
-
+/* Collapsed cards render NO body markup at all (`v-if`), so there is nothing to
+   clip or animate shut; only the opening gets a short entrance. This is what
+   keeps quoted replies and raw HTML out of the collapsed DOM. */
 .message-body {
   padding: 0 16px 18px;
+  animation: nova-message-open var(--nova-motion-base) var(--nova-motion-ease) both;
+}
+
+@keyframes nova-message-open {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* A message that arrived through realtime polling fades in with a soft ring,
+   then settles into the normal card. */
+.thread-message.is-new {
+  animation: nova-message-arrive 2.4s var(--nova-motion-ease) both;
+}
+
+@keyframes nova-message-arrive {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--el-color-primary) 45%, transparent);
+    background: color-mix(in srgb, var(--el-color-primary) 10%, var(--el-bg-color));
+  }
+  18% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  70% {
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--el-color-primary) 22%, transparent);
+    background: color-mix(in srgb, var(--el-color-primary) 5%, var(--el-bg-color));
+  }
+  100% {
+    box-shadow: none;
+    background: var(--el-bg-color);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .message-body,
+  .thread-message.is-new {
+    animation: none;
+  }
 }
 
 /* Body failed / not returned: explain + retry instead of a blank area. */
@@ -1026,6 +1470,43 @@ const handleDelete = () => {
   color: var(--regular-text-color);
 }
 
+/* Quoted history collapsed by default: "... 显示引用内容", click to expand. */
+.email-text :deep(.quote-toggle) {
+  margin-top: 10px;
+}
+
+.email-text :deep(.quote-toggle-summary) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+  color: var(--regular-text-color);
+  font-size: 13px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.email-text :deep(.quote-toggle-summary)::-webkit-details-marker {
+  display: none;
+}
+
+.email-text :deep(.quote-toggle-summary)::marker {
+  content: '';
+}
+
+.email-text :deep(.quote-toggle-summary:hover) {
+  color: var(--el-color-primary);
+}
+
+.email-text :deep(.quote-toggle[open] > .quote-toggle-summary) {
+  margin-bottom: 6px;
+}
+
+.email-text :deep(.quote-content) {
+  display: block;
+}
+
 @media (max-width: 767px) {
   .email-text :deep(.quote-block) {
     margin-left: 4px;
@@ -1043,9 +1524,15 @@ const handleDelete = () => {
   .scrollbar { height: calc(100% - 112px); }
   .message-meta { gap: 10px; margin-bottom: 20px; }
   .sender-avatar { width: 36px; height: 36px; flex-basis: 36px; font-size: 14px; }
-  .sender-line strong { font-size: 14px; }
-  .sender-line span { font-size: 12px; }
+  .sender-line .sender-name { font-size: 14px; }
+  .sender-line .sender-email { font-size: 12px; }
   .message-date { font-size: 11px; }
+
+  /* Metadata stays a two-column table: the label keeps its width and the value
+     gets whatever is left, so a long address wraps across lines — never one
+     character per line. */
+  .message-details { padding: 8px 9px; }
+  .message-details .detail-row { grid-template-columns: 48px minmax(0, 1fr); gap: 6px; }
 
   /* Conversation cards tighten up on phones. */
   .thread { gap: 10px; }

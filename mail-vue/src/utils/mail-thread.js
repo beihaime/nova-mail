@@ -10,6 +10,8 @@
  * `toThreadMessage`), so `email.content`, `email.attList` etc. keep working.
  */
 
+import { buildMessagePreview } from './quoted-text.js'
+
 // "Re:", "RE :", "Re[2]:", "Fwd:", "Fw:", "回复：", "答复:", "转发：", "转寄:"
 const SUBJECT_PREFIX = /^\s*(?:(?:re|fwd?|fw|aw|sv|回复|答复|转发|转寄)\s*(?:\[\d+])?\s*[:：]\s*)+/i
 
@@ -43,6 +45,28 @@ function headerId(value) {
 }
 
 /**
+ * Identity used to dedupe thread messages.
+ *
+ * Prefers the row id (brief and full rows of the same email share it), then the
+ * RFC 5322 `Message-ID` header (the same message delivered twice under two row
+ * ids), then the local id, and finally a sender + timestamp + subject
+ * signature. Two rows sharing an identity are one message.
+ */
+export function threadMessageKey(raw) {
+    const id = messageId(raw)
+    if (id) return `e:${id}`
+
+    const header = headerId(raw?.messageId)
+    if (header) return `m:${header}`
+
+    const local = String(raw?.localId || '')
+    if (local) return `l:${local}`
+
+    const time = String(raw?.createTime || raw?.date || '')
+    return `t:${raw?.sendEmail || ''}|${time}|${threadSubjectKey(raw?.subject)}`
+}
+
+/**
  * Map a raw email row onto a thread message.
  *
  * Every original field is kept (`...raw`) so downstream code that expects
@@ -70,6 +94,10 @@ export function toThreadMessage(raw) {
         // Brief list rows drop `text` and expose `listText` instead, so fall
         // back to it: without this a not-yet-loaded message renders nothing.
         text: raw?.text || raw?.listText || '',
+        // Collapsed-card summary: the first paragraph of the *new* text only.
+        // Quoted history, "On … wrote:" headers, forwarded blocks and raw
+        // markup are stripped here, so they can never reach a collapsed card.
+        preview: buildMessagePreview(raw),
         attachments: raw?.attList || raw?.attachments || [],
         status: raw?.status,
         message: raw?.message,
@@ -122,26 +150,44 @@ function isCandidate(primary, raw) {
 export function buildThreadMessages(primary, pool = [], extra = []) {
     const key = threadSubjectKey(primary?.subject)
     const collected = new Map()
+    // Message-ID header -> identity of the message already holding it. Guards
+    // against the same reply arriving twice under two different row ids.
+    const headerOwners = new Map()
 
     const others = Array.isArray(pool) ? pool : []
 
     const push = (raw) => {
-        const id = messageKey(raw)
-        if (!id) return false
+        const identity = threadMessageKey(raw)
+        if (!identity) return false
 
-        const existing = collected.get(id)
+        const header = headerId(raw?.messageId)
+
+        if (header && headerOwners.has(header)) {
+            // Same message, another row id: upgrade to the richer row if the
+            // stored one has no body yet.
+            const ownerKey = headerOwners.get(header)
+            const owner = collected.get(ownerKey)
+            if (owner && !owner.content && raw?.content) {
+                collected.set(ownerKey, raw)
+            }
+            return false
+        }
+
+        const existing = collected.get(identity)
 
         if (existing) {
             // The list first delivers brief rows (no `content`), the full rows
             // arrive later with the same id. Keep the richer row so the body and
             // attachments are never dropped, no matter which one is seen first.
             if (!existing.content && raw?.content) {
-                collected.set(id, raw)
+                collected.set(identity, raw)
             }
+            if (header) headerOwners.set(header, identity)
             return false
         }
 
-        collected.set(id, raw)
+        collected.set(identity, raw)
+        if (header) headerOwners.set(header, identity)
         return true
     }
 
@@ -175,7 +221,7 @@ export function buildThreadMessages(primary, pool = [], extra = []) {
 
         for (const raw of [...others, ...extra]) {
             if (!isCandidate(primary, raw)) continue
-            if (collected.has(messageKey(raw))) continue
+            if (collected.has(threadMessageKey(raw))) continue
 
             const id = headerId(raw.messageId)
             const inReplyTo = headerId(raw.inReplyTo)
@@ -184,8 +230,9 @@ export function buildThreadMessages(primary, pool = [], extra = []) {
             const repliedTo = inReplyTo && knownMessageIds.has(inReplyTo)
 
             if (linksBack || repliedTo) {
-                push(raw)
-                grew = true
+                // Only a real insertion counts as growth: a duplicate arriving
+                // under another row id must not keep the loop spinning.
+                if (push(raw)) grew = true
             }
         }
     }

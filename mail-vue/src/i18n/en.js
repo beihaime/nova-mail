@@ -294,6 +294,7 @@ const en = {
     reqFailErrorMsg: 'Request failed. Try again later',
     bodyLoadFailMsg: 'Message body could not be loaded',
     retry: 'Retry',
+    showQuotedContent: 'Show quoted content',
     message: 'Mail',
     language: 'Language',
     totalUserAccount: '{msg}',
