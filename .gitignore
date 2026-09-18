@@ -29,3 +29,5 @@ git-tools.js
 
 # Local Cloudflare Worker secrets
 mail-worker/.dev.vars
+*.backup
+*.bak-*
