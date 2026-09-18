@@ -1,5 +1,5 @@
 <template>
-  <div id="login-box" :class="{ 'has-custom-background': background }" :style="background" v-loading="oauthLoading" element-loading-text="登录中...">
+  <div id="login-box" :class="{ 'has-custom-background': !!settingStore.settings.background }" :style="background" v-loading="oauthLoading" element-loading-text="登录中...">
     <div class="login-scene" aria-hidden="true">
       <div class="login-sky-glow"></div>
     </div>
@@ -10,6 +10,21 @@
         <span>{{ $t('loginTagline') }}</span>
       </div>
     </header>
+
+    <button
+      class="login-theme-toggle"
+      type="button"
+      :aria-label="uiStore.dark ? 'Switch to light mode' : 'Switch to dark mode'"
+      :title="uiStore.dark ? 'Light mode' : 'Dark mode'"
+      @click="toggleLoginTheme"
+    >
+      <Icon
+        :icon="uiStore.dark ? 'solar:sun-2-linear' : 'solar:moon-linear'"
+        width="21"
+        height="21"
+      />
+    </button>
+
     <div class="login-quiet-tagline">{{ $t('quietTagline') }}</div>
     <div class="form-wrapper">
       <div class="container">
@@ -183,6 +198,10 @@ const oauthLoading = ref(false);
 const showBindForm = ref(false);
 const show = ref('login')
 
+function toggleLoginTheme() {
+  uiStore.setThemeMode(uiStore.dark ? 'light' : 'dark')
+}
+
 const oauthKeys = ['linuxdo', 'google']
 
 const oauthProvider = computed(() => {
@@ -265,13 +284,25 @@ const loginOpacity = computed(() => {
 const hideLoginDomain = computed(() => settingStore.settings.loginDomain === 1)
 
 const background = computed(() => {
+  if (settingStore.settings.background) {
+    return {
+      'background-image': `url(${cvtR2Url(settingStore.settings.background)})`,
+      'background-repeat': 'no-repeat',
+      'background-size': 'cover',
+      'background-position': 'center'
+    }
+  }
 
-  return settingStore.settings.background ? {
-    'background-image': `url(${cvtR2Url(settingStore.settings.background)})`,
-    'background-repeat': 'no-repeat',
-    'background-size': 'cover',
-    'background-position': 'center'
-  } : ''
+  if (uiStore.dark) {
+    return {
+      'background-image': "url('/image/login-dark.png')",
+      'background-repeat': 'no-repeat',
+      'background-size': 'cover',
+      'background-position': 'center center'
+    }
+  }
+
+  return ''
 })
 
 const openSelect = () => {
@@ -1066,6 +1097,94 @@ function submitRegister() {
   width: 180px;
   right: 50px;
   top: -90px;
+}
+
+
+/* Login theme toggle */
+.login-theme-toggle {
+  position: fixed;
+  z-index: 30;
+  top: max(24px, env(safe-area-inset-top));
+  right: 28px;
+
+  width: 42px;
+  height: 42px;
+
+  display: grid;
+  place-items: center;
+
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, .30);
+  border-radius: 50%;
+
+  color: #1c1c1e;
+  background: rgba(255, 255, 255, .72);
+
+  backdrop-filter: blur(16px) saturate(1.1);
+  box-shadow: 0 6px 20px rgba(15, 23, 42, .12);
+
+  cursor: pointer;
+
+  transition:
+    background-color .18s ease,
+    border-color .18s ease,
+    color .18s ease,
+    transform .18s ease;
+}
+
+.login-theme-toggle:hover {
+  transform: translateY(-1px);
+}
+
+.login-theme-toggle:active {
+  transform: scale(.96);
+}
+
+:global(html.dark) .login-theme-toggle {
+  color: #f2f2f7;
+  background: rgba(28, 28, 30, .66);
+  border-color: rgba(255, 255, 255, .12);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .24);
+}
+
+@media (max-width: 767px) {
+  .login-theme-toggle {
+    top: calc(16px + env(safe-area-inset-top, 0px));
+    right: 16px;
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/* Dark login scene tuning */
+:global(html.dark) #login-box:not(.has-custom-background) {
+  background-color: #081426;
+}
+
+:global(html.dark) #login-box:not(.has-custom-background) .login-scene {
+  background:
+    linear-gradient(
+      rgba(4, 12, 28, .10),
+      rgba(4, 12, 28, .20)
+    );
+}
+
+:global(html.dark) #login-box:not(.has-custom-background) .login-sky-glow,
+:global(html.dark) #login-box:not(.has-custom-background) .login-mountain {
+  opacity: 0;
+}
+
+:global(html.dark) .container {
+  background: rgba(16, 23, 35, .76);
+  border-color: rgba(255, 255, 255, .10);
+  box-shadow: 0 20px 55px rgba(0, 0, 0, .24);
+  backdrop-filter: blur(20px) saturate(1.08);
+}
+
+:global(html.dark) .login-brand,
+:global(html.dark) .login-quiet-tagline,
+:global(html.dark) .login-copyright {
+  color: rgba(242, 242, 247, .94);
 }
 
 </style>

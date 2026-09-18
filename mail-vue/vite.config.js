@@ -32,8 +32,7 @@ export default defineConfig(({mode}) => {
                     scope: '/',
                     display: 'standalone',
                     background_color: '#FFFFFF',
-                    theme_color: '#141414',
-                    icons: [
+                      icons: [
                         {
                             src: '/icons/nova-mail-192.png',
                             sizes: '192x192',
