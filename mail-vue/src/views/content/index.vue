@@ -38,11 +38,17 @@
                 'is-new': isNewMessage(message)
               }"
           >
-            <header class="message-head" @click="toggleMessage(message)">
+            <header
+                class="message-head"
+                :class="{ 'is-details-open': isMetadataOpen(message) }"
+                @click="toggleMessage(message)"
+            >
               <SenderAvatar class="message-avatar" :email="message" :size="40" />
               <div class="sender-details">
                 <!-- Collapsed cards show sender name + email on ONE line; the
-                     email ellipsises instead of wrapping character by character. -->
+                     email ellipsises instead of wrapping character by character.
+                     On phones the same markup is re-flowed into three grid rows
+                     (see the 767px block): name | time | star, then email. -->
                 <div class="sender-line">
                   <strong class="sender-name">{{ message.from.name || message.from.email || '—' }}</strong>
                   <span v-if="message.from.email" class="sender-email">&lt;{{ message.from.email }}&gt;</span>
@@ -57,24 +63,24 @@
                   <div v-if="isMetadataOpen(message)" class="message-details" @click.stop>
                     <div class="detail-row">
                       <span class="detail-label">{{ $t('from') }}</span>
-                      <span class="detail-value">{{ message.from.name || '—' }} &lt;{{ message.from.email || '—' }}&gt;</span>
+                      <span class="detail-value"><span class="detail-name">{{ message.from.name || '—' }}</span> <span class="detail-email">&lt;{{ message.from.email || '—' }}&gt;</span></span>
                     </div>
                     <div class="detail-row">
                       <span class="detail-label">{{ $t('recipient') }}</span>
-                      <span class="detail-value">{{ recipientLabelFor(message) }}</span>
+                      <span class="detail-value"><span v-for="(address, index) in recipientPartsFor(message)" :key="index" class="detail-address">{{ address }}</span></span>
                     </div>
                     <div v-if="formatAddressList(message.cc)" class="detail-row">
                       <span class="detail-label">Cc</span>
-                      <span class="detail-value">{{ formatAddressList(message.cc) }}</span>
+                      <span class="detail-value"><span v-for="(address, index) in parseAddressList(message.cc)" :key="index" class="detail-address">{{ address }}</span></span>
                     </div>
                     <div v-if="formatAddressList(message.bcc)" class="detail-row">
                       <span class="detail-label">Bcc</span>
-                      <span class="detail-value">{{ formatAddressList(message.bcc) }}</span>
+                      <span class="detail-value"><span v-for="(address, index) in parseAddressList(message.bcc)" :key="index" class="detail-address">{{ address }}</span></span>
                     </div>
                   </div>
                 </template>
               </div>
-              <time class="message-date">{{ formatDetailDate(message.date) }}</time>
+              <time class="message-date">{{ messageTimeFor(message) }}</time>
               <button
                   v-if="message.emailId && !message.isMine"
                   class="message-star"
@@ -170,7 +176,7 @@ import {emailDelete, emailLatest, emailList, emailRead} from "@/request/email.js
 import {Icon} from "@iconify/vue";
 import {useEmailStore} from "@/store/email.js";
 import {useAccountStore} from "@/store/account.js";
-import {formatDetailDate} from "@/utils/day.js";
+import {formatCompactDate, formatDetailDate} from "@/utils/day.js";
 import {starAdd, starCancel} from "@/request/star.js";
 import {getExtName, formatBytes} from "@/utils/file-utils.js";
 import {fetchPrivateAttachment, resolvePrivateMailImages} from '@/utils/private-attachments.js'
@@ -831,17 +837,44 @@ function formateReceive(recipient) {
   return formatAddressList(recipient)
 }
 
-function formatAddressList(value) {
-  if (!value) return ''
+/**
+ * Parse a recipient/cc/bcc field into display strings.
+ *
+ * Presentation-only helper around the same parsing `formatAddressList` always
+ * did; the metadata rows need the individual addresses so each one can stay on
+ * a single line (nowrap + ellipsis) instead of breaking apart.
+ */
+function parseAddressList(value) {
+  if (!value) return []
   let addresses = value
   if (typeof value === 'string') {
-    try { addresses = JSON.parse(value) } catch { return value }
+    try { addresses = JSON.parse(value) } catch { return [value] }
   }
-  if (!Array.isArray(addresses)) return String(addresses)
+  if (!Array.isArray(addresses)) return [String(addresses)]
   return addresses.map(item => {
     if (typeof item === 'string') return item
     return item.name ? `${item.name} <${item.address}>` : item.address
-  }).filter(Boolean).join(', ')
+  }).filter(Boolean)
+}
+
+function formatAddressList(value) {
+  return parseAddressList(value).join(', ')
+}
+
+/** Address parts for the metadata "To" row, keeping the `—` empty fallback. */
+function recipientPartsFor(message) {
+  const parts = parseAddressList(message?.recipient)
+  return parts.length ? parts : ['—']
+}
+
+/**
+ * Header timestamp. Phones get the compact clock/date ("7:37 AM" / "Sep 19");
+ * desktop keeps the full `formatDetailDate` string untouched.
+ */
+function messageTimeFor(message) {
+  return isMobileReader.value
+      ? formatCompactDate(message.date)
+      : formatDetailDate(message.date)
 }
 
 function setMessageStarState(message, value) {
@@ -1242,6 +1275,13 @@ const handleDelete = () => {
   word-break: break-word;
 }
 
+/* Address lists are rendered one <span> per recipient so each address can be
+   kept on a single line on phones. The separator reproduces the exact
+   `a, b` text the joined string used to render. */
+.message-details .detail-address:not(:last-child)::after {
+  content: ', ';
+}
+
 /* Conversation thread (Gmail-style message cards) -------------------------- */
 .thread {
   max-width: 1100px;
@@ -1524,22 +1564,148 @@ const handleDelete = () => {
   .scrollbar { height: calc(100% - 112px); }
   .message-meta { gap: 10px; margin-bottom: 20px; }
   .sender-avatar { width: 36px; height: 36px; flex-basis: 36px; font-size: 14px; }
-  .sender-line .sender-name { font-size: 14px; }
-  .sender-line .sender-email { font-size: 12px; }
-  .message-date { font-size: 11px; }
 
-  /* Metadata stays a two-column table: the label keeps its width and the value
-     gets whatever is left, so a long address wraps across lines — never one
-     character per line. */
-  .message-details { padding: 8px 9px; }
-  .message-details .detail-row { grid-template-columns: 48px minmax(0, 1fr); gap: 6px; }
+  /* ---- Message header: Gmail-style rows ----------------------------------
+     Row 1: avatar | sender name | compact time | star
+     Row 2:          | sender address
+     Row 3:          | "To …" line (or the metadata box when it is open)
+
+     The address no longer competes with the name for the first row, so the
+     name gets every pixel the time and star do not need.
+
+     `display: contents` drops the desktop wrappers (`.sender-details`,
+     `.sender-line`) out of the box tree so their children become grid items.
+     It is scoped to this media query: desktop keeps its flex layout. */
+  .message-head {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    column-gap: 10px;
+    row-gap: 2px;
+    align-items: center;
+    padding: 12px;
+  }
+
+  .message-head .message-avatar {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    align-self: start;
+    justify-self: start;
+  }
+
+  .message-head .sender-details,
+  .message-head .sender-line {
+    display: contents;
+  }
+
+  .message-head .sender-name {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: 14px;
+  }
+
+  .message-head .message-date {
+    grid-column: 3;
+    grid-row: 1;
+    margin-left: 0;
+    padding-top: 0;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .message-head .message-star {
+    grid-column: 4;
+    grid-row: 1;
+    margin-left: 0;
+  }
+
+  .message-head .sender-email {
+    grid-column: 2 / 5;
+    grid-row: 2;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: 12px;
+  }
+
+  .message-head .recipient-toggle {
+    grid-column: 2 / 5;
+    grid-row: 3;
+    margin-top: 4px;
+    max-width: 100%;
+  }
+
+  .message-head .message-details {
+    grid-column: 2 / 5;
+    grid-row: 3;
+    margin-top: 8px;
+  }
+
+  /* Once the details box is open it owns From/To, so the header's duplicate
+     "To …" line is hidden. Class-only: the rule lives in this media query, so
+     desktop markup/behaviour is untouched. */
+  .message-head.is-details-open .recipient-toggle {
+    display: none;
+  }
+
+  /* ---- Metadata box: fixed label column, adaptive value column ----------
+     `normal` wrapping keeps addresses intact; each address is nowrap with an
+     ellipsis, so nothing is ever split one or two characters per line. */
+  .message-details {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding: 8px 9px;
+  }
+
+  .message-details .detail-row {
+    grid-template-columns: 54px minmax(0, 1fr);
+    gap: 10px;
+    align-items: start;
+  }
+
+  .message-details .detail-label {
+    white-space: nowrap;
+  }
+
+  .message-details .detail-value {
+    min-width: 0;
+    word-break: normal;
+    overflow-wrap: normal;
+  }
+
+  .message-details .detail-name,
+  .message-details .detail-email,
+  .message-details .detail-address {
+    display: inline-block;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* ---- Body spacing: never glued to the header --------------------------
+     The expanded header drops its bottom padding so `margin-top: 16px` is the
+     real gap between the To line / metadata box and the body. */
+  .thread-message.is-expanded .message-head {
+    padding-bottom: 0;
+  }
+
+  .message-body {
+    margin-top: 16px;
+    padding: 0 12px 16px;
+  }
 
   /* Conversation cards tighten up on phones. */
   .thread { gap: 10px; }
   .thread-message { border-radius: 12px; }
-  .message-head { gap: 10px; padding: 12px; }
   .message-preview { padding: 0 12px 12px; }
-  .message-body { padding: 0 12px 16px; }
 
   /* Reserve room so the fixed action bar never covers the last lines. */
   .container { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
