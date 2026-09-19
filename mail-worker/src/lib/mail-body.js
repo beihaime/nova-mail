@@ -40,22 +40,45 @@ export function isMarkdownPart(part) {
  * in `text` — and storing that as plain text makes the reader escape it, which is
  * how a message body shows up as visible `<html><body>…` source.
  *
- * The check is deliberately conservative: a whole document (`<!doctype html>`,
- * `<html …`) is always markup, and otherwise at least three real tags are needed,
- * so prose that merely mentions a tag is still treated as prose.
+ * A bare tag count is not enough: a short but perfectly real HTML mail such as
+ * `<p>Hello</p>`, `<div>Only one div</div>` or `Line one<br>Line two` carries only
+ * one or two tags, so it used to fall through as plain text. The check now also
+ * accepts a body that *opens* with a tag and a body containing any structural or
+ * void tag (`<br>`, `<img>`, `<table>` …). Prose that merely mentions an inline
+ * tag still needs several tags before it is treated as markup.
  *
  * @param {string} text
  * @returns {boolean}
  */
+const TAG_RE = /<\/?([a-z][a-z0-9-]*)\b[^>]*>/gi;
+const OPENING_TAG_RE = /^\s*<\/?[a-z][a-z0-9-]*(?:\s[^>]*)?\/?>/i;
+// Tags that essentially never show up in prose: void/structural markup.
+const STRUCTURAL_TAGS = new Set([
+	'br', 'hr', 'img', 'picture', 'source', 'video', 'audio',
+	'table', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th', 'caption', 'colgroup', 'col',
+	'ul', 'ol', 'li', 'dl', 'dt', 'dd',
+	'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+	'blockquote', 'pre', 'center', 'font', 'head', 'body', 'html', 'meta', 'link', 'style', 'script',
+]);
+
 export function looksLikeHtmlDocument(text) {
-	const value = String(text || '');
-	if (!value.trim()) return false;
+	const value = String(text || '').trim();
+	if (!value) return false;
 
-	if (/^\s*(?:<!doctype\s+html|<html[\s>])/i.test(value)) return true;
+	if (/^<!doctype\s+html/i.test(value)) return true;
 
-	const tags = value.match(/<\/?(?:html|head|body|div|p|span|table|tbody|thead|tr|td|th|h[1-6]|ul|ol|li|br|img|a|strong|em|b|i|u|blockquote|font)\b[^>]*>/gi);
+	const tags = [...value.matchAll(TAG_RE)];
+	if (!tags.length) return false;
 
-	return Boolean(tags && tags.length >= 3);
+	// A body that opens with a tag is markup, not prose.
+	if (OPENING_TAG_RE.test(value)) return true;
+
+	// One structural tag is enough: <br>, <img>, <table> … are not prose.
+	if (tags.some(match => STRUCTURAL_TAGS.has(match[1].toLowerCase()))) return true;
+
+	// Otherwise several inline tags are needed, so prose merely mentioning one
+	// ("See <a href=\"x\">this</a> link.") is still treated as prose.
+	return tags.length >= 3;
 }
 
 /**

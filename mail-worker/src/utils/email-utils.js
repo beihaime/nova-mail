@@ -70,10 +70,18 @@ const emailUtils = {
 	 */
 	toPreviewText(text, html) {
 		const plain = this.formatText(text);
-		const source = plain && !looksLikeHtmlDocument(plain)
+		let source = plain && !looksLikeHtmlDocument(plain)
 			? plain
 			: this.htmlToText(html || text);
-		return source.replace(/\s+/g, ' ').trim();
+		source = source.replace(/\s+/g, ' ').trim();
+
+		// Last guard: a row preview is plain text, so tag-like fragments must never
+		// reach the list even when the stored body was classified as plain (short
+		// HTML bodies, prose that quotes a tag). The parser strips them safely.
+		if (/<[a-z!/][^>]*>/i.test(source)) {
+			source = this.htmlToText(source).replace(/\s+/g, ' ').trim();
+		}
+		return source;
 	},
 
 	/**

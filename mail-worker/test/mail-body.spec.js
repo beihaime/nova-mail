@@ -184,6 +184,17 @@ describe('markup that arrives in the text part', () => {
 		}
 	});
 
+	it('treats a short HTML body (only one or two tags) as markup', () => {
+		for (const fragment of [
+			'<p>Hello world</p>',
+			'<div>Only one div</div>',
+			'Line one<br>Line two',
+			'<img src="https://example.com/a.png" alt="logo">',
+		]) {
+			expect(resolveMailBody({ text: fragment }).bodyType, fragment).toBe(MAIL_BODY.HTML);
+		}
+	});
+
 	it('prefers a real HTML part over markup in the text part', () => {
 		const body = resolveMailBody({ html: '<p>real</p>', text: DOC });
 

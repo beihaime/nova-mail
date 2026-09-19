@@ -55,9 +55,12 @@ describe('emailUtils.toPreviewText', () => {
 			.toBe('From the html part');
 	});
 
-	it('does not treat prose that mentions a tag as markup', () => {
+	it('never lets a tag reach the preview, even from a plain-classified body', () => {
+		// The stored body may be plain, but a row preview must still be text only.
 		expect(emailUtils.toPreviewText('Use a <div> for blocks', null))
-			.toBe('Use a <div> for blocks');
+			.toBe('Use a for blocks');
+		expect(emailUtils.toPreviewText('Hello <div>World</div>', null))
+			.toBe('Hello World');
 	});
 
 	it('stays compact (single line, no source) for a long html body', () => {
