@@ -25,6 +25,27 @@ export async function fetchPrivateAttachment(key, imageOnly = true) {
   return response.blob()
 }
 
+/**
+ * Read one attachment by its row id (`att.attId`).
+ *
+ * Unlike the key-addressed reader above, this keeps the server's real content
+ * type — images *and* PDFs come back inline — so the caller can hand the blob to
+ * `URL.createObjectURL()` and render it in an `<img>` or a PDF `<iframe>`.
+ */
+export async function fetchAttachmentBlob(attId) {
+  const id = Number(attId) || 0
+  if (!id) throw new Error('Invalid attachment id')
+
+  const response = await fetch(`${import.meta.env.VITE_BASE_URL}/attachments/${id}`, {
+    headers: { Authorization: localStorage.getItem('token') || '' },
+    cache: 'no-store'
+  })
+
+  if (!response.ok) throw new Error('Attachment unavailable')
+
+  return response.blob()
+}
+
 export async function resolvePrivateMailImages(html, storageDomain) {
   // Only inspect img src attributes as text. Parsing untrusted mail into a DOM
   // before sanitization could itself initiate remote image requests.

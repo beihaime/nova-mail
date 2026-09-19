@@ -144,15 +144,15 @@
                 </div>
                 <div class="att-box">
                   <div class="att-item" v-for="att in message.attachments" :key="att.attId || att.key">
-                    <div class="att-icon" @click="showImage(att.key)">
+                    <div class="att-icon" @click="previewAttachment(att)">
                       <Icon v-bind="getIconByName(att.filename)" />
                     </div>
-                    <div class="att-name" @click="showImage(att.key)">
+                    <div class="att-name" @click="previewAttachment(att)">
                       {{ att.filename }}
                     </div>
                     <div class="att-size">{{ formatBytes(att.size) }}</div>
                     <div class="opt-icon att-icon">
-                      <Icon v-if="isImage(att.filename)" icon="hugeicons:view" width="22" height="22" @click="showImage(att.key)"/>
+                      <Icon v-if="canPreviewAttachment(att)" icon="hugeicons:view" width="22" height="22" @click="previewAttachment(att)"/>
                       <AppIcon name="download-outline" :size="22" @click="downloadAttachment(att)" />
                     </div>
                   </div>
@@ -175,6 +175,28 @@
         show-progress
         @close="closePreview"
     />
+    <!-- PDF attachments: the object URL keeps the blob's application/pdf type,
+         so the browser's own viewer renders it inside the frame. -->
+    <el-dialog
+        v-model="pdfPreview.show"
+        :title="pdfPreview.name"
+        class="pdf-preview-dialog"
+        width="min(1040px, 94vw)"
+        append-to-body
+        destroy-on-close
+        @closed="closePdfPreview"
+    >
+      <iframe
+          v-if="pdfPreview.url"
+          class="pdf-preview-frame"
+          :src="pdfPreview.url"
+          :title="pdfPreview.name"
+      ></iframe>
+      <template #footer>
+        <a class="pdf-preview-open" :href="pdfPreview.url" target="_blank" rel="noopener">{{ $t('openInNewTab') }}</a>
+        <el-button @click="closePdfPreview">{{ $t('cancel') }}</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 <script setup>
@@ -189,7 +211,7 @@ import {useAccountStore} from "@/store/account.js";
 import {formatCompactDate, formatDetailDate} from "@/utils/day.js";
 import {starAdd, starCancel} from "@/request/star.js";
 import {getExtName, formatBytes} from "@/utils/file-utils.js";
-import {fetchPrivateAttachment, resolvePrivateMailImages} from '@/utils/private-attachments.js'
+import {fetchAttachmentBlob, fetchPrivateAttachment, resolvePrivateMailImages} from '@/utils/private-attachments.js'
 import {getIconByName} from "@/utils/icon-utils.js";
 import {useSettingStore} from "@/store/setting.js";
 import {allEmailDelete} from "@/request/all-email.js";
@@ -216,6 +238,9 @@ const email = computed(() => emailStore.contentData.email || {
 })
 const showPreview = ref(false)
 const srcList = reactive([])
+// PDF attachments are shown in-place, in a frame fed by an object URL.
+const pdfPreview = reactive({ show: false, url: '', name: '' })
+let pdfUrl = null
 const scrollRef = ref(null)
 
 // The mobile action bar is teleported to <body> so no transformed ancestor
@@ -917,6 +942,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   closePreview()
+  closePdfPreview()
   stopRealtime()
   document.removeEventListener('visibilitychange', handleVisibilityChange)
   emailStore.contentData.showUnread = false;
@@ -932,6 +958,9 @@ onUnmounted(() => {
 function handleKeyDown(event) {
   if (event.key !== 'Escape') return;
   if (showPreview.value) return;
+  // The PDF viewer is its own layer: Escape closes it, it must not also leave
+  // the reader.
+  if (pdfPreview.show) return;
   if (document.querySelector('.el-message-box')) return;
   const writeBox = document.querySelector('.write-box');
   if (writeBox && writeBox.offsetParent !== null) return;
@@ -957,29 +986,65 @@ function toMessage(message) {
   return  message ? JSON.parse(message).message : '';
 }
 
-async function showImage(key) {
-  if (!isImage(key)) return;
+function isPdf(att) {
+  const type = String(att?.mimeType || '').toLowerCase()
+  const name = String(att?.filename || '').toLowerCase()
+  return type.includes('pdf') || name.endsWith('.pdf')
+}
+
+/** Images and PDFs can be shown in place; anything else downloads. */
+function canPreviewAttachment(att) {
+  return isImage(att?.filename) || isPdf(att)
+}
+
+/**
+ * Preview one attachment.
+ *
+ * Reads the bytes from `GET /api/attachments/<attId>` (the server returns the
+ * real content type), turns them into an object URL and then either hands it to
+ * the existing image viewer or to the PDF frame. The attachment list markup is
+ * unchanged.
+ */
+async function previewAttachment(att) {
+  const attId = Number(att?.attId) || 0
+  if (!attId || !canPreviewAttachment(att)) return
+
   try {
-    const blob = await fetchPrivateAttachment(key)
+    const blob = await fetchAttachmentBlob(attId)
+
+    if (isPdf(att)) {
+      openPdfPreview(URL.createObjectURL(blob), att.filename)
+      return
+    }
+
     closePreview()
     previewUrl = URL.createObjectURL(blob)
     srcList.push(previewUrl)
     showPreview.value = true
-  } catch {
+  } catch (error) {
+    console.error('Nova Mail: attachment preview failed', error)
     ElMessage.error(t('reqFailErrorMsg'))
   }
 }
 
-function closePreview() {
-  showPreview.value = false
-  srcList.length = 0
-  if (previewUrl) URL.revokeObjectURL(previewUrl)
-  previewUrl = null
+function openPdfPreview(url, filename) {
+  closePdfPreview()
+  pdfUrl = url
+  pdfPreview.url = url
+  pdfPreview.name = filename || 'PDF'
+  pdfPreview.show = true
+}
+
+function closePdfPreview() {
+  pdfPreview.show = false
+  pdfPreview.url = ''
+  if (pdfUrl) URL.revokeObjectURL(pdfUrl)
+  pdfUrl = null
 }
 
 async function downloadAttachment(att) {
   try {
-    const blob = await fetchPrivateAttachment(att.key, false)
+    const blob = await fetchAttachmentBlob(att.attId)
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
@@ -1949,6 +2014,30 @@ const handleDelete = () => {
 /* Nova reader active star */
 .header-actions .star-active-icon {
   color: var(--el-color-primary) !important;
+}
+
+/* PDF attachment preview: the object URL carries the blob's application/pdf
+   type, so the browser's built-in viewer fills the frame. */
+.pdf-preview-frame {
+  width: 100%;
+  height: min(70vh, 720px);
+  border: 0;
+  background: var(--el-bg-color);
+}
+
+.pdf-preview-open {
+  margin-right: 12px;
+  color: var(--el-color-primary);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.pdf-preview-open:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 767px) {
+  .pdf-preview-frame { height: 68vh; }
 }
 
 </style>

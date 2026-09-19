@@ -17,7 +17,9 @@ export default {
 			return app.fetch(req, env, ctx);
 		}
 
-		 // Private mail attachments must only be served by the authenticated /api/oss/* route.
+		 // Private mail attachments are only served by the authenticated routes
+		 // (/api/oss/<key> and /api/attachments/<id>). A bare /attachments/…
+		 // path is not an API call, so it must never reach storage.
 		 if (url.pathname.startsWith('/attachments/')) {
 			 return new Response('Not found', { status: 404, headers: { 'Cache-Control': 'no-store' } });
 		 }

@@ -334,6 +334,7 @@ const en = {
     pushDeniedMsg: 'Notification permission was denied — allow it in your browser settings and retry',
     pushUnsupportedMsg: 'This browser does not support notifications',
     pushUnavailableMsg: 'Push keys are not configured on the server',
+    openInNewTab: 'Open in a new tab',
     icon: 'Icon',
     position: 'Position',
     offset: 'Offset',

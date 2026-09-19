@@ -334,6 +334,7 @@ const zh = {
     pushDeniedMsg: '通知权限被拒绝，请在浏览器设置中允许后重试',
     pushUnsupportedMsg: '当前浏览器不支持通知',
     pushUnavailableMsg: '服务器未配置推送密钥，暂时无法开启',
+    openInNewTab: '在新标签打开',
     icon: '图标',
     position: '位置',
     offset: '偏移距离',
