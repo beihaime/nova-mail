@@ -102,6 +102,27 @@ export function formatCompactDate(time) {
     return settingStore.lang === 'en' ? d.format('MMM D, YYYY') : d.format('YYYY年M月D日');
 }
 
+/**
+ * Fixed clock label for the mobile Inbox list.
+ *
+ * Today's mail always reads as a zero-padded 24-hour `HH:mm` ("08:05") instead
+ * of `fromNow`'s relative wording ("51 min ago" / "1 hour ago"), so the right
+ * column scans as one aligned set of timestamps. Anything older keeps the same
+ * calendar label the list already showed.
+ *
+ * Deliberately language-independent: the list shows a clock, not prose.
+ */
+export function formatListClock(time) {
+    const d = dayjs.utc(time).tz(timeZone);
+    const now = dayjs();
+
+    if (now.isSame(d, 'day')) return d.format('HH:mm');
+
+    return now.year() === d.year()
+        ? d.format('MMM D')
+        : d.format('YYYY/MM/DD');
+}
+
 export function tzDayjs(time) {
     return dayjs.utc(time).tz(timeZone)
 }

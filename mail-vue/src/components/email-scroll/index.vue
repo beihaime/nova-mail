@@ -27,27 +27,31 @@
               v-for="filter in mobileFilters"
               :key="filter.key"
               :class="{ active: mobileFilter === filter.key }"
-              @click="selectMobileFilter(filter)"
+              @click="selectMobileFilter(filter.key)"
           >
             {{ filter.label }}
           </button>
         </div>
 
-        <button
-            class="mobile-tool-button mobile-sort"
-            :aria-label="t('sortByTime')"
-            @click="mobileSortClick"
-        >
-          <Icon icon="solar:sort-vertical-linear" width="21" height="21" />
-        </button>
+        <!-- Right-hand group: sort + multi-select, kept together so the row
+             balances against the filter chips instead of crowding them. -->
+        <div class="mobile-filter-actions">
+          <button
+              class="mobile-tool-button mobile-sort"
+              :aria-label="t('sortByTime')"
+              @click="mobileSortClick"
+          >
+            <Icon icon="solar:sort-vertical-linear" width="21" height="21" />
+          </button>
 
-        <button
-            class="mobile-tool-button"
-            :aria-label="mobileSelecting ? t('cancel') : t('multiSelect')"
-            @click="toggleMobileSelection"
-        >
-          <Icon icon="solar:menu-dots-bold" width="21" height="21" />
-        </button>
+          <button
+              class="mobile-tool-button"
+              :aria-label="mobileSelecting ? t('cancel') : t('multiSelect')"
+              @click="toggleMobileSelection"
+          >
+            <Icon icon="solar:menu-dots-bold" width="21" height="21" />
+          </button>
+        </div>
       </div>
     </div>
 
@@ -210,7 +214,7 @@
                    Both share one centred flex column so the star never drifts
                    with the timestamp's width. -->
               <div v-if="type === 'email'" class="mobile-row-meta">
-                <span class="mobile-meta-time">{{ item.formatCreateTime }}</span>
+                <span class="mobile-meta-time">{{ listClock(item) }}</span>
                 <button
                     v-if="showStar"
                     class="mobile-row-star"
@@ -356,14 +360,12 @@ import {useEmailStore} from "@/store/email.js";
 import {useUiStore} from "@/store/ui.js";
 import {useSettingStore} from "@/store/setting.js";
 import {sleep} from "@/utils/time-utils.js"
-import {fromNow} from "@/utils/day.js";
+import {fromNow, formatListClock} from "@/utils/day.js";
 import {useI18n} from "vue-i18n";
 import {EmailUnreadEnum} from "@/enums/email-enum.js";
 import { UseVirtualList } from '@vueuse/components'
 import { useScroll } from '@vueuse/core'
 import SenderAvatar from '@/components/sender-avatar/index.vue'
-import router from '@/router/index.js'
-import {hasPerm} from '@/perm/perm.js'
 import { MAIL_BODY_TYPE, unwrapNestedMessage, looksLikeMarkdownDocument } from '@/utils/mail-html.js'
 import { stripMarkdown } from '@/utils/quoted-text.js'
 
@@ -463,11 +465,7 @@ const mobileSelecting = ref(false)
 const mobileFilters = computed(() => [
   { key: 'all', label: t('all') },
   { key: 'unread', label: t('unreadMail') },
-  { key: 'attachments', label: t('withAttachments') },
-  // Shortcut, not a filter: opens the existing Drafts route (the same
-  // destination as the bottom navigation) instead of narrowing the Inbox list.
-  // `route` marks it as a navigation target rather than a `mobileFilter` value.
-  { key: 'drafts', label: t('drafts'), route: 'draft' }
+  { key: 'attachments', label: t('withAttachments') }
 ])
 
 let longPressTimer = null
@@ -592,14 +590,18 @@ const visibleList = computed(() => {
 })
 
 function selectMobileFilter(filter) {
-  // The Drafts chip never becomes the active filter: it leaves the Inbox for
-  // the Drafts route, so `mobileFilter` stays on the real filter it belonged to.
-  if (filter.route) {
-    if (hasPerm('email:send')) router.push({ name: filter.route })
-    return
-  }
+  mobileFilter.value = filter
+}
 
-  mobileFilter.value = filter.key
+/**
+ * Right-hand list timestamp.
+ *
+ * A fixed 24-hour clock ("08:05") for today's mail, a short date otherwise —
+ * never `fromNow`'s relative wording, which made a column of rows read as
+ * prose instead of a scannable set of timestamps.
+ */
+function listClock(item) {
+  return item?.createTime ? formatListClock(item.createTime) : (item?.formatCreateTime || '')
 }
 
 function mobileSortClick() {
@@ -2067,21 +2069,27 @@ ul {
     height: 40px;
     min-width: 0;
 
-    /* Tight sides so tabs + sort/more read as one continuous toolbar. */
-    padding: 2px 4px 5px 8px;
+    /* Page gutter on the left, tight on the right: the chips own the left half
+       and the action group is pinned to the right edge. */
+    padding: 2px 8px 5px 12px;
 
     display: flex;
     align-items: center;
+    /* Two clear groups: filters left, sort + more right. */
+    justify-content: space-between;
+    /* Minimum air between the groups when the chips grow. */
+    gap: 10px;
 
     border-bottom: 1px solid var(--nova-divider-soft, color-mix(in srgb, var(--nova-divider) 55%, transparent));
   }
 
   .mobile-filters {
-    flex: 1;
+    flex: 1 1 auto;
     min-width: 0;
 
-    display: grid;
-    grid-template-columns: 0.7fr 0.95fr 1.45fr 0.9fr;
+    /* Content-sized chips in a plain flex row, so the group stays left and the
+       actions keep their own space instead of being crowded. */
+    display: flex;
     align-items: center;
     gap: 2px;
 
@@ -2090,14 +2098,14 @@ ul {
   }
 
   .mobile-filters button {
-    /* Content-sized pills: the active background hugs the label instead of
-       filling the whole grid track. */
+    /* Every chip carries the same box whether or not it is active, so toggling
+       a filter cannot shift its neighbours. */
+    flex: 0 0 auto;
     width: auto;
     max-width: 100%;
-    justify-self: center;
     min-width: 0;
     height: 32px;
-    padding: 0 4px;
+    padding: 0 8px;
     box-sizing: border-box;
 
     border: 0;
@@ -2115,12 +2123,19 @@ ul {
   }
 
   .mobile-filters button.active {
-    padding-inline: 8px;
-
     color: var(--el-color-primary);
     background: var(--nova-selected);
 
     font-weight: 650;
+  }
+
+  /* Sort + multi-select behave as one right-aligned unit. */
+  .mobile-filter-actions {
+    flex: 0 0 auto;
+
+    display: flex;
+    align-items: center;
+    gap: 2px;
   }
 
   .mobile-tool-button {
@@ -2189,7 +2204,7 @@ ul {
        50px track, so its trailing 10px is the avatar -> text gap and the body
        column gets every remaining pixel. Every track except the body is fixed,
        so a read/unread flip or a long sender can never move anything. */
-    grid-template-columns: 16px 50px minmax(0, 1fr) 70px;
+    grid-template-columns: 16px 50px minmax(0, 1fr) 72px;
 
     column-gap: 0;
 
@@ -2213,8 +2228,9 @@ ul {
     content: '';
 
     position: absolute;
-    /* Starts under the message body: padding-left + gutter + avatar track. */
-    left: 74px;
+    /* Spans the whole row: the avatar, the body and the time/star column all
+       sit on the same divider, so the list reads as one continuous table. */
+    left: 0;
     right: 0;
     bottom: 0;
 
@@ -2239,7 +2255,7 @@ ul {
   .email-container.mobile-selecting
     :deep(.email-row.email) {
     /* The checkbox replaces the unread gutter in the first track. */
-    grid-template-columns: 20px 50px minmax(0, 1fr) 70px;
+    grid-template-columns: 20px 50px minmax(0, 1fr) 72px;
   }
 
   .email-container.mobile-selecting
@@ -2465,11 +2481,11 @@ ul {
 
     align-self: start;
 
-    /* Fixed 70px: the measured natural width of the longest label `fromNow`
-       produces at 14px ("2024/01/15"), so a year-old date is never ellipsised.
+    /* Fixed 72px: `2024/01/15` measures 70.08px at 14px, so a year-old date
+       needs the extra 2px of slack or `text-overflow` clips it to "2024/01/…".
        Never allowed to grow into the message body. */
-    width: 70px;
-    min-width: 70px;
+    width: 72px;
+    min-width: 72px;
 
     display: flex;
     flex-direction: column;
@@ -2508,10 +2524,10 @@ ul {
   /* ---------- Mobile star ---------- */
 
   .mobile-row-star {
-    /* A 40px tap target around a 20px glyph: easy to hit, light on the eye, and
-       quieter than the timestamp beside it. */
-    width: 40px;
-    height: 40px;
+    /* A 36px tap target around an 18px glyph: still easy to hit, but light
+       enough that the star stays an auxiliary action next to the timestamp. */
+    width: 36px;
+    height: 36px;
     flex: 0 0 auto;
 
     display: grid;
@@ -2527,8 +2543,8 @@ ul {
   }
 
   .mobile-row-star .iconify {
-    width: 20px !important;
-    height: 20px !important;
+    width: 18px !important;
+    height: 18px !important;
   }
 
   /* Starred rows use the theme accent on the phone list (the desktop list keeps
