@@ -59,10 +59,15 @@ import writer from '@/layout/write/index.vue'
 import router from '@/router/index.js'
 import {useRoute} from 'vue-router'
 import {Icon} from '@iconify/vue'
+import {useGlobalMailAlert} from '@/composables/use-global-mail-alert.js'
 
 const uiStore = useUiStore();
 const writerRef = ref({})
 const route = useRoute()
+
+// New-mail sound on every route: the Inbox and the reader poll on their own, so
+// this covers the rest without adding a second request where they already run.
+useGlobalMailAlert()
 const isMobile = ref(window.innerWidth < 1025)
 const handleResize = () => {
   isMobile.value = window.innerWidth < 1025

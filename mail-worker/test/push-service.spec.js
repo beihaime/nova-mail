@@ -123,8 +123,11 @@ describe('notifyNewMail', () => {
 			expect(vapid.claims.sub).toBe('mailto:admin@beihaime.com');
 		}
 
-		// The browser can decrypt it, and it carries no message body.
-		const payload = JSON.parse(await decryptPayload(fetchCalls[0].init.body, desktop));
+		// The browser can decrypt it, and it carries no message body. Look the
+		// call up by endpoint: the two deliveries race, so `fetchCalls[0]` is not
+		// reliably the desktop one.
+		const desktopCall = fetchCalls.find(call => call.url.endsWith('/desktop'));
+		const payload = JSON.parse(await decryptPayload(desktopCall.init.body, desktop));
 		expect(payload).toEqual({
 			title: 'Nova Mail',
 			body: '收到来自 dev@beihaime.com 的邮件',
@@ -173,5 +176,42 @@ describe('notifyNewMail', () => {
 		await expect(pushService.notifyNewMail(env, 7, { emailId: 1, from: 'a@b.c', subject: 's' }))
 			.resolves.toEqual({ sent: 0 });
 		expect(fetchCalls).toHaveLength(0);
+	});
+});
+
+describe('test notification (settings diagnostics)', () => {
+	it('reports the feature as disabled when no VAPID keys are configured', async () => {
+		await expect(pushService.testNotification({}, 7)).resolves.toEqual({ devices: 0, sent: 0, enabled: false });
+		expect(fetchCalls).toHaveLength(0);
+	});
+
+	it('reports zero devices without sending anything', async () => {
+		const env = await vapidEnv();
+		state.rows = [];
+
+		await expect(pushService.testNotification(env, 7)).resolves.toEqual({ devices: 0, sent: 0, enabled: true });
+		expect(fetchCalls).toHaveLength(0);
+	});
+
+	it('pushes a payload with no mail to open to every registered device', async () => {
+		const env = await vapidEnv();
+		const desktop = await createSubscription();
+		const phone = await createSubscription();
+
+		state.rows = [
+			{ id: 1, endpoint: 'https://fcm.googleapis.com/fcm/send/desktop', p256dh: desktop.p256dh, auth: desktop.auth },
+			{ id: 2, endpoint: 'https://fcm.googleapis.com/fcm/send/phone', p256dh: phone.p256dh, auth: phone.auth },
+		];
+
+		await expect(pushService.testNotification(env, 7)).resolves.toEqual({ devices: 2, sent: 2, enabled: true });
+		expect(fetchCalls).toHaveLength(2);
+
+		// Same race as above: pick this device's own request out of the batch.
+		const desktopCall = fetchCalls.find(call => call.url.endsWith('/desktop'));
+		const payload = JSON.parse(await decryptPayload(desktopCall.init.body, desktop));
+		expect(payload.emailId).toBe(0);
+		// No conversation to open, so the worker falls back to the app root.
+		expect(payload.url).toBe('.');
+		expect(payload.body).toBeTruthy();
 	});
 });

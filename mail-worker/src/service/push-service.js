@@ -176,13 +176,16 @@ const pushService = {
 
 		const emailId = Number(mail?.emailId) || 0;
 		const from = clean(mail?.from, MAX_SUBJECT_LENGTH) || 'Nova Mail';
+		// `body` is only overridden by the settings page's test notification.
+		const body = clean(mail?.body, MAX_SUBJECT_LENGTH) || `收到来自 ${from} 的邮件`;
 
 		// No message body, no recipient list — just enough to identify the mail.
 		const payload = JSON.stringify({
 			title: 'Nova Mail',
-			body: `收到来自 ${from} 的邮件`,
+			body,
 			subject: clean(mail?.subject, MAX_SUBJECT_LENGTH),
-			url: `mail?emailId=${emailId}`,
+			// A test notification has no mail to open.
+			url: emailId ? `mail?emailId=${emailId}` : '.',
 			emailId,
 		});
 
@@ -233,6 +236,47 @@ const pushService = {
 		}));
 
 		return { sent };
+	},
+
+	/** How many devices this account has registered (never exposes endpoints). */
+	async countSubscriptions(env, userId) {
+		const owner = Number(userId) || 0;
+		if (!owner) return 0;
+
+		try {
+			const rows = await orm({ env })
+				.select({ id: pushSubscription.id })
+				.from(pushSubscription)
+				.where(eq(pushSubscription.userId, owner))
+				.all();
+			return rows.length;
+		} catch (error) {
+			console.error('Nova Mail: could not count push subscriptions', error);
+			return 0;
+		}
+	},
+
+	/**
+	 * Send a notification to the caller's own devices so the settings page can
+	 * show whether the current browser is really registered — the difference
+	 * between "not subscribed" and "subscribed but silenced by the OS" is the
+	 * usual reason a desktop gets nothing while a phone does.
+	 */
+	async testNotification(env, userId) {
+		const owner = Number(userId) || 0;
+		if (!this.getConfig(env).enabled) {
+			return { devices: 0, sent: 0, enabled: false };
+		}
+
+		const devices = await this.countSubscriptions(env, owner);
+		if (!devices) return { devices: 0, sent: 0, enabled: true };
+
+		const { sent } = await this.notifyNewMail(env, owner, {
+			body: t('pushTestBody'),
+			subject: '',
+		});
+
+		return { devices, sent, enabled: true };
 	},
 
 	/**

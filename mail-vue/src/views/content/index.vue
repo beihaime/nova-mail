@@ -221,7 +221,7 @@ import {EmailUnreadEnum} from "@/enums/email-enum.js";
 import SenderAvatar from '@/components/sender-avatar/index.vue'
 import {buildThreadMessages, threadSubjectKey} from '@/utils/mail-thread.js'
 import {quotedTextToHtml, wrapHtmlQuotes} from '@/utils/quoted-text.js'
-import {playNotificationSound} from '@/utils/notificationSound.js'
+import {alertNewMail} from '@/utils/new-mail-alert.js'
 
 const uiStore = useUiStore();
 const settingStore = useSettingStore();
@@ -716,6 +716,8 @@ function ingestIncoming(rows) {
   if (!rows?.length) return
 
   let newestId = 0
+  // Email ids of everything new to this client, in this conversation or not.
+  const freshIds = []
 
   for (const raw of rows) {
     if (!raw) continue
@@ -731,6 +733,8 @@ function ingestIncoming(rows) {
 
     knownIdentities.add(identity)
     if (header) knownHeaderIds.add(header)
+
+    if (emailId) freshIds.push(emailId)
 
     // Rows from other conversations are ignored: merging them would only bloat
     // the in-memory detail cache without ever joining this thread.
@@ -749,14 +753,14 @@ function ingestIncoming(rows) {
   // Announce the newest arrival to the thread watcher (auto-expand + scroll).
   if (newestId) {
     pendingArrivalId = String(newestId)
-
-    // A reply that lands in the conversation being read is new mail too. Opening
-    // a conversation never reaches here: the cursor is primed to the newest
-    // known message, so the first poll has nothing to ingest.
-    if (settingStore.notificationSound) {
-      playNotificationSound(settingStore.notificationSoundType)
-    }
   }
+
+  // Ring for any new mail. The reader is the only detector while a conversation
+  // is open (the desktop reading pane replaces the Inbox), so limiting this to
+  // the open thread would swallow every other conversation's notification.
+  // Opening a conversation never reaches here: the cursor is primed to the
+  // newest known message, so the first poll has nothing to ingest.
+  alertNewMail(freshIds)
 }
 
 async function pollOnce() {

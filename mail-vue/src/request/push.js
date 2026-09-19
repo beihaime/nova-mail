@@ -16,3 +16,8 @@ export function pushSubscribe(payload) {
 export function pushUnsubscribe(endpoint) {
     return http.delete('/push/subscribe', {params: {endpoint}, noMsg: true})
 }
+
+/** Ask the server to notify this account's own devices (diagnostics). */
+export function pushTest() {
+    return http.post('/push/test', {}, {noMsg: true})
+}

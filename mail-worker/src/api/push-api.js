@@ -20,3 +20,9 @@ app.delete('/push/subscribe', async (c) => {
 	const data = await pushService.unsubscribe(c, c.req.query(), userContext.getUserId(c));
 	return c.json(result.ok(data));
 });
+
+/** Send a test notification to the caller's own devices (diagnostics). */
+app.post('/push/test', async (c) => {
+	const data = await pushService.testNotification(c.env, userContext.getUserId(c));
+	return c.json(result.ok(data));
+});

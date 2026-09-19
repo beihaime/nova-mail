@@ -27,6 +27,7 @@ const zh = {
 	sendEmailNotCurUser: '发件人邮箱非当前用户所有',
 	notExistEmailReply: '邮件不存在无法回复',
 	pushSubscriptionInvalid: '推送订阅信息无效',
+	pushTestBody: '这是一条测试通知，收到即表示通知已生效',
 	imageAttLimit: '图片不能超过10个',
 	attLimit: '附件不能超过10个',
 	pwdLengthLimit: '密码长度超出限制',

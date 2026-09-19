@@ -40,7 +40,7 @@ import router from "@/router/index.js";
 import {Icon} from "@iconify/vue";
 import { useRoute } from 'vue-router'
 import {useMailSearch} from "@/composables/use-mail-search.js";
-import {playNotificationSound} from "@/utils/notificationSound.js";
+import {alertNewMail} from "@/utils/new-mail-alert.js";
 
 defineOptions({
   name: 'email'
@@ -124,12 +124,11 @@ async function latest() {
         //确保请求回来后，账号没有切换，时间排序没有改变，全部邮件类型没变
         if (accountId === accountStore.currentAccountId && params.timeSort === curTimeSort && allReceive === accountStore.currentAccount.allReceive) {
           if (list.length > 0) {
-            // Only genuinely new messages ring. The first load (guarded by
-            // `firstLoad` above), opening a mail and manual refreshes never get
-            // here, and an already-seen id is ignored.
-            if (settingStore.notificationSound && list.some(email => !existIds.has(email.emailId))) {
-              playNotificationSound(settingStore.notificationSoundType)
-            }
+            // Only genuinely new messages ring (the first load is guarded by
+            // `firstLoad` above, opening a mail and manual refreshes never get
+            // here). The shared cursor also suppresses mail the global watcher
+            // already announced before this route was entered.
+            alertNewMail(list.filter(email => !existIds.has(email.emailId)).map(email => email.emailId))
 
             emailStore.applyFullList(list)
 

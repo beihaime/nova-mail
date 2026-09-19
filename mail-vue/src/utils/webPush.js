@@ -10,7 +10,7 @@
  * mail itself must never depend on notifications working.
  */
 
-import { pushConfig, pushSubscribe, pushUnsubscribe } from '@/request/push.js'
+import { pushConfig, pushSubscribe, pushTest, pushUnsubscribe } from '@/request/push.js'
 
 /** Status values shared with the settings UI. */
 export const PUSH_STATUS = {
@@ -184,4 +184,12 @@ export async function syncPushSubscription() {
         console.warn('Nova Mail: could not sync the push subscription', error)
         return false
     }
+}
+
+/**
+ * Ask the server to notify this account's devices.
+ * @returns {Promise<{devices:number, sent:number, enabled:boolean}>}
+ */
+export async function sendTestNotification() {
+    return await pushTest()
 }

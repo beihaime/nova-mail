@@ -117,12 +117,15 @@
           <span>{{ $t('pushNotification') }}</span>
           <small class="notification-status" :class="{ 'is-on': pushOn }">{{ pushStatusText }}</small>
         </div>
-        <el-switch
-            :model-value="pushOn"
-            :loading="pushLoading"
-            :disabled="!pushAvailable"
-            @change="togglePush"
-        />
+        <div class="notification-actions">
+          <el-button v-if="pushOn" :loading="pushTesting" @click="sendTestPush">{{ $t('pushTest') }}</el-button>
+          <el-switch
+              :model-value="pushOn"
+              :loading="pushLoading"
+              :disabled="!pushAvailable"
+              @change="togglePush"
+          />
+        </div>
       </div>
 
       <div class="notification-row">
@@ -192,6 +195,7 @@ import {
   disablePush,
   enablePush,
   pushState,
+  sendTestNotification,
   syncPushSubscription,
 } from '@/utils/webPush.js';
 
@@ -310,6 +314,41 @@ async function togglePush(enabled) {
   } finally {
     pushLoading.value = false
     await refreshPushState()
+  }
+}
+
+const pushTesting = ref(false)
+
+/**
+ * Ask the server to push to this account's devices.
+ *
+ * The device count is the point: if it stays 1 while this browser is enabled,
+ * this browser's subscription never reached the server; if it counts this
+ * browser and no notification appears, the OS is silencing it (Windows Focus
+ * Assist, macOS Focus, Chrome site permission).
+ */
+async function sendTestPush() {
+  pushTesting.value = true
+
+  try {
+    const data = await sendTestNotification()
+
+    if (!data?.devices) {
+      ElMessage({ message: t('pushTestNone'), type: 'warning', plain: true })
+    } else {
+      ElMessage({
+        message: t('pushTestResult', { sent: data.sent, total: data.devices }),
+        type: 'success',
+        plain: true,
+      })
+    }
+
+    await refreshPushState()
+  } catch (error) {
+    console.error('Nova Mail: test notification failed', error)
+    ElMessage({ message: t('reqFailErrorMsg'), type: 'error', plain: true })
+  } finally {
+    pushTesting.value = false
   }
 }
 

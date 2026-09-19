@@ -25,6 +25,11 @@ export const useEmailStore = defineStore('email', {
         // Replies/forwards sent this session, shown in the conversation thread
         // immediately without waiting for a list refresh. Not persisted.
         threadMessages: [],
+        // Highest email id already announced by a notification sound. Shared by
+        // the Inbox poll, the reader poll and the global watcher so the same
+        // mail never rings twice (e.g. right after switching route). Session
+        // only, never persisted.
+        notifyCursor: 0,
     }),
     persist: {
         pick: ['contentData'],
