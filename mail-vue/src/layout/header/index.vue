@@ -1,7 +1,7 @@
 <template>
   <div class="header" :class="!hasPerm('email:send') ? 'not-send' : ''">
     <div class="header-btn">
-      <hanburger @click="changeAside"></hanburger>
+      <hanburger class="menu-button" @click="changeAside"></hanburger>
       <span class="breadcrumb-item">{{ $t(route.meta.title) }}</span>
     </div>
     <label class="search-shell desktop-search-only">
@@ -350,7 +350,7 @@ function formatName(email) {
   .header-btn {
     grid-column: 1;
     min-width: 0;
-    gap: 6px;
+    gap: 2px;
   }
 
   .mobile-inline-search {
@@ -362,30 +362,20 @@ function formatName(email) {
     grid-column: 3;
   }
 
-  .header-btn :deep(> div) {
-    width: 40px;
-    height: 40px;
-
-    padding: 0 !important;
-
-    display: grid;
-    place-items: center;
-  }
-
   .search-shell {
     display: none;
   }
 
-  /* Narrow inline search pill: grows only into the leftover middle space and
-     caps out so it never dominates the app bar. The title keeps its width and
-     the placeholder shortens (clips) first on narrow phones. */
+  /* Inline search pill: the phone app bar no longer carries a theme toggle, so
+     the pill fills the whole middle column and reaches the avatar. The title
+     keeps its own column and can never be squeezed by the field. */
   .mobile-inline-search {
     display: flex;
     align-items: center;
     gap: 5px;
 
     width: 100%;
-    max-width: 188px;
+    max-width: none;
     min-width: 0;
     height: 38px;
 
@@ -434,19 +424,9 @@ function formatName(email) {
     height: 40px;
   }
 
-  /* Keep desktop AppIcon exactly as-is; replace it only visually on phones. */
-  .toolbar .sun-icon :deep(.app-icon),
-  .toolbar .dark-icon :deep(.app-icon) {
-    display: none;
-  }
-
-  .toolbar .mobile-theme-icon {
-    display: block;
-    width: 21px;
-    height: 21px;
-    color: var(--mobile-primary);
-  }
-
+  /* The phone app bar hides the entire theme toggle (see the scoped block
+     below); these stale icon swap rules lived in a non-scoped <style> where
+     :deep() is invalid and never applied, so they are simply gone. */
   .toolbar .notice {
     display: none;
   }
@@ -738,9 +718,21 @@ function formatName(email) {
   }
   .header.not-send { grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto; }
   .search-shell { display: none; }
-  .header-btn { grid-column: 1; }
-  .mobile-inline-search { grid-column: 2; }
-  .toolbar { grid-column: 3; gap: 8px; }
+  .header-btn { grid-column: 1; gap: 2px; }
+  .mobile-inline-search { grid-column: 2; max-width: none; }
+  .toolbar { grid-column: 3; gap: 0; }
+  /* Menu button: a fixed 44px tap target instead of the 50px the hamburger
+     component's inline `padding: 0 15px` produced, so the title sits closer. */
+  .menu-button {
+    width: 44px;
+    height: 44px;
+    padding: 0 !important;
+    display: grid;
+    place-items: center;
+  }
+  /* Phones drop the theme toggle; the freed space now belongs to the search. */
+  .toolbar .sun-icon,
+  .toolbar .dark-icon { display: none; }
   .toolbar .notice { display: none; }
   .toolbar .setting-icon { display: none; }
   .toolbar .avatar { margin-left: 0; }

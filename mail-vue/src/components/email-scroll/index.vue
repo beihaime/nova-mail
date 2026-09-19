@@ -1894,11 +1894,12 @@ ul {
   /* ---------- Filters ---------- */
 
   .mobile-filter-bar {
-    height: 40px;
+    /* border-box: 46 = 2 (top) + 36 (tabs) + 7 (bottom) + 1 (divider). The tabs
+       get 7px of air above the divider instead of 2px, for +6px total height. */
+    height: 46px;
     min-width: 0;
 
-    /* Tighter than before: the 36px tabs own the row. */
-    padding: 2px 6px 2px 10px;
+    padding: 2px 6px 7px 10px;
 
     display: flex;
     align-items: center;
