@@ -337,9 +337,15 @@ function formatName(email) {
     height: 64px;
     min-height: 64px;
 
-    padding: 0 12px 0 10px;
+    /* Symmetric padding: the grid content box is centred on the viewport, so a
+       full-width row item centred inside it lands on the viewport centre line. */
+    padding: 0 12px;
     column-gap: 6px;
     row-gap: 0;
+
+    /* Side margin the centred pill must keep clear of the menu + title. Wide
+       enough for both "Inbox" and the wider CJK 收件箱 at the same size. */
+    --mobile-appbar-reserve: 102px;
 
     grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
     align-items: center;
@@ -349,32 +355,35 @@ function formatName(email) {
 
   .header-btn {
     grid-column: 1;
+    grid-row: 1;
     min-width: 0;
     gap: 2px;
   }
 
+  /* The pill spans the whole row and centres itself, so it ignores how wide the
+     title cluster is — the old `justify-self: end` pushed it toward the avatar. */
   .mobile-inline-search {
-    grid-column: 2;
-    justify-self: end;
+    grid-column: 1 / -1;
+    grid-row: 1;
+    justify-self: center;
   }
 
   .toolbar {
     grid-column: 3;
+    grid-row: 1;
   }
 
   .search-shell {
     display: none;
   }
 
-  /* Inline search pill: the phone app bar no longer carries a theme toggle, so
-     the pill fills the whole middle column and reaches the avatar. The title
-     keeps its own column and can never be squeezed by the field. */
+  /* Inline search pill. Width is owned by the scoped block, which centres it on
+     the viewport and shrinks it before it can touch the title or the avatar. */
   .mobile-inline-search {
     display: flex;
     align-items: center;
     gap: 5px;
 
-    width: 100%;
     max-width: none;
     min-width: 0;
     height: 38px;
@@ -710,17 +719,29 @@ function formatName(email) {
   .header {
     height: 64px;
     min-height: 64px;
-    padding: 0 12px 0 10px;
+    padding: 0 12px;
     column-gap: 6px;
     row-gap: 0;
     align-items: center;
     grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
+    --mobile-appbar-reserve: 102px;
   }
   .header.not-send { grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto; }
   .search-shell { display: none; }
-  .header-btn { grid-column: 1; gap: 2px; }
-  .mobile-inline-search { grid-column: 2; max-width: none; }
-  .toolbar { grid-column: 3; gap: 0; }
+  .header-btn { grid-column: 1; grid-row: 1; gap: 2px; }
+  /* True horizontal centring: the label owns the full grid row and centres
+     inside it, so its middle sits on the viewport centre line regardless of the
+     title width. `100% - 2 * reserve` shrinks the pill first at narrow widths
+     (≈92px at 320, ≈138px at 360) while keeping it off the title and avatar. */
+  .mobile-inline-search {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    justify-self: center;
+
+    width: min(300px, calc(100% - 2 * var(--mobile-appbar-reserve, 102px)));
+    max-width: none;
+  }
+  .toolbar { grid-column: 3; grid-row: 1; gap: 0; }
   /* Menu button: a fixed 44px tap target instead of the 50px the hamburger
      component's inline `padding: 0 15px` produced, so the title sits closer. */
   .menu-button {

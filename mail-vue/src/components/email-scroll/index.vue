@@ -1887,7 +1887,9 @@ ul {
     width: 100%;
     max-width: 100%;
     min-width: 0;
-    padding-top: 0;
+    /* 5px of air below the filter divider so it no longer touches the first
+       mail row. Adds only 5px to the Inbox header block. */
+    padding: 0 0 5px;
     background: var(--nova-surface);
   }
 
@@ -2013,7 +2015,10 @@ ul {
     display: grid;
     grid-template-columns: 36px minmax(0, 1fr);
 
-    column-gap: 10px;
+    /* Tightened from 10px: the 36px avatar sat a touch far from the sender /
+       subject / preview column. 7px brings the text 3px closer without
+       crowding it, and the divider below is re-aligned to match. */
+    column-gap: 7px;
 
     width: 100%;
     height: 72px;
@@ -2033,7 +2038,7 @@ ul {
     content: '';
 
     position: absolute;
-    left: 62px;
+    left: 59px;
     right: 0;
     bottom: 0;
 
