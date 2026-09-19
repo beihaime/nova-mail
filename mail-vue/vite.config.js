@@ -73,6 +73,9 @@ export default defineConfig(({mode}) => {
                     cleanupOutdatedCaches: true,
                     clientsClaim: true,
                     skipWaiting: true,
+                    // Pull the Web Push handlers into the generated worker rather
+                    // than running a second service worker for notifications.
+                    importScripts: ['push-sw.js'],
                 }
             }),
             AutoImport({

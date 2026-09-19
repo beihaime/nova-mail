@@ -36,8 +36,45 @@ const dbInit = {
 		await this.v3_4DB(c);
 		await this.v3_5DB(c);
 		await this.v3_6DB(c);
+		await this.v3_7DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
+	},
+
+	/**
+	 * v3.7 — Web Push subscriptions.
+	 *
+	 * One row per browser/PWA that enabled notifications. `endpoint` is unique:
+	 * subscribing again from the same browser updates that row (including the
+	 * owning user, if a different account signs in on it) instead of leaving a
+	 * stale duplicate behind.
+	 */
+	async v3_7DB(c) {
+		await c.env.db.prepare(`
+		  CREATE TABLE IF NOT EXISTS push_subscription (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id INTEGER NOT NULL,
+			endpoint TEXT NOT NULL,
+			p256dh TEXT NOT NULL,
+			auth TEXT NOT NULL,
+			user_agent TEXT NOT NULL DEFAULT '',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+		  )
+		`).run();
+
+		const INDEX_SQL_LIST = [
+			`CREATE UNIQUE INDEX IF NOT EXISTS idx_push_subscription_endpoint ON push_subscription(endpoint);`,
+			`CREATE INDEX IF NOT EXISTS idx_push_subscription_user ON push_subscription(user_id);`,
+		];
+
+		for (const sql of INDEX_SQL_LIST) {
+			try {
+				await c.env.db.prepare(sql).run();
+			} catch (e) {
+				console.warn(`跳过索引创建：${e.message}`);
+			}
+		}
 	},
 
 	/**

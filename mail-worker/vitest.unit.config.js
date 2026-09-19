@@ -5,7 +5,12 @@ import { defineConfig } from 'vitest/config';
 // not be used here.
 export default defineConfig({
 	test: {
-		include: ['test/security*.spec.js', 'test/thread*.spec.js'],
+		include: [
+			'test/security*.spec.js',
+			'test/thread*.spec.js',
+			'test/web-push.spec.js',
+			'test/push-service.spec.js',
+		],
 		environment: 'node',
 	},
 });

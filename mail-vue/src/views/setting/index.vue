@@ -108,6 +108,46 @@
         <el-option label="English" value="en" @pointerdown.prevent.stop="changeLang('en')"/>
       </el-select>
     </div>
+
+    <div class="notification">
+      <div class="title">{{ $t('notification') }}</div>
+
+      <div class="notification-row">
+        <div class="notification-label">
+          <span>{{ $t('pushNotification') }}</span>
+          <small class="notification-status" :class="{ 'is-on': pushOn }">{{ pushStatusText }}</small>
+        </div>
+        <el-switch
+            :model-value="pushOn"
+            :loading="pushLoading"
+            :disabled="!pushAvailable"
+            @change="togglePush"
+        />
+      </div>
+
+      <div class="notification-row">
+        <span class="notification-label">{{ $t('notificationSound') }}</span>
+        <el-switch v-model="settingStore.notificationSound"/>
+      </div>
+
+      <div class="notification-row">
+        <span class="notification-label">{{ $t('notificationSoundType') }}</span>
+        <div class="notification-actions">
+          <el-select v-model="soundType" class="notification-select">
+            <el-option
+                v-for="sound in soundOptions"
+                :key="sound.type"
+                :label="sound.label"
+                :value="sound.type"
+            />
+          </el-select>
+          <el-button class="notification-play" @click="previewSound">
+            <Icon icon="solar:play-linear" width="16" height="16" />
+            <span>{{ $t('notificationSoundPlay') }}</span>
+          </el-button>
+        </div>
+      </div>
+    </div>
     <div class="del-email" v-perm="'my:delete'">
       <div class="title">{{$t('deleteUser')}}</div>
       <div style="color: var(--regular-text-color);">
@@ -127,7 +167,7 @@
   </div>
 </template>
 <script setup>
-import {onMounted, reactive, ref, computed, defineOptions} from 'vue'
+import {onMounted, reactive, ref, computed, watch, defineOptions} from 'vue'
 import {resetPassword, userDelete} from "@/request/my.js";
 import {useUserStore} from "@/store/user.js";
 import router from "@/router/index.js";
@@ -140,6 +180,20 @@ import {useUiStore} from "@/store/ui.js";
 import {connectGithubAccount, disconnectGithubAccount, githubConnectedAccount, connectGoogleAccount, disconnectGoogleAccount, googleConnectedAccount} from '@/request/ouath.js';
 import {Icon} from '@iconify/vue';
 import {applyThemeTransition} from "@/utils/theme-transition.js";
+import {
+  NOTIFICATION_SOUNDS,
+  playNotificationSound,
+  preloadNotificationSound,
+  setNotificationSoundType,
+  stopNotificationSound,
+} from '@/utils/notificationSound.js';
+import {
+  PUSH_STATUS,
+  disablePush,
+  enablePush,
+  pushState,
+  syncPushSubscription,
+} from '@/utils/webPush.js';
 
 const { t } = useI18n()
 const accountStore = useAccountStore()
@@ -174,12 +228,102 @@ const appearanceTitle = computed(() =>
   settingStore.lang === 'zh' ? '外观' : 'Appearance'
 )
 
+/* ---------- Notification sound ---------- */
+
+const soundOptions = NOTIFICATION_SOUNDS
+
+// The store is the single source of truth, so the choice survives reloads.
+const soundType = computed({
+  get: () => settingStore.notificationSoundType,
+  set: (type) => {
+    settingStore.notificationSoundType = setNotificationSoundType(type)
+  },
+})
+
+// Auditioning should feel immediate: keep the selected file buffered.
+watch(
+  () => settingStore.notificationSoundType,
+  (type) => preloadNotificationSound(type)
+)
+
+watch(
+  () => settingStore.notificationSound,
+  (enabled) => {
+    if (!enabled) stopNotificationSound()
+  }
+)
+
+function previewSound() {
+  // An explicit click, so it plays even while the automatic sound is off.
+  playNotificationSound(settingStore.notificationSoundType, { force: true })
+}
+
+/* ---------- Web Push (system notifications) ---------- */
+
+const pushLoading = ref(false)
+const push = reactive({ supported: true, permission: PUSH_STATUS.DEFAULT, subscribed: false })
+
+const pushAvailable = computed(() => push.supported && push.permission !== PUSH_STATUS.DENIED)
+const pushOn = computed(() => push.subscribed)
+
+const pushStatusText = computed(() => {
+  if (!push.supported) return t('pushStatusUnsupported')
+  if (push.permission === PUSH_STATUS.DENIED) return t('pushStatusDenied')
+  return push.subscribed ? t('pushStatusOn') : t('pushStatusOff')
+})
+
+async function refreshPushState() {
+  try {
+    Object.assign(push, await pushState())
+  } catch (error) {
+    console.warn('Nova Mail: could not read the push state', error)
+  }
+}
+
+const PUSH_FAILURE_MESSAGE = {
+  [PUSH_STATUS.DENIED]: 'pushDeniedMsg',
+  [PUSH_STATUS.UNSUPPORTED]: 'pushUnsupportedMsg',
+  [PUSH_STATUS.UNAVAILABLE]: 'pushUnavailableMsg',
+  [PUSH_STATUS.DEFAULT]: 'pushDeniedMsg',
+}
+
+async function togglePush(enabled) {
+  if (pushLoading.value || !push.supported) return
+
+  pushLoading.value = true
+
+  try {
+    const result = enabled ? await enablePush() : await disablePush()
+
+    if (enabled && result.status !== PUSH_STATUS.GRANTED) {
+      ElMessage({
+        message: t(PUSH_FAILURE_MESSAGE[result.status] || 'reqFailErrorMsg'),
+        type: 'warning',
+        plain: true,
+      })
+    } else if (enabled) {
+      ElMessage({ message: t('pushEnabledMsg'), type: 'success', plain: true })
+    }
+  } catch (error) {
+    console.error('Nova Mail: push toggle failed', error)
+    ElMessage({ message: t('reqFailErrorMsg'), type: 'error', plain: true })
+  } finally {
+    pushLoading.value = false
+    await refreshPushState()
+  }
+}
+
 
 defineOptions({
   name: 'setting'
 })
 
 onMounted(async () => {
+  // Normalise a value persisted by an older build, then warm the sound the
+  // user is most likely to audition.
+  settingStore.notificationSoundType = setNotificationSoundType(settingStore.notificationSoundType)
+  preloadNotificationSound(settingStore.notificationSoundType)
+
   try {
     const account = await githubConnectedAccount()
     Object.assign(githubAccount, account)
@@ -196,6 +340,11 @@ onMounted(async () => {
   } catch {
     // The endpoint can be unavailable until the non-destructive migration runs.
   }
+
+  // Re-register a device whose endpoint rotated (or whose row was cleaned up
+  // after a 404/410), then show the real state. Both are best effort.
+  await syncPushSubscription()
+  await refreshPushState()
 })
 
 async function connectGithub() {
@@ -530,6 +679,67 @@ function submitPwd() {
     gap: 20px;
   }
 }
+
+  /* ---------- Notification sound ---------- */
+  .notification {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-bottom: 40px;
+    font-size: 14px;
+  }
+
+  .notification-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 14px 16px;
+    border: 1px solid var(--el-border-color-lighter);
+    border-radius: 12px;
+  }
+
+  .notification-label { min-width: 0; }
+
+  .notification-label > span { display: block; }
+
+  /* Status under the label: muted by default, primary once enabled. */
+  .notification-status {
+    display: block;
+    margin-top: 2px;
+    color: var(--regular-text-color);
+    font-size: 12px;
+  }
+
+  .notification-status.is-on { color: var(--el-color-primary); }
+
+  .notification-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .notification-select { width: 150px; }
+
+  .notification-play {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  @media (max-width: 767px) {
+    .notification-row {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 12px;
+    }
+
+    .notification-actions {
+      justify-content: space-between;
+    }
+
+    .notification-select { flex: 1; width: auto; }
+  }
 
   /* ---------- Appearance ---------- */
   .appearance {

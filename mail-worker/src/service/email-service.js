@@ -24,6 +24,7 @@ import account from "../entity/account";
 import { att } from '../entity/att';
 import telegramService from './telegram-service';
 import threadService from './thread-service';
+import pushService from './push-service';
 
 const MAX_SEARCH_LENGTH = 200;
 
@@ -1029,6 +1030,16 @@ const emailService = {
 			}
 
 			const emailRow = await orm(c).insert(email).values(emailData).returning().get();
+
+			// The recipient may be a different user of this instance: notify their
+			// devices too, so on-site mail behaves like an external delivery.
+			if (emailRow.userId > 0 && emailRow.status === emailConst.status.RECEIVE) {
+				pushService.scheduleNewMail(c, emailRow.userId, {
+					emailId: emailRow.emailId,
+					from: emailRow.sendEmail,
+					subject: emailRow.subject,
+				});
+			}
 
 			//设置附件保存
 			for (const attRow of attList) {

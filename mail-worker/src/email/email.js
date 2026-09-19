@@ -12,6 +12,7 @@ import userService from '../service/user-service';
 import telegramService from '../service/telegram-service';
 import aiService from '../service/ai-service';
 import webhookService from '../service/webhook-service';
+import pushService from '../service/push-service';
 
 export async function email(message, env, ctx) {
 
@@ -160,6 +161,16 @@ export async function email(message, env, ctx) {
 		}
 
 		emailRow = await emailService.completeReceive({ env }, account ? emailConst.status.RECEIVE : emailConst.status.NOONE, emailRow.emailId);
+
+		// Notify the owner's devices. `waitUntil` keeps delivery off the critical
+		// path: the mail is already stored, and push failures are swallowed.
+		if (account?.userId) {
+			pushService.scheduleNewMail({ env, executionCtx: ctx }, account.userId, {
+				emailId: emailRow.emailId,
+				from: emailRow.sendEmail,
+				subject: emailRow.subject,
+			});
+		}
 
 
 		if (ruleType === settingConst.ruleType.RULE) {

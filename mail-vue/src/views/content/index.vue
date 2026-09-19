@@ -180,7 +180,7 @@
 <script setup>
 import ShadowHtml from '@/components/shadow-html/index.vue'
 import {computed, reactive, ref, watch, nextTick, onMounted, onUnmounted} from "vue";
-import {useRouter} from 'vue-router'
+import {useRoute, useRouter} from 'vue-router'
 import {ElMessage, ElMessageBox} from 'element-plus'
 import {emailDelete, emailLatest, emailList, emailRead, emailThread} from "@/request/email.js";
 import {Icon} from "@iconify/vue";
@@ -199,12 +199,14 @@ import {EmailUnreadEnum} from "@/enums/email-enum.js";
 import SenderAvatar from '@/components/sender-avatar/index.vue'
 import {buildThreadMessages, threadSubjectKey} from '@/utils/mail-thread.js'
 import {quotedTextToHtml, wrapHtmlQuotes} from '@/utils/quoted-text.js'
+import {playNotificationSound} from '@/utils/notificationSound.js'
 
 const uiStore = useUiStore();
 const settingStore = useSettingStore();
 const accountStore = useAccountStore();
 const emailStore = useEmailStore();
 const router = useRouter()
+const route = useRoute()
 const email = computed(() => emailStore.contentData.email || {
   emailId: 0,
   attList: [],
@@ -435,6 +437,49 @@ watch(
     },
     { immediate: true }
 )
+
+/**
+ * Open the conversation a system notification points at.
+ *
+ * A push notification carries `mail?emailId=<id>`; the reader is normally fed by
+ * the Inbox (`contentData.email`), so a cold deep link has to load that message
+ * itself. The thread endpoint already returns every message of the
+ * conversation, so the anchor is picked out of it and the rest is merged for the
+ * reader's own assembly.
+ */
+async function openFromNotificationLink() {
+  const emailId = Number(route.query.emailId) || 0
+  if (!emailId) return
+  if (Number(emailStore.contentData.email?.emailId) === emailId) return
+
+  try {
+    const accountId = Number(emailStore.contentData.email?.accountId) || accountStore.currentAccountId
+    const allReceive = accountStore.currentAccount?.allReceive
+    const data = await emailThread(emailId, accountId, allReceive)
+    const messages = Array.isArray(data?.messages) ? data.messages : []
+
+    if (!messages.length) return
+
+    const target = messages.find(message => Number(message.emailId) === emailId) || messages[messages.length - 1]
+
+    for (const message of messages) {
+      emailStore.mergeFullEmail(message)
+    }
+
+    // Same defaults the Inbox applies when a row is opened.
+    emailStore.contentData.email = emailStore.detailMap[target.emailId] || target
+    emailStore.contentData.delType = 'logic'
+    emailStore.contentData.showUnread = true
+    emailStore.contentData.showStar = true
+    emailStore.contentData.showReply = true
+  } catch (error) {
+    console.error('Nova Mail: could not open the notified mail', error)
+  }
+}
+
+// The reader is kept alive, so a click on another notification while it is open
+// only changes the query string.
+watch(() => route.query.emailId, () => openFromNotificationLink())
 
 let lastThreadMessageId = ''
 
@@ -677,7 +722,16 @@ function ingestIncoming(rows) {
   }
 
   // Announce the newest arrival to the thread watcher (auto-expand + scroll).
-  if (newestId) pendingArrivalId = String(newestId)
+  if (newestId) {
+    pendingArrivalId = String(newestId)
+
+    // A reply that lands in the conversation being read is new mail too. Opening
+    // a conversation never reaches here: the cursor is primed to the newest
+    // known message, so the first poll has nothing to ingest.
+    if (settingStore.notificationSound) {
+      playNotificationSound(settingStore.notificationSoundType)
+    }
+  }
 }
 
 async function pollOnce() {
@@ -847,6 +901,9 @@ watch(
 )
 
 onMounted(() => {
+  // A notification click lands straight on /mail?emailId=… with nothing in the
+  // store yet; load it before anything tries to mark it read.
+  openFromNotificationLink()
   tryMarkRead()
   startRealtime()
   document.addEventListener('visibilitychange', handleVisibilityChange)
