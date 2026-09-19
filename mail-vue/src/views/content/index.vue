@@ -54,6 +54,16 @@
                   <span v-if="message.from.email" class="sender-email">&lt;{{ message.from.email }}&gt;</span>
                 </div>
 
+                <!-- Collapsed card: compact recipient line. The expanded card
+                     shows the full metadata panel instead (From/To), so this is
+                     hidden there to avoid repeating the same information. -->
+                <div
+                    v-if="!isMessageExpanded(message) && recipientLabelFor(message)"
+                    class="message-recipient-preview"
+                >
+                  {{ $t('to') }} {{ recipientLabelFor(message) }}
+                </div>
+
                 <!-- Receiver line + header metadata only exist on the expanded
                      card: a collapsed card must not leak header metadata. -->
                 <template v-if="isMessageExpanded(message)">
@@ -172,7 +182,7 @@ import ShadowHtml from '@/components/shadow-html/index.vue'
 import {computed, reactive, ref, watch, nextTick, onMounted, onUnmounted} from "vue";
 import {useRouter} from 'vue-router'
 import {ElMessage, ElMessageBox} from 'element-plus'
-import {emailDelete, emailLatest, emailList, emailRead} from "@/request/email.js";
+import {emailDelete, emailLatest, emailList, emailRead, emailThread} from "@/request/email.js";
 import {Icon} from "@iconify/vue";
 import {useEmailStore} from "@/store/email.js";
 import {useAccountStore} from "@/store/account.js";
@@ -229,9 +239,15 @@ const quoteLabel = computed(() => `… ${t('showQuotedContent')}`)
 // subject, plus anything sent from this session (see the email store).
 const thread = computed(() => buildThreadMessages(
     email.value,
-    Object.values(emailStore.detailMap),
+    [...serverThread.value, ...Object.values(emailStore.detailMap)],
     emailStore.threadMessages
 ))
+
+// Messages returned by `GET /email/thread`. The Inbox only carries the newest
+// message of a conversation, so the reader asks the server for the whole thread
+// (original + every reply, including the user's own sent replies).
+const serverThread = ref([])
+const threadRequesting = ref(0)
 
 // Per-message UI state, keyed by message id.
 const expandedMessages = reactive({})
@@ -355,6 +371,70 @@ watch(quoteLabel, () => {
   quotedBodyCache.clear()
   resolveThreadBodies()
 })
+
+/**
+ * Load every message of the open conversation.
+ *
+ * The Inbox collapses replies into their conversation, so the list no longer
+ * carries the older messages. This pulls the whole thread and merges it into
+ * the store; `buildThreadMessages` then renders original → reply 1 → reply 2…
+ */
+async function fetchThreadMessages() {
+  const current = email.value
+  const emailId = Number(current?.emailId) || 0
+
+  if (!emailId) {
+    serverThread.value = []
+    return
+  }
+
+  threadRequesting.value = emailId
+
+  try {
+    const accountId = Number(current.accountId) || accountStore.currentAccountId
+    const allReceive = accountStore.currentAccount?.allReceive
+    const data = await emailThread(emailId, accountId, allReceive)
+
+    // The reader moved to another message while this was in flight.
+    if ((Number(email.value?.emailId) || 0) !== emailId) return
+
+    const messages = Array.isArray(data?.messages) ? data.messages : []
+    serverThread.value = messages
+
+    // Adopt the server-resolved conversation key, so a message opened from a
+    // list that does not carry `threadId` (e.g. starred) still groups by it.
+    if (data?.threadId) {
+      if (current && !current.threadId) current.threadId = data.threadId
+      const stored = emailStore.detailMap[emailId]
+      if (stored && !stored.threadId) stored.threadId = data.threadId
+    }
+
+    // Keep the shared caches warm so the realtime poll and other views agree.
+    for (const message of messages) {
+      emailStore.mergeFullEmail(message)
+    }
+
+    await nextTick()
+    tryMarkRead()
+  } catch (error) {
+    console.error('Nova Mail: failed to load the conversation', error)
+    if ((Number(email.value?.emailId) || 0) === emailId) serverThread.value = []
+  } finally {
+    if (threadRequesting.value === emailId) threadRequesting.value = 0
+  }
+}
+
+// Opening a message (or switching conversation inside the reader) reloads the
+// whole thread; the first paint uses the local pool until it arrives.
+watch(
+    () => Number(email.value?.emailId) || 0,
+    (id, previous) => {
+      if (!id || id === previous) return
+      serverThread.value = []
+      fetchThreadMessages()
+    },
+    { immediate: true }
+)
 
 let lastThreadMessageId = ''
 
@@ -711,7 +791,15 @@ let readRequesting = false
 function tryMarkRead() {
   if (!emailStore.contentData.showUnread || readRequesting) return
   const current = email.value
-  if (!current?.emailId || current.unread !== EmailUnreadEnum.UNREAD) return
+  if (!current?.emailId) return
+
+  // Reading a conversation reads all of it, not just the newest message.
+  const messages = thread.value.messages
+  const unread = messages.filter(
+      message => message.emailId && Number(message.unread) === EmailUnreadEnum.UNREAD
+  )
+
+  if (!unread.length) return
 
   // 等详情数据就绪（detailMap 已写入，或正文已有内容）再标已读
   const full = emailStore.detailMap[current.emailId]
@@ -719,13 +807,30 @@ function tryMarkRead() {
   if (!detailReady) return
 
   readRequesting = true
-  const emailId = current.emailId
-  current.unread = EmailUnreadEnum.READ
-  if (emailStore.detailMap[emailId]) {
-    emailStore.detailMap[emailId].unread = EmailUnreadEnum.READ
+
+  const unreadIds = []
+
+  for (const message of messages) {
+    if (Number(message.unread) !== EmailUnreadEnum.UNREAD) continue
+
+    const emailId = Number(message.emailId) || 0
+    if (!emailId) continue
+
+    unreadIds.push(emailId)
+    message.unread = EmailUnreadEnum.READ
+    if (emailStore.detailMap[emailId]) {
+      emailStore.detailMap[emailId].unread = EmailUnreadEnum.READ
+    }
+    // The Inbox row is the conversation's newest message.
+    emailStore.markListRead(emailId)
   }
-  emailStore.markListRead(emailId)
-  emailRead([emailId]).finally(() => {
+
+  if (!unreadIds.length) {
+    readRequesting = false
+    return
+  }
+
+  emailRead(unreadIds).finally(() => {
     readRequesting = false
   })
 }
@@ -1233,6 +1338,19 @@ const handleDelete = () => {
   font-size: 13px;
 }
 
+/* Collapsed-card recipient line ("To …"). Hidden once the card is expanded,
+   where the metadata panel owns From/To. */
+.message-recipient-preview {
+  margin-top: 6px;
+  min-width: 0;
+  max-width: 100%;
+  color: var(--secondary-text-color);
+  font-size: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .recipient-toggle { display: inline-flex; align-items: center; gap: 5px; margin-top: 4px; padding: 0; color: var(--regular-text-color); font-size: 12px; cursor: pointer; text-align: left; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .recipient-toggle:hover { color: var(--el-color-primary); }
 .message-date { flex: 0 0 auto; margin-left: auto; padding-top: 2px; color: var(--regular-text-color); font-size: 12px; white-space: nowrap; }
@@ -1639,6 +1757,15 @@ const handleDelete = () => {
     grid-row: 3;
     margin-top: 4px;
     max-width: 100%;
+  }
+
+  /* Row 3 while collapsed. The expanded card swaps in the recipient-toggle /
+     metadata panel, which occupy the same grid cell. */
+  .message-head .message-recipient-preview {
+    grid-column: 2 / 5;
+    grid-row: 3;
+    margin-top: 4px;
+    font-size: 12px;
   }
 
   .message-head .message-details {

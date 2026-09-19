@@ -82,6 +82,9 @@ export function toThreadMessage(raw) {
         emailId,
         localId: raw?.localId || '',
         subject: raw?.subject || '',
+        // Server-resolved conversation key (In-Reply-To → References → subject).
+        // When present it is the authoritative grouping key.
+        threadId: raw?.threadId || '',
         from: {
             name: raw?.name || raw?.sendEmail || '',
             email: raw?.sendEmail || '',
@@ -123,6 +126,12 @@ function messageOrder(message) {
 function isCandidate(primary, raw) {
     if (!raw) return false
     if (!messageId(raw) && !raw.localId) return false
+
+    // An explicit conversation key wins: the server already resolved the thread
+    // from the reply headers, so membership is not an account question.
+    if (primary?.threadId && raw.threadId && primary.threadId === raw.threadId) {
+        return true
+    }
 
     // Never merge conversations that belong to different accounts.
     if (
@@ -194,7 +203,20 @@ export function buildThreadMessages(primary, pool = [], extra = []) {
     // Seed with the message the reader opened.
     push(primary)
 
-    // 1) Same normalised subject.
+    // 1) Explicit conversation key — the server resolved it from In-Reply-To /
+    //    References, so this is the authoritative grouping.
+    const primaryThreadId = primary?.threadId
+
+    if (primaryThreadId) {
+        for (const raw of [...others, ...extra]) {
+            if (!isCandidate(primary, raw)) continue
+            if (raw?.threadId !== primaryThreadId) continue
+            push(raw)
+        }
+    }
+
+    // 2) Same normalised subject — compatibility path for rows stored before
+    //    conversation keys existed (and for locally composed replies).
     if (key) {
         for (const raw of [...others, ...extra]) {
             if (!isCandidate(primary, raw)) continue
@@ -203,7 +225,7 @@ export function buildThreadMessages(primary, pool = [], extra = []) {
         }
     }
 
-    // 2) Reply graph — grow until no new message can be linked.
+    // 3) Reply graph — grow until no new message can be linked.
     let grew = true
     while (grew) {
         grew = false

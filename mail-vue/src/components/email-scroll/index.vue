@@ -907,6 +907,44 @@ function deleteEmail(emailIds) {
 
 function addItem(email) {
 
+  // The Inbox lists conversations, not messages: a new reply must re-order and
+  // refresh its conversation row instead of adding a second inbox item.
+  if (props.type === 'email' && email.threadId) {
+    const threadIndex = emailList.findIndex(item => item.threadId && item.threadId === email.threadId)
+
+    if (threadIndex > -1) {
+      const previous = emailList[threadIndex]
+
+      // Same representative message: nothing to update.
+      if (previous.emailId === email.emailId) {
+        return false
+      }
+
+      const merged = { ...previous, ...email }
+      // Preserve row-local UI state.
+      merged.checked = previous.checked
+      merged.expand = previous.expand
+
+      emailList.splice(threadIndex, 1)
+
+      if (noLoading.value) {
+        handleList([merged])
+      }
+
+      if (props.timeSort) {
+        emailList.push(merged)
+      } else {
+        emailList.unshift(merged)
+      }
+
+      if (email.emailId > (latestEmail.value?.emailId || 0)) {
+        latestEmail.value = email
+      }
+
+      return false
+    }
+  }
+
   const existIndex = emailList.findIndex(item => item.emailId === email.emailId)
 
   if (existIndex > -1) {
