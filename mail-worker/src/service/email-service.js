@@ -325,8 +325,7 @@ const emailService = {
 	},
 
 	toListText(item) {
-		const raw = emailUtils.formatText(item.text) || emailUtils.htmlToText(item.content);
-		return raw.replace(/\s+/g, ' ').trim().slice(0, EMAIL_LIST_TEXT_LEN);
+		return emailUtils.toPreviewText(item.text, item.content).slice(0, EMAIL_LIST_TEXT_LEN);
 	},
 
 	applyListText(list) {
