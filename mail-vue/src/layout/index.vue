@@ -30,8 +30,12 @@
     <button @click="uiStore.asideShow = true">
       <AppIcon name="folder-nav" :size="24" /><span>{{ $t('folders') }}</span>
     </button>
-    <button :class="{active: route.name === 'star'}" @click="router.push({name: 'star'})">
-      <AppIcon name="starred-nav" :size="24" /><span>{{ $t('starred') }}</span>
+    <button
+        v-perm="'email:send'"
+        :class="{active: route.name === 'draft'}"
+        @click="router.push({name: 'draft'})"
+    >
+      <AppIcon name="drafts-nav" :size="24" /><span>{{ $t('drafts') }}</span>
     </button>
     <button :class="{active: route.name === 'setting'}" @click="router.push({name: 'setting'})">
       <AppIcon name="settings-top" :size="24" /><span>{{ $t('settings') }}</span>
@@ -268,7 +272,11 @@ onBeforeUnmount(() => {
     bottom: 0;
 
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    /* Any number of items share the row equally, so hiding Drafts (no send
+       permission) keeps the remaining tabs balanced instead of leaving a gap. */
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    grid-template-columns: none;
     align-items: center;
 
     height: calc(56px + env(safe-area-inset-bottom, 0px));

@@ -1,6 +1,26 @@
 <template>
   <div class="email-container" :class="{ 'mobile-selecting': mobileSelecting }">
     <div v-if="type === 'email'" class="mobile-inbox-tools">
+      <div class="mobile-search-row">
+        <label class="mobile-search">
+          <AppIcon name="search" :size="18" />
+          <input
+              v-model.trim="mobileSearchInput"
+              type="search"
+              :placeholder="t('searchShort')"
+              :aria-label="t('searchShort')"
+              @keydown.esc="mobileSearchInput = ''"
+          />
+          <button
+              v-if="mobileSearchInput"
+              class="mobile-search-clear"
+              type="button"
+              :aria-label="t('clearSearch')"
+              @click="mobileSearchInput = ''"
+          >×</button>
+        </label>
+      </div>
+
       <div class="mobile-filter-bar">
         <div class="mobile-filters">
           <button
@@ -153,19 +173,6 @@
                          and must never leak back into a row. -->
                     <span v-if="item.listText" class="email-content">{{ item.listText }}</span>
                   </div>
-                  <button
-                      v-if="type === 'email' && showStar"
-                      class="mobile-row-star"
-                      :aria-label="t('star')"
-                      @click.stop="starChange(item)"
-                  >
-                    <Icon
-                        :class="['inbox-star-icon', { 'is-active': item.isStar }]"
-                        :icon="item.isStar ? 'solar:star-bold' : 'solar:star-linear'"
-                        width="19"
-                        height="19"
-                    />
-                  </button>
 
                   <div class="user-info" v-if="showUserInfo">
                     <div class="user">
@@ -185,6 +192,25 @@
               </div>
               <div class="email-right" :style="showUserInfo ? 'align-self: start;':''">
                 <span class="email-time" :style="(item.unread === EmailUnreadEnum.UNREAD && showUnread) ? 'font-weight: bold' : ''">{{ item.formatCreateTime }}</span>
+              </div>
+              <!-- Fixed right-hand metadata/action column (time above star).
+                   Both share one centred flex column so the star never drifts
+                   with the timestamp's width. -->
+              <div v-if="type === 'email'" class="mobile-row-meta">
+                <span class="mobile-meta-time">{{ item.formatCreateTime }}</span>
+                <button
+                    v-if="showStar"
+                    class="mobile-row-star"
+                    :aria-label="t('star')"
+                    @click.stop="starChange(item)"
+                >
+                  <Icon
+                      :class="['inbox-star-icon', { 'is-active': item.isStar }]"
+                      :icon="item.isStar ? 'solar:star-bold' : 'solar:star-linear'"
+                      width="19"
+                      height="19"
+                  />
+                </button>
               </div>
             </div>
             <skeletonBlock v-else-if="item.expand === 'loading'"
@@ -407,9 +433,13 @@ let reqLock = false
 let isMobile = ref(innerWidth < 1367)
 const isPhone = ref(innerWidth < 768)
 
-// The phone search field now lives in the mobile header; its query is shared
-// through the email store so the list keeps filtering here.
+// The phone search field sits on its own row under the Inbox header and shares
+// its query through the email store so the list keeps filtering here.
 const mobileSearch = computed(() => emailStore.mobileSearch)
+const mobileSearchInput = computed({
+  get: () => emailStore.mobileSearch,
+  set: value => { emailStore.mobileSearch = value }
+})
 const mobileFilter = ref('all')
 const mobileSelecting = ref(false)
 
@@ -1864,6 +1894,7 @@ ul {
 
 .mobile-inbox-tools,
 .mobile-sender-avatar,
+.mobile-row-meta,
 .mobile-row-star,
 .mobile-filter-empty {
   display: none;
@@ -1880,7 +1911,7 @@ ul {
     grid-template-rows: auto auto minmax(0, 1fr);
   }
 
-  /* ---------- Inbox tools (filter row) ---------- */
+  /* ---------- Inbox tools (search + filter rows) ---------- */
 
   .mobile-inbox-tools {
     display: block;
@@ -1891,6 +1922,93 @@ ul {
        mail row, without adding height to the Inbox header block. */
     padding: 0 0 4px;
     background: var(--nova-surface);
+  }
+
+  /* ---------- Search row ---------- */
+
+  .mobile-search-row {
+    /* Page gutter shared with the app bar and mail rows. */
+    padding: 2px 12px 8px;
+    box-sizing: border-box;
+  }
+
+  .mobile-search {
+    width: 100%;
+    height: 44px;
+
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    padding: 0 12px;
+    box-sizing: border-box;
+
+    border: 1px solid var(--nova-search-border);
+    border-radius: 12px;
+
+    /* A step above the page surface in both themes: light keeps the iOS grey,
+       dark lifts off the near-black page instead of dissolving into it. */
+    background: var(--nova-search-bg);
+    color: var(--mobile-secondary);
+
+    transition: border-color var(--nova-motion-fast) var(--nova-motion-ease),
+                box-shadow var(--nova-motion-fast) var(--nova-motion-ease);
+  }
+
+  .mobile-search:focus-within {
+    border-color: color-mix(in srgb, var(--el-color-primary) 55%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--el-color-primary) 12%, transparent);
+  }
+
+  .mobile-search .app-icon {
+    flex: 0 0 auto;
+    width: 18px;
+    height: 18px;
+    opacity: .72;
+  }
+
+  .mobile-search input {
+    flex: 1 1 auto;
+    width: 0;
+    min-width: 0;
+    height: 100%;
+
+    border: 0;
+    outline: 0;
+    background: transparent;
+
+    color: var(--mobile-primary);
+    font-size: 15px;
+    text-overflow: ellipsis;
+  }
+
+  .mobile-search input::placeholder {
+    color: color-mix(in srgb, var(--mobile-secondary) 88%, transparent);
+    opacity: 1;
+  }
+
+  .mobile-search-clear {
+    flex: 0 0 auto;
+
+    width: 24px;
+    height: 24px;
+    padding: 0;
+
+    display: grid;
+    place-items: center;
+
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+
+    color: var(--mobile-secondary);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .mobile-search-clear:active {
+    background: var(--nova-hover);
   }
 
   /* ---------- Filters ---------- */
@@ -2017,7 +2135,10 @@ ul {
     position: relative;
 
     display: grid;
-    grid-template-columns: 44px minmax(0, 1fr);
+    /* Avatar | message body | fixed metadata/action column. The middle track is
+       the only flexible one, so long senders/subjects truncate instead of
+       pushing the time + star around. */
+    grid-template-columns: 44px minmax(0, 1fr) 62px;
 
     /* 44px avatar + 8px gutter; the tighter left inset pulls the whole row in. */
     column-gap: 8px;
@@ -2064,7 +2185,7 @@ ul {
 
   .email-container.mobile-selecting
     :deep(.email-row.email) {
-    grid-template-columns: 20px 42px minmax(0, 1fr);
+    grid-template-columns: 20px 44px minmax(0, 1fr) 62px;
   }
 
   .email-container.mobile-selecting
@@ -2124,12 +2245,13 @@ ul {
 
     width: 100%;
     min-width: 0;
+    max-width: 100%;
 
     display: block;
 
     padding: 0;
 
-    position: relative;
+    overflow: hidden;
   }
 
   .email-container.mobile-selecting
@@ -2150,8 +2272,8 @@ ul {
     line-height: 20px;
     margin-bottom: 1px;
 
-    /* Keeps the timestamp clear of the star target on the right. */
-    padding-right: 26px;
+    /* Overflow lives in the row's own meta column now. */
+    padding-right: 0;
 
     color: var(--mobile-primary);
 
@@ -2184,19 +2306,10 @@ ul {
     display: none;
   }
 
+  /* The timestamp moved to the row's metadata column; the inline copy would
+     duplicate it. */
   :deep(.email-row.email .phone-time) {
-    flex: none;
-
-    display: block;
-
-    margin-left: auto;
-
-    /* Metadata, not message: the dimmest ink in the row. */
-    color: color-mix(in srgb, var(--mobile-tertiary) 78%, transparent);
-
-    font-size: 12.5px;
-    line-height: 20px;
-    font-weight: 400;
+    display: none;
   }
 
   :deep(.email-row.email .email-text) {
@@ -2205,7 +2318,7 @@ ul {
     width: 100%;
     min-width: 0;
 
-    padding-right: 26px;
+    padding-right: 0;
     margin-top: 1px;
 
     line-height: 18px;
@@ -2275,45 +2388,82 @@ ul {
     background: var(--el-color-primary);
   }
 
+  /* ---------- Metadata column (time above star) ---------- */
+
+  .mobile-row-meta {
+    grid-column: 3;
+
+    align-self: start;
+
+    width: 62px;
+    min-width: 62px;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+
+    gap: 3px;
+
+    padding-top: 1px;
+  }
+
+  .email-container.mobile-selecting
+    .mobile-row-meta {
+    grid-column: 4;
+  }
+
+  .mobile-meta-time {
+    display: block;
+
+    max-width: 100%;
+
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    text-align: center;
+
+    /* Tabular digits keep the label from twitching as the value changes. */
+    font-variant-numeric: tabular-nums;
+
+    /* Metadata, not message: the dimmest ink in the row. */
+    color: color-mix(in srgb, var(--mobile-tertiary) 82%, transparent);
+
+    font-size: 12.5px;
+    line-height: 18px;
+    font-weight: 400;
+  }
+
   /* ---------- Mobile star ---------- */
 
   .mobile-row-star {
-    position: absolute;
-
-    /* Smaller, lighter glyph vertically centred in the row. The ::before keeps a
-       44x44 touch target without widening the visual button. */
-    right: 8px;
-    top: 26px;
-
-    width: 28px;
-    height: 28px;
+    /* Auxiliary row action: a 36px tap target around a 19px glyph, no plate. */
+    width: 36px;
+    height: 36px;
+    flex: 0 0 auto;
 
     display: grid;
     place-items: center;
 
     padding: 0;
+    margin: 0;
 
     border: 0;
     background: transparent;
 
-    /* Dim the whole button: global `html.dark .iconify { opacity: … !important }`
-       rules make the child's own opacity unreliable, but parent opacity always
-       composites over the subtree. */
-    opacity: .6;
-
     cursor: pointer;
   }
 
-  .mobile-row-star::before {
-    content: '';
-
-    position: absolute;
-    inset: -8px;
+  .mobile-row-star .iconify {
+    width: 19px !important;
+    height: 19px !important;
   }
 
-  .mobile-row-star .iconify {
-    width: 20px !important;
-    height: 20px !important;
+  /* Starred rows use the theme accent on the phone list (the desktop list keeps
+     the global treatment). `!important` outranks the global dark icon veil. */
+  .mobile-row-star .inbox-star-icon.is-active {
+    color: var(--el-color-primary) !important;
+    opacity: 1 !important;
   }
 
   /* ---------- Filtered empty ---------- */

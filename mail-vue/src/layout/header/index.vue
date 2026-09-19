@@ -10,30 +10,12 @@
       <button v-if="keyword" class="search-clear" type="button" :aria-label="$t('clearSearch')" @click="clear">×</button>
 
     </label>
-    <!-- Phone-only inline search: sits between the title and the theme/avatar
-         controls instead of owning a full-width row. Kept in sync with the
-         client-side Inbox filter through the email store. -->
-    <label
-        v-show="route.name === 'email'"
-        class="mobile-inline-search"
-    >
-      <AppIcon name="search" :size="18" />
-      <input
-          v-model.trim="mobileSearch"
-          type="search"
-          :placeholder="$t('searchShort')"
-          :aria-label="$t('searchShort')"
-          @keydown.esc="mobileSearch = ''"
-      />
-    </label>
     <div class="toolbar">
       <div v-if="uiStore.dark" class="sun-icon icon-item" @click="openDark($event)">
         <AppIcon name="theme-toggle" :size="20" />
-        <Icon class="mobile-theme-icon" icon="mingcute:sun-fill" width="23" height="23" />
       </div>
       <div v-else class="dark-icon icon-item" @click="openDark($event)">
         <AppIcon name="theme-toggle" :size="20" />
-        <Icon class="mobile-theme-icon" icon="solar:moon-linear" width="23" height="23" />
       </div>
       <div
           class="notice icon-item"
@@ -128,12 +110,6 @@ const uiStore = useUiStore();
 const accountStore = useAccountStore();
 const emailStore = useEmailStore();
 const {keyword, clear, handleKeydown} = useMailSearch();
-// Phone Inbox search field: proxies the store so the list keeps filtering in
-// email-scroll while the input lives in the header.
-const mobileSearch = computed({
-  get: () => emailStore.mobileSearch,
-  set: value => { emailStore.mobileSearch = value }
-})
 const logoutLoading = ref(false)
 const userInfoShow = ref(false)
 const userinfoRef = ref({})
@@ -321,15 +297,6 @@ function formatName(email) {
 /* Mobile Header v2.
    Desktop behavior, mail search, OAuth avatars and account switching remain
    owned by the stable implementation above. */
-.mobile-theme-icon {
-  display: none;
-}
-
-/* The inline search only exists on phones; on desktop the wide search-shell
-   owns the middle grid column. */
-.mobile-inline-search {
-  display: none;
-}
 
 @media (max-width: 767px) {
   .header,
@@ -337,17 +304,13 @@ function formatName(email) {
     height: 60px;
     min-height: 60px;
 
-    /* Symmetric padding: the grid content box is centred on the viewport, so a
-       full-width row item centred inside it lands on the viewport centre line. */
     padding: 0 12px;
     column-gap: 6px;
     row-gap: 0;
 
-    /* Side margin the centred pill must keep clear of the menu + title. Tuned
-       with the 15px title so the search gets a little more width. */
-    --mobile-appbar-reserve: 96px;
-
-    grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
+    /* The title owns the free row; the toolbar keeps its intrinsic width. The
+       Inbox search now lives on its own row underneath the app bar. */
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
 
     background: var(--nova-surface);
@@ -360,83 +323,35 @@ function formatName(email) {
     gap: 2px;
   }
 
-  /* The pill spans the whole row and centres itself, so it ignores how wide the
-     title cluster is — the old `justify-self: end` pushed it toward the avatar. */
-  .mobile-inline-search {
-    grid-column: 1 / -1;
-    grid-row: 1;
-    justify-self: center;
-  }
-
   .toolbar {
-    grid-column: 3;
+    grid-column: 2;
     grid-row: 1;
+
+    gap: 2px;
+    align-items: center;
+    justify-content: end;
   }
 
   .search-shell {
     display: none;
   }
 
-  /* Inline search pill. Width is owned by the scoped block, which centres it on
-     the viewport and shrinks it before it can touch the title or the avatar. */
-  .mobile-inline-search {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-
-    max-width: none;
-    min-width: 0;
-    height: 38px;
-
-    padding: 0 9px;
-    box-sizing: border-box;
-
-    border-radius: 12px;
-    color: var(--mobile-secondary);
-    /* Softer than a solid muted fill: the pill reads as a field, not a block. */
-    background: color-mix(in srgb, var(--nova-surface-muted) 72%, transparent);
-  }
-
-  .mobile-inline-search :deep(.app-icon) {
-    flex: 0 0 auto;
-    width: 17px;
-    height: 17px;
-    opacity: .6;
-  }
-
-  .mobile-inline-search input {
-    flex: 1 1 auto;
-    width: 0;
-    min-width: 0;
-    height: 100%;
-
-    border: 0;
-    outline: 0;
-    background: transparent;
-
-    color: var(--mobile-primary);
-    font-size: 15px;
-    text-overflow: ellipsis;
-  }
-
-  .mobile-inline-search input::placeholder {
-    color: var(--mobile-tertiary);
-    opacity: .82;
-  }
-
-  .toolbar {
-    gap: 0;
-    align-items: center;
-  }
-
+  /* Quiet square tap targets: 38px clears the 36px minimum without turning the
+     app bar into a row of filled buttons. */
   .toolbar .icon-item {
-    width: 40px;
-    height: 40px;
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
   }
 
-  /* The phone app bar hides the entire theme toggle (see the scoped block
-     below); these stale icon swap rules lived in a non-scoped <style> where
-     :deep() is invalid and never applied, so they are simply gone. */
+  /* Phones keep the bundled sun/moon asset (dark → sun, light → moon), scaled
+     to ~21px and centred in the 38px target. */
+  .toolbar .sun-icon .app-icon,
+  .toolbar .dark-icon .app-icon {
+    width: 21px;
+    height: 21px;
+  }
+
   .toolbar .notice {
     display: none;
   }
@@ -454,8 +369,8 @@ function formatName(email) {
   }
 
   .toolbar .avatar {
-    width: 42px;
-    height: 42px;
+    width: 40px;
+    height: 40px;
 
     margin: 0;
 
@@ -724,30 +639,12 @@ function formatName(email) {
     column-gap: 6px;
     row-gap: 0;
     align-items: center;
-    grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
-    --mobile-appbar-reserve: 96px;
+    grid-template-columns: minmax(0, 1fr) auto;
   }
-  .header.not-send { grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto; }
+  .header.not-send { grid-template-columns: minmax(0, 1fr) auto; }
   .search-shell { display: none; }
   .header-btn { grid-column: 1; grid-row: 1; gap: 2px; }
-  /* True horizontal centring: the label owns the full grid row and centres
-     inside it, so its middle sits on the viewport centre line regardless of the
-     title width. `100% - 2 * reserve` shrinks the pill first at narrow widths
-     (≈92px at 320, ≈138px at 360) while keeping it off the title and avatar. */
-  .mobile-inline-search {
-    grid-column: 1 / -1;
-    grid-row: 1;
-    justify-self: center;
-
-    width: min(300px, calc(100% - 2 * var(--mobile-appbar-reserve, 96px)));
-    max-width: none;
-  }
-  /* The AppIcon wrapper is a child-component root, so the scoped attribute
-     matches it; !important outranks the global dark icon veil. */
-  .header .mobile-inline-search .app-icon {
-    opacity: .62 !important;
-  }
-  .toolbar { grid-column: 3; grid-row: 1; gap: 0; }
+  .toolbar { grid-column: 2; grid-row: 1; gap: 2px; }
   /* Menu button: a fixed 44px tap target instead of the 50px the hamburger
      component's inline `padding: 0 15px` produced, so the title sits closer. */
   .menu-button {
@@ -757,16 +654,17 @@ function formatName(email) {
     display: grid;
     place-items: center;
   }
-  /* Phones drop the theme toggle; the freed space now belongs to the search. */
+  /* Phones keep the theme toggle: it sits between the title and the avatar and
+     swaps the sun/moon glyph, vertically centred on the avatar. */
   .toolbar .sun-icon,
-  .toolbar .dark-icon { display: none; }
+  .toolbar .dark-icon { width: 38px; height: 38px; }
   .toolbar .notice { display: none; }
   .toolbar .setting-icon { display: none; }
   .toolbar .avatar { margin-left: 0; }
-  /* 40px avatar, 40px tap target — Gmail Android app-bar proportions. */
+  /* 40px avatar, 40px tap target — unchanged from the stable mobile chrome. */
   .toolbar .avatar .avatar-text { width: 40px; height: 40px; }
   .toolbar .avatar .avatar-image { width: 40px; height: 40px; flex: 0 0 40px; }
-  .toolbar .icon-item { width: 40px; height: 40px; }
+  .toolbar .icon-item { width: 38px; height: 38px; }
   .toolbar .avatar .account-summary { display: none; }
   .breadcrumb-item { font-size: 15px; }
 }
