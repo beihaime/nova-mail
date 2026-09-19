@@ -2324,29 +2324,52 @@ const handleDelete = () => {
     padding: 0 12px 16px;
   }
 
-  /* ---- Conversation stack (Gmail-style) ----------------------------------
-     The cards read as one continuous flow, not as a column of identical
-     bricks. The uniform flex `gap` is dropped so every card owns its own
-     vertical rhythm through the position classes: `is-middle` is the tight
-     band, `is-head` / `is-tail` keep a little breathing room at the ends and
-     a lone message (`is-single`) is spaced like a normal card. */
+  /* ---- Conversation sheet (Gmail-style) ----------------------------------
+     The messages are ONE continuous sheet, not a column of cards: no gap, no
+     per-card outer margin, a single hairline between neighbours and rounding
+     only at the two outer corners.
+
+     The `.thread-message` articles are the direct children of `.thread` (there
+     is no wrapper between them), so `:first-child` / `:last-child` /
+     `:only-child` match the real message items. */
   .thread {
     gap: 0;
   }
 
-  .thread-message {
-    border-radius: 12px;
-
-    /* Belt and braces with the base rule: a phone card must never be held open
-       by a height it does not need. */
-    height: auto;
-    min-height: 0;
+  /* One surface and one hairline colour for the whole sheet. The expanded card
+     used to switch to `--el-bg-color` and a tinted border, which cut the
+     conversation into separate blocks and showed the page colour between them. */
+  .thread-message,
+  .thread-message.is-expanded,
+  .thread-message.is-latest:not(.is-expanded),
+  .thread-message.is-mine.is-expanded {
+    background: var(--nova-surface-muted);
+    border-color: var(--nova-divider);
   }
 
-  .thread-message.is-single { margin-block: 12px 14px; }
-  .thread-message.is-head   { margin-top: 12px;  margin-bottom: 6px; }
-  .thread-message.is-middle { margin-top: 4px;   margin-bottom: 4px; }
-  .thread-message.is-tail   { margin-top: 4px;   margin-bottom: 12px; }
+  .thread-message {
+    /* Content-driven height, and never an outer gap — collapsed or expanded. */
+    height: auto;
+    min-height: 0;
+    margin: 0;
+    border-radius: 0;
+
+    /* Draw the sheet edges here rather than with a full border on every card:
+       the top edge doubles as the divider, so two neighbours share ONE 1px line
+       instead of stacking two. The bottom edge belongs to the last card only. */
+    border-width: 1px 1px 0 1px;
+  }
+
+  .thread-message:last-child {
+    border-bottom-width: 1px;
+  }
+
+  /* Top corners on the first message, bottom corners on the last, full rounding
+     when the conversation holds a single message. `:only-child` is last so it
+     wins over the two edge cases it also matches. */
+  .thread-message:first-child { border-radius: 12px 12px 0 0; }
+  .thread-message:last-child  { border-radius: 0 0 12px 12px; }
+  .thread-message:only-child  { border-radius: 12px; }
 
   .message-preview { padding: 0 12px 12px; }
 
