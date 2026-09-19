@@ -32,6 +32,7 @@
               :key="message.id"
               class="thread-message"
               :class="{
+                [messageStackPosition(index, thread.messages.length)]: true,
                 'is-expanded': isMessageExpanded(message),
                 'is-latest': index === thread.messages.length - 1,
                 'is-mine': message.isMine,
@@ -370,6 +371,22 @@ function recipientLabelFor(message) {
 
 function isNewMessage(message) {
   return !!arrivingIds[message.id]
+}
+
+/**
+ * Where a message sits inside the open conversation, so the reader can shape a
+ * Gmail-style stack instead of a column of identical cards. "Same group" is the
+ * list the reader is currently showing for this conversation: a single-message
+ * thread is `is-single`, otherwise the first is the head, the last is the tail
+ * and everything between is the compact middle.
+ *
+ * Presentation only: no data is merged or reordered here.
+ */
+function messageStackPosition(index, total) {
+  if (total <= 1) return 'is-single'
+  if (index === 0) return 'is-head'
+  if (index === total - 1) return 'is-tail'
+  return 'is-middle'
 }
 
 /**
@@ -1780,6 +1797,10 @@ const handleDelete = () => {
   border-radius: 14px;
   background: var(--nova-surface-muted);
   overflow: hidden;
+  /* The card is content-driven: nothing pins it to a fixed height and a short
+     body simply makes a short card. */
+  height: auto;
+  min-height: 0;
   transition:
     background-color var(--nova-motion-base) var(--nova-motion-ease),
     border-color var(--nova-motion-base) var(--nova-motion-ease);
@@ -2303,10 +2324,68 @@ const handleDelete = () => {
     padding: 0 12px 16px;
   }
 
-  /* Conversation cards tighten up on phones. */
-  .thread { gap: 10px; }
-  .thread-message { border-radius: 12px; }
+  /* ---- Conversation stack (Gmail-style) ----------------------------------
+     The cards read as one continuous flow, not as a column of identical
+     bricks. The uniform flex `gap` is dropped so every card owns its own
+     vertical rhythm through the position classes: `is-middle` is the tight
+     band, `is-head` / `is-tail` keep a little breathing room at the ends and
+     a lone message (`is-single`) is spaced like a normal card. */
+  .thread {
+    gap: 0;
+  }
+
+  .thread-message {
+    border-radius: 12px;
+
+    /* Belt and braces with the base rule: a phone card must never be held open
+       by a height it does not need. */
+    height: auto;
+    min-height: 0;
+  }
+
+  .thread-message.is-single { margin-block: 12px 14px; }
+  .thread-message.is-head   { margin-top: 12px;  margin-bottom: 6px; }
+  .thread-message.is-middle { margin-top: 4px;   margin-bottom: 4px; }
+  .thread-message.is-tail   { margin-top: 4px;   margin-bottom: 12px; }
+
   .message-preview { padding: 0 12px 12px; }
+
+  /* ---- Middle cards: the compact band of the conversation ---------------
+     A middle message is a continuation, not an opening: its header is
+     tighter, the header -> body gap is halved and the bottom padding is cut,
+     so a one-line body can never trail a large empty area. */
+  .thread-message.is-middle .message-head {
+    padding: 10px 12px;
+  }
+
+  .thread-message.is-middle .message-preview {
+    padding: 0 12px 8px;
+  }
+
+  .thread-message.is-middle .message-body {
+    margin-top: 8px;
+    padding-top: 0;
+    padding-bottom: 8px;
+  }
+
+  /* The expanded header already drops its bottom padding; keep that for a
+     middle card too, where the body margin is the whole gap. */
+  .thread-message.is-middle.is-expanded .message-head {
+    padding-bottom: 0;
+  }
+
+  /* A middle body is purely content-sized: no min-height and no flexible
+     filler can stretch it past its text. */
+  .thread-message.is-middle .message-body,
+  .thread-message.is-middle .htm-scrollbar,
+  .thread-message.is-middle .email-text {
+    min-height: 0;
+  }
+
+  /* The 30px "no attachments" spacer is a desktop affordance. On a phone the
+     card padding is the whole gap, which is what removes the empty band under
+     a short body — most visibly on the middle cards. */
+  .bottom-distance { margin-bottom: 0; }
 
   /* Reserve room so the fixed action bar never covers the last lines. */
   .container { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
