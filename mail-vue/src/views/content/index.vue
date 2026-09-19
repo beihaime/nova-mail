@@ -325,7 +325,8 @@ const arrivingIds = reactive({})
 // A phone has no console, and the reported symptom (a tall, blank message body)
 // has to be distinguished from a body that never rendered at all.
 const mailDebug = typeof window !== 'undefined'
-  && new URLSearchParams(window.location.search).has('maildebug')
+  && (new URLSearchParams(window.location.search).has('maildebug')
+    || window.localStorage.getItem('maildebug') === '1')
 const mailDebugLine = ref('')
 let mailDebugTimer = null
 
@@ -334,27 +335,35 @@ function describeExpandedCard() {
   const body = card?.querySelector('.message-body')
   const frame = card?.querySelector('.mail-frame')
   const iframe = card?.querySelector('.mail-frame__iframe')
+  const textEl = card?.querySelector('.email-text')
   const height = element => (element ? Math.round(element.getBoundingClientRect().height) : '-')
+  const style = (element, name) => (element ? getComputedStyle(element)[name] : '-')
 
+  const row = email.value || {}
   let inner = 'no-document'
   try {
-    const innerBody = iframe?.contentDocument?.body
-    if (innerBody) {
-      inner = `${Math.round(innerBody.getBoundingClientRect().width)}x${Math.round(innerBody.getBoundingClientRect().height)}`
-    }
+    const doc = iframe?.contentDocument
+    const innerBody = doc?.body
+    const wrap = doc?.querySelector('[data-nova-mail-body]')
+    inner = innerBody
+      ? `html=${innerBody.innerHTML.length} text=${(innerBody.textContent || '').trim().length} `
+        + `wrap=${Math.round(wrap?.getBoundingClientRect().height || 0)}x${Math.round(wrap?.getBoundingClientRect().width || 0)} `
+        + `op=${style(wrap, 'opacity')} vis=${style(wrap, 'visibility')} color=${style(wrap, 'color')}`
+      : 'body-missing'
   } catch (error) {
     inner = `blocked:${error.name}`
   }
 
   mailDebugLine.value = [
     `vp=${window.innerWidth}x${window.innerHeight}`,
-    `body h=${height(body)} opacity=${body ? getComputedStyle(body).opacity : '-'} display=${body ? getComputedStyle(body).display : '-'}`,
+    `row=#${row.emailId || 0} type=${row.bodyType || 'none'} content=${(row.content || '').length} text=${(row.text || '').length}`,
+    `body h=${height(body)} op=${style(body, 'opacity')} disp=${style(body, 'display')}`,
     `frame h=${height(frame)} ${frame ? frame.className.replace('mail-frame ', '') : '-'}`,
-    `iframe ${iframe ? iframe.clientWidth : '-'}x${iframe ? iframe.clientHeight : '-'} style=${iframe ? iframe.style.height || 'auto' : '-'}`,
-    `inner=${inner}`,
-    `cards=${document.querySelectorAll('.thread-message').length}`,
+    `iframe ${iframe ? iframe.clientWidth : '-'}x${iframe ? iframe.clientHeight : '-'} style=${iframe ? iframe.style.height || 'auto' : '-'} srcdoc=${iframe ? (iframe.getAttribute('srcdoc') || '').length : '-'}`,
+    `plain=${textEl ? (textEl.textContent || '').trim().length : 'none'} preview=${(document.querySelector('.message-preview') || {}).textContent ? 'yes' : 'no'}`,
+    `inner: ${inner}`,
     navigator.userAgent.slice(0, 44)
-  ].join(' | ')
+  ].join('\n')
 }
 
 function isMessageExpanded(message) {

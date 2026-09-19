@@ -7,129 +7,129 @@
 <style>
   body { margin: 0; padding: 12px; background: #111; color: #eee;
          font: 14px/1.6 -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; }
-  h1 { font-size: 16px; margin: 0 0 8px; }
-  p.hint { margin: 0 0 12px; color: #9aa1ab; font-size: 12px; }
+  h1 { font-size: 16px; margin: 0 0 6px; }
+  h2 { font-size: 13px; margin: 14px 0 4px; color: #7ee787; }
+  p.hint { margin: 0 0 10px; color: #9aa1ab; font-size: 12px; }
   pre { white-space: pre-wrap; word-break: break-word; background: #000; padding: 10px;
         border-radius: 8px; font-size: 12px; line-height: 1.5; }
-  .ok { color: #7ee787; }
-  .bad { color: #ff7b72; }
-  iframe { width: 100%; height: 320px; border: 1px solid #444; background: #fff; display: block; margin-top: 12px; }
-  button { margin-top: 10px; padding: 8px 14px; border-radius: 8px; border: 1px solid #444;
-           background: #222; color: #eee; font-size: 14px; }
+  iframe { width: 100%; height: 120px; border: 1px solid #444; background: #fff; display: block; }
 </style>
 </head>
 <body>
 <h1>Nova Mail · 正文渲染自检</h1>
-<p class="hint">这一页只做一件事：在一台设备上创建与邮件正文完全相同的沙箱 iframe，并报告它能否被测量、
-渲染多大。请把下面这段文字（或截图）发回给我。</p>
+<p class="hint">两个 iframe 里是同一封 HTML 邮件的文档：A 不带 CSP，B 带 Nova Mail 应用里那条 CSP。
+如果 A 正常、B 空白，就是 CSP 在这台设备上把正文挡掉了。请把这个页面截图发回。</p>
 <pre id="out">running…</pre>
-<button id="again" type="button">重新检测</button>
 
-<iframe id="frame"
-        sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
-        scrolling="auto"
-        referrerpolicy="no-referrer"></iframe>
+<h2>A · 不带 CSP</h2>
+<iframe id="frameA" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" scrolling="auto" referrerpolicy="no-referrer"></iframe>
+
+<h2>B · 带应用的 CSP</h2>
+<iframe id="frameB" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" scrolling="auto" referrerpolicy="no-referrer"></iframe>
 
 <script>
-// The frame document mirrors what utils/mail-frame.js produces.
-var DOC = '<!DOCTYPE html><html><head><meta charset="utf-8">'
-  + '<style>'
-  + 'html,body{margin:0;padding:0;background:transparent}'
-  + 'body{font:15px/1.6 sans-serif;color:#13181d;display:flow-root;word-break:break-word;overflow-wrap:anywhere}'
-  + 'body > *{max-width:100%!important;box-sizing:border-box}'
-  + 'img{max-width:100%;height:auto}table{max-width:100%;border-collapse:collapse}'
-  + '</style></head><body>'
-  + '<div class="nova-mail-body" data-nova-mail-body="1">'
-  + '<p>Line one of the test message.</p>'
-  + '<p>' + new Array(40).join('wrap ') + '</p>'
-  + '<table width="600" style="border-collapse:collapse"><tr><td style="padding:10px">A 600px-wide table cell, the way a newsletter ships.</td></tr>'
-  + '<tr><td style="padding:10px">Second row.</td></tr></table>'
-  + '</div></body></html>'
-
-var frame = document.getElementById('frame')
-var out = document.getElementById('out')
 var MIN_WIDTH = 80
 
-function measure() {
-  var lines = []
-  lines.push('UA: ' + navigator.userAgent)
-  lines.push('viewport: ' + innerWidth + 'x' + innerHeight + '  dpr=' + (devicePixelRatio || 1))
-  lines.push('online: ' + navigator.onLine + '  secure: ' + (window.isSecureContext ? 'yes' : 'no'))
-  lines.push('iframe box: ' + frame.clientWidth + 'x' + frame.clientHeight
-    + '  style.height=' + (frame.style.height || 'auto'))
+var STYLE = 'html,body{margin:0;padding:0;background:transparent}'
+  + 'body{font:15px/1.6 sans-serif;color:#13181d;display:flow-root;word-break:break-word;overflow-wrap:anywhere}'
+  + 'body > *{max-width:100%!important;box-sizing:border-box}'
+  + '.nova-mail-body{display:flow-root}'
+  + 'img{max-width:100%;height:auto}table{max-width:100%;border-collapse:collapse}'
 
-  var doc = null
-  try {
-    doc = frame.contentDocument
-  } catch (e) {
-    lines.push('contentDocument: ❌ 抛异常 ' + e.name + ': ' + e.message)
-    return lines
+// The exact CSP meta the app writes into the frame (utils/mail-frame.js).
+var CSP = "default-src 'none'; img-src data: blob: https: http:; media-src data: blob:; "
+  + "font-src data:; style-src 'unsafe-inline'; script-src 'none'; connect-src 'none'; "
+  + "form-action 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'"
+
+var BODY = '<div class="nova-mail-body" data-nova-mail-body="1">'
+  + '<h1 style="color:#123456">Hello</h1>'
+  + '<p>This is HTML mail that arrived without a proper Content-Type.</p>'
+  + '<table width="600" style="border-collapse:collapse"><tr><td style="padding:8px;border:1px solid #ccc">cell one</td></tr>'
+  + '<tr><td style="padding:8px;border:1px solid #ccc">cell two</td></tr></table>'
+  + '<p><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAAAyCAYAAACqNX6+AAAAOUlEQVR42u3PMQEAAAgDoC251a3gLwSgcyfF4QAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADwYwGkvQABlKbC6QAAAABJRU5ErkJggg==" width="80" height="40" alt="inline"></p>'
+  + '<p>A block of text long enough to wrap over several lines on a phone screen, so the measured height is clearly not the viewport floor.</p>'
+  + '</div>'
+
+function doc(withCsp) {
+  return '<!DOCTYPE html><html lang="und"><head><meta charset="utf-8">'
+    + '<meta name="referrer" content="no-referrer">'
+    + (withCsp ? '<meta http-equiv="Content-Security-Policy" content="' + CSP + '">' : '')
+    + '<style>' + STYLE + '</style></head><body>' + BODY + '</body></html>'
+}
+
+function probe(iframe) {
+  var lines = []
+  lines.push('iframe box: ' + iframe.clientWidth + 'x' + iframe.clientHeight)
+
+  var d = null
+  try { d = iframe.contentDocument } catch (e) { lines.push('contentDocument: THREW ' + e.name); return { lines: lines, height: 0 } }
+  if (!d) { lines.push('contentDocument: null'); return { lines: lines, height: 0 } }
+
+  var body = d.body
+  if (!body) { lines.push('body: missing'); return { lines: lines, height: 0 } }
+
+  var wrap = d.querySelector('[data-nova-mail-body]')
+  var h1 = d.querySelector('h1')
+  var img = d.querySelector('img')
+  var wrapRect = wrap ? wrap.getBoundingClientRect() : { width: 0, height: 0 }
+  var height = Math.round(wrapRect.height || 0)
+
+  lines.push('body.innerHTML: ' + body.innerHTML.length + ' chars')
+  lines.push('body text: "' + (body.textContent || '').replace(/[ \n\r\t]+/g, ' ').trim().slice(0, 46) + '"')
+  lines.push('wrap: ' + Math.round(wrapRect.width) + 'x' + height)
+  if (h1) {
+    var cs = getComputedStyle(h1)
+    lines.push('h1: color=' + cs.color + ' opacity=' + cs.opacity + ' visibility=' + cs.visibility + ' display=' + cs.display
+      + ' fontSize=' + cs.fontSize + ' rect=' + Math.round(h1.getBoundingClientRect().height))
+  } else lines.push('h1: MISSING (sanitized away?)')
+  lines.push('img: ' + (img ? (img.complete ? 'loaded ' : 'not loaded ') + img.naturalWidth + 'x' + img.naturalHeight : 'MISSING'))
+
+  if (height > 8 && iframe.clientWidth >= MIN_WIDTH) {
+    iframe.style.height = height + 'px'
+    iframe.setAttribute('scrolling', 'no')
+    lines.push('=> applied height ' + height + 'px')
+  } else {
+    lines.push('=> kept fallback height ' + iframe.clientHeight + 'px')
   }
 
-  if (!doc) { lines.push('contentDocument: ❌ null（沙箱拿不到同源文档）'); return lines }
-  lines.push('contentDocument: ✅ 可访问')
-
-  var body = doc.body
-  if (!body) { lines.push('body: ❌ 不存在'); return lines }
-
-  var wrap = doc.querySelector('[data-nova-mail-body]')
-  var rect = body.getBoundingClientRect()
-  lines.push('docElement.scrollHeight: ' + doc.documentElement.scrollHeight)
-  lines.push('body.scrollHeight: ' + body.scrollHeight)
-  lines.push('body rect: ' + Math.round(rect.width) + 'x' + Math.round(rect.height))
-  lines.push('wrap rect: ' + (wrap
-    ? Math.round(wrap.getBoundingClientRect().width) + 'x' + Math.round(wrap.getBoundingClientRect().height)
-    : '❌ null'))
-  lines.push('body display: ' + getComputedStyle(body).display)
-  lines.push('text: ' + (body.textContent || '').replace(/[ \n\r\t]+/g, ' ').trim().slice(0, 50))
-  return lines
+  return { lines: lines, height: height }
 }
 
 function run() {
-  out.textContent = 'running…'
-  frame.style.height = '320px'
-  frame.setAttribute('scrolling', 'auto')
-  frame.removeAttribute('srcdoc')
-  setTimeout(function () { frame.srcdoc = DOC }, 50)
-}
+  var a = document.getElementById('frameA')
+  var b = document.getElementById('frameB')
+  var out = document.getElementById('out')
 
-function finish(step) {
-  var lines = measure()
-  var body = null
-  try { body = frame.contentDocument && frame.contentDocument.body } catch (e) {}
-  var height = body
-    ? Math.max(body.scrollHeight || 0, Math.round(body.getBoundingClientRect().height || 0))
-    : 0
+  a.srcdoc = doc(false)
+  b.srcdoc = doc(true)
 
-  lines.push('---')
-  lines.push('测量到的内容高度: ' + height + (frame.clientWidth < MIN_WIDTH ? '（宽度 ' + frame.clientWidth + ' < ' + MIN_WIDTH + '，生产代码会判为未布局）' : ''))
-
-  if (height > 8 && frame.clientWidth >= MIN_WIDTH) {
-    frame.style.height = height + 'px'
-    frame.setAttribute('scrolling', 'no')
-    lines.push('应用后 iframe 高度: ' + frame.style.height)
-    var after = measure()
-    var bodyRect = after[after.length - 1]
-    lines.push('结论: ✅ 测量成功，正文在应用里应当可见')
-  } else {
-    lines.push('结论: ❌ 测量失败 —— 这正是「展开后看不到正文」的原因，请把以上内容发回')
+  var done = 0
+  function report() {
+    if (++done < 2) return
+    setTimeout(function () {
+      var ra = probe(a)
+      var rb = probe(b)
+      var lines = []
+      lines.push('UA: ' + navigator.userAgent)
+      lines.push('viewport: ' + innerWidth + 'x' + innerHeight + '  dpr=' + (devicePixelRatio || 1))
+      lines.push('')
+      lines.push('A · 不带 CSP')
+      lines = lines.concat(ra.lines)
+      lines.push('')
+      lines.push('B · 带应用的 CSP')
+      lines = lines.concat(rb.lines)
+      lines.push('')
+      lines.push('结论: ' + (ra.height > 8 && rb.height > 8
+        ? '两版都能渲染 —— CSP 不是原因'
+        : (ra.height > 8 ? 'A 正常 / B 失败 —— CSP 是原因！' : '两版都失败 —— 与 CSP 无关，是文档或设备本身')))
+      out.textContent = lines.join('\n')
+    }, 400)
   }
 
-  out.textContent = step + '\n' + lines.join('\n')
+  a.addEventListener('load', report)
+  b.addEventListener('load', report)
+  setTimeout(function () { if (out.textContent === 'running…') out.textContent = 'timeout: load 未触发' }, 5000)
 }
-
-frame.addEventListener('load', function () {
-  setTimeout(function () { finish('frame check (load 事件已触发)') }, 350)
-})
-
-setTimeout(function () {
-  if (out.textContent === 'running…') finish('frame check (4s 内 load 未触发)')
-}, 4000)
-
-document.getElementById('again').addEventListener('click', function () {
-  run()
-  setTimeout(function () { finish('frame check (重新检测)') }, 1200)
-})
 
 run()
 </script>

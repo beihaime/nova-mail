@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nova Mail · 诊断模式</title>
+<style>body{margin:0;padding:16px;background:#111;color:#eee;font:15px/1.7 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}
+a{color:#7ee787}code{background:#000;padding:2px 6px;border-radius:6px}</style></head>
+<body>
+<h3>诊断模式已开启</h3>
+<p>现在打开一封邮件（回到收件箱点开就行），页面底部会出现一条黑色浮层，里面是这台设备真实的渲染数据。</p>
+<p>请把那条浮层截图发回给我。</p>
+<p><a id="go" href="/">→ 去收件箱</a></p>
+<p style="color:#9aa1ab;font-size:13px">关闭诊断：访问 <code>/debug?off=1</code>。诊断只写入本机 localStorage，不影响其他设备。</p>
+<script>
+  var off = new URLSearchParams(location.search).get('off') === '1'
+  if (off) {
+    localStorage.removeItem('maildebug')
+    document.querySelector('h3').textContent = '诊断模式已关闭'
+    document.querySelector('p').textContent = '刷新一次页面即可恢复。'
+  } else {
+    localStorage.setItem('maildebug', '1')
+  }
+</script>
+</body>
+</html>
