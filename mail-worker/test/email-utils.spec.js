@@ -102,3 +102,16 @@ describe('emailUtils.toPreviewText (markdown)', () => {
 		expect(emailUtils.toPreviewText('2 * 3 = 6', null, 'text/plain')).toBe('2 * 3 = 6');
 	});
 });
+
+describe('emailUtils.toPreviewText (raw message body)', () => {
+	it('unwraps a pasted raw message instead of showing its MIME headers', () => {
+		const raw = 'MIME-Version: 1.0\n'
+			+ 'Content-Type: text/markdown; charset=utf-8\n\n'
+			+ '# Hello\n\n**Bold** text with a [link](https://example.com).';
+
+		const preview = emailUtils.toPreviewText(raw, null, 'text/plain');
+
+		expect(preview).toBe('Hello Bold text with a link.');
+		expect(preview).not.toContain('MIME-Version');
+	});
+});

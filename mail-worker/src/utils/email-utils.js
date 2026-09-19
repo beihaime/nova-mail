@@ -1,5 +1,5 @@
 import { parseHTML } from 'linkedom';
-import { MAIL_BODY, looksLikeHtmlDocument } from '../lib/mail-body.js';
+import { MAIL_BODY, looksLikeHtmlDocument, unwrapNestedMessage } from '../lib/mail-body.js';
 
 /**
  * Markdown syntax that must not survive into a one-line row preview.
@@ -102,6 +102,12 @@ const emailUtils = {
 	 * @param {string} [bodyType] one of MAIL_BODY (text/markdown, text/html, …)
 	 */
 	toPreviewText(text, html, bodyType) {
+		// A stored body may itself be a whole raw message (forwarded source, bounce,
+		// digest, or a "paste the raw mail" test): unwrap it first so its
+		// `MIME-Version:` / `Content-Type:` lines never reach the row.
+		const nested = unwrapNestedMessage(text);
+		if (nested) return this.toPreviewText(nested.text, nested.html, nested.bodyType);
+
 		let source;
 
 		if (bodyType === MAIL_BODY.MARKDOWN) {

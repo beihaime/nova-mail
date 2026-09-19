@@ -97,6 +97,60 @@ export function looksLikeHtmlDocument(text) {
  * @param {{html?:string, text?:string, attachments?:object[]}} parsed postal-mime result
  * @returns {{bodyType: string, html: string, text: string, markdown: string, markdownPart: object|null}}
  */
+/**
+ * Unwrap a body that is itself a whole raw message.
+ *
+ * Forwarded source, bounce reports, list digests and "paste the raw mail" tests
+ * arrive as a plain-text body whose first lines are RFC 5322 headers
+ * (`MIME-Version: 1.0`, `Content-Type: …`) followed by a blank line and the real
+ * body. Without unwrapping, the reader and the Inbox preview show those headers
+ * instead of the message.
+ *
+ * Returns null unless the text really starts with a header block that contains a
+ * recognisable mail/MIME header, so ordinary prose ("Note: …") is left alone.
+ *
+ * @param {string} text
+ * @returns {{bodyType:string, html:string, text:string, markdown:string, markdownPart:null}|null}
+ */
+const HEADER_LINE = /^([A-Za-z][A-Za-z0-9-]*):[ \t]?(.*)$/;
+const KNOWN_HEADERS = /^(mime-version|content-type|content-transfer-encoding|content-disposition|from|to|cc|bcc|subject|date|message-id|received|return-path|delivered-to|reply-to|dkim-signature|references|in-reply-to)$/i;
+
+export function unwrapNestedMessage(text) {
+	const lines = String(text || '').split(/\r?\n/);
+	let index = 0;
+	let knownHeader = false;
+
+	for (; index < lines.length; index++) {
+		const line = lines[index];
+		// Blank separator: tolerate a line that only holds spaces/tabs.
+		if (line.trim() === '') break;
+
+		const match = HEADER_LINE.exec(line);
+		if (!match) return null;
+
+		if (KNOWN_HEADERS.test(match[1])) knownHeader = true;
+	}
+
+	// No blank line, or a header block without any real mail/MIME header.
+	if (!knownHeader || index >= lines.length) return null;
+
+	const headerBlock = lines.slice(0, index).join('\n');
+	const body = lines.slice(index + 1).join('\n').trim();
+	if (!body) return null;
+
+	const innerType = (/^content-type:[ \t]*([^;\s]+)/im.exec(headerBlock) || [])[1]?.toLowerCase() || '';
+
+	if (innerType === MAIL_BODY.MARKDOWN) {
+		return { bodyType: MAIL_BODY.MARKDOWN, html: '', text: body, markdown: body, markdownPart: null };
+	}
+
+	if (innerType === MAIL_BODY.HTML) {
+		return { bodyType: MAIL_BODY.HTML, html: body, text: '', markdown: '', markdownPart: null };
+	}
+
+	return { bodyType: MAIL_BODY.PLAIN, html: '', text: body, markdown: '', markdownPart: null };
+}
+
 export function resolveMailBody(parsed) {
 	const html = String(parsed?.html || '');
 
@@ -123,6 +177,11 @@ export function resolveMailBody(parsed) {
 	const text = String(parsed?.text || '');
 
 	if (text.trim()) {
+		// A body that is itself a raw message wins over the HTML check: its header
+		// block would otherwise be counted as content.
+		const nested = unwrapNestedMessage(text);
+		if (nested) return nested;
+
 		// No HTML part, but the text is a markup document: that is the body, and it
 		// has to reach the reader as HTML or it will be shown as source.
 		if (looksLikeHtmlDocument(text)) {
@@ -149,4 +208,4 @@ export function bodyViewFor(parsed, body) {
 	};
 }
 
-export default { MAIL_BODY, resolveMailBody, bodyViewFor, isMarkdownPart, partMimeType, decodePartContent, looksLikeHtmlDocument };
+export default { MAIL_BODY, resolveMailBody, bodyViewFor, isMarkdownPart, partMimeType, decodePartContent, looksLikeHtmlDocument, unwrapNestedMessage };

@@ -195,6 +195,48 @@ describe('markup that arrives in the text part', () => {
 		}
 	});
 
+	it('unwraps a body that is itself a raw message (headers + blank line)', () => {
+		const raw = 'MIME-Version: 1.0\nContent-Type: text/markdown; charset=utf-8\n\n# Hello\n\n**Bold** text.';
+		const body = resolveMailBody({ text: raw });
+
+		expect(body.bodyType).toBe(MAIL_BODY.MARKDOWN);
+		expect(body.text).toBe('# Hello\n\n**Bold** text.');
+		expect(body.text).not.toContain('MIME-Version');
+	});
+
+	it('unwraps a nested raw html body without rendering the headers', () => {
+		const raw = 'MIME-Version: 1.0\nContent-Type: text/html; charset=utf-8\n\n<div>Hi</div><p>There</p>';
+		const body = resolveMailBody({ text: raw });
+
+		expect(body.bodyType).toBe(MAIL_BODY.HTML);
+		expect(body.html).toContain('<div>Hi</div>');
+		expect(body.html).not.toContain('MIME-Version');
+	});
+
+	it('unwraps a raw message whose header separator holds spaces', () => {
+		const raw = 'Content-Type: text/markdown; charset=utf-8\n \n# Hello';
+		const body = resolveMailBody({ text: raw });
+
+		expect(body.bodyType).toBe(MAIL_BODY.MARKDOWN);
+		expect(body.text).toBe('# Hello');
+	});
+
+	it('unwraps a nested raw plain body and drops the header block', () => {
+		const raw = 'From: a@b.c\nTo: c@d.e\nSubject: hi\n\nHello there';
+		const body = resolveMailBody({ text: raw });
+
+		expect(body.bodyType).toBe(MAIL_BODY.PLAIN);
+		expect(body.text).toBe('Hello there');
+	});
+
+	it('leaves prose that merely starts with a word and a colon alone', () => {
+		const prose = 'Note: this is important.\n\nThanks';
+		const body = resolveMailBody({ text: prose });
+
+		expect(body.bodyType).toBe(MAIL_BODY.PLAIN);
+		expect(body.text).toBe(prose);
+	});
+
 	it('prefers a real HTML part over markup in the text part', () => {
 		const body = resolveMailBody({ html: '<p>real</p>', text: DOC });
 
