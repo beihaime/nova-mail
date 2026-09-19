@@ -265,13 +265,16 @@ function previewSound() {
 /* ---------- Web Push (system notifications) ---------- */
 
 const pushLoading = ref(false)
-const push = reactive({ supported: true, permission: PUSH_STATUS.DEFAULT, subscribed: false })
+const push = reactive({ supported: true, available: true, permission: PUSH_STATUS.DEFAULT, subscribed: false })
 
-const pushAvailable = computed(() => push.supported && push.permission !== PUSH_STATUS.DENIED)
-const pushOn = computed(() => push.subscribed)
+// The switch follows the server, not just the browser: a lingering local
+// subscription must not look enabled when the Worker has no VAPID keys.
+const pushAvailable = computed(() => push.supported && push.available && push.permission !== PUSH_STATUS.DENIED)
+const pushOn = computed(() => push.available && push.subscribed)
 
 const pushStatusText = computed(() => {
   if (!push.supported) return t('pushStatusUnsupported')
+  if (!push.available) return t('pushStatusUnavailable')
   if (push.permission === PUSH_STATUS.DENIED) return t('pushStatusDenied')
   return push.subscribed ? t('pushStatusOn') : t('pushStatusOff')
 })

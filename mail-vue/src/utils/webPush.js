@@ -84,13 +84,25 @@ async function saveSubscription(subscription) {
 /** Current state for the settings page. */
 export async function pushState() {
     if (!pushSupported()) {
-        return { supported: false, permission: PUSH_STATUS.UNSUPPORTED, subscribed: false }
+        return { supported: false, available: false, permission: PUSH_STATUS.UNSUPPORTED, subscribed: false }
+    }
+
+    // Ask the server first. A browser can hold a subscription that predates the
+    // current key pair (or was created before the keys were removed); reporting
+    // that as "on" is how a phone ends up looking enabled while the server has
+    // nothing to sign with. `available` is the only honest source of truth.
+    let available = false
+    try {
+        const config = await pushConfig()
+        available = Boolean(config?.enabled && config.publicKey)
+    } catch {
+        available = false
     }
 
     const permission = Notification.permission
     const subscription = permission === 'granted' ? await getPushSubscription() : null
 
-    return { supported: true, permission, subscribed: Boolean(subscription) }
+    return { supported: true, available, permission, subscribed: Boolean(subscription) }
 }
 
 /**
