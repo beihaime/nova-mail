@@ -1,4 +1,5 @@
 import settingService from '../service/setting-service';
+import threadService from '../service/thread-service';
 import emailUtils from '../utils/email-utils';
 import {emailConst} from "../const/entity-const";
 
@@ -34,8 +35,67 @@ const dbInit = {
 		await this.v3_3DB(c);
 		await this.v3_4DB(c);
 		await this.v3_5DB(c);
+		await this.v3_6DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
+	},
+
+	/**
+	 * v3.6 — conversations.
+	 *
+	 * Stores the conversation key on each message so the Inbox can return one
+	 * row per conversation, then backfills every pre-existing message (this is
+	 * what collapses the duplicate rows already in the Inbox) and adds the
+	 * indexes the thread lookups rely on.
+	 */
+	async v3_6DB(c) {
+		const ADD_COLUMN_SQL_LIST = [
+			`ALTER TABLE email ADD COLUMN thread_id TEXT NOT NULL DEFAULT '';`,
+			`ALTER TABLE email ADD COLUMN parent_message_id INTEGER NOT NULL DEFAULT 0;`,
+		];
+
+		for (const sql of ADD_COLUMN_SQL_LIST) {
+			try {
+				await c.env.db.prepare(sql).run();
+			} catch (e) {
+				console.warn(`跳过字段添加：${e.message}`);
+			}
+		}
+
+		// Assign thread ids to every message that does not have one yet. Safe to
+		// re-run: after the first pass the query returns nothing.
+		try {
+			const total = await threadService.backfillThreadIds(c);
+			if (total > 0) {
+				console.log(`会话线程回填完成：${total} 封邮件`);
+			}
+		} catch (e) {
+			console.error('会话线程回填失败：', e);
+		}
+
+		const INDEX_SQL_LIST = [
+			`CREATE INDEX IF NOT EXISTS idx_email_thread ON email(user_id, thread_id, email_id);`,
+			`CREATE INDEX IF NOT EXISTS idx_email_message_id ON email(user_id, message_id);`,
+		];
+
+		for (const sql of INDEX_SQL_LIST) {
+			try {
+				await c.env.db.prepare(sql).run();
+			} catch (e) {
+				console.warn(`跳过索引创建：${e.message}`);
+			}
+		}
+
+		// Best-effort uniqueness guard so a webhook / Cloudflare retry cannot
+		// insert the same message twice. Legacy duplicate rows would make this
+		// fail, in which case the application-level check still applies.
+		try {
+			await c.env.db.prepare(
+				`CREATE UNIQUE INDEX IF NOT EXISTS idx_email_message_id_unique ON email(user_id, message_id) WHERE message_id != '';`
+			).run();
+		} catch (e) {
+			console.warn(`跳过 Message-ID 唯一索引（存在历史重复）：${e.message}`);
+		}
 	},
 
 	async v3_5DB(c) {

@@ -23,6 +23,7 @@ import domainUtils from '../utils/domain-uitls';
 import account from "../entity/account";
 import { att } from '../entity/att';
 import telegramService from './telegram-service';
+import threadService from './thread-service';
 
 const MAX_SEARCH_LENGTH = 200;
 
@@ -96,40 +97,120 @@ const emailService = {
 		const countFilters = this.emailListFilters({ userId, accountId, type, allReceive, withCursor: false, keyword });
 		const columns = full ? emailListColumns : emailBriefColumns;
 
-		const query = orm(c)
-			.select({
-				...columns,
-				starId: star.starId
-			})
-			.from(email)
-			.leftJoin(
-				star,
-				and(
-					eq(star.emailId, email.emailId),
-					eq(star.userId, userId)
+		// The Inbox (received mail) is a conversation list: rows are collapsed to
+		// the newest message of each thread so a reply updates and re-orders its
+		// conversation instead of appearing as a second Inbox item. Sent and the
+		// other folders stay message-per-row.
+		const groupByThread = type === emailConst.type.RECEIVE;
+
+		// Conversation key. Legacy rows without a thread id stay separate
+		// (`e:<email_id>`) instead of collapsing into one bucket.
+		const threadKey = sql`coalesce(nullif(${email.threadId}, ''), 'e:' || ${email.emailId})`;
+		const newestMessageId = sql`max(${email.emailId})`;
+
+		let list;
+		let totalRow;
+
+		if (groupByThread) {
+			// 1) Pick the representative (newest) message of every conversation.
+			const representativeQuery = orm(c)
+				.select({ emailId: sql`${newestMessageId}`.as('emailId') })
+				.from(email)
+				.innerJoin(
+					account,
+					eq(account.accountId, email.accountId)
 				)
-			)
-			.innerJoin(
-				account,
-				eq(account.accountId, email.accountId)
-			)
-			.where(and(...filters));
+				.where(and(...filters))
+				.groupBy(threadKey);
 
-		if (timeSort) {
-			query.orderBy(asc(email.emailId));
+			if (emailId) {
+				representativeQuery.having(
+					timeSort ? sql`${newestMessageId} > ${emailId}` : sql`${newestMessageId} < ${emailId}`
+				);
+			}
+
+			representativeQuery
+				.orderBy(timeSort ? sql`${newestMessageId} asc` : sql`${newestMessageId} desc`)
+				.limit(size);
+
+			const representatives = await representativeQuery.all();
+			const representativeIds = representatives.map(row => row.emailId);
+
+			if (representativeIds.length) {
+				// 2) Hydrate them with the requested column set.
+				const rows = await orm(c)
+					.select({
+						...columns,
+						starId: star.starId
+					})
+					.from(email)
+					.leftJoin(
+						star,
+						and(
+							eq(star.emailId, email.emailId),
+							eq(star.userId, userId)
+						)
+					)
+					.innerJoin(
+						account,
+						eq(account.accountId, email.accountId)
+					)
+					.where(inArray(email.emailId, representativeIds))
+					.all();
+
+				// `IN (…)` does not preserve order, so re-apply the thread order.
+				const order = new Map(representativeIds.map((id, index) => [id, index]));
+				rows.sort((a, b) => order.get(a.emailId) - order.get(b.emailId));
+				list = rows;
+			} else {
+				list = [];
+			}
+
+			totalRow = await orm(c)
+				.select({ total: sql`count(distinct ${threadKey})` })
+				.from(email)
+				.innerJoin(
+					account,
+					eq(account.accountId, email.accountId)
+				)
+				.where(and(...countFilters))
+				.get();
 		} else {
-			query.orderBy(desc(email.emailId));
+			const query = orm(c)
+				.select({
+					...columns,
+					starId: star.starId
+				})
+				.from(email)
+				.leftJoin(
+					star,
+					and(
+						eq(star.emailId, email.emailId),
+						eq(star.userId, userId)
+					)
+				)
+				.innerJoin(
+					account,
+					eq(account.accountId, email.accountId)
+				)
+				.where(and(...filters));
+
+			if (timeSort) {
+				query.orderBy(asc(email.emailId));
+			} else {
+				query.orderBy(desc(email.emailId));
+			}
+
+			list = await query.limit(size).all();
+
+			totalRow = await orm(c).select({ total: count() }).from(email)
+				.innerJoin(
+					account,
+					eq(account.accountId, email.accountId)
+				)
+				.where(and(...countFilters))
+				.get();
 		}
-
-		const listQuery = query.limit(size).all();
-
-		const totalQuery = orm(c).select({ total: count() }).from(email)
-			.innerJoin(
-				account,
-				eq(account.accountId, email.accountId)
-			)
-			.where(and(...countFilters))
-			.get();
 
 		const latestEmailQuery = orm(c).select({
 			emailId: email.emailId,
@@ -145,7 +226,7 @@ const emailService = {
 			))
 			.orderBy(desc(email.emailId)).limit(1).get();
 
-		let [list, totalRow, latestEmail] = await Promise.all([listQuery, totalQuery, latestEmailQuery]);
+		let latestEmail = await latestEmailQuery;
 
 		list = list.map(item => ({
 			...item,
@@ -167,6 +248,78 @@ const emailService = {
 		}
 
 		return { list, total: totalRow.total, latestEmail };
+	},
+
+	/**
+	 * Every message of one conversation, oldest → newest.
+	 *
+	 * The Inbox only carries the newest message of a thread, so the reader calls
+	 * this to rebuild the whole conversation: the original, every received
+	 * reply and the user's own replies.
+	 */
+	async thread(c, params, userId) {
+		const emailId = Number(params.emailId) || 0;
+		let threadId = String(params.threadId || '').trim();
+
+		// Legacy rows may still be missing a thread id; fall back to resolving it
+		// from the anchor message, then to the single-message key.
+		const legacyThreadKey = sql`coalesce(nullif(${email.threadId}, ''), 'e:' || ${email.emailId})`;
+
+		if (!threadId && emailId) {
+			const anchor = await orm(c)
+				.select({
+					emailId: email.emailId,
+					threadId: email.threadId,
+					messageId: email.messageId,
+					inReplyTo: email.inReplyTo,
+					relation: email.relation,
+					subject: email.subject,
+					userId: email.userId,
+					accountId: email.accountId,
+				})
+				.from(email)
+				.where(and(eq(email.emailId, emailId), eq(email.userId, userId)))
+				.get();
+
+			if (!anchor) {
+				throw new BizError(t('notExistEmailReply'));
+			}
+
+			if (anchor.threadId) {
+				threadId = anchor.threadId;
+			} else {
+				const resolved = await threadService.resolveThreadForMessage(c, anchor);
+				threadId = resolved.threadId || `e:${anchor.emailId}`;
+			}
+		}
+
+		if (!threadId) {
+			return { threadId: '', subject: '', messages: [] };
+		}
+
+		const messages = await orm(c)
+			.select({ ...emailListColumns })
+			.from(email)
+			.innerJoin(
+				account,
+				eq(account.accountId, email.accountId)
+			)
+			.where(and(
+				eq(email.userId, userId),
+				eq(legacyThreadKey, threadId),
+				eq(email.isDel, isDel.NORMAL),
+				eq(account.isDel, isDel.NORMAL),
+			))
+			.orderBy(asc(email.emailId))
+			.all();
+
+		await this.emailAddAtt(c, messages);
+
+		return {
+			threadId,
+			subject: messages[0]?.subject || '',
+			messages,
+		};
 	},
 
 	toListText(item) {
@@ -270,8 +423,26 @@ const emailService = {
 			.run();
 	},
 
-	receive(c, params, cidAttList, r2domain) {
-		params.content = this.imgReplace(params.content, cidAttList, r2domain)
+	/**
+	 * Persist an incoming message.
+	 *
+	 * Two things happen before the insert:
+	 *  - Message-ID dedupe: a Cloudflare / webhook retry of the same message
+	 *    must not create a second row.
+	 *  - Thread resolution: the message joins the conversation of its parent
+	 *    (In-Reply-To → References → subject fallback), otherwise it starts one.
+	 */
+	async receive(c, params, cidAttList, r2domain) {
+		const existing = await threadService.findExistingMessage(c, params);
+		if (existing) {
+			return existing;
+		}
+
+		const thread = await threadService.resolveThreadForMessage(c, params);
+		params.threadId = thread.threadId || threadService.newThreadId();
+		params.parentMessageId = thread.parentMessageId || 0;
+		params.content = this.imgReplace(params.content, cidAttList, r2domain);
+
 		return orm(c).insert(email).values({ ...params }).returning().get();
 	},
 
@@ -453,6 +624,21 @@ const emailService = {
 		if (sendType === 'reply') {
 			emailData.inReplyTo = emailRow.messageId;
 			emailData.relation = emailRow.messageId;
+
+			// Keep the reply inside the conversation it answers so the reader can
+			// reload the whole thread (and the Inbox never splits it).
+			const thread = await threadService.resolveThreadForMessage(c, {
+				userId,
+				accountId,
+				messageId: '',
+				inReplyTo: emailRow.messageId,
+				references: emailRow.messageId,
+				subject,
+				threadId: emailRow.threadId,
+				parentMessageId: emailRow.emailId
+			});
+			emailData.threadId = thread.threadId || emailRow.threadId || threadService.newThreadId();
+			emailData.parentMessageId = thread.parentMessageId || Number(emailRow.emailId) || 0;
 		}
 
 		//如果权限有发送次数增加用户发送次数
@@ -772,6 +958,20 @@ const emailService = {
 		const receiveEmailList = emailDataList.filter(emailRow => emailRow.status === emailConst.status.RECEIVE || emailRow.status === emailConst.status.NOONE);
 
 		for (const emailData of receiveEmailList) {
+
+			// The recipient's copy belongs to the *recipient's* conversation: it
+			// is resolved again in their own mailbox instead of inheriting the
+			// sender's thread key.
+			const thread = await threadService.resolveThreadForMessage(c, {
+				userId: emailData.userId,
+				accountId: emailData.accountId,
+				messageId: emailData.messageId,
+				inReplyTo: emailData.inReplyTo,
+				references: emailData.relation,
+				subject: emailData.subject
+			});
+			emailData.threadId = thread.threadId || threadService.newThreadId();
+			emailData.parentMessageId = thread.parentMessageId || 0;
 
 			const emailRow = await orm(c).insert(email).values(emailData).returning().get();
 

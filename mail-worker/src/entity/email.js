@@ -18,6 +18,11 @@ export const email = sqliteTable('email', {
 	inReplyTo: text('in_reply_to').default(''),
 	relation: text('relation').default(''),
 	messageId: text('message_id').default(''),
+	// Conversation key. Every message of one conversation (original + replies +
+	// the user's own replies) shares it; the Inbox collapses rows by this value.
+	threadId: text('thread_id').default('').notNull(),
+	// Direct parent message id (RFC In-Reply-To / References hit), 0 when unknown.
+	parentMessageId: integer('parent_message_id').default(0).notNull(),
 	authResults: text('auth_results').default('').notNull(),
 	type: integer('type').default(0).notNull(),
 	status: integer('status').default(0).notNull(),

@@ -34,6 +34,9 @@ export const emailBriefColumns = {
 	unread: email.unread,
 	createTime: email.createTime,
 	isDel: email.isDel,
+	// The Inbox is rendered one row per conversation, so the client needs the
+	// conversation key on brief rows too (kept on A7 upgrades / realtime upserts).
+	threadId: email.threadId,
 	content: sql`CASE WHEN trim(coalesce(${email.text}, '')) != '' THEN NULL ELSE ${sqlStripWhitespace(email.content)} END`.as('content'),
 	text: sql`substr(coalesce(${email.text}, ''), 1, ${EMAIL_LIST_TEXT_LEN})`.as('text'),
 };

@@ -14,6 +14,12 @@ app.get('/email/latest', async (c) => {
 	return c.json(result.ok(list));
 });
 
+// Whole conversation of the anchor message (Inbox rows are one per thread).
+app.get('/email/thread', async (c) => {
+	const data = await emailService.thread(c, c.req.query(), userContext.getUserId(c));
+	return c.json(result.ok(data));
+});
+
 app.delete('/email/delete', async (c) => {
 	await emailService.delete(c, c.req.query(), userContext.getUserId(c));
 	return c.json(result.ok());
