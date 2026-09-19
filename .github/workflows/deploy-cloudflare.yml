@@ -64,8 +64,27 @@ jobs:
           
           echo "🔐 Starting environment setup..."
           
-          if [ -z "$JWT_SECRET" ] || grep -q '[?%#/\\]' <<< "$JWT_SECRET"; then
-            echo "❌ JWT_SECRET variable is empty or contains invalid characters (?, %, #, /, \\)."
+          # These values are substituted into wrangler-action.toml with `sed`
+          # below. A wrapped paste (a value holding a newline) turns those
+          # substitutions into `sed: unterminated 's' command`, which names
+          # neither the variable nor the real problem, so reject the shape up
+          # front. `[![:print:]]` catches newlines, carriage returns, tabs and
+          # other control characters; plain spaces are fine.
+          for entry in NAME CUSTOM_DOMAIN DOMAIN ADMIN JWT_SECRET R2_BUCKET_NAME PROJECT_LINK ANALYSIS_CACHE AI_MODEL; do
+            entry_value="${!entry}"
+            case "$entry_value" in
+              *[![:print:]]*)
+                echo "❌ $entry must be a single line (a wrapped paste breaks the deploy)."
+                exit 1
+                ;;
+            esac
+          done
+          
+          # `|` delimits the sed substitutions and `&` re-inserts the matched
+          # text, so either one would corrupt the generated config instead of
+          # failing loudly.
+          if [ -z "$JWT_SECRET" ] || grep -q '[?%#/\\|&]' <<< "$JWT_SECRET"; then
+            echo "❌ JWT_SECRET variable is empty or contains invalid characters (?, %, #, /, \\, |, &)."
             exit 1
           fi
           
