@@ -110,6 +110,14 @@ function buildCsp(nonce) {
   ].join('; ')
 }
 
+/** Escape text for the plain-text fallback rendered inside the frame. */
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
 /** Random nonce for the height reporter; `Math.random` is fine as a fallback. */
 export function createFrameNonce() {
   const globalCrypto = typeof crypto !== 'undefined' ? crypto : null
@@ -159,6 +167,8 @@ function buildFrameStyle(theme) {
     /* Own formatting context: children's margins stay inside, so this element's
        height is exactly the mail's height — it is what the reader measures. */
     .nova-mail-body { display: flow-root; }
+    /* Plain-text alternative, shown only when the markup had nothing to render. */
+    .nova-fallback { margin: 0; font: inherit; color: inherit; white-space: pre-wrap; word-break: break-word; }
     img { max-width: 100%; height: auto; }
     table { max-width: 100%; border-collapse: collapse; }
     td, th { max-width: 100%; }
@@ -267,12 +277,18 @@ export function buildMailFrameDocument({
   theme = 'light',
   nonce = '',
   title = '',
+  fallbackText = '',
 } = {}) {
   const frameNonce = MAIL_FRAME_SCRIPTS ? (nonce || createFrameNonce()) : ''
 
   // Sanitize, harden every link and hold remote resources back until the reader
   // asks for them. This is the only path from mail HTML to the frame.
   const { html: safeHtml, blocked } = prepareMailBody({ html, allowImages })
+
+  // Markup that sanitizes to nothing, or none at all: show the text alternative
+  // inside the frame rather than an empty body. The reader keeps its single
+  // HTML renderer, so nothing has to switch renderers mid-flight.
+  const fallback = safeHtml.trim() ? '' : escapeHtml(String(fallbackText || ''))
 
   const reporter = MAIL_FRAME_SCRIPTS ? buildHeightReporter(frameNonce) : ''
 
@@ -286,7 +302,7 @@ export function buildMailFrameDocument({
 <style>${buildFrameStyle(theme)}</style>
 </head>
 <body>
-<div class="nova-mail-body" data-nova-mail-body="1">${safeHtml}</div>
+<div class="nova-mail-body" data-nova-mail-body="1">${safeHtml}${fallback ? `<pre class="nova-fallback">${fallback}</pre>` : ''}</div>
 ${reporter}
 </body>
 </html>`
@@ -299,7 +315,7 @@ ${reporter}
     // How much of the body survived sanitizing. Zero for a mail whose markup the
     // sanitizer removed entirely (or one that arrived empty); the reader uses it
     // to fall back to the plain-text alternative instead of showing a blank frame.
-    sanitizedLength: safeHtml.length,
+    sanitizedLength: safeHtml.length + fallback.length,
   }
 }
 

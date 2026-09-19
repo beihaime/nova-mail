@@ -141,11 +141,11 @@
                     class="shadow-html"
                     :ref="element => setFrameRef(message, element)"
                     :html="bodyFor(message)"
+                    :text="message.text || ''"
                     :allow-images="isRemoteImagesAllowed(message)"
                     :theme="uiStore.dark ? 'dark' : 'light'"
                     :title="message.subject || ''"
                     @blocked="count => setBlockedImageCount(message, count)"
-                    @empty="isEmpty => { emptyFrames[message.id] = isEmpty }"
                 />
                 <!-- Markdown path: markdown-it → sanitize → hardened links. It is
                      plain Vue markup on purpose: markdown never uses the iframe. -->
@@ -363,6 +363,13 @@ function describeExpandedCard() {
     `iframe ${iframe ? iframe.clientWidth : '-'}x${iframe ? iframe.clientHeight : '-'} style=${iframe ? iframe.style.height || 'auto' : '-'} srcdoc=${iframe ? (iframe.getAttribute('srcdoc') || '').length : '-'}`,
     `plain=${textEl ? (textEl.textContent || '').trim().length : 'none'} preview=${(document.querySelector('.message-preview') || {}).textContent ? 'yes' : 'no'}`,
     `inner: ${inner}`,
+    `doc url=${(() => { try { return iframe?.contentDocument?.URL || '-' } catch { return 'blocked' } })()} rs=${(() => { try { return iframe?.contentDocument?.readyState || '-' } catch { return 'blocked' } })()}`,
+    `expanded cards: ${[...document.querySelectorAll('.thread-message.is-expanded')].map((card, index) => {
+      const frame = card.querySelector('.mail-frame__iframe')
+      let wrap = 'no-doc'
+      try { wrap = frame?.contentDocument?.querySelector('[data-nova-mail-body]') ? 'wrap' : 'NO-WRAP' } catch { wrap = 'blocked' }
+      return `#${index} ${frame ? `${frame.clientWidth}x${frame.clientHeight}` : 'no-frame'} ${wrap}`
+    }).join(' | ') || 'none'}`,
     navigator.userAgent.slice(0, 44)
   ].join('\n')
 }
@@ -498,21 +505,15 @@ function messageBodyKind(message) {
     return hasText ? 'plain' : 'none'
   }
   if (type === MAIL_BODY_TYPE.HTML) {
-    if (hasHtml) {
-      // Nothing survived sanitizing: show the text alternative rather than an
-      // empty frame, and say the body could not be loaded when there is none.
-      if (emptyFrames[message.id]) return hasText ? 'plain' : 'none'
-      return 'html'
-    }
+    // The frame renders the markup, and falls back to the text alternative inside
+    // itself when the markup has nothing renderable left.
+    if (hasHtml) return 'html'
     // No `content` yet (a brief list row): use the markup if the text holds it,
     // otherwise show the text rather than an empty box.
     return markupInText ? 'html' : (hasText ? 'plain' : 'none')
   }
 
-  if (hasHtml) {
-    if (emptyFrames[message.id]) return hasText ? 'plain' : 'none'
-    return 'html'
-  }
+  if (hasHtml) return 'html'
   if (markupInText) return 'html'
   return hasText ? 'plain' : 'none'
 }
@@ -522,8 +523,6 @@ function messageBodyKind(message) {
 // A plain Map: it is filled while rendering, and the reactive inputs that make
 // it stale (the quote label, the image opt-in) are read on the same path.
 const markdownState = new Map()
-// message id -> the sandboxed frame found no renderable markup in the mail.
-const emptyFrames = reactive({})
 // message id -> remote resources the sandboxed frame withheld.
 const blockedImages = reactive({})
 // message id -> the reader explicitly asked for remote images.

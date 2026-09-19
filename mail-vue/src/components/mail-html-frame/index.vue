@@ -3,7 +3,6 @@
     <iframe
       ref="frame"
       class="mail-frame__iframe"
-      :srcdoc="srcdoc"
       :sandbox="sandbox"
       :title="title || t('bodyFrameTitle')"
       :style="frameStyle"
@@ -47,6 +46,12 @@ const props = defineProps({
     type: String,
     default: ''
   },
+  // Plain-text alternative. Shown inside the frame when the markup has nothing
+  // renderable left (a mail whose HTML the sanitizer removed entirely).
+  text: {
+    type: String,
+    default: ''
+  },
   // Reader allowed remote images for this message.
   allowImages: {
     type: Boolean,
@@ -63,7 +68,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['blocked', 'loaded', 'empty'])
+const emit = defineEmits(['blocked', 'loaded'])
 
 const { t } = useI18n()
 
@@ -90,12 +95,16 @@ const MIN_MEASURED_HEIGHT = MAIL_FRAME_MIN_HEIGHT
 let frameObserver = null
 let wrapperObserver = null
 let timers = []
+// The mail itself had no renderable markup (set by rebuild, read by the report).
+// When the document was last written, and whether a reload has been tried. The
+// frame's very first `load` (about:blank) can arrive before the document is in
+// place, so an empty frame is only acted on after a grace period.
+let writtenAt = 0
+let reloadAttempted = false
 
 const frameStyle = computed(() => (
   measured.value ? { height: `${frameHeight.value}px` } : {}
 ))
-
-const srcdoc = ref('')
 
 function releaseFrame() {
   frameObserver?.disconnect()
@@ -130,6 +139,67 @@ function measureFrame() {
   measured.value = true
 }
 
+/**
+ * Put the built document into the frame.
+ *
+ * Written straight into the frame's own document rather than through `srcdoc`.
+ * `srcdoc` has to navigate the frame, and on some phones that navigation never
+ * lands: the attribute held 8957 characters while the frame document stayed empty,
+ * so the message rendered as a blank box. Writing is synchronous and cannot be
+ * lost; `srcdoc` remains the fallback for an engine that does not expose the
+ * frame document at all.
+ */
+function applyDocument(markup) {
+  const element = frame.value
+  if (!element) return
+
+  let written = false
+  try {
+    const doc = element.contentDocument
+    if (doc) {
+      doc.open()
+      doc.write(markup)
+      doc.close()
+      written = true
+    }
+  } catch {
+    written = false
+  }
+
+  if (!written) element.srcdoc = markup
+
+  writtenAt = Date.now()
+
+  observeFrame()
+}
+
+/**
+ * Did the document actually land?
+ *
+ * `srcdoc` navigations can be lost and a write can fail on an engine that does not
+ * hand over the frame document; when that happens the frame is empty, so the
+ * document is applied again once. The reader never has to change renderers.
+ */
+function ensureFrameLoaded() {
+  if (frameHasDocument() || !props.html) return
+  if (reloadAttempted || Date.now() - writtenAt <= EMPTY_GRACE_MS) return
+
+  reloadAttempted = true
+  rebuild()
+}
+
+/** Does the frame hold our document (the body wrapper is the marker)? */
+function frameHasDocument() {
+  try {
+    return Boolean(frame.value?.contentDocument?.querySelector?.('[data-nova-mail-body]'))
+  } catch {
+    return false
+  }
+}
+
+/** How long a frame may take to hold its document before it counts as failed. */
+const EMPTY_GRACE_MS = 800
+
 function observeFrame() {
   releaseFrame()
   measureFrame()
@@ -156,7 +226,7 @@ function observeFrame() {
   // Images and webfonts land after `load`; re-measure a few times as a cheap
   // safety net for browsers without ResizeObserver.
   ;[60, 180, 400, 900, 1600].forEach(delay => {
-    timers.push(setTimeout(measureFrame, delay))
+    timers.push(setTimeout(() => { measureFrame(); ensureFrameLoaded() }, delay))
   })
 
   doc.fonts?.ready?.then?.(() => measureFrame()).catch?.(() => {})
@@ -188,6 +258,7 @@ function observeWrapper() {
 
 function handleFrameLoad() {
   observeFrame()
+  ensureFrameLoaded()
   emit('loaded')
 }
 
@@ -207,7 +278,7 @@ function handleMessage(event) {
 
 function rebuild() {
   if (!props.html) {
-    srcdoc.value = ''
+    try { frame.value?.contentDocument?.open?.(); frame.value?.contentDocument?.close?.() } catch { /* frame gone */ }
     measured.value = false
     frameHeight.value = 0
     emit('blocked', 0)
@@ -224,14 +295,14 @@ function rebuild() {
     allowImages: props.allowImages,
     theme: props.theme === 'dark' ? 'dark' : 'light',
     nonce,
-    title: props.title
+    title: props.title,
+    fallbackText: props.text
   })
 
-  srcdoc.value = built.document
+  reloadAttempted = false
+
+  applyDocument(built.document)
   emit('blocked', built.blocked)
-  // The mail has markup but none of it survived, or there is none at all: tell
-  // the reader so it can render the text alternative instead of a blank frame.
-  emit('empty', built.sanitizedLength === 0)
 }
 
 onMounted(() => {

@@ -277,6 +277,19 @@ describe('readFrameContentHeight', () => {
     expect(build('<script>alert(1)</script>').sanitizedLength).toBe(0)
   })
 
+  it('renders the text alternative inside the frame when the markup is empty', () => {
+    // "Nothing survived sanitizing" must still show the mail, not a blank frame.
+    const emptied = build('<script>alert(1)</script>', { fallbackText: 'plain <fallback> & text' })
+
+    expect(emptied.document).toContain('nova-fallback')
+    expect(emptied.document).toContain('plain &lt;fallback&gt; &amp; text')
+    expect(emptied.sanitizedLength).toBeGreaterThan(0)
+
+    // A mail with real markup keeps the markup only (the stylesheet always
+    // mentions the class, so assert on the rendered element).
+    expect(build('<p>hello</p>', { fallbackText: 'ignored' }).document).not.toContain('<pre class="nova-fallback">')
+  })
+
   it('discards a reading far taller than the frame is wide (sliver wrap)', () => {
     // A one-line mail once measured 888px while the card was still zero-wide. That
     // kind of reading must never stretch the card into a wall of blank space.
