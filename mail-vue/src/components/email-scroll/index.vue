@@ -171,7 +171,7 @@
                     <!-- Keep list previews sourced from the list payload only.  The
                          detail `text` field is populated when a message is opened
                          and must never leak back into a row. -->
-                    <span v-if="item.listText" class="email-content">{{ item.listText }}</span>
+                    <span v-if="listPreview(item)" class="email-content">{{ listPreview(item) }}</span>
                   </div>
 
                   <div class="user-info" v-if="showUserInfo">
@@ -349,6 +349,8 @@ import {EmailUnreadEnum} from "@/enums/email-enum.js";
 import { UseVirtualList } from '@vueuse/components'
 import { useScroll } from '@vueuse/core'
 import SenderAvatar from '@/components/sender-avatar/index.vue'
+import { MAIL_BODY_TYPE, unwrapNestedMessage, looksLikeMarkdownDocument } from '@/utils/mail-html.js'
+import { stripMarkdown } from '@/utils/quoted-text.js'
 
 const props = defineProps({
   getEmailList: Function,
@@ -635,6 +637,28 @@ watch(scrollbarRef, () => {
 watch(itemHeight, () => {
   keyCount.value ++
 })
+
+/**
+ * Row preview text, hardened on the client too.
+ *
+ * The Worker already flattens markdown and unwraps a body that is itself a raw
+ * message when it builds `listText`, but a row stored before those rules still
+ * carries its `MIME-Version:` header block or markdown syntax. Normalising here
+ * means the Inbox never shows either, whatever the stored row looks like.
+ */
+function listPreview(item) {
+  const raw = String(item?.listText || '')
+  if (!raw) return ''
+
+  const nested = unwrapNestedMessage(raw)
+  if (nested) {
+    const body = nested.text || ''
+    return nested.bodyType === MAIL_BODY_TYPE.MARKDOWN ? stripMarkdown(body).trim() : body
+  }
+
+  // A markdown body that arrived as text/plain: flatten it for the row.
+  return looksLikeMarkdownDocument(raw) ? stripMarkdown(raw).trim() : raw
+}
 
 watch(followLoading, (isFollowLoading) => {
   if (isFollowLoading) {

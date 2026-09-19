@@ -320,6 +320,94 @@ export const MAIL_BODY_TYPE = {
   PLAIN: 'text/plain',
 }
 
+const NESTED_HEADER_LINE = /^([A-Za-z][A-Za-z0-9-]*):[ \t]?(.*)$/
+const NESTED_KNOWN_HEADERS = /^(mime-version|content-type|content-transfer-encoding|content-disposition|from|to|cc|bcc|subject|date|message-id|received|return-path|delivered-to|reply-to|dkim-signature|references|in-reply-to)$/i
+
+/**
+ * Unwrap a body that is itself a whole raw message.
+ *
+ * Forwarded source, bounce reports, digests and "paste the raw mail" tests arrive
+ * as a plain-text body whose first lines are RFC 5322 headers (`MIME-Version: 1.0`,
+ * `Content-Type: …`) followed by a blank line and the real body.
+ *
+ * The Worker drops that header block when it stores new mail (see
+ * `lib/mail-body.js`), but rows written before that rule still hold the raw
+ * source, so the reader applies the same unwrap at read time.
+ *
+ * @param {string} text
+ * @returns {{bodyType: string, text: string, content: string}|null}
+ */
+export function unwrapNestedMessage(text) {
+  const lines = String(text || '').split(/\r?\n/)
+  let index = 0
+  let knownHeader = false
+
+  for (; index < lines.length; index++) {
+    const line = lines[index]
+    // Blank separator: tolerate a line that only holds spaces/tabs.
+    if (line.trim() === '') break
+
+    const match = NESTED_HEADER_LINE.exec(line)
+    if (!match) return null
+
+    if (NESTED_KNOWN_HEADERS.test(match[1])) knownHeader = true
+  }
+
+  if (!knownHeader || index >= lines.length) return null
+
+  const headerBlock = lines.slice(0, index).join('\n')
+  const body = lines.slice(index + 1).join('\n').trim()
+  if (!body) return null
+
+  const innerType = (/^content-type:[ \t]*([^;\s]+)/im.exec(headerBlock) || [])[1]?.toLowerCase() || ''
+
+  if (innerType === MAIL_BODY_TYPE.MARKDOWN) return { bodyType: MAIL_BODY_TYPE.MARKDOWN, text: body, content: '' }
+  if (innerType === MAIL_BODY_TYPE.HTML) return { bodyType: MAIL_BODY_TYPE.HTML, text: '', content: body }
+  return { bodyType: MAIL_BODY_TYPE.PLAIN, text: body, content: '' }
+}
+
+/**
+ * A message whose stored body is a raw message, re-pointed at its real body.
+ * Returns the message untouched when there is nothing to unwrap.
+ *
+ * @param {object} message
+ */
+export function normalizeNestedBody(message) {
+  const nested = message ? unwrapNestedMessage(message.text) : null
+  if (!nested) return message
+
+  return {
+    ...message,
+    bodyType: nested.bodyType,
+    text: nested.text,
+    content: nested.content || message.content,
+  }
+}
+
+// Markdown shapes that ordinary prose does not produce on its own.
+const MARKDOWN_SIGNALS = [
+  /^[ \t]{0,3}#{1,6}[ \t]+\S/m,                          // ATX heading
+  /^[ \t]{0,3}(?:```|~~~)/m,                             // fenced code
+  /\[[^\]\n]+\]\((?:https?:|mailto:|\/)[^)\s]*\)/,       // link with a real target
+]
+
+/**
+ * Is this plain-text body actually a markdown document?
+ *
+ * Some senders put markdown in a `text/plain` part (or omit `Content-Type`
+ * entirely), so the body is stored as plain text and the reader would otherwise
+ * show `# Title **bold** [x](http://…)` as punctuation. Only strong signals
+ * count — an ATX heading, a code fence or a real markdown link — so ordinary
+ * prose, `2 * 3 = 6` and "- sent from my phone" style lines stay plain.
+ *
+ * @param {string} text
+ */
+export function looksLikeMarkdownDocument(text) {
+  const value = String(text || '')
+  if (!value.trim()) return false
+  return MARKDOWN_SIGNALS.some(pattern => pattern.test(value))
+}
+
 /**
  * Full pipeline for one mail body.
  *

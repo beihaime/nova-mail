@@ -249,7 +249,7 @@ import {EmailUnreadEnum} from "@/enums/email-enum.js";
 import SenderAvatar from '@/components/sender-avatar/index.vue'
 import {buildThreadMessages, threadSubjectKey} from '@/utils/mail-thread.js'
 import {quotedTextToHtml, wrapHtmlQuotes} from '@/utils/quoted-text.js'
-import {MAIL_BODY_TYPE, blockRemoteResources, prepareMarkdownBody} from '@/utils/mail-html.js'
+import {MAIL_BODY_TYPE, blockRemoteResources, prepareMarkdownBody, normalizeNestedBody, looksLikeMarkdownDocument} from '@/utils/mail-html.js'
 import {looksLikeHtmlDocument} from '@/utils/mail-body-hint.js'
 import {attachmentRisk} from '@/utils/attachment-risk.js'
 import {alertNewMail} from '@/utils/new-mail-alert.js'
@@ -295,11 +295,21 @@ const quoteLabel = computed(() => `… ${t('showQuotedContent')}`)
 // The API stores one row per message and exposes no thread endpoint, so the
 // conversation is assembled from every loaded message that shares a normalised
 // subject, plus anything sent from this session (see the email store).
-const thread = computed(() => buildThreadMessages(
-    email.value,
-    [...serverThread.value, ...Object.values(emailStore.detailMap)],
-    emailStore.threadMessages
-))
+const thread = computed(() => {
+    const built = buildThreadMessages(
+        email.value,
+        [...serverThread.value, ...Object.values(emailStore.detailMap)],
+        emailStore.threadMessages
+    )
+
+    // Rows stored before the Worker learned to unwrap a body that is itself a raw
+    // message still hold the `MIME-Version:` / `Content-Type:` header block; unwrap
+    // them at read time so they render as their real body.
+    return {
+        ...built,
+        messages: built.messages.map(normalizeNestedBody),
+    }
+})
 
 // Messages returned by `GET /email/thread`. The Inbox only carries the newest
 // message of a conversation, so the reader asks the server for the whole thread
@@ -443,10 +453,14 @@ function messageBodyKind(message) {
   const hasHtml = !!String(message.content || '').trim()
   const hasText = !!String(message.text || '').trim()
   const markupInText = hasText && looksLikeHtmlDocument(message.text)
+  // Markdown that arrived in a `text/plain` part (or a raw paste) is still
+  // markdown; render it rather than showing its syntax.
+  const markdownInText = hasText && looksLikeMarkdownDocument(message.text)
 
   if (type === MAIL_BODY_TYPE.MARKDOWN) return hasText ? 'markdown' : 'none'
   if (type === MAIL_BODY_TYPE.PLAIN) {
     if (markupInText) return 'html'
+    if (markdownInText) return 'markdown'
     return hasText ? 'plain' : 'none'
   }
   if (type === MAIL_BODY_TYPE.HTML) {
@@ -460,6 +474,7 @@ function messageBodyKind(message) {
 
   if (hasHtml) return 'html'
   if (markupInText) return 'html'
+  if (markdownInText) return 'markdown'
   return hasText ? 'plain' : 'none'
 }
 

@@ -5,10 +5,13 @@ import {
   blockRemoteResources,
   hardenLinks,
   isSafeUrl,
+  looksLikeMarkdownDocument,
+  normalizeNestedBody,
   prepareMailBody,
   prepareMarkdownBody,
   renderMarkdown,
   sanitizeMailHtml,
+  unwrapNestedMessage,
 } from '../src/utils/mail-html.js'
 
 /** Everything a mail body might use to escape its box. */
@@ -322,5 +325,62 @@ describe('markdown bodies', () => {
     expect(MAIL_BODY_TYPE.HTML).toBe('text/html')
     expect(MAIL_BODY_TYPE.MARKDOWN).toBe('text/markdown')
     expect(MAIL_BODY_TYPE.PLAIN).toBe('text/plain')
+  })
+})
+
+describe('nested raw message bodies', () => {
+  it('unwraps headers and honours the inner content type', () => {
+    const markdown = unwrapNestedMessage(
+      'MIME-Version: 1.0\nContent-Type: text/markdown; charset=utf-8\n\n# Hello\n\n**Bold** text.',
+    )
+
+    expect(markdown.bodyType).toBe(MAIL_BODY_TYPE.MARKDOWN)
+    expect(markdown.text).toBe('# Hello\n\n**Bold** text.')
+
+    const html = unwrapNestedMessage(
+      'MIME-Version: 1.0\nContent-Type: text/html; charset=utf-8\n\n<div>Hi</div>',
+    )
+
+    expect(html.bodyType).toBe(MAIL_BODY_TYPE.HTML)
+    expect(html.content).toBe('<div>Hi</div>')
+  })
+
+  it('tolerates a separator line that only holds spaces', () => {
+    expect(unwrapNestedMessage('Content-Type: text/markdown; charset=utf-8\n \n# Hello').bodyType)
+      .toBe(MAIL_BODY_TYPE.MARKDOWN)
+  })
+
+  it('leaves ordinary prose alone', () => {
+    expect(unwrapNestedMessage('Note: this is important.\n\nThanks')).toBe(null)
+    expect(unwrapNestedMessage('Just a body with no headers.')).toBe(null)
+  })
+
+  it('re-points a message at its real body', () => {
+    const message = { emailId: 1, bodyType: 'text/plain', text: 'MIME-Version: 1.0\nContent-Type: text/markdown; charset=utf-8\n\n# Hi', content: '' }
+    const normalized = normalizeNestedBody(message)
+
+    expect(normalized.bodyType).toBe(MAIL_BODY_TYPE.MARKDOWN)
+    expect(normalized.text).toBe('# Hi')
+    expect(normalized.emailId).toBe(1)
+  })
+
+  it('returns the message untouched when there is nothing to unwrap', () => {
+    const message = { emailId: 2, bodyType: 'text/plain', text: 'plain body' }
+    expect(normalizeNestedBody(message)).toBe(message)
+  })
+})
+
+describe('looksLikeMarkdownDocument', () => {
+  it('accepts bodies with strong markdown signals', () => {
+    expect(looksLikeMarkdownDocument('# Hello\n\n**Bold** text with a [link](https://example.com).')).toBe(true)
+    expect(looksLikeMarkdownDocument('```js\nconst x = 1\n```')).toBe(true)
+    expect(looksLikeMarkdownDocument('See [the docs](mailto:x@y.z)')).toBe(true)
+  })
+
+  it('leaves ordinary plain text alone', () => {
+    expect(looksLikeMarkdownDocument('2 * 3 = 6')).toBe(false)
+    expect(looksLikeMarkdownDocument('- sent from my phone')).toBe(false)
+    expect(looksLikeMarkdownDocument('Issue #123 is fixed')).toBe(false)
+    expect(looksLikeMarkdownDocument('')).toBe(false)
   })
 })
