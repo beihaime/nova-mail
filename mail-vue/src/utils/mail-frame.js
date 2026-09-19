@@ -156,6 +156,9 @@ function buildFrameStyle(theme) {
     /* A mail laid out at a fixed pixel width must never produce a horizontal
        scrollbar: the top-level blocks are capped to the available width. */
     body > * { max-width: 100% !important; box-sizing: border-box; }
+    /* Own formatting context: children's margins stay inside, so this element's
+       height is exactly the mail's height — it is what the reader measures. */
+    .nova-mail-body { display: flow-root; }
     img { max-width: 100%; height: auto; }
     table { max-width: 100%; border-collapse: collapse; }
     td, th { max-width: 100%; }
@@ -299,11 +302,11 @@ export function isOpenableLink(href) {
 /**
  * Height the mail occupies inside a frame document, in CSS pixels.
  *
- * Deliberately **not** `documentElement.scrollHeight`: on the root element that
- * value is at least the viewport height, so a one-line mail measured as tall as
- * the frame itself, and because the frame's own height feeds the next reading it
- * could only ever grow — never shrink back. The body (and the wrapper inside it)
- * report the content instead.
+ * Read from the content wrapper only. Neither the root element nor `body` can be
+ * trusted: both are stretched to the viewport, so their height is at least the
+ * frame's current height — a reading that can never shrink and would leave the
+ * frame taller than the mail inside it. Measured on a Chrome Android device:
+ * `documentElement` 301, `body` 301, content wrapper 286.
  *
  * @param {Document} doc the frame's content document
  * @param {number} clientWidth the frame's laid-out width
@@ -315,15 +318,19 @@ export function readFrameContentHeight(doc, clientWidth) {
   const width = clientWidth || 0
   if (width < MAIL_FRAME_MIN_WIDTH) return 0
 
-  const body = doc.body
   const content = doc.querySelector?.('[data-nova-mail-body]')
+  const contentHeight = content
+    ? Math.max(content.getBoundingClientRect?.().height || 0, content.offsetHeight || 0)
+    : 0
 
-  const height = Math.max(
-    body?.scrollHeight || 0,
-    body?.getBoundingClientRect?.().height || 0,
-    content?.getBoundingClientRect?.().height || 0,
-    content?.offsetHeight || 0
-  )
+  const body = doc.body
+  const bodyHeight = body
+    ? Math.max(body.scrollHeight || 0, body.getBoundingClientRect?.().height || 0)
+    : 0
+
+  // A document without the wrapper (an empty or unexpected frame) still has to
+  // report something, so fall back to the body.
+  const height = contentHeight > 0 ? contentHeight : bodyHeight
 
   // A reading this far beyond the width is a sliver-wrap artefact, not a mail.
   if (height > width * MAIL_FRAME_MAX_RATIO) return 0

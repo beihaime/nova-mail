@@ -227,15 +227,23 @@ describe('frame helpers', () => {
     expect(isOpenableLink('javascript:alert(1)')).toBe(false)
   })
 
-  it('gives the frame body its own formatting context, so its height includes margins', () => {
-    expect(build('<p>x</p>').document).toContain('display: flow-root')
+  it('gives the frame body and the content wrapper their own formatting contexts', () => {
+    const { document } = build('<p>x</p>')
+
+    expect(document).toContain('display: flow-root')
+    expect(document).toContain('.nova-mail-body { display: flow-root; }')
   })
 })
 
 describe('readFrameContentHeight', () => {
-  it('measures the body, never the root element', () => {
-    // `documentElement.scrollHeight` is floored by the viewport: on a frame that
-    // is currently 320px tall a one-line mail reads 320 there and 24 on the body.
+  it('measures the content wrapper, never the viewport-stretched body', () => {
+    // Numbers measured on a Chrome Android device: the root element and `body`
+    // both report the frame's own height (301) while the wrapper holds the mail
+    // (286). Taking the largest of them kept the frame taller than its mail.
+    expect(readFrameContentHeight(frameDoc({ rootScroll: 301, bodyScroll: 301, bodyRect: 301, wrapRect: 286 }), 345)).toBe(286)
+  })
+
+  it('falls back to the body when the document has no wrapper', () => {
     expect(readFrameContentHeight(frameDoc({ rootScroll: 320, bodyScroll: 24 }), 375)).toBe(24)
   })
 
@@ -247,9 +255,10 @@ describe('readFrameContentHeight', () => {
     expect(readFrameContentHeight(doc, MAIL_FRAME_MIN_WIDTH)).toBe(888)
   })
 
-  it('takes the largest of body and wrapper, so a collapsed margin cannot clip content', () => {
-    expect(readFrameContentHeight(frameDoc({ bodyScroll: 100, wrapRect: 140 }), 375)).toBe(140)
-    expect(readFrameContentHeight(frameDoc({ bodyScroll: 100, wrapOffset: 160 }), 375)).toBe(160)
+  it('prefers the wrapper and uses offsetHeight when the rect is unavailable', () => {
+    // The body is deliberately the larger value here: it must not win.
+    expect(readFrameContentHeight(frameDoc({ bodyScroll: 400, wrapRect: 140 }), 375)).toBe(140)
+    expect(readFrameContentHeight(frameDoc({ bodyScroll: 400, wrapOffset: 160 }), 375)).toBe(160)
     expect(readFrameContentHeight(frameDoc({ bodyRect: 70 }), 375)).toBe(70)
   })
 
