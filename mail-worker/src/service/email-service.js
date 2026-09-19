@@ -431,16 +431,34 @@ const emailService = {
 	 *    must not create a second row.
 	 *  - Thread resolution: the message joins the conversation of its parent
 	 *    (In-Reply-To → References → subject fallback), otherwise it starts one.
+	 *
+	 * If the v3.6 migration has not run yet (the Worker is deployed a few
+	 * seconds before `/api/init` adds the columns), the mail is still stored —
+	 * just without a conversation key — so nothing is rejected or lost.
 	 */
 	async receive(c, params, cidAttList, r2domain) {
-		const existing = await threadService.findExistingMessage(c, params);
-		if (existing) {
-			return existing;
+		let thread = { threadId: '', parentMessageId: 0 };
+		let supportsThreads = true;
+
+		try {
+			const existing = await threadService.findExistingMessage(c, params);
+			if (existing) {
+				return existing;
+			}
+
+			thread = await threadService.resolveThreadForMessage(c, params);
+		} catch (error) {
+			if (!threadService.isMissingThreadColumn(error)) {
+				throw error;
+			}
+			supportsThreads = false;
 		}
 
-		const thread = await threadService.resolveThreadForMessage(c, params);
-		params.threadId = thread.threadId || threadService.newThreadId();
-		params.parentMessageId = thread.parentMessageId || 0;
+		if (supportsThreads) {
+			params.threadId = thread.threadId || threadService.newThreadId();
+			params.parentMessageId = thread.parentMessageId || 0;
+		}
+
 		params.content = this.imgReplace(params.content, cidAttList, r2domain);
 
 		return orm(c).insert(email).values({ ...params }).returning().get();
@@ -626,19 +644,24 @@ const emailService = {
 			emailData.relation = emailRow.messageId;
 
 			// Keep the reply inside the conversation it answers so the reader can
-			// reload the whole thread (and the Inbox never splits it).
-			const thread = await threadService.resolveThreadForMessage(c, {
-				userId,
-				accountId,
-				messageId: '',
-				inReplyTo: emailRow.messageId,
-				references: emailRow.messageId,
-				subject,
-				threadId: emailRow.threadId,
-				parentMessageId: emailRow.emailId
-			});
-			emailData.threadId = thread.threadId || emailRow.threadId || threadService.newThreadId();
-			emailData.parentMessageId = thread.parentMessageId || Number(emailRow.emailId) || 0;
+			// reload the whole thread (and the Inbox never splits it). A reply
+			// sent before the v3.6 migration runs simply has no thread key.
+			try {
+				const thread = await threadService.resolveThreadForMessage(c, {
+					userId,
+					accountId,
+					messageId: '',
+					inReplyTo: emailRow.messageId,
+					references: emailRow.messageId,
+					subject,
+					threadId: emailRow.threadId,
+					parentMessageId: emailRow.emailId
+				});
+				emailData.threadId = thread.threadId || emailRow.threadId || threadService.newThreadId();
+				emailData.parentMessageId = thread.parentMessageId || Number(emailRow.emailId) || 0;
+			} catch (error) {
+				if (!threadService.isMissingThreadColumn(error)) throw error;
+			}
 		}
 
 		//如果权限有发送次数增加用户发送次数
@@ -962,16 +985,23 @@ const emailService = {
 			// The recipient's copy belongs to the *recipient's* conversation: it
 			// is resolved again in their own mailbox instead of inheriting the
 			// sender's thread key.
-			const thread = await threadService.resolveThreadForMessage(c, {
-				userId: emailData.userId,
-				accountId: emailData.accountId,
-				messageId: emailData.messageId,
-				inReplyTo: emailData.inReplyTo,
-				references: emailData.relation,
-				subject: emailData.subject
-			});
-			emailData.threadId = thread.threadId || threadService.newThreadId();
-			emailData.parentMessageId = thread.parentMessageId || 0;
+			try {
+				const thread = await threadService.resolveThreadForMessage(c, {
+					userId: emailData.userId,
+					accountId: emailData.accountId,
+					messageId: emailData.messageId,
+					inReplyTo: emailData.inReplyTo,
+					references: emailData.relation,
+					subject: emailData.subject
+				});
+				emailData.threadId = thread.threadId || threadService.newThreadId();
+				emailData.parentMessageId = thread.parentMessageId || 0;
+			} catch (error) {
+				if (!threadService.isMissingThreadColumn(error)) throw error;
+				// Pre-migration schema: store the copy without a conversation key.
+				delete emailData.threadId;
+				delete emailData.parentMessageId;
+			}
 
 			const emailRow = await orm(c).insert(email).values(emailData).returning().get();
 

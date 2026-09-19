@@ -6,6 +6,7 @@ import {
   createThreadIndex,
   indexThreadMessage,
   resolveThreadKey,
+  isMissingThreadColumn,
   runThreadBackfill,
 } from '../src/service/thread-service';
 
@@ -193,6 +194,17 @@ describe('conversation assembly', () => {
     const second = indexRows(first);
 
     expect(second.map(row => row.threadId)).toEqual(first.map(row => row.threadId));
+  });
+});
+
+describe('pre-migration tolerance', () => {
+  it('recognises the missing thread columns so mail is still stored', () => {
+    expect(isMissingThreadColumn(new Error('D1_ERROR: no such column: thread_id at offset 42'))).toBe(true);
+    expect(isMissingThreadColumn({ message: 'no such column: parent_message_id' })).toBe(true);
+    // Anything else must still surface.
+    expect(isMissingThreadColumn(new Error('D1_ERROR: no such column: something_else'))).toBe(false);
+    expect(isMissingThreadColumn(new Error('D1_ERROR: network unavailable'))).toBe(false);
+    expect(isMissingThreadColumn(undefined)).toBe(false);
   });
 });
 

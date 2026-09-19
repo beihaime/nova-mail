@@ -76,6 +76,19 @@ export function newThreadId() {
 	}
 }
 
+/**
+ * True when the error is D1 rejecting `thread_id` / `parent_message_id` because
+ * the v3.6 migration has not run yet.
+ *
+ * The Worker is deployed before `/api/init` adds the columns, so inbound mail
+ * arriving in that window must still be stored (without a conversation key)
+ * instead of being rejected.
+ */
+export function isMissingThreadColumn(error) {
+	const message = String(error?.message || error || '');
+	return /no such column/i.test(message) && /thread_id|parent_message_id/i.test(message);
+}
+
 /** Empty in-memory index of an already-loaded message set. */
 export function createThreadIndex() {
 	return { byMessageId: new Map(), bySubject: new Map() };
