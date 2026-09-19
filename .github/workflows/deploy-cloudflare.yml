@@ -294,10 +294,22 @@ jobs:
         run: |
           echo "🔎 Checking email.body_type..."
           
+          # `--json` sends errors to stdout as well, so a plain
+          # `SCHEMA=$(...)` under `bash -e` would exit on failure and swallow the
+          # reason — capture both streams and report them instead.
+          set +e
           SCHEMA=$(pnpm wrangler d1 execute "$D1_DATABASE_ID" --remote --yes --json \
-            --command "SELECT name FROM pragma_table_info('email');")
+            --command "SELECT name FROM pragma_table_info('email');" 2>&1)
+          STATUS=$?
+          set -e
           
+          echo "exit status: $STATUS"
           echo "$SCHEMA"
+          
+          if [ "$STATUS" -ne 0 ]; then
+            echo "❌ Could not read the schema above. Reading a remote D1 database needs an API token with D1 → Edit."
+            exit 1
+          fi
           
           if ! printf '%s' "$SCHEMA" | grep -q 'body_type'; then
             echo "❌ email.body_type is missing: the v3.8 migration did not apply."
