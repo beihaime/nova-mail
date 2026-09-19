@@ -197,9 +197,6 @@
         </Teleport>
       </div>
     </el-scrollbar>
-    <!-- Temporary diagnostic: `?maildebug=1` reports what this device actually
-         renders, so a phone that misbehaves can be diagnosed without a console. -->
-    <pre v-if="mailDebug" class="mail-debug">{{ mailDebugLine }}</pre>
     <el-image-viewer
         v-if="showPreview"
         :url-list="srcList"
@@ -321,58 +318,6 @@ const resolvedSources = {}
 const wrappedFallback = new Map()
 // message id -> true while the "just arrived" animation plays.
 const arrivingIds = reactive({})
-
-// Temporary diagnostic: `?maildebug=1` renders what this device actually shows.
-// A phone has no console, and the reported symptom (a tall, blank message body)
-// has to be distinguished from a body that never rendered at all.
-const mailDebug = typeof window !== 'undefined'
-  && (new URLSearchParams(window.location.search).has('maildebug')
-    || window.localStorage.getItem('maildebug') === '1')
-const mailDebugLine = ref('')
-let mailDebugTimer = null
-
-function describeExpandedCard() {
-  const card = document.querySelector('.thread-message.is-expanded')
-  const body = card?.querySelector('.message-body')
-  const frame = card?.querySelector('.mail-frame')
-  const iframe = card?.querySelector('.mail-frame__iframe')
-  const textEl = card?.querySelector('.email-text')
-  const height = element => (element ? Math.round(element.getBoundingClientRect().height) : '-')
-  const style = (element, name) => (element ? getComputedStyle(element)[name] : '-')
-
-  const row = email.value || {}
-  let inner = 'no-document'
-  try {
-    const doc = iframe?.contentDocument
-    const innerBody = doc?.body
-    const wrap = doc?.querySelector('[data-nova-mail-body]')
-    inner = innerBody
-      ? `html=${innerBody.innerHTML.length} text=${(innerBody.textContent || '').trim().length} `
-        + `wrap=${Math.round(wrap?.getBoundingClientRect().height || 0)}x${Math.round(wrap?.getBoundingClientRect().width || 0)} `
-        + `op=${style(wrap, 'opacity')} vis=${style(wrap, 'visibility')} color=${style(wrap, 'color')}`
-      : 'body-missing'
-  } catch (error) {
-    inner = `blocked:${error.name}`
-  }
-
-  mailDebugLine.value = [
-    `vp=${window.innerWidth}x${window.innerHeight}`,
-    `row=#${row.emailId || 0} type=${row.bodyType || 'none'} content=${(row.content || '').length} text=${(row.text || '').length}`,
-    `body h=${height(body)} op=${style(body, 'opacity')} disp=${style(body, 'display')}`,
-    `frame h=${height(frame)} ${frame ? frame.className.replace('mail-frame ', '') : '-'}`,
-    `iframe ${iframe ? iframe.clientWidth : '-'}x${iframe ? iframe.clientHeight : '-'} style=${iframe ? iframe.style.height || 'auto' : '-'} srcdoc=${iframe ? (iframe.getAttribute('srcdoc') || '').length : '-'}`,
-    `plain=${textEl ? (textEl.textContent || '').trim().length : 'none'} preview=${(document.querySelector('.message-preview') || {}).textContent ? 'yes' : 'no'}`,
-    `inner: ${inner}`,
-    `doc url=${(() => { try { return iframe?.contentDocument?.URL || '-' } catch { return 'blocked' } })()} rs=${(() => { try { return iframe?.contentDocument?.readyState || '-' } catch { return 'blocked' } })()}`,
-    `expanded cards: ${[...document.querySelectorAll('.thread-message.is-expanded')].map((card, index) => {
-      const frame = card.querySelector('.mail-frame__iframe')
-      let wrap = 'no-doc'
-      try { wrap = frame?.contentDocument?.querySelector('[data-nova-mail-body]') ? 'wrap' : 'NO-WRAP' } catch { wrap = 'blocked' }
-      return `#${index} ${frame ? `${frame.clientWidth}x${frame.clientHeight}` : 'no-frame'} ${wrap}`
-    }).join(' | ') || 'none'}`,
-    navigator.userAgent.slice(0, 44)
-  ].join('\n')
-}
 
 function isMessageExpanded(message) {
   return !!expandedMessages[message.id]
@@ -1165,10 +1110,6 @@ onMounted(() => {
   tryMarkRead()
   startRealtime()
   document.addEventListener('visibilitychange', handleVisibilityChange)
-  if (mailDebug) {
-    describeExpandedCard()
-    mailDebugTimer = setInterval(describeExpandedCard, 900)
-  }
   window.addEventListener('keydown', handleKeyDown);
   if (mobileReaderQuery.addEventListener) {
     mobileReaderQuery.addEventListener('change', handleMobileReaderChange)
@@ -1182,8 +1123,6 @@ onUnmounted(() => {
   closePdfPreview()
   stopRealtime()
   document.removeEventListener('visibilitychange', handleVisibilityChange)
-  clearInterval(mailDebugTimer)
-  mailDebugTimer = null
   emailStore.contentData.showUnread = false;
   readRequesting = false
   window.removeEventListener('keydown', handleKeyDown);
@@ -2062,26 +2001,6 @@ const handleDelete = () => {
 
 .remote-images-bar button:hover {
   border-color: var(--el-color-primary);
-}
-
-/* Temporary diagnostic badge (`?maildebug=1`): pinned to the viewport so it is
-   visible on a phone whatever the reader's scroll position is. */
-.mail-debug {
-  position: fixed;
-  left: 0;
-  right: 0;
-  top: 0;
-  z-index: 60;
-  max-height: 60vh;
-  overflow-y: auto;
-  margin: 0;
-  padding: calc(6px + env(safe-area-inset-top, 0px)) 8px 6px;
-  background: rgba(0, 0, 0, .88);
-  color: #7ee787;
-  font-size: 11px;
-  line-height: 1.45;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
 }
 
 /* An attachment the operating system would run is marked in the list, not only
