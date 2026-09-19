@@ -285,6 +285,30 @@ jobs:
             exit 1
           fi
 
+      # The initialization route answers `success` even when an individual
+      # migration throws: init.js wraps every ALTER in try/catch so an existing
+      # column (or a locked database) cannot fail the whole run. A green run
+      # therefore does not prove the schema is current, so read it back.
+      - name: 🔎 验证数据库 / Verify database schema
+        working-directory: ./mail-worker
+        run: |
+          echo "🔎 Checking email.body_type..."
+          
+          SCHEMA=$(pnpm wrangler d1 execute "$D1_DATABASE_ID" --remote --yes --json \
+            --command "SELECT name FROM pragma_table_info('email');")
+          
+          echo "$SCHEMA"
+          
+          if ! printf '%s' "$SCHEMA" | grep -q 'body_type'; then
+            echo "❌ email.body_type is missing: the v3.8 migration did not apply."
+            exit 1
+          fi
+          
+          pnpm wrangler d1 execute "$D1_DATABASE_ID" --remote --yes --json \
+            --command "SELECT body_type, COUNT(*) AS total FROM email GROUP BY body_type;"
+          
+          echo "✅ email.body_type is present."
+
       - name: 🗑️ 删除运行记录 / Delete workflow runs
         uses: GitRML/delete-workflow-runs@main
         continue-on-error: true
