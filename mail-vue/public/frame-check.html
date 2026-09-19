@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nova Mail · 正文渲染自检</title>
+<style>
+  body { margin: 0; padding: 12px; background: #111; color: #eee;
+         font: 14px/1.6 -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; }
+  h1 { font-size: 16px; margin: 0 0 8px; }
+  p.hint { margin: 0 0 12px; color: #9aa1ab; font-size: 12px; }
+  pre { white-space: pre-wrap; word-break: break-word; background: #000; padding: 10px;
+        border-radius: 8px; font-size: 12px; line-height: 1.5; }
+  .ok { color: #7ee787; }
+  .bad { color: #ff7b72; }
+  iframe { width: 100%; height: 320px; border: 1px solid #444; background: #fff; display: block; margin-top: 12px; }
+  button { margin-top: 10px; padding: 8px 14px; border-radius: 8px; border: 1px solid #444;
+           background: #222; color: #eee; font-size: 14px; }
+</style>
+</head>
+<body>
+<h1>Nova Mail · 正文渲染自检</h1>
+<p class="hint">这一页只做一件事：在一台设备上创建与邮件正文完全相同的沙箱 iframe，并报告它能否被测量、
+渲染多大。请把下面这段文字（或截图）发回给我。</p>
+<pre id="out">running…</pre>
+<button id="again" type="button">重新检测</button>
+
+<iframe id="frame"
+        sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+        scrolling="auto"
+        referrerpolicy="no-referrer"></iframe>
+
+<script>
+// The frame document mirrors what utils/mail-frame.js produces.
+var DOC = '<!DOCTYPE html><html><head><meta charset="utf-8">'
+  + '<style>'
+  + 'html,body{margin:0;padding:0;background:transparent}'
+  + 'body{font:15px/1.6 sans-serif;color:#13181d;display:flow-root;word-break:break-word;overflow-wrap:anywhere}'
+  + 'body > *{max-width:100%!important;box-sizing:border-box}'
+  + 'img{max-width:100%;height:auto}table{max-width:100%;border-collapse:collapse}'
+  + '</style></head><body>'
+  + '<div class="nova-mail-body" data-nova-mail-body="1">'
+  + '<p>Line one of the test message.</p>'
+  + '<p>' + new Array(40).join('wrap ') + '</p>'
+  + '<table width="600" style="border-collapse:collapse"><tr><td style="padding:10px">A 600px-wide table cell, the way a newsletter ships.</td></tr>'
+  + '<tr><td style="padding:10px">Second row.</td></tr></table>'
+  + '</div></body></html>'
+
+var frame = document.getElementById('frame')
+var out = document.getElementById('out')
+var MIN_WIDTH = 80
+
+function measure() {
+  var lines = []
+  lines.push('UA: ' + navigator.userAgent)
+  lines.push('viewport: ' + innerWidth + 'x' + innerHeight + '  dpr=' + (devicePixelRatio || 1))
+  lines.push('online: ' + navigator.onLine + '  secure: ' + (window.isSecureContext ? 'yes' : 'no'))
+  lines.push('iframe box: ' + frame.clientWidth + 'x' + frame.clientHeight
+    + '  style.height=' + (frame.style.height || 'auto'))
+
+  var doc = null
+  try {
+    doc = frame.contentDocument
+  } catch (e) {
+    lines.push('contentDocument: ❌ 抛异常 ' + e.name + ': ' + e.message)
+    return lines
+  }
+
+  if (!doc) { lines.push('contentDocument: ❌ null（沙箱拿不到同源文档）'); return lines }
+  lines.push('contentDocument: ✅ 可访问')
+
+  var body = doc.body
+  if (!body) { lines.push('body: ❌ 不存在'); return lines }
+
+  var wrap = doc.querySelector('[data-nova-mail-body]')
+  var rect = body.getBoundingClientRect()
+  lines.push('docElement.scrollHeight: ' + doc.documentElement.scrollHeight)
+  lines.push('body.scrollHeight: ' + body.scrollHeight)
+  lines.push('body rect: ' + Math.round(rect.width) + 'x' + Math.round(rect.height))
+  lines.push('wrap rect: ' + (wrap
+    ? Math.round(wrap.getBoundingClientRect().width) + 'x' + Math.round(wrap.getBoundingClientRect().height)
+    : '❌ null'))
+  lines.push('body display: ' + getComputedStyle(body).display)
+  lines.push('text: ' + (body.textContent || '').replace(/[ \n\r\t]+/g, ' ').trim().slice(0, 50))
+  return lines
+}
+
+function run() {
+  out.textContent = 'running…'
+  frame.style.height = '320px'
+  frame.setAttribute('scrolling', 'auto')
+  frame.removeAttribute('srcdoc')
+  setTimeout(function () { frame.srcdoc = DOC }, 50)
+}
+
+function finish(step) {
+  var lines = measure()
+  var body = null
+  try { body = frame.contentDocument && frame.contentDocument.body } catch (e) {}
+  var height = body
+    ? Math.max(body.scrollHeight || 0, Math.round(body.getBoundingClientRect().height || 0))
+    : 0
+
+  lines.push('---')
+  lines.push('测量到的内容高度: ' + height + (frame.clientWidth < MIN_WIDTH ? '（宽度 ' + frame.clientWidth + ' < ' + MIN_WIDTH + '，生产代码会判为未布局）' : ''))
+
+  if (height > 8 && frame.clientWidth >= MIN_WIDTH) {
+    frame.style.height = height + 'px'
+    frame.setAttribute('scrolling', 'no')
+    lines.push('应用后 iframe 高度: ' + frame.style.height)
+    var after = measure()
+    var bodyRect = after[after.length - 1]
+    lines.push('结论: ✅ 测量成功，正文在应用里应当可见')
+  } else {
+    lines.push('结论: ❌ 测量失败 —— 这正是「展开后看不到正文」的原因，请把以上内容发回')
+  }
+
+  out.textContent = step + '\n' + lines.join('\n')
+}
+
+frame.addEventListener('load', function () {
+  setTimeout(function () { finish('frame check (load 事件已触发)') }, 350)
+})
+
+setTimeout(function () {
+  if (out.textContent === 'running…') finish('frame check (4s 内 load 未触发)')
+}, 4000)
+
+document.getElementById('again').addEventListener('click', function () {
+  run()
+  setTimeout(function () { finish('frame check (重新检测)') }, 1200)
+})
+
+run()
+</script>
+</body>
+</html>
