@@ -719,10 +719,31 @@ function submitPwd() {
       align-items: center;
       gap: 12px;
 
-      /* The text column must be allowed to shrink; the provider mark keeps its
-         own size via grid place-items. */
+      /* Only the text column may shrink; it truncates the handle/email. */
       > div {
+        flex: 1 1 auto;
         min-width: 0;
+      }
+
+      /* Every provider avatar is the same fixed 32px circle. `flex: 0 0 32px`
+         (plus min-width) stops flex from squashing the OAuth image into an
+         ellipse when a long Google address squeezes the row. */
+      .github-mark,
+      .provider-mark,
+      :deep(.el-avatar) {
+        flex: 0 0 32px;
+        width: 32px;
+        height: 32px;
+        min-width: 32px;
+        min-height: 32px;
+        border-radius: 50%;
+      }
+
+      /* Keep the bitmap square inside the circle instead of stretching. */
+      :deep(.el-avatar > img) {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
       }
     }
 
@@ -758,15 +779,12 @@ function submitPwd() {
       color: var(--el-text-color-secondary);
       font-size: 13px;
       margin-top: 2px;
-    }
 
-    @media (max-width: 767px) {
-      .provider-status {
-        min-width: 0;
-        overflow: hidden;
-        white-space: nowrap;
-        text-overflow: ellipsis;
-      }
+      /* Long handles / addresses stay on one line and truncate. */
+      min-width: 0;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
     }
   }
 

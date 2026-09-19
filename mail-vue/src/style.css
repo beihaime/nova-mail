@@ -296,6 +296,16 @@ html[data-theme-to="light"]::view-transition-old(root) {
 
 /* Mobile dark-mode icon normalization */
 @media (max-width: 767px) {
+  /* Light-mode counterparts of the phone ink scale. These previously existed
+     only under html.dark, so in light mode `var(--mobile-secondary/tertiary)`
+     was invalid and Sender, Subject and Preview all inherited the same colour —
+     which is why the list had no visual hierarchy. */
+  :root {
+    --mobile-primary: #1c1c1e;
+    --mobile-secondary: #6b7280;
+    --mobile-tertiary: #9aa1ab;
+  }
+
   html.dark {
     --mobile-primary: #f2f2f7;
     --mobile-secondary: #aeaeb2;

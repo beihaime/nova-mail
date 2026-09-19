@@ -382,25 +382,25 @@ function formatName(email) {
   .mobile-inline-search {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 6px;
 
     max-width: none;
     min-width: 0;
-    height: 38px;
+    height: 43px;
 
-    padding: 0 8px;
+    padding: 0 10px;
     box-sizing: border-box;
 
-    border-radius: 19px;
+    border-radius: 12px;
     color: var(--mobile-secondary);
     background: var(--nova-surface-muted);
   }
 
   .mobile-inline-search :deep(.app-icon) {
     flex: 0 0 auto;
-    width: 17px;
-    height: 17px;
-    opacity: .8;
+    width: 18px;
+    height: 18px;
+    opacity: .72;
   }
 
   .mobile-inline-search input {
@@ -414,7 +414,7 @@ function formatName(email) {
     background: transparent;
 
     color: var(--mobile-primary);
-    font-size: 14px;
+    font-size: 15px;
     text-overflow: ellipsis;
   }
 
@@ -762,7 +762,7 @@ function formatName(email) {
   .toolbar .avatar .avatar-image { width: 40px; height: 40px; flex: 0 0 40px; }
   .toolbar .icon-item { width: 40px; height: 40px; }
   .toolbar .avatar .account-summary { display: none; }
-  .breadcrumb-item { font-size: 16px; }
+  .breadcrumb-item { font-size: 15px; }
 }
 
 .el-tooltip__trigger:first-child:focus-visible {

@@ -585,10 +585,10 @@ const itemHeight = computed(() => {
     if (props.type === 'all-email') {
       return isMobile.value ? 132 : 65;
     } else  {
-      // Phone inbox rows are 72px tall (see the .email-row.email mobile rules);
+      // Phone inbox rows are 82px tall (see the .email-row.email mobile rules);
       // keep the virtual list in lock-step so rows never overlap.
       return isPhone.value && props.type === 'email'
-        ? 72
+        ? 82
         : (isMobile.value ? 83 : 48);
     }
 })
@@ -1887,26 +1887,25 @@ ul {
     width: 100%;
     max-width: 100%;
     min-width: 0;
-    /* 5px of air below the filter divider so it no longer touches the first
-       mail row. Adds only 5px to the Inbox header block. */
-    padding: 0 0 5px;
+    /* 4px of air below the filter divider so it no longer touches the first
+       mail row, without adding height to the Inbox header block. */
+    padding: 0 0 4px;
     background: var(--nova-surface);
   }
 
   /* ---------- Filters ---------- */
 
   .mobile-filter-bar {
-    /* border-box: 46 = 2 (top) + 36 (tabs) + 7 (bottom) + 1 (divider). The tabs
-       get 7px of air above the divider instead of 2px, for +6px total height. */
-    height: 46px;
+    /* border-box: 42 = 2 (top) + 34 (tabs) + 5 (bottom) + 1 (divider). */
+    height: 42px;
     min-width: 0;
 
-    padding: 2px 6px 7px 10px;
+    padding: 2px 6px 5px 10px;
 
     display: flex;
     align-items: center;
 
-    border-bottom: 1px solid var(--nova-divider);
+    border-bottom: 1px solid color-mix(in srgb, var(--nova-divider) 55%, transparent);
   }
 
   .mobile-filters {
@@ -1925,7 +1924,7 @@ ul {
   .mobile-filters button {
     width: 100%;
     min-width: 0;
-    height: 36px;
+    height: 34px;
     padding: 0 2px;
     box-sizing: border-box;
 
@@ -1939,8 +1938,8 @@ ul {
     white-space: nowrap;
     text-overflow: clip;
 
-    /* ~1px smaller than the previous scale, still comfortably legible. */
-    font-size: clamp(10px, 2.6vw, 11.2px);
+    /* Reads ~14px on modern phones while staying legible on a 320px screen. */
+    font-size: clamp(12px, 3.5vw, 14px);
     cursor: pointer;
   }
 
@@ -1954,10 +1953,10 @@ ul {
   }
 
   .mobile-tool-button {
-    flex: 0 0 38px;
+    flex: 0 0 36px;
 
-    width: 38px;
-    height: 36px;
+    width: 36px;
+    height: 34px;
     padding: 0;
 
     display: grid;
@@ -1971,8 +1970,8 @@ ul {
   }
 
   .mobile-tool-button :deep(.app-icon) {
-    width: 20px;
-    height: 20px;
+    width: 19px;
+    height: 19px;
   }
 
   /* ---------- Hide desktop action toolbar ---------- */
@@ -2013,18 +2012,17 @@ ul {
     position: relative;
 
     display: grid;
-    grid-template-columns: 36px minmax(0, 1fr);
+    grid-template-columns: 42px minmax(0, 1fr);
 
-    /* Tightened from 10px: the 36px avatar sat a touch far from the sender /
-       subject / preview column. 7px brings the text 3px closer without
-       crowding it, and the divider below is re-aligned to match. */
-    column-gap: 7px;
+    /* 42px avatar, 8px gutter: avatar + body + time read as one tight grid
+       instead of three loosely spaced columns. */
+    column-gap: 8px;
 
     width: 100%;
-    height: 72px;
-    min-height: 72px;
+    height: 82px;
+    min-height: 82px;
 
-    padding: 6px 12px 6px 16px;
+    padding: 10px 14px 10px 12px;
 
     box-sizing: border-box;
 
@@ -2038,13 +2036,15 @@ ul {
     content: '';
 
     position: absolute;
-    left: 59px;
+    left: 62px;
     right: 0;
     bottom: 0;
 
     height: 1px;
 
-    background: var(--nova-divider);
+    /* Dividers are structure, not content: keep them well below the text
+       contrast so the row rhythm reads without drawing the eye. */
+    background: color-mix(in srgb, var(--nova-divider) 55%, transparent);
   }
 
   :deep(.email-row.email:active) {
@@ -2062,7 +2062,7 @@ ul {
 
   .email-container.mobile-selecting
     :deep(.email-row.email) {
-    grid-template-columns: 20px 36px minmax(0, 1fr);
+    grid-template-columns: 20px 42px minmax(0, 1fr);
   }
 
   .email-container.mobile-selecting
@@ -2081,10 +2081,10 @@ ul {
   .mobile-sender-avatar {
     grid-column: 1;
 
-    width: 36px;
-    height: 36px;
-    min-width: 36px;
-    min-height: 36px;
+    width: 42px;
+    height: 42px;
+    min-width: 42px;
+    min-height: 42px;
 
     display: grid;
     place-items: center;
@@ -2098,7 +2098,7 @@ ul {
     color: var(--el-color-primary);
     background: var(--nova-selected);
 
-    font-size: 15px;
+    font-size: 16px;
     font-weight: 650;
     line-height: 1;
     text-align: center;
@@ -2144,11 +2144,16 @@ ul {
 
     gap: 4px;
 
-    line-height: 19px;
+    /* Sender is the strongest line: largest type, tight leading, primary ink. */
+    line-height: 20px;
+    margin-bottom: 1px;
+
+    /* Keeps the timestamp clear of the 40px star target on the right. */
+    padding-right: 24px;
 
     color: var(--mobile-primary);
 
-    font-size: 15px;
+    font-size: 16px;
     font-weight: 500;
   }
 
@@ -2184,10 +2189,11 @@ ul {
 
     margin-left: auto;
 
-    color: var(--mobile-tertiary);
+    /* Metadata, not message: dimmer than both text lines. */
+    color: color-mix(in srgb, var(--mobile-tertiary) 90%, transparent);
 
-    font-size: 12px;
-    line-height: 19px;
+    font-size: 12.5px;
+    line-height: 20px;
     font-weight: 400;
   }
 
@@ -2197,7 +2203,8 @@ ul {
     width: 100%;
     min-width: 0;
 
-    padding-right: 28px;
+    padding-right: 26px;
+    margin-top: 1px;
 
     line-height: 18px;
 
@@ -2214,10 +2221,11 @@ ul {
     white-space: nowrap;
     text-overflow: ellipsis;
 
+    /* Second step: still primary ink, one size down from the sender. */
     color: var(--mobile-primary);
 
-    font-size: 14px;
-    line-height: 18px;
+    font-size: 15px;
+    line-height: 19px;
     font-weight: 400;
   }
 
@@ -2225,7 +2233,7 @@ ul {
     font-weight: 550;
   }
 
-  :deep(.email-row.email .email-content) {
+  :deep(.email-row.email .email-text .email-content) {
     display: block;
 
     width: 100%;
@@ -2237,9 +2245,12 @@ ul {
     white-space: nowrap;
     text-overflow: ellipsis;
 
-    color: var(--mobile-secondary);
+    /* Third step: the preview drops to the weakest text tier so the eye lands
+       on Sender -> Subject first. The extra .email-text step wins the cascade
+       against the older `.email-row:not(.all-email) .email-content` rule. */
+    color: var(--mobile-tertiary);
 
-    font-size: 13px;
+    font-size: 14px;
     line-height: 18px;
     font-weight: 400;
   }
@@ -2251,8 +2262,8 @@ ul {
 
     position: absolute;
 
-    left: 4px;
-    top: 25px;
+    left: 5px;
+    top: 16px;
 
     width: 7px;
     height: 7px;
@@ -2267,11 +2278,12 @@ ul {
   .mobile-row-star {
     position: absolute;
 
-    right: -2px;
-    top: 14px;
+    right: 0;
+    top: 8px;
 
-    width: 34px;
-    height: 34px;
+    /* 40x40 minimum touch target around a 21px glyph. */
+    width: 40px;
+    height: 40px;
 
     display: grid;
     place-items: center;
@@ -2282,6 +2294,11 @@ ul {
     background: transparent;
 
     cursor: pointer;
+  }
+
+  .mobile-row-star :deep(.iconify) {
+    width: 21px !important;
+    height: 21px !important;
   }
 
   .mobile-row-star :deep(.app-icon) {
