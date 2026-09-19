@@ -27,7 +27,7 @@
               v-for="filter in mobileFilters"
               :key="filter.key"
               :class="{ active: mobileFilter === filter.key }"
-              @click="selectMobileFilter(filter.key)"
+              @click="selectMobileFilter(filter)"
           >
             {{ filter.label }}
           </button>
@@ -362,6 +362,8 @@ import {EmailUnreadEnum} from "@/enums/email-enum.js";
 import { UseVirtualList } from '@vueuse/components'
 import { useScroll } from '@vueuse/core'
 import SenderAvatar from '@/components/sender-avatar/index.vue'
+import router from '@/router/index.js'
+import {hasPerm} from '@/perm/perm.js'
 import { MAIL_BODY_TYPE, unwrapNestedMessage, looksLikeMarkdownDocument } from '@/utils/mail-html.js'
 import { stripMarkdown } from '@/utils/quoted-text.js'
 
@@ -462,7 +464,10 @@ const mobileFilters = computed(() => [
   { key: 'all', label: t('all') },
   { key: 'unread', label: t('unreadMail') },
   { key: 'attachments', label: t('withAttachments') },
-  { key: 'star', label: t('starred') }
+  // Shortcut, not a filter: opens the existing Drafts route (the same
+  // destination as the bottom navigation) instead of narrowing the Inbox list.
+  // `route` marks it as a navigation target rather than a `mobileFilter` value.
+  { key: 'drafts', label: t('drafts'), route: 'draft' }
 ])
 
 let longPressTimer = null
@@ -569,8 +574,7 @@ const visibleList = computed(() => {
       (mobileFilter.value === 'unread' &&
         item.unread === EmailUnreadEnum.UNREAD) ||
       (mobileFilter.value === 'attachments' &&
-        !!emailStore.detailMap[item.emailId]?.attList?.length) ||
-      (mobileFilter.value === 'star' && !!item.isStar)
+        !!emailStore.detailMap[item.emailId]?.attList?.length)
 
     const matchesSearch =
       !query ||
@@ -588,7 +592,14 @@ const visibleList = computed(() => {
 })
 
 function selectMobileFilter(filter) {
-  mobileFilter.value = filter
+  // The Drafts chip never becomes the active filter: it leaves the Inbox for
+  // the Drafts route, so `mobileFilter` stays on the real filter it belonged to.
+  if (filter.route) {
+    if (hasPerm('email:send')) router.push({ name: filter.route })
+    return
+  }
+
+  mobileFilter.value = filter.key
 }
 
 function mobileSortClick() {
@@ -2174,18 +2185,21 @@ ul {
 
     display: grid;
     /* Unread gutter | avatar | message body | fixed metadata/action column.
-       Every track except the message body is fixed width, so a read/unread
-       flip or a long sender can never move the avatar, the time or the star. */
-    grid-template-columns: 16px 44px minmax(0, 1fr) 62px;
+       Tracks are flush (no column gap): the avatar sits at the start of its
+       50px track, so its trailing 10px is the avatar -> text gap and the body
+       column gets every remaining pixel. Every track except the body is fixed,
+       so a read/unread flip or a long sender can never move anything. */
+    grid-template-columns: 16px 50px minmax(0, 1fr) 70px;
 
-    /* 8px between tracks; the tighter left inset pulls the whole row in. */
-    column-gap: 8px;
+    column-gap: 0;
 
     width: 100%;
     height: 80px;
     min-height: 80px;
 
-    padding: 10px 12px 10px 8px;
+    /* The right inset is trimmed to 8px to pay for the wider time column, so
+       the message body still ends up wider than before. */
+    padding: 10px 8px 10px 8px;
 
     box-sizing: border-box;
 
@@ -2199,8 +2213,8 @@ ul {
     content: '';
 
     position: absolute;
-    /* Starts under the message body: padding-left + gutter + avatar + gaps. */
-    left: 84px;
+    /* Starts under the message body: padding-left + gutter + avatar track. */
+    left: 74px;
     right: 0;
     bottom: 0;
 
@@ -2225,7 +2239,7 @@ ul {
   .email-container.mobile-selecting
     :deep(.email-row.email) {
     /* The checkbox replaces the unread gutter in the first track. */
-    grid-template-columns: 20px 44px minmax(0, 1fr) 62px;
+    grid-template-columns: 20px 50px minmax(0, 1fr) 70px;
   }
 
   .email-container.mobile-selecting
@@ -2256,7 +2270,7 @@ ul {
     align-self: start;
 
     width: 100%;
-    height: 44px;
+    height: 40px;
 
     display: grid;
     place-items: center;
@@ -2268,8 +2282,9 @@ ul {
 
     border-radius: 999px;
 
-    /* Hugs the avatar side of the gutter instead of the screen edge. */
-    justify-self: end;
+    /* Centred in the gutter so it reads as "beside the avatar" without being
+       pushed against the avatar's edge now that the tracks are flush. */
+    justify-self: center;
 
     background: var(--el-color-primary);
   }
@@ -2279,10 +2294,14 @@ ul {
   .mobile-sender-avatar {
     grid-column: 2;
 
-    width: 44px;
-    height: 44px;
-    min-width: 44px;
-    min-height: 44px;
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    min-height: 40px;
+
+    /* Anchored to the start of its 50px track: the 10px left over is the gap
+       between the avatar and the message body. */
+    justify-self: start;
 
     display: grid;
     place-items: center;
@@ -2446,15 +2465,20 @@ ul {
 
     align-self: start;
 
-    width: 62px;
-    min-width: 62px;
+    /* Fixed 70px: the measured natural width of the longest label `fromNow`
+       produces at 14px ("2024/01/15"), so a year-old date is never ellipsised.
+       Never allowed to grow into the message body. */
+    width: 70px;
+    min-width: 70px;
 
     display: flex;
     flex-direction: column;
-    align-items: center;
+    /* Time and star both hang off the right edge so the column reads as one
+       right-aligned metadata block. */
+    align-items: flex-end;
     justify-content: flex-start;
 
-    gap: 3px;
+    gap: 2px;
 
     padding-top: 1px;
   }
@@ -2467,25 +2491,27 @@ ul {
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
-    text-align: center;
+    text-align: right;
 
     /* Tabular digits keep the label from twitching as the value changes. */
     font-variant-numeric: tabular-nums;
 
-    /* Metadata, not message: the dimmest ink in the row. */
-    color: color-mix(in srgb, var(--mobile-tertiary) 82%, transparent);
+    /* Metadata, not message: dimmer than the sender, brighter than before so a
+       date is still legible at this size. */
+    color: color-mix(in srgb, var(--mobile-secondary) 82%, transparent);
 
-    font-size: 12.5px;
-    line-height: 18px;
+    font-size: 14px;
+    line-height: 1.2;
     font-weight: 400;
   }
 
   /* ---------- Mobile star ---------- */
 
   .mobile-row-star {
-    /* Auxiliary row action: a 36px tap target around a 19px glyph, no plate. */
-    width: 36px;
-    height: 36px;
+    /* A 40px tap target around a 20px glyph: easy to hit, light on the eye, and
+       quieter than the timestamp beside it. */
+    width: 40px;
+    height: 40px;
     flex: 0 0 auto;
 
     display: grid;
@@ -2501,8 +2527,8 @@ ul {
   }
 
   .mobile-row-star .iconify {
-    width: 19px !important;
-    height: 19px !important;
+    width: 20px !important;
+    height: 20px !important;
   }
 
   /* Starred rows use the theme accent on the phone list (the desktop list keeps
