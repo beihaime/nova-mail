@@ -8,7 +8,7 @@
       <button v-perm="'email:send'" class="compose" @click="openCompose">
          <span>{{ $t('compose') }}</span>
       </button>
-      <el-menu :collapse="false" style="margin-top: 14px">
+      <el-menu :collapse="false">
         <el-menu-item @click="router.push({name: 'email'})" index="email"
                       :class="route.meta.name === 'email' ? 'choose-item' : ''">
           <AppIcon name="inbox" :size="19" />
@@ -326,6 +326,7 @@ const openCompose = () => uiStore.writerRef?.open()
 }
 
 .el-menu {
+  margin-top: 14px;
   border-right: 0;
   width: 232px;
 }
@@ -359,6 +360,21 @@ const openCompose = () => uiStore.writerRef?.open()
        stay visually continuous, and clear the phone's home-indicator area. */
     background: var(--aside-backgound);
     padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (max-width: 767px) {
+  /* The phone drawer has no room for the desktop compose button — the floating
+     compose action owns that job. `display:none` removes the button and the
+     vertical space it occupied, so nothing is left behind. */
+  .compose {
+    display: none;
+  }
+
+  /* The removed button used to contribute the gap under the brand; keep the
+     brand-to-menu rhythm natural without it. */
+  .el-menu {
+    margin-top: 10px;
   }
 }
 
