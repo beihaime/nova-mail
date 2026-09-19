@@ -34,6 +34,9 @@ export const emailBriefColumns = {
 	unread: email.unread,
 	createTime: email.createTime,
 	isDel: email.isDel,
+	// The renderer is chosen from this value, and the list preview needs it too:
+	// markdown must not be shown with its syntax characters.
+	bodyType: email.bodyType,
 	// The Inbox is rendered one row per conversation, so the client needs the
 	// conversation key on brief rows too (kept on A7 upgrades / realtime upserts).
 	threadId: email.threadId,

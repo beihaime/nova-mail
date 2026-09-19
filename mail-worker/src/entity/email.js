@@ -10,6 +10,9 @@ export const email = sqliteTable('email', {
 	code: text('code').default('').notNull(),
 	text: text('text'),
 	content: text('content'),
+	// How the reader must render this mail: text/html (sandboxed iframe),
+	// text/markdown (markdown-it) or text/plain. See lib/mail-body.js.
+	bodyType: text('body_type').default('').notNull(),
 	cc: text('cc').default('[]'),
 	bcc: text('bcc').default('[]'),
 	recipient: text('recipient'),

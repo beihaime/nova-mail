@@ -1,0 +1,281 @@
+import { isSafeUrl, prepareMailBody } from './mail-html'
+
+/**
+ * Builds the standalone document that a mail's HTML body is rendered in.
+ *
+ * The body never touches the application DOM: it is sanitized (see
+ * `mail-html.js`), wrapped in its own `<html>` document with its own stylesheet
+ * and CSP, and handed to an `<iframe sandbox>` through `srcdoc`. A mail body can
+ * therefore not read the session, the store, LocalStorage, cookies or the Vue
+ * tree — it only ever gets a private document.
+ *
+ * The document is a plain string so the whole thing is unit testable without a
+ * browser (see `test/mail-frame.spec.js`).
+ */
+
+/** Height reports sent from inside the frame (only in scripts mode). */
+export const MAIL_FRAME_HEIGHT_MESSAGE = 'nova-mail-frame-height'
+
+/**
+ * Allow script inside the frame?
+ *
+ * Auto-height has one structural requirement: somebody has to read the rendered
+ * height of the mail, and a sandboxed frame with `allow-same-origin` withheld is
+ * an opaque origin the parent cannot inspect. There are exactly two ways out:
+ *
+ *   `false` (default) — no script may run in the frame at all. The parent reads
+ *     `contentDocument.documentElement.scrollHeight` directly, which requires
+ *     `allow-same-origin`. `script-src 'none'` plus the missing `allow-scripts`
+ *     token block execution twice over, so the origin sharing stays inert.
+ *     Nothing attacker-controlled ever executes.
+ *
+ *   `true` — the frame gets an opaque origin (`allow-scripts` without
+ *     `allow-same-origin`) and reports its height through `postMessage`. This is
+ *     the strongest isolation: even a sanitizer bypass could not reach the
+ *     application. It costs one inline script in the frame, guarded by a nonce
+ *     CSP so only our own reporter runs.
+ *
+ * Flipping this constant is the only change needed; both modes are supported by
+ * the component and the reader.
+ */
+export const MAIL_FRAME_SCRIPTS = false
+
+/** Sandbox tokens shared by both modes: links may open, nothing else may. */
+const BASE_SANDBOX_TOKENS = ['allow-popups', 'allow-popups-to-escape-sandbox']
+
+/**
+ * The `sandbox` attribute for the reader's iframe.
+ *
+ * Never contains `allow-same-origin` *and* `allow-scripts` together: that
+ * combination would let the frame remove its own sandbox attribute.
+ */
+export const MAIL_FRAME_SANDBOX = (MAIL_FRAME_SCRIPTS
+  ? ['allow-scripts', ...BASE_SANDBOX_TOKENS]
+  : ['allow-same-origin', ...BASE_SANDBOX_TOKENS]).join(' ')
+
+/** True when the parent is expected to measure the frame itself. */
+export const MAIL_FRAME_MEASURE_BY_PARENT = !MAIL_FRAME_SCRIPTS
+
+/* ------------------------------------------------------------------ helpers */
+
+function escapeAttribute(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
+/** `'self'`-free CSP: no network, no forms, no frames, no plugins. */
+function buildCsp(nonce) {
+  const scriptPolicy = MAIL_FRAME_SCRIPTS && nonce ? `'nonce-${nonce}'` : "'none'"
+
+  return [
+    "default-src 'none'",
+    // Remote images are only ever present after the reader opted in; while they
+    // are blocked the `src` attribute has been removed, so nothing is fetched.
+    'img-src data: blob: https: http:',
+    'media-src data: blob:',
+    'font-src data:',
+    "style-src 'unsafe-inline'",
+    `script-src ${scriptPolicy}`,
+    "connect-src 'none'",
+    "form-action 'none'",
+    "frame-src 'none'",
+    "object-src 'none'",
+    "base-uri 'none'",
+  ].join('; ')
+}
+
+/** Random nonce for the height reporter; `Math.random` is fine as a fallback. */
+export function createFrameNonce() {
+  const globalCrypto = typeof crypto !== 'undefined' ? crypto : null
+
+  if (globalCrypto?.getRandomValues) {
+    const bytes = new Uint8Array(16)
+    globalCrypto.getRandomValues(bytes)
+    return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('')
+  }
+
+  return Math.random().toString(36).slice(2) + Date.now().toString(36)
+}
+
+/**
+ * The frame's own stylesheet.
+ *
+ * Mail HTML is written for email clients: it leans on tables, inline styles and
+ * hard-coded pixel widths. These rules keep that markup readable (and stop it
+ * from overflowing a phone) without overriding what the sender explicitly set.
+ */
+function buildFrameStyle(theme) {
+  const dark = theme === 'dark'
+
+  const text = dark ? '#e6e6e6' : '#13181d'
+  const link = dark ? '#7cb0f0' : '#0e70df'
+  const quoteLine = dark ? '#4a4a4a' : '#c7cdd4'
+  const quoteText = dark ? '#a8a8a8' : '#5f6368'
+
+  return `
+    html { color-scheme: ${dark ? 'dark' : 'light'}; }
+    html, body { margin: 0; padding: 0; background: transparent; }
+    body {
+      font-family: Inter, "Helvetica Neue", Helvetica, "PingFang SC",
+                   "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", Arial, sans-serif;
+      font-size: 15px;
+      line-height: 1.6;
+      color: ${text};
+      word-break: break-word;
+      overflow-wrap: anywhere;
+    }
+    /* A mail laid out at a fixed pixel width must never produce a horizontal
+       scrollbar: the top-level blocks are capped to the available width. */
+    body > * { max-width: 100% !important; box-sizing: border-box; }
+    img { max-width: 100%; height: auto; }
+    table { max-width: 100%; border-collapse: collapse; }
+    td, th { max-width: 100%; }
+    h1, h2, h3, h4 { font-size: 18px; font-weight: 700; margin: 12px 0 6px; }
+    p { margin: 0 0 10px; }
+    a { color: ${link}; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    pre { white-space: pre-wrap; word-break: break-word; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    hr { border: 0; border-top: 1px solid ${quoteLine}; }
+
+    /* Gmail-style quoted history. The wrapper is added by
+       utils/quoted-text.js; <details> expands natively, so no script is needed. */
+    blockquote, .nova-quoted, .quote-block {
+      margin: 6px 0 0 8px;
+      padding: 0 0 0 12px;
+      border-left: 2px solid ${quoteLine};
+      color: ${quoteText};
+    }
+    blockquote > :first-child,
+    .nova-quoted > :first-child,
+    .quote-block > :first-child { margin-top: 0; }
+
+    details.quote-toggle { margin-top: 10px; }
+    details.quote-toggle > summary.quote-toggle-summary {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 0;
+      color: ${quoteText};
+      font-size: 13px;
+      cursor: pointer;
+      list-style: none;
+      user-select: none;
+    }
+    details.quote-toggle > summary.quote-toggle-summary::-webkit-details-marker { display: none; }
+    details.quote-toggle > summary.quote-toggle-summary::marker { content: ''; }
+    details.quote-toggle[open] > summary.quote-toggle-summary { margin-bottom: 6px; }
+    details.quote-toggle > .quote-content { display: block; }
+
+    @media (max-width: 767px) {
+      blockquote, .nova-quoted, .quote-block { margin-left: 4px; padding-left: 8px; }
+    }
+  `
+}
+
+/** Inline reporter: measures the document and posts the height to the parent. */
+function buildHeightReporter(nonce) {
+  return `<script nonce="${escapeAttribute(nonce)}">
+(function () {
+  var TYPE = '${MAIL_FRAME_HEIGHT_MESSAGE}';
+  var last = -1;
+
+  function measure() {
+    var el = document.documentElement;
+    var body = document.body;
+    var height = Math.max(
+      el ? el.scrollHeight : 0,
+      el ? el.offsetHeight : 0,
+      body ? body.scrollHeight : 0,
+      body ? body.offsetHeight : 0
+    );
+    if (!height || height === last) return;
+    last = height;
+    try {
+      parent.postMessage({ type: TYPE, height: height }, '*');
+    } catch (e) { /* parent gone */ }
+  }
+
+  function schedule() { window.requestAnimationFrame(measure); }
+
+  window.addEventListener('load', schedule);
+  window.addEventListener('resize', schedule);
+  document.addEventListener('DOMContentLoaded', schedule);
+
+  if (typeof ResizeObserver !== 'undefined') {
+    var observer = new ResizeObserver(schedule);
+    document.addEventListener('DOMContentLoaded', function () {
+      observer.observe(document.documentElement);
+      if (document.body) observer.observe(document.body);
+    });
+  }
+
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(schedule).catch(function () {});
+  for (var i = 0; i < 6; i++) setTimeout(schedule, 50 * (i + 1));
+})();
+</script>`
+}
+
+/* ------------------------------------------------------------- the document */
+
+/**
+ * Turn an untrusted mail body into the sandboxed document for `srcdoc`.
+ *
+ * @param {object} params
+ * @param {string} params.html raw mail body (already HTML, not markdown)
+ * @param {boolean} [params.allowImages] reader allowed remote images
+ * @param {'light'|'dark'} [params.theme] reader theme
+ * @param {string} [params.nonce] nonce for the height reporter
+ * @param {string} [params.title] document title (subject); untrusted
+ * @returns {{document: string, blocked: number, sandbox: string, nonce: string}}
+ */
+export function buildMailFrameDocument({
+  html,
+  allowImages = false,
+  theme = 'light',
+  nonce = '',
+  title = '',
+} = {}) {
+  const frameNonce = MAIL_FRAME_SCRIPTS ? (nonce || createFrameNonce()) : ''
+
+  // Sanitize, harden every link and hold remote resources back until the reader
+  // asks for them. This is the only path from mail HTML to the frame.
+  const { html: safeHtml, blocked } = prepareMailBody({ html, allowImages })
+
+  const reporter = MAIL_FRAME_SCRIPTS ? buildHeightReporter(frameNonce) : ''
+
+  const document = `<!DOCTYPE html>
+<html lang="und">
+<head>
+<meta charset="utf-8">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="${escapeAttribute(buildCsp(frameNonce))}">
+<title>${escapeAttribute(title)}</title>
+<style>${buildFrameStyle(theme)}</style>
+</head>
+<body>
+<div class="nova-mail-body" data-nova-mail-body="1">${safeHtml}</div>
+${reporter}
+</body>
+</html>`
+
+  return { document, blocked, sandbox: MAIL_FRAME_SANDBOX, nonce: frameNonce }
+}
+
+/** True when a link target may be opened outside the reader. */
+export function isOpenableLink(href) {
+  return isSafeUrl(href)
+}
+
+export default {
+  MAIL_FRAME_SANDBOX,
+  MAIL_FRAME_HEIGHT_MESSAGE,
+  MAIL_FRAME_SCRIPTS,
+  MAIL_FRAME_MEASURE_BY_PARENT,
+  buildMailFrameDocument,
+  createFrameNonce,
+  isOpenableLink,
+}

@@ -13,6 +13,7 @@ import telegramService from '../service/telegram-service';
 import aiService from '../service/ai-service';
 import webhookService from '../service/webhook-service';
 import pushService from '../service/push-service';
+import { MAIL_BODY, bodyViewFor, resolveMailBody } from '../lib/mail-body';
 
 export async function email(message, env, ctx) {
 
@@ -55,8 +56,13 @@ export async function email(message, env, ctx) {
 
 		const email = await PostalMime.parse(content);
 
+		// Which body the reader has to render: html / markdown / plain. The
+		// blacklist and the code extractor see the effective body too, so a
+		// markdown-only mail is not silently skipped.
+		const body = resolveMailBody(email);
+		const bodyView = bodyViewFor(email, body);
 
-		const blockFlag = checkBlock(blackSubject, blackContent, blackFrom, email);
+		const blockFlag = checkBlock(blackSubject, blackContent, blackFrom, bodyView);
 
 		if (blockFlag) {
 			message.setReject('Message rejected');
@@ -105,7 +111,7 @@ export async function email(message, env, ctx) {
 		}
 
 		const toName = email.to.find(item => item.address === message.to)?.name || '';
-		const code = await aiService.extractCode({ env }, email, { aiCode, aiCodeFilter });
+		const code = await aiService.extractCode({ env }, bodyView, { aiCode, aiCodeFilter });
 
 		const params = {
 			toEmail: message.to,
@@ -114,8 +120,9 @@ export async function email(message, env, ctx) {
 			name: email.from.name || emailUtils.getName(email.from.address),
 			subject: email.subject,
 			code,
-			content: email.html,
-			text: email.text,
+			content: body.bodyType === MAIL_BODY.HTML ? email.html : '',
+			text: body.text,
+			bodyType: body.bodyType,
 			cc: email.cc ? JSON.stringify(email.cc) : '[]',
 			bcc: email.bcc ? JSON.stringify(email.bcc) : '[]',
 			recipient: JSON.stringify(email.to),
@@ -135,6 +142,12 @@ export async function email(message, env, ctx) {
 		const cidAttachments = [];
 
 		for (let item of email.attachments) {
+			// The markdown body arrives as a part (see resolveMailBody); it is the
+			// message itself, never a file the reader may download.
+			if (body.markdownPart && item === body.markdownPart) {
+				continue;
+			}
+
 			let attachment = { ...item };
 			attachment.key = constant.ATTACHMENT_PREFIX + await fileUtils.getBuffHash(attachment.content) + fileUtils.getExtFileName(item.filename);
 			attachment.size = item.content.length ?? item.content.byteLength;

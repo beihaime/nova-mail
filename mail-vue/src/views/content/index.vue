@@ -124,15 +124,36 @@
               <el-alert v-if="message.status === 5" :closable="false" :title="$t('delayed')" class="email-msg" type="warning" show-icon />
 
               <el-scrollbar class="htm-scrollbar" :class="!message.attachments?.length ? 'bottom-distance' : ''">
-                <!-- HTML path: body with its quoted history wrapped in a
-                     collapsed Gmail-style <details> toggle. -->
-                <ShadowHtml v-if="bodyFor(message)" class="shadow-html" :html="bodyFor(message)" />
-                <!-- Plain-text path: same treatment, rendered from the parser. -->
-                <div v-else-if="message.text" class="email-text" v-html="quotedBody(message.text)"></div>
+                <!-- Remote content is opt-in. The body stays untouched until the
+                     reader asks for it, so a tracking pixel never fires. -->
+                <div v-if="showRemoteImagesBar(message)" class="remote-images-bar">
+                  <AppIcon name="eye-off" :size="16" />
+                  <span>{{ $t('imagesBlocked', { count: blockedImageCount(message) }) }}</span>
+                  <button type="button" @click.stop="allowRemoteImages(message)">{{ $t('showImages') }}</button>
+                </div>
+
+                <!-- HTML path: sanitized, then rendered inside its own sandboxed
+                     document. The markup never enters this DOM, so it cannot
+                     reach the store, the session or LocalStorage. Quoted history
+                     sits behind a collapsed Gmail-style <details> toggle. -->
+                <MailHtmlFrame
+                    v-if="messageBodyKind(message) === 'html'"
+                    class="shadow-html"
+                    :html="bodyFor(message)"
+                    :allow-images="isRemoteImagesAllowed(message)"
+                    :theme="uiStore.dark ? 'dark' : 'light'"
+                    :title="message.subject || ''"
+                    @blocked="count => setBlockedImageCount(message, count)"
+                />
+                <!-- Markdown path: markdown-it → sanitize → hardened links. It is
+                     plain Vue markup on purpose: markdown never uses the iframe. -->
+                <div v-else-if="messageBodyKind(message) === 'markdown'" class="email-text email-markdown" v-html="markdownBody(message)"></div>
+                <!-- Plain-text path: same quote treatment, rendered from the parser. -->
+                <div v-else-if="messageBodyKind(message) === 'plain'" class="email-text" v-html="quotedBody(message.text)"></div>
               </el-scrollbar>
 
               <!-- Never leave the body silently blank: show why + retry. -->
-              <div v-if="!bodyFor(message) && !message.text" class="message-empty">
+              <div v-if="messageBodyKind(message) === 'none'" class="message-empty">
                 <span>{{ $t('bodyLoadFailMsg') }}</span>
                 <button type="button" @click.stop="fetchPrimaryBody">{{ $t('retry') }}</button>
               </div>
@@ -147,8 +168,13 @@
                     <div class="att-icon" @click="previewAttachment(att)">
                       <Icon v-bind="getIconByName(att.filename)" />
                     </div>
-                    <div class="att-name" @click="previewAttachment(att)">
+                    <div class="att-name" :class="{ 'is-risky': isRiskyAttachment(att) }" @click="handleAttachmentClick(att)">
                       {{ att.filename }}
+                      <!-- An attachment that the OS would run is called out, not
+                           silently handed over. -->
+                      <span v-if="isRiskyAttachment(att)" class="att-risk" :title="attachmentRiskHint(att)">
+                        ⚠ {{ attachmentRiskHint(att) }}
+                      </span>
                     </div>
                     <div class="att-size">{{ formatBytes(att.size) }}</div>
                     <div class="opt-icon att-icon">
@@ -200,7 +226,7 @@
   </div>
 </template>
 <script setup>
-import ShadowHtml from '@/components/shadow-html/index.vue'
+import MailHtmlFrame from '@/components/mail-html-frame/index.vue'
 import {computed, reactive, ref, watch, nextTick, onMounted, onUnmounted} from "vue";
 import {useRoute, useRouter} from 'vue-router'
 import {ElMessage, ElMessageBox} from 'element-plus'
@@ -221,6 +247,8 @@ import {EmailUnreadEnum} from "@/enums/email-enum.js";
 import SenderAvatar from '@/components/sender-avatar/index.vue'
 import {buildThreadMessages, threadSubjectKey} from '@/utils/mail-thread.js'
 import {quotedTextToHtml, wrapHtmlQuotes} from '@/utils/quoted-text.js'
+import {MAIL_BODY_TYPE, blockRemoteResources, prepareMarkdownBody} from '@/utils/mail-html.js'
+import {attachmentRisk} from '@/utils/attachment-risk.js'
 import {alertNewMail} from '@/utils/new-mail-alert.js'
 
 const uiStore = useUiStore();
@@ -350,6 +378,9 @@ function quotedBody(text) {
  * behind a collapsed `<details>` (Gmail style). Until that async pass finishes
  * the raw `content` is wrapped synchronously, so the box is never blank and
  * quotes never flash open.
+ *
+ * The result is handed to `MailHtmlFrame`, which sanitizes it once more and
+ * renders it in a sandboxed document — it never reaches this component's DOM.
  */
 function bodyFor(message) {
   const resolved = renderedBodies[message.id]
@@ -365,6 +396,94 @@ function bodyFor(message) {
   const html = wrapHtmlQuotes(source, label)
   wrappedFallback.set(message.id, { source, label, html })
   return html
+}
+
+/**
+ * Which renderer a message needs.
+ *
+ * `bodyType` is stored per message (see the worker's `lib/mail-body.js`); rows
+ * written before that column existed have an empty value and are classified
+ * from their data, where a non-empty `content` means HTML.
+ *
+ * @returns {'html'|'markdown'|'plain'|'none'}
+ */
+function messageBodyKind(message) {
+  const type = message.bodyType || ''
+  const hasHtml = !!String(message.content || '').trim()
+  const hasText = !!String(message.text || '').trim()
+
+  if (type === MAIL_BODY_TYPE.MARKDOWN) return hasText ? 'markdown' : 'none'
+  if (type === MAIL_BODY_TYPE.PLAIN) return hasText ? 'plain' : 'none'
+  if (type === MAIL_BODY_TYPE.HTML) {
+    if (hasHtml) return 'html'
+    return hasText ? 'plain' : 'none'
+  }
+
+  if (hasHtml) return 'html'
+  if (hasText) return 'plain'
+  return 'none'
+}
+
+// Markdown bodies, rendered once per body + label. A markdown body is not sent
+// through the iframe; it becomes Vue-safe markup (see prepareMarkdownBody).
+// A plain Map: it is filled while rendering, and the reactive inputs that make
+// it stale (the quote label, the image opt-in) are read on the same path.
+const markdownState = new Map()
+// message id -> remote resources the sandboxed frame withheld.
+const blockedImages = reactive({})
+// message id -> the reader explicitly asked for remote images.
+const allowedImages = reactive({})
+
+function markdownBody(message) {
+  const label = quoteLabel.value
+  const source = String(message.text || '')
+  const allowed = !!allowedImages[message.id]
+
+  const cached = markdownState.get(message.id)
+  if (cached && cached.label === label && cached.source === source && cached.allowed === allowed) {
+    return cached.html
+  }
+
+  // Render with remote resources present, then hand them back only when the
+  // reader opted in — the same contract the HTML path has inside the frame.
+  const { html } = prepareMarkdownBody(source, { allowImages: true })
+  const blocked = allowed ? { html, blocked: 0 } : blockRemoteResources(html)
+  const state = {
+    label,
+    source,
+    allowed,
+    html: wrapHtmlQuotes(blocked.html, label),
+    blocked: blocked.blocked,
+  }
+
+  markdownState.set(message.id, state)
+  return state.html
+}
+
+function setBlockedImageCount(message, count) {
+  blockedImages[message.id] = Number(count) || 0
+}
+
+function blockedImageCount(message) {
+  return blockedImages[message.id] ?? markdownState.get(message.id)?.blocked ?? 0
+}
+
+function isRemoteImagesAllowed(message) {
+  return !!allowedImages[message.id]
+}
+
+/**
+ * The "show images" bar is offered only while something is actually held back.
+ * HTML mail reports its own count (the sandboxed frame blocks the resources),
+ * markdown is counted here; plain text has no remote content at all.
+ */
+function showRemoteImagesBar(message) {
+  if (isRemoteImagesAllowed(message)) return false
+  return blockedImageCount(message) > 0
+}
+
+function allowRemoteImages(message) {
+  allowedImages[message.id] = true
 }
 
 async function resolveThreadBodies() {
@@ -1002,6 +1121,74 @@ function canPreviewAttachment(att) {
 }
 
 /**
+ * The reader's warning copy for an attachment the OS would execute.
+ *
+ * The reason comes from `utils/attachment-risk.js`, which looks through double
+ * extensions (`invoice.pdf.exe`) — the classic way a dangerous file is made to
+ * look harmless.
+ */
+function attachmentRiskHint(att) {
+  const { reason, extension } = attachmentRisk(att)
+
+  if (reason === 'double-extension') return t('attachmentRiskDouble', { ext: extension })
+  if (reason === 'active-content') return t('attachmentRiskActive', { ext: extension })
+  if (reason === 'macro') return t('attachmentRiskMacro', { ext: extension })
+
+  return t('attachmentRiskExecutable', { ext: extension })
+}
+
+function isRiskyAttachment(att) {
+  return attachmentRisk(att).risky
+}
+
+/** The attachment name opens a preview when there is one, and downloads otherwise. */
+function handleAttachmentClick(att) {
+  if (canPreviewAttachment(att)) {
+    previewAttachment(att)
+    return
+  }
+
+  downloadAttachment(att)
+}
+
+/**
+ * Download one attachment, after confirming a type the OS would run.
+ *
+ * The confirmation is deliberately a hard stop rather than a silent download:
+ * "invoice.pdf.exe" arrives from strangers and is only dangerous once opened.
+ */
+async function downloadAttachment(att) {
+  if (isRiskyAttachment(att)) {
+    try {
+      await ElMessageBox.confirm(
+        `${attachmentRiskHint(att)}\n${att.filename || ''}`,
+        t('attachmentRiskTitle'),
+        {
+          type: 'warning',
+          confirmButtonText: t('download'),
+          cancelButtonText: t('cancel'),
+          customClass: 'attachment-risk-confirm'
+        }
+      )
+    } catch {
+      return
+    }
+  }
+
+  try {
+    const blob = await fetchAttachmentBlob(att.attId)
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = att.filename || 'attachment'
+    link.click()
+    setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  } catch {
+    ElMessage.error(t('reqFailErrorMsg'))
+  }
+}
+
+/**
  * Preview one attachment.
  *
  * Reads the bytes from `GET /api/attachments/<attId>` (the server returns the
@@ -1044,20 +1231,6 @@ function closePdfPreview() {
   pdfPreview.url = ''
   if (pdfUrl) URL.revokeObjectURL(pdfUrl)
   pdfUrl = null
-}
-
-async function downloadAttachment(att) {
-  try {
-    const blob = await fetchAttachmentBlob(att.attId)
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = att.filename || 'attachment'
-    link.click()
-    setTimeout(() => URL.revokeObjectURL(url), 60_000)
-  } catch {
-    ElMessage.error(t('reqFailErrorMsg'))
-  }
 }
 
 function isImage(filename) {
@@ -1733,11 +1906,108 @@ const handleDelete = () => {
   pointer-events: none; /* 不影响点击 */
 }
 
+/* Remote content is held back until the reader asks for it, so a tracking pixel
+   never fires just because a message was opened. */
+.remote-images-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  max-width: 1100px;
+  margin: 0 0 14px;
+  padding: 8px 12px;
+  border: 1px solid var(--light-border);
+  border-radius: 10px;
+  background: var(--base-fill);
+  color: var(--regular-text-color);
+  font-size: 13px;
+}
+
+.remote-images-bar button {
+  min-height: 28px;
+  padding: 0 12px;
+  margin-left: auto;
+  color: var(--el-color-primary);
+  border: 1px solid var(--light-border);
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.remote-images-bar button:hover {
+  border-color: var(--el-color-primary);
+}
+
+/* An attachment the operating system would run is marked in the list, not only
+   in the download confirmation. */
+.att-name.is-risky {
+  color: var(--el-color-warning);
+}
+
+.att-risk {
+  display: block;
+  margin-top: 2px;
+  color: var(--el-color-warning);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .email-text {
   font-family: inherit;
   white-space: pre-wrap;
   word-break: break-word;
   margin: 0;
+}
+
+/* Markdown renders real block markup, so its own source newlines must collapse
+   instead of turning into blank lines the way the plain-text path needs. */
+.email-text.email-markdown {
+  white-space: normal;
+  line-height: 1.65;
+}
+
+.email-text.email-markdown :deep(table) {
+  border-collapse: collapse;
+  max-width: 100%;
+}
+
+.email-text.email-markdown :deep(th),
+.email-text.email-markdown :deep(td) {
+  border: 1px solid var(--light-border);
+  padding: 4px 8px;
+}
+
+.email-text.email-markdown :deep(pre) {
+  max-width: 100%;
+  padding: 10px 12px;
+  overflow-x: auto;
+  border-radius: 8px;
+  background: var(--base-fill);
+  white-space: pre;
+}
+
+.email-text.email-markdown :deep(code) {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+}
+
+.email-text.email-markdown :deep(img) {
+  max-width: 100%;
+  height: auto;
+}
+
+.email-text.email-markdown :deep(a) {
+  color: var(--el-color-primary);
+  word-break: break-all;
+}
+
+.email-text.email-markdown :deep(blockquote) {
+  margin: 6px 0 0 8px;
+  padding-left: 12px;
+  border-left: 2px solid var(--nova-quote-line);
+  color: var(--regular-text-color);
 }
 
 /* Gmail-style quoted-reply hierarchy for plain-text bodies. Same idea as the
@@ -2096,7 +2366,9 @@ const handleDelete = () => {
   body.nova-mail-printing .mail-reader .email-title { color: #111 !important; }
   body.nova-mail-printing .mail-reader .message-details { display: grid !important; color: #111 !important; }
   body.nova-mail-printing .mail-reader .recipient-toggle { display: none !important; }
-  body.nova-mail-printing .mail-reader .shadow-html { zoom: 1 !important; }
+  /* The body lives in a sandboxed iframe now: it is a pane of its own, so it
+     must be allowed to print at its full measured height. */
+  body.nova-mail-printing .mail-reader .shadow-html { overflow: visible !important; }
   body.nova-mail-printing .mail-reader .att .opt-icon { display: none !important; }
 }
 </style>

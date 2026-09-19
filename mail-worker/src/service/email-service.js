@@ -23,6 +23,7 @@ import domainUtils from '../utils/domain-uitls';
 import account from "../entity/account";
 import { att } from '../entity/att';
 import telegramService from './telegram-service';
+import { MAIL_BODY } from '../lib/mail-body';
 import threadService from './thread-service';
 import pushService from './push-service';
 
@@ -626,6 +627,9 @@ const emailService = {
 		emailData.subject = subject;
 		emailData.content = html;
 		emailData.text = text;
+		// Outbound mail written in the composer is HTML; a text-only body is
+		// stored as plain so the reader escapes it instead of rendering markup.
+		emailData.bodyType = html && html.trim() ? MAIL_BODY.HTML : MAIL_BODY.PLAIN;
 		emailData.accountId = accountId;
 		emailData.status = useCloudflareEmail ? emailConst.status.DELIVERED : emailConst.status.SENT;
 		emailData.type = emailConst.type.SEND;

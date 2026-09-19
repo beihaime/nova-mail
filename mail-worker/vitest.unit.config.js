@@ -8,6 +8,7 @@ export default defineConfig({
 		include: [
 			'test/security*.spec.js',
 			'test/thread*.spec.js',
+			'test/mail-body.spec.js',
 			'test/web-push.spec.js',
 			'test/push-service.spec.js',
 		],

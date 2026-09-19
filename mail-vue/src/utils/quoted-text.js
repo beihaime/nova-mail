@@ -125,6 +125,36 @@ export function plainTextPreview(text, max = MAX_PREVIEW) {
     return truncate(firstParagraph(stripQuotedPlainText(text)), max)
 }
 
+// Markdown syntax that must not show up verbatim inside a one-line summary.
+const MARKDOWN_NOISE = [
+    [/^#{1,6}[ \t]+/gm, ''],                    // headings
+    [/^[ \t]*>[ \t]?/gm, ''],                   // block quotes
+    [/^[ \t]*(?:[-*+]|\d+\.)[ \t]+/gm, ''],     // list markers
+    [/`{1,3}([^`]*)`{1,3}/g, '$1'],             // inline code / fences
+    [/!\[([^\]]*)\]\([^)]*\)/g, '$1'],          // images
+    [/\[([^\]]*)\]\([^)]*\)/g, '$1'],           // links
+    [/\*\*([^*]+)\*\*/g, '$1'],                 // bold
+    [/__([^_]+)__/g, '$1'],
+    [/\*([^*\n]+)\*/g, '$1'],                   // italic
+    [/~~([^~]+)~~/g, '$1'],                     // strikethrough
+    [/^[ \t]*(?:[-*_][ \t]*){3,}$/gm, ''],      // horizontal rule
+]
+
+/**
+ * Strip the markdown syntax a summary should not show.
+ *
+ * Only used for previews: the reader renders the real markdown, but a collapsed
+ * card must not display `# Title **bold** [x](http://…)` as punctuation soup.
+ */
+export function stripMarkdown(value) {
+    let text = String(value || '')
+    for (const [pattern, replacement] of MARKDOWN_NOISE) text = text.replace(pattern, replacement)
+    return text
+}
+
+/** Body type of a stored markdown message (see the worker's lib/mail-body.js). */
+const BODY_TYPE_MARKDOWN = 'text/markdown'
+
 /** Recursively flatten a DOM subtree, keeping block boundaries as newlines. */
 function extractNodeText(node) {
     let out = ''
@@ -218,7 +248,11 @@ export function buildMessagePreview(raw, max = MAX_PREVIEW) {
     const html = String(raw.content || '').trim()
 
     let preview = ''
-    if (text) preview = plainTextPreview(text, max)
+    if (text) {
+        // A markdown body would otherwise show its syntax in the summary.
+        const summary = raw.bodyType === BODY_TYPE_MARKDOWN ? stripMarkdown(text) : text
+        preview = plainTextPreview(summary, max)
+    }
     else if (listText) preview = truncate(firstParagraph(stripQuotedPlainText(listText)), max)
     else if (html) preview = htmlPreview(html, max)
 

@@ -37,8 +37,33 @@ const dbInit = {
 		await this.v3_5DB(c);
 		await this.v3_6DB(c);
 		await this.v3_7DB(c);
+		await this.v3_8DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
+	},
+
+	/**
+	 * v3.8 — body type.
+	 *
+	 * The reader needs to know whether `content` is HTML, markdown or plain text
+	 * before it renders anything, because HTML goes through the sandboxed iframe
+	 * and must never touch the application DOM. Existing rows are classified from
+	 * their data: a stored HTML body means text/html, everything else text/plain.
+	 */
+	async v3_8DB(c) {
+		try {
+			await c.env.db.prepare(`ALTER TABLE email ADD COLUMN body_type TEXT NOT NULL DEFAULT '';`).run();
+		} catch (e) {
+			console.warn(`跳过字段添加：${e.message}`);
+		}
+
+		try {
+			await c.env.db.prepare(
+				`UPDATE email SET body_type = CASE WHEN content IS NOT NULL AND TRIM(content) != '' THEN 'text/html' ELSE 'text/plain' END WHERE body_type = '' OR body_type IS NULL;`
+			).run();
+		} catch (e) {
+			console.error('邮件正文类型回填失败：', e);
+		}
 	},
 
 	/**
