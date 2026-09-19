@@ -44,7 +44,7 @@
       :aria-label="$t('compose')"
       @click="writerRef?.open()"
   >
-    <Icon icon="solar:pen-2-linear" width="24" height="24" />
+    <Icon icon="solar:pen-2-linear" width="21" height="21" />
   </button>
   <writer ref="writerRef" />
 </template>
@@ -203,12 +203,12 @@ onBeforeUnmount(() => {
 .mobile-nav { display: none; }
 
 @media (max-width: 767px) {
-  .layout.has-mobile-nav { padding-bottom: 58px; }
+  .layout.has-mobile-nav { padding-bottom: 56px; }
   .main-container { min-height: 0; }
-  .mobile-nav { position: fixed; z-index: 20; display: grid; grid-template-columns: repeat(5, 1fr); align-items: end; padding: 7px 10px max(8px, env(safe-area-inset-bottom)); left: 0; right: 0; bottom: 0; min-height: 58px; background: color-mix(in srgb, var(--el-bg-color) 92%, transparent); border-top: 1px solid var(--light-border); backdrop-filter: blur(18px); }
+  .mobile-nav { position: fixed; z-index: 20; display: grid; grid-template-columns: repeat(5, 1fr); align-items: end; padding: 7px 10px max(8px, env(safe-area-inset-bottom)); left: 0; right: 0; bottom: 0; min-height: 56px; background: color-mix(in srgb, var(--el-bg-color) 92%, transparent); border-top: 1px solid var(--light-border); backdrop-filter: blur(18px); }
   .mobile-nav button { min-width: 0; min-height: 44px; display: grid; place-items: center; gap: 2px; color: var(--regular-text-color); cursor: pointer; font-size: 12px; }
   .mobile-nav button :deep(.app-icon) { width: 22px; height: 22px; opacity: .68; }
-  .mobile-nav button.active { color: var(--el-color-primary); font-weight: 650; }
+  .mobile-nav button.active { color: var(--el-color-primary); font-weight: 600; }
   .mobile-nav button.active :deep(.app-icon) { opacity: 1; }
   :global(.dark .mobile-nav button:not(.active) .app-icon) { opacity: 1; }
   .mobile-nav .mobile-compose {
@@ -250,11 +250,11 @@ onBeforeUnmount(() => {
 
 @media (max-width: 767px) {
   .layout.has-mobile-nav {
-    padding-bottom: calc(58px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
   }
 
   .el-header {
-    height: calc(64px + env(safe-area-inset-top, 0px));
+    height: calc(60px + env(safe-area-inset-top, 0px));
     padding-top: env(safe-area-inset-top, 0px);
     border-bottom: 0;
     background: var(--nova-surface);
@@ -271,7 +271,7 @@ onBeforeUnmount(() => {
     grid-template-columns: repeat(4, 1fr);
     align-items: center;
 
-    height: calc(58px + env(safe-area-inset-bottom, 0px));
+    height: calc(56px + env(safe-area-inset-bottom, 0px));
     min-height: 0;
 
     padding:
@@ -280,7 +280,7 @@ onBeforeUnmount(() => {
       env(safe-area-inset-bottom, 0px);
 
     background: var(--nova-surface);
-    border-top: 1px solid color-mix(in srgb, var(--nova-divider) 55%, transparent);
+    border-top: 1px solid var(--nova-divider-soft, color-mix(in srgb, var(--nova-divider) 45%, transparent));
     backdrop-filter: none;
   }
 
@@ -312,42 +312,42 @@ onBeforeUnmount(() => {
 
   .mobile-nav button.active {
     color: var(--el-color-primary);
-    font-weight: 650;
+    font-weight: 600;
   }
 
   .mobile-nav button.active :deep(.app-icon) {
-    opacity: 1;
+    opacity: .95;
   }
 
   .mobile-compose-fab {
     position: fixed;
     z-index: 21;
 
-    right: 16px;
+    right: 22px;
     bottom: calc(
-      58px +
+      56px +
       env(safe-area-inset-bottom, 0px) +
       12px
     );
 
-    width: 56px;
-    height: 56px;
+    width: 51px;
+    height: 51px;
 
     display: grid;
     place-items: center;
 
     padding: 0;
     border: 0;
-    border-radius: 18px;
+    border-radius: 16px;
 
     color: #fff;
     background: var(--el-color-primary);
     cursor: pointer;
 
-    /* Gmail Android keeps the FAB almost flat: a soft ambient shadow only. */
+    /* Soft ambient shadow only: a wide, low-opacity halo keeps the FAB light. */
     box-shadow:
-      0 2px 6px
-      color-mix(in srgb, var(--el-color-primary) 22%, transparent);
+      0 6px 16px
+      color-mix(in srgb, var(--el-color-primary) 18%, transparent);
 
     transition:
       transform var(--nova-motion-fast) var(--nova-motion-ease),
@@ -356,14 +356,14 @@ onBeforeUnmount(() => {
 
   .mobile-compose-fab :deep(.iconify) {
     color: #fff;
-    opacity: 1;
+    opacity: .96;
   }
 
   .mobile-compose-fab:hover,
   .mobile-compose-fab:focus-visible {
     box-shadow:
-      0 3px 8px
-      color-mix(in srgb, var(--el-color-primary) 26%, transparent);
+      0 8px 20px
+      color-mix(in srgb, var(--el-color-primary) 24%, transparent);
   }
 
   .mobile-compose-fab:active {
@@ -371,7 +371,7 @@ onBeforeUnmount(() => {
   }
 
   :global(.dark .mobile-compose-fab) {
-    box-shadow: 0 2px 6px rgba(0, 0, 0, .34);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, .3);
   }
 }
 

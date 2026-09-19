@@ -585,10 +585,10 @@ const itemHeight = computed(() => {
     if (props.type === 'all-email') {
       return isMobile.value ? 132 : 65;
     } else  {
-      // Phone inbox rows are 82px tall (see the .email-row.email mobile rules);
+      // Phone inbox rows are 80px tall (see the .email-row.email mobile rules);
       // keep the virtual list in lock-step so rows never overlap.
       return isPhone.value && props.type === 'email'
-        ? 82
+        ? 80
         : (isMobile.value ? 83 : 48);
     }
 })
@@ -1896,16 +1896,17 @@ ul {
   /* ---------- Filters ---------- */
 
   .mobile-filter-bar {
-    /* border-box: 42 = 2 (top) + 34 (tabs) + 5 (bottom) + 1 (divider). */
-    height: 42px;
+    /* border-box: 40 = 2 (top) + 32 (tabs) + 5 (bottom) + 1 (divider). */
+    height: 40px;
     min-width: 0;
 
-    padding: 2px 6px 5px 10px;
+    /* Tight sides so tabs + sort/more read as one continuous toolbar. */
+    padding: 2px 4px 5px 8px;
 
     display: flex;
     align-items: center;
 
-    border-bottom: 1px solid color-mix(in srgb, var(--nova-divider) 55%, transparent);
+    border-bottom: 1px solid var(--nova-divider-soft, color-mix(in srgb, var(--nova-divider) 55%, transparent));
   }
 
   .mobile-filters {
@@ -1915,17 +1916,21 @@ ul {
     display: grid;
     grid-template-columns: 0.7fr 0.95fr 1.45fr 0.9fr;
     align-items: center;
-    gap: 3px;
+    gap: 2px;
 
     overflow: hidden;
     white-space: nowrap;
   }
 
   .mobile-filters button {
-    width: 100%;
+    /* Content-sized pills: the active background hugs the label instead of
+       filling the whole grid track. */
+    width: auto;
+    max-width: 100%;
+    justify-self: center;
     min-width: 0;
-    height: 34px;
-    padding: 0 2px;
+    height: 32px;
+    padding: 0 4px;
     box-sizing: border-box;
 
     border: 0;
@@ -1938,13 +1943,12 @@ ul {
     white-space: nowrap;
     text-overflow: clip;
 
-    /* Reads ~14px on modern phones while staying legible on a 320px screen. */
-    font-size: clamp(12px, 3.5vw, 14px);
+    font-size: clamp(11.5px, 3.1vw, 13px);
     cursor: pointer;
   }
 
   .mobile-filters button.active {
-    padding-inline: 2px;
+    padding-inline: 8px;
 
     color: var(--el-color-primary);
     background: var(--nova-selected);
@@ -1953,10 +1957,10 @@ ul {
   }
 
   .mobile-tool-button {
-    flex: 0 0 36px;
+    flex: 0 0 32px;
 
-    width: 36px;
-    height: 34px;
+    width: 32px;
+    height: 32px;
     padding: 0;
 
     display: grid;
@@ -1969,9 +1973,10 @@ ul {
     cursor: pointer;
   }
 
-  .mobile-tool-button :deep(.app-icon) {
-    width: 19px;
-    height: 19px;
+  .mobile-tool-button .iconify {
+    width: 18px !important;
+    height: 18px !important;
+    opacity: .72 !important;
   }
 
   /* ---------- Hide desktop action toolbar ---------- */
@@ -2012,17 +2017,16 @@ ul {
     position: relative;
 
     display: grid;
-    grid-template-columns: 42px minmax(0, 1fr);
+    grid-template-columns: 44px minmax(0, 1fr);
 
-    /* 42px avatar, 8px gutter: avatar + body + time read as one tight grid
-       instead of three loosely spaced columns. */
+    /* 44px avatar + 8px gutter; the tighter left inset pulls the whole row in. */
     column-gap: 8px;
 
     width: 100%;
-    height: 82px;
-    min-height: 82px;
+    height: 80px;
+    min-height: 80px;
 
-    padding: 10px 14px 10px 12px;
+    padding: 10px 12px 10px 8px;
 
     box-sizing: border-box;
 
@@ -2036,15 +2040,13 @@ ul {
     content: '';
 
     position: absolute;
-    left: 62px;
+    left: 60px;
     right: 0;
     bottom: 0;
 
     height: 1px;
 
-    /* Dividers are structure, not content: keep them well below the text
-       contrast so the row rhythm reads without drawing the eye. */
-    background: color-mix(in srgb, var(--nova-divider) 55%, transparent);
+    background: var(--nova-divider-soft, color-mix(in srgb, var(--nova-divider) 55%, transparent));
   }
 
   :deep(.email-row.email:active) {
@@ -2081,10 +2083,10 @@ ul {
   .mobile-sender-avatar {
     grid-column: 1;
 
-    width: 42px;
-    height: 42px;
-    min-width: 42px;
-    min-height: 42px;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
 
     display: grid;
     place-items: center;
@@ -2098,7 +2100,7 @@ ul {
     color: var(--el-color-primary);
     background: var(--nova-selected);
 
-    font-size: 16px;
+    font-size: 17px;
     font-weight: 650;
     line-height: 1;
     text-align: center;
@@ -2144,21 +2146,21 @@ ul {
 
     gap: 4px;
 
-    /* Sender is the strongest line: largest type, tight leading, primary ink. */
+    /* Sender is the strongest line: largest type, heaviest weight, primary ink. */
     line-height: 20px;
     margin-bottom: 1px;
 
-    /* Keeps the timestamp clear of the 40px star target on the right. */
-    padding-right: 24px;
+    /* Keeps the timestamp clear of the star target on the right. */
+    padding-right: 26px;
 
     color: var(--mobile-primary);
 
-    font-size: 16px;
-    font-weight: 500;
+    font-size: 17px;
+    font-weight: 600;
   }
 
   :deep(.email-row.email.is-unread .title .email-sender) {
-    font-weight: 650;
+    font-weight: 700;
   }
 
   /* hide old status placeholder / old unread dot */
@@ -2189,8 +2191,8 @@ ul {
 
     margin-left: auto;
 
-    /* Metadata, not message: dimmer than both text lines. */
-    color: color-mix(in srgb, var(--mobile-tertiary) 90%, transparent);
+    /* Metadata, not message: the dimmest ink in the row. */
+    color: color-mix(in srgb, var(--mobile-tertiary) 78%, transparent);
 
     font-size: 12.5px;
     line-height: 20px;
@@ -2230,7 +2232,7 @@ ul {
   }
 
   :deep(.email-row.email.is-unread .email-subject) {
-    font-weight: 550;
+    font-weight: 600;
   }
 
   :deep(.email-row.email .email-text .email-content) {
@@ -2262,11 +2264,11 @@ ul {
 
     position: absolute;
 
-    left: 5px;
-    top: 16px;
+    left: 1px;
+    top: 17px;
 
-    width: 7px;
-    height: 7px;
+    width: 6px;
+    height: 6px;
 
     border-radius: 50%;
 
@@ -2278,12 +2280,13 @@ ul {
   .mobile-row-star {
     position: absolute;
 
-    right: 0;
-    top: 8px;
+    /* Smaller, lighter glyph vertically centred in the row. The ::before keeps a
+       44x44 touch target without widening the visual button. */
+    right: 8px;
+    top: 26px;
 
-    /* 40x40 minimum touch target around a 21px glyph. */
-    width: 40px;
-    height: 40px;
+    width: 28px;
+    height: 28px;
 
     display: grid;
     place-items: center;
@@ -2293,16 +2296,24 @@ ul {
     border: 0;
     background: transparent;
 
+    /* Dim the whole button: global `html.dark .iconify { opacity: … !important }`
+       rules make the child's own opacity unreliable, but parent opacity always
+       composites over the subtree. */
+    opacity: .6;
+
     cursor: pointer;
   }
 
-  .mobile-row-star :deep(.iconify) {
-    width: 21px !important;
-    height: 21px !important;
+  .mobile-row-star::before {
+    content: '';
+
+    position: absolute;
+    inset: -8px;
   }
 
-  .mobile-row-star :deep(.app-icon) {
-    opacity: .65;
+  .mobile-row-star .iconify {
+    width: 20px !important;
+    height: 20px !important;
   }
 
   /* ---------- Filtered empty ---------- */
@@ -2332,6 +2343,13 @@ ul {
     font-size: 14px;
 
     pointer-events: none;
+  }
+
+  /* End-of-list label: give it real air below the last message instead of
+     sitting flush against the final row. */
+  .noLoading {
+    padding: 20px 0 14px;
+    font-size: 13px;
   }
 }
 

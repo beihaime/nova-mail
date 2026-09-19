@@ -166,12 +166,12 @@ const handleResize = () => {
   height: calc(100% - 60px);
 }
 
-/* The mobile app bar is 64px tall (plus the notch inset), so the scrollable
+/* The mobile app bar is 60px tall (plus the notch inset), so the scrollable
    workspace below it has to reserve exactly that much. */
 @media (max-width: 767px) {
   .main-box-show,
   .main-box-hide {
-    height: calc(100% - 64px - env(safe-area-inset-top, 0px));
+    height: calc(100% - 60px - env(safe-area-inset-top, 0px));
   }
 }
 

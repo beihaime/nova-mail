@@ -334,8 +334,8 @@ function formatName(email) {
 @media (max-width: 767px) {
   .header,
   .header.not-send {
-    height: 64px;
-    min-height: 64px;
+    height: 60px;
+    min-height: 60px;
 
     /* Symmetric padding: the grid content box is centred on the viewport, so a
        full-width row item centred inside it lands on the viewport centre line. */
@@ -343,9 +343,9 @@ function formatName(email) {
     column-gap: 6px;
     row-gap: 0;
 
-    /* Side margin the centred pill must keep clear of the menu + title. Wide
-       enough for both "Inbox" and the wider CJK 收件箱 at the same size. */
-    --mobile-appbar-reserve: 102px;
+    /* Side margin the centred pill must keep clear of the menu + title. Tuned
+       with the 15px title so the search gets a little more width. */
+    --mobile-appbar-reserve: 96px;
 
     grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
     align-items: center;
@@ -382,25 +382,26 @@ function formatName(email) {
   .mobile-inline-search {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
 
     max-width: none;
     min-width: 0;
-    height: 43px;
+    height: 38px;
 
-    padding: 0 10px;
+    padding: 0 9px;
     box-sizing: border-box;
 
     border-radius: 12px;
     color: var(--mobile-secondary);
-    background: var(--nova-surface-muted);
+    /* Softer than a solid muted fill: the pill reads as a field, not a block. */
+    background: color-mix(in srgb, var(--nova-surface-muted) 72%, transparent);
   }
 
   .mobile-inline-search :deep(.app-icon) {
     flex: 0 0 auto;
-    width: 18px;
-    height: 18px;
-    opacity: .72;
+    width: 17px;
+    height: 17px;
+    opacity: .6;
   }
 
   .mobile-inline-search input {
@@ -419,8 +420,8 @@ function formatName(email) {
   }
 
   .mobile-inline-search input::placeholder {
-    color: var(--mobile-secondary);
-    opacity: 1;
+    color: var(--mobile-tertiary);
+    opacity: .82;
   }
 
   .toolbar {
@@ -717,14 +718,14 @@ function formatName(email) {
 
 @media (max-width: 767px) {
   .header {
-    height: 64px;
-    min-height: 64px;
+    height: 60px;
+    min-height: 60px;
     padding: 0 12px;
     column-gap: 6px;
     row-gap: 0;
     align-items: center;
     grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
-    --mobile-appbar-reserve: 102px;
+    --mobile-appbar-reserve: 96px;
   }
   .header.not-send { grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto; }
   .search-shell { display: none; }
@@ -738,8 +739,13 @@ function formatName(email) {
     grid-row: 1;
     justify-self: center;
 
-    width: min(300px, calc(100% - 2 * var(--mobile-appbar-reserve, 102px)));
+    width: min(300px, calc(100% - 2 * var(--mobile-appbar-reserve, 96px)));
     max-width: none;
+  }
+  /* The AppIcon wrapper is a child-component root, so the scoped attribute
+     matches it; !important outranks the global dark icon veil. */
+  .header .mobile-inline-search .app-icon {
+    opacity: .62 !important;
   }
   .toolbar { grid-column: 3; grid-row: 1; gap: 0; }
   /* Menu button: a fixed 44px tap target instead of the 50px the hamburger

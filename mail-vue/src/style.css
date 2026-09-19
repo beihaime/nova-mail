@@ -155,6 +155,8 @@ button, input, select, textarea {
     --nova-surface: #ffffff;
     --nova-surface-muted: #f7f8fa;
     --nova-divider: #e8ebef;
+    /* Structure-only divider: list rows, filter and nav hairlines. */
+    --nova-divider-soft: color-mix(in srgb, var(--nova-divider) 60%, transparent);
     /* Quoted-reply hierarchy line (Gmail style). */
     --nova-quote-line: #c7cdd4;
     --nova-hover: #f3f7fc;
@@ -198,6 +200,8 @@ button, input, select, textarea {
     --nova-surface: #17191d;
     --nova-surface-muted: #1d2025;
     --nova-divider: #2c3037;
+    /* Dark dividers must stay quiet: same token, lower opacity. */
+    --nova-divider-soft: color-mix(in srgb, var(--nova-divider) 45%, transparent);
     /* Quoted-reply hierarchy line (Gmail style). */
     --nova-quote-line: #4b5563;
     --nova-hover: #202833;
