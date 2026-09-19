@@ -33,6 +33,7 @@ let loadedType = '';
 let currentType = DEFAULT_NOTIFICATION_SOUND;
 let lastPlayedAt = 0;
 let unlockArmed = false;
+let gestureUnlockArmed = false;
 
 function hasType(type) {
 	return NOTIFICATION_SOUNDS.some(item => item.type === type);
@@ -49,12 +50,36 @@ export function notificationSoundUrl(type) {
 	return `${base}sounds/${normalizeSoundType(type)}.wav`;
 }
 
+/** Human-readable reason a media element refused to play. */
+function describeMediaError(media) {
+	const error = media && media.error;
+	if (!error) return 'playback rejected (usually blocked autoplay)';
+
+	switch (error.code) {
+		case 1: return 'MEDIA_ERR_ABORTED';
+		case 2: return 'MEDIA_ERR_NETWORK';
+		case 3: return 'MEDIA_ERR_DECODE';
+		case 4: return 'MEDIA_ERR_SRC_NOT_SUPPORTED — the URL did not return playable audio';
+		default: return `media error ${error.code}`;
+	}
+}
+
 function getAudio() {
 	if (audio) return audio;
 	if (typeof Audio === 'undefined') return null;
 
 	audio = new Audio();
 	audio.preload = 'auto';
+
+	// A deploy that returns the SPA shell (or a 404) for /sounds/*.wav makes the
+	// element fail here. Without this the app is simply silent with no clue why.
+	audio.addEventListener('error', () => {
+		console.warn(
+			`Nova Mail: notification sound ${audio.currentSrc || audio.src} could not be loaded ` +
+			`(${describeMediaError(audio)}) — make sure the deployment serves /sounds/*.wav as audio.`
+		);
+	});
+
 	return audio;
 }
 
@@ -136,16 +161,71 @@ export async function playNotificationSound(type = currentType, { force = false 
 		// Restart from the beginning instead of queueing behind a previous play.
 		player.pause();
 		player.currentTime = 0;
+		player.muted = false;
 		player.volume = 1;
 
 		await player.play();
 		return true;
 	} catch (error) {
 		// Blocked autoplay, unsupported codec, muted device… stay silent.
-		console.warn('Nova Mail: notification sound could not play', error);
+		console.warn(
+			`Nova Mail: notification sound ${player.currentSrc || player.src} could not play ` +
+			`(${describeMediaError(player)}${error && error.name ? `; ${error.name}` : ''}` +
+			`${error && error.message ? `: ${error.message}` : ''})`
+		);
 		armUnlockRetry(resolved);
 		return false;
 	}
+}
+
+/**
+ * Desktop browsers refuse `play()` until the page has had a real user gesture,
+ * while an installed PWA (the phone) is exempt — which is exactly why the sound
+ * rings on the phone but stays silent on the desktop. Prime the shared element
+ * on the first gesture so later automatic alerts are allowed; muted playback
+ * needs no gesture, so the prime itself cannot make noise.
+ */
+function armGestureUnlock() {
+	if (gestureUnlockArmed || typeof window === 'undefined') return;
+	gestureUnlockArmed = true;
+
+	const unlock = () => {
+		window.removeEventListener('pointerdown', unlock, true);
+		window.removeEventListener('keydown', unlock, true);
+		window.removeEventListener('touchstart', unlock, true);
+
+		const player = getAudio();
+		if (!player) return;
+
+		try {
+			if (!player.getAttribute('src')) player.src = notificationSoundUrl(currentType);
+			player.muted = true;
+
+			const settle = () => {
+				// Only undo the prime if a real playback has not taken over yet;
+				// otherwise this would pause (and re-mute) a live notification.
+				if (!player.muted) return;
+
+				try {
+					player.pause();
+					player.currentTime = 0;
+				} catch {
+					// The element may not have metadata yet; nothing to reset.
+				}
+				player.muted = false;
+			};
+
+			const started = player.play();
+			if (started && typeof started.then === 'function') started.then(settle, settle);
+			else settle();
+		} catch {
+			player.muted = false;
+		}
+	};
+
+	window.addEventListener('pointerdown', unlock, true);
+	window.addEventListener('keydown', unlock, true);
+	window.addEventListener('touchstart', unlock, true);
 }
 
 /** Stop a sound that is still playing (leaving the page, disabling the sound). */
@@ -159,3 +239,7 @@ export function stopNotificationSound() {
 		console.warn('Nova Mail: could not stop the notification sound', error);
 	}
 }
+
+// Arm the one-time autoplay prime as soon as the module is loaded, so the very
+// first click anywhere in the app unlocks notification sounds.
+armGestureUnlock();
