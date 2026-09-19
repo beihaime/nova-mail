@@ -134,7 +134,7 @@ const handleResize = () => {
 }
 
 .show {
-  animation: nova-popover-in var(--nova-motion-base) var(--nova-motion-ease) both;
+  animation: nova-popover-in var(--nova-motion-base) var(--nova-motion-ease) forwards;
   @media (max-width: 767px) {
     position: fixed;
     z-index: 100;
@@ -196,7 +196,7 @@ const handleResize = () => {
 .main-view {
   min-width: 0;
   background: var(--el-bg-color);
-  animation: nova-view-in var(--nova-motion-base) var(--nova-motion-ease) both;
+  animation: nova-view-in var(--nova-motion-base) var(--nova-motion-ease) forwards;
 }
 
 .desktop-mail-workspace {
@@ -206,7 +206,7 @@ const handleResize = () => {
   min-height: 0;
   height: 100%;
   background: var(--el-bg-color);
-  animation: nova-view-in var(--nova-motion-base) var(--nova-motion-ease) both;
+  animation: nova-view-in var(--nova-motion-base) var(--nova-motion-ease) forwards;
 }
 
 .desktop-message-list { min-width: 0; }

@@ -768,7 +768,7 @@ function submitRegister() {
   display: flex;
   align-items: center;
   justify-content: center;
-  animation: nova-login-card-in 300ms var(--nova-motion-ease) 60ms both;
+  animation: nova-login-card-in 300ms var(--nova-motion-ease) 60ms forwards;
   @media (max-width: 767px) {
     width: 100%;
   }
@@ -1046,7 +1046,7 @@ function submitRegister() {
   display: flex;
   align-items: center;
   gap: 12px;
-  animation: nova-login-brand-in 300ms var(--nova-motion-ease) both;
+  animation: nova-login-brand-in 300ms var(--nova-motion-ease) forwards;
 
   color: #334155;
   text-shadow: none;

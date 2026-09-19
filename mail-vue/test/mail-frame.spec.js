@@ -259,6 +259,15 @@ describe('readFrameContentHeight', () => {
     expect(readFrameContentHeight(frameDoc({}), 375)).toBe(0)
   })
 
+  it('discards a reading far taller than the frame is wide (sliver wrap)', () => {
+    // A one-line mail once measured 888px while the card was still zero-wide. That
+    // kind of reading must never stretch the card into a wall of blank space.
+    expect(readFrameContentHeight(frameDoc({ bodyScroll: 30000 }), 375)).toBe(0)
+    expect(readFrameContentHeight(frameDoc({ bodyScroll: 22501 }), 375)).toBe(0)
+    // A genuinely long newsletter is still accepted.
+    expect(readFrameContentHeight(frameDoc({ bodyScroll: 4000 }), 375)).toBe(4000)
+  })
+
   it('keeps the floor small enough for a one-line mail', () => {
     // 24px of content is a real message, not a not-yet-laid-out document.
     expect(MAIL_FRAME_MIN_HEIGHT).toBeLessThan(24)

@@ -30,6 +30,16 @@ export const MAIL_FRAME_MIN_WIDTH = 80
 export const MAIL_FRAME_MIN_HEIGHT = 8
 
 /**
+ * A mail taller than this many times the frame width was wrapped into a sliver.
+ *
+ * At 375px that is over sixty screens of mail, so the only readings that reach it
+ * come from content laid out at a width it no longer has (a card that was still
+ * 0-wide while the frame loaded). Such a reading is discarded rather than
+ * stretching the card into a wall of blank space.
+ */
+export const MAIL_FRAME_MAX_RATIO = 60
+
+/**
  * Allow script inside the frame?
  *
  * Auto-height has one structural requirement: somebody has to read the rendered
@@ -301,17 +311,24 @@ export function isOpenableLink(href) {
  */
 export function readFrameContentHeight(doc, clientWidth) {
   if (!doc?.documentElement) return 0
-  if ((clientWidth || 0) < MAIL_FRAME_MIN_WIDTH) return 0
+
+  const width = clientWidth || 0
+  if (width < MAIL_FRAME_MIN_WIDTH) return 0
 
   const body = doc.body
   const content = doc.querySelector?.('[data-nova-mail-body]')
 
-  return Math.max(
+  const height = Math.max(
     body?.scrollHeight || 0,
     body?.getBoundingClientRect?.().height || 0,
     content?.getBoundingClientRect?.().height || 0,
     content?.offsetHeight || 0
   )
+
+  // A reading this far beyond the width is a sliver-wrap artefact, not a mail.
+  if (height > width * MAIL_FRAME_MAX_RATIO) return 0
+
+  return height
 }
 
 export default {
@@ -319,6 +336,7 @@ export default {
   MAIL_FRAME_HEIGHT_MESSAGE,
   MAIL_FRAME_MIN_WIDTH,
   MAIL_FRAME_MIN_HEIGHT,
+  MAIL_FRAME_MAX_RATIO,
   MAIL_FRAME_SCRIPTS,
   MAIL_FRAME_MEASURE_BY_PARENT,
   buildMailFrameDocument,

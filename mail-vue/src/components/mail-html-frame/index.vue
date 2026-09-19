@@ -252,6 +252,20 @@ watch(
   () => [props.html, props.allowImages, props.theme],
   () => rebuild()
 )
+
+/**
+ * Re-measure on demand.
+ *
+ * The reader calls this right after a card is expanded: on a phone the frame is
+ * created by that tap, so the earliest readings are taken while the card is still
+ * opening and the layout that matters only exists a frame later.
+ */
+defineExpose({
+  remeasure() {
+    observeWrapper()
+    measureFrame()
+  }
+})
 </script>
 
 <style scoped>
@@ -270,12 +284,12 @@ watch(
   color-scheme: normal;
 }
 
-/* Before the first measurement the frame keeps a sane fixed height with its own
-   scrollbar, so a browser that cannot be measured still shows the whole mail.
-   Once measured, the exact height is set inline and no scrollbar remains. */
+/* Before the first successful measurement the frame stands at a small, scrollable
+   height — never a large one. A frame that cannot be measured must not be allowed
+   to push the rest of the conversation off screen; the height is replaced by the
+   mail's real height as soon as it can be read. */
 .mail-frame:not(.is-measured) .mail-frame__iframe {
-  height: 320px;
-  min-height: 160px;
+  height: 150px;
   overflow: auto;
 }
 </style>

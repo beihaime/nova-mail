@@ -139,6 +139,7 @@
                 <MailHtmlFrame
                     v-if="messageBodyKind(message) === 'html'"
                     class="shadow-html"
+                    :ref="element => setFrameRef(message, element)"
                     :html="bodyFor(message)"
                     :allow-images="isRemoteImagesAllowed(message)"
                     :theme="uiStore.dark ? 'dark' : 'light'"
@@ -195,6 +196,9 @@
         </Teleport>
       </div>
     </el-scrollbar>
+    <!-- Temporary diagnostic: `?maildebug=1` reports what this device actually
+         renders, so a phone that misbehaves can be diagnosed without a console. -->
+    <pre v-if="mailDebug" class="mail-debug">{{ mailDebugLine }}</pre>
     <el-image-viewer
         v-if="showPreview"
         :url-list="srcList"
@@ -316,12 +320,67 @@ const wrappedFallback = new Map()
 // message id -> true while the "just arrived" animation plays.
 const arrivingIds = reactive({})
 
+// Temporary diagnostic: `?maildebug=1` renders what this device actually shows.
+// A phone has no console, and the reported symptom (a tall, blank message body)
+// has to be distinguished from a body that never rendered at all.
+const mailDebug = typeof window !== 'undefined'
+  && new URLSearchParams(window.location.search).has('maildebug')
+const mailDebugLine = ref('')
+let mailDebugTimer = null
+
+function describeExpandedCard() {
+  const card = document.querySelector('.thread-message.is-expanded')
+  const body = card?.querySelector('.message-body')
+  const frame = card?.querySelector('.mail-frame')
+  const iframe = card?.querySelector('.mail-frame__iframe')
+  const height = element => (element ? Math.round(element.getBoundingClientRect().height) : '-')
+
+  let inner = 'no-document'
+  try {
+    const innerBody = iframe?.contentDocument?.body
+    if (innerBody) {
+      inner = `${Math.round(innerBody.getBoundingClientRect().width)}x${Math.round(innerBody.getBoundingClientRect().height)}`
+    }
+  } catch (error) {
+    inner = `blocked:${error.name}`
+  }
+
+  mailDebugLine.value = [
+    `vp=${window.innerWidth}x${window.innerHeight}`,
+    `body h=${height(body)} opacity=${body ? getComputedStyle(body).opacity : '-'} display=${body ? getComputedStyle(body).display : '-'}`,
+    `frame h=${height(frame)} ${frame ? frame.className.replace('mail-frame ', '') : '-'}`,
+    `iframe ${iframe ? iframe.clientWidth : '-'}x${iframe ? iframe.clientHeight : '-'} style=${iframe ? iframe.style.height || 'auto' : '-'}`,
+    `inner=${inner}`,
+    `cards=${document.querySelectorAll('.thread-message').length}`,
+    navigator.userAgent.slice(0, 44)
+  ].join(' | ')
+}
+
 function isMessageExpanded(message) {
   return !!expandedMessages[message.id]
 }
 
-function toggleMessage(message) {
+/**
+ * The sandboxed frame of each expanded message, so a card can ask it to measure
+ * again right after it opens.
+ */
+const frameRefs = {}
+
+function setFrameRef(message, element) {
+  if (element) frameRefs[message.id] = element
+  else delete frameRefs[message.id]
+}
+
+async function toggleMessage(message) {
   expandedMessages[message.id] = !expandedMessages[message.id]
+
+  if (!expandedMessages[message.id]) return
+
+  // The frame is created by this tap, and on a phone the card's final width only
+  // exists a frame later: re-measure once the DOM has settled instead of trusting
+  // whatever the first reading saw.
+  await nextTick()
+  frameRefs[message.id]?.remeasure?.()
 }
 
 function isMetadataOpen(message) {
@@ -1055,6 +1114,10 @@ onMounted(() => {
   tryMarkRead()
   startRealtime()
   document.addEventListener('visibilitychange', handleVisibilityChange)
+  if (mailDebug) {
+    describeExpandedCard()
+    mailDebugTimer = setInterval(describeExpandedCard, 900)
+  }
   window.addEventListener('keydown', handleKeyDown);
   if (mobileReaderQuery.addEventListener) {
     mobileReaderQuery.addEventListener('change', handleMobileReaderChange)
@@ -1068,6 +1131,8 @@ onUnmounted(() => {
   closePdfPreview()
   stopRealtime()
   document.removeEventListener('visibilitychange', handleVisibilityChange)
+  clearInterval(mailDebugTimer)
+  mailDebugTimer = null
   emailStore.contentData.showUnread = false;
   readRequesting = false
   window.removeEventListener('keydown', handleKeyDown);
@@ -1377,7 +1442,7 @@ const handleDelete = () => {
   height: 100%;
   overflow: hidden;
   position: relative;
-  animation: nova-view-in var(--nova-motion-base) var(--nova-motion-ease) both;
+  animation: nova-view-in var(--nova-motion-base) var(--nova-motion-ease) forwards;
 }
 
 .header-actions {
@@ -1801,10 +1866,18 @@ const handleDelete = () => {
 
 /* Collapsed cards render NO body markup at all (`v-if`), so there is nothing to
    clip or animate shut; only the opening gets a short entrance. This is what
-   keeps quoted replies and raw HTML out of the collapsed DOM. */
+   keeps quoted replies and raw HTML out of the collapsed DOM.
+ *
+ * The fill mode is `forwards`, never `both`. `both` holds the FIRST keyframe
+ * until the animation runs — and the body is created by the tap that opens the
+ * card, at a moment when phone engines routinely skip or interrupt that entrance
+ * animation. The body then kept `opacity: 0` while still occupying its full
+ * height: the expanded card looked like a large blank area with the next message
+ * pushed far below. `forwards` keeps the end state and never holds the start one,
+ * so a skipped animation can only skip the fade, not the content. */
 .message-body {
   padding: 0 16px 18px;
-  animation: nova-message-open var(--nova-motion-base) var(--nova-motion-ease) both;
+  animation: nova-message-open var(--nova-motion-base) var(--nova-motion-ease) forwards;
 }
 
 @keyframes nova-message-open {
@@ -1815,7 +1888,7 @@ const handleDelete = () => {
 /* A message that arrived through realtime polling fades in with a soft ring,
    then settles into the normal card. */
 .thread-message.is-new {
-  animation: nova-message-arrive 2.4s var(--nova-motion-ease) both;
+  animation: nova-message-arrive 2.4s var(--nova-motion-ease) forwards;
 }
 
 @keyframes nova-message-arrive {
@@ -1938,6 +2011,24 @@ const handleDelete = () => {
 
 .remote-images-bar button:hover {
   border-color: var(--el-color-primary);
+}
+
+/* Temporary diagnostic badge (`?maildebug=1`): pinned to the viewport so it is
+   visible on a phone whatever the reader's scroll position is. */
+.mail-debug {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  margin: 0;
+  padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+  background: rgba(0, 0, 0, .86);
+  color: #7ee787;
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 /* An attachment the operating system would run is marked in the list, not only
@@ -2256,7 +2347,7 @@ const handleDelete = () => {
     backdrop-filter: blur(18px) saturate(1.4);
     -webkit-backdrop-filter: blur(18px) saturate(1.4);
 
-    animation: nova-action-bar-in var(--nova-motion-base) var(--nova-motion-ease) both;
+    animation: nova-action-bar-in var(--nova-motion-base) var(--nova-motion-ease) forwards;
   }
 
   .reader-bottom-actions button {
