@@ -35,3 +35,6 @@ mail-worker/.dev.vars
 # Local-only scratch: headless-Chrome harnesses, screenshots, profiles
 .nova-test/
 .nova-verify/
+
+# Generated SQL from `npm run threads:rebuild`
+.thread-rebuild/
