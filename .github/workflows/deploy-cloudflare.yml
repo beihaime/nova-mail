@@ -283,10 +283,22 @@ jobs:
           
           printf '%s' "$VAPID_PUBLIC_KEY"  | pnpm wrangler secret put vapid_public_key  -c wrangler-action.toml
           printf '%s' "$VAPID_PRIVATE_KEY" | pnpm wrangler secret put vapid_private_key -c wrangler-action.toml
-          printf '%s' "${VAPID_SUBJECT:-mailto:admin@example.com}" \
-            | pnpm wrangler secret put vapid_subject -c wrangler-action.toml
           
-          echo "✅ VAPID keys uploaded."
+          # `vapid_subject` may already exist as a plain Worker variable (set in
+          # the dashboard), and a secret cannot share a name with a variable.
+          # That is not an error — the Worker only needs the value to be present.
+          printf '%s' "${VAPID_SUBJECT:-mailto:admin@example.com}" \
+            | pnpm wrangler secret put vapid_subject -c wrangler-action.toml \
+            || echo "::notice::vapid_subject already exists as a Worker variable; leaving it unchanged."
+          
+          echo "--- Worker secret names ---"
+          pnpm wrangler secret list -c wrangler-action.toml
+          
+          if pnpm wrangler secret list -c wrangler-action.toml 2>/dev/null | grep -q vapid_public_key; then
+            echo "✅ VAPID keys are on the Worker."
+          else
+            echo "::warning::vapid_public_key is missing from the Worker."
+          fi
 
       - name: ♻️ 初始化数据库 / Initialize database
         run: |
