@@ -145,6 +145,7 @@
                     :theme="uiStore.dark ? 'dark' : 'light'"
                     :title="message.subject || ''"
                     @blocked="count => setBlockedImageCount(message, count)"
+                    @empty="isEmpty => { emptyFrames[message.id] = isEmpty }"
                 />
                 <!-- Markdown path: markdown-it → sanitize → hardened links. It is
                      plain Vue markup on purpose: markdown never uses the iframe. -->
@@ -497,13 +498,21 @@ function messageBodyKind(message) {
     return hasText ? 'plain' : 'none'
   }
   if (type === MAIL_BODY_TYPE.HTML) {
-    if (hasHtml) return 'html'
+    if (hasHtml) {
+      // Nothing survived sanitizing: show the text alternative rather than an
+      // empty frame, and say the body could not be loaded when there is none.
+      if (emptyFrames[message.id]) return hasText ? 'plain' : 'none'
+      return 'html'
+    }
     // No `content` yet (a brief list row): use the markup if the text holds it,
     // otherwise show the text rather than an empty box.
     return markupInText ? 'html' : (hasText ? 'plain' : 'none')
   }
 
-  if (hasHtml) return 'html'
+  if (hasHtml) {
+    if (emptyFrames[message.id]) return hasText ? 'plain' : 'none'
+    return 'html'
+  }
   if (markupInText) return 'html'
   return hasText ? 'plain' : 'none'
 }
@@ -513,6 +522,8 @@ function messageBodyKind(message) {
 // A plain Map: it is filled while rendering, and the reactive inputs that make
 // it stale (the quote label, the image opt-in) are read on the same path.
 const markdownState = new Map()
+// message id -> the sandboxed frame found no renderable markup in the mail.
+const emptyFrames = reactive({})
 // message id -> remote resources the sandboxed frame withheld.
 const blockedImages = reactive({})
 // message id -> the reader explicitly asked for remote images.
@@ -2060,11 +2071,13 @@ const handleDelete = () => {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: 0;
-  z-index: 40;
+  top: 0;
+  z-index: 60;
+  max-height: 60vh;
+  overflow-y: auto;
   margin: 0;
-  padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
-  background: rgba(0, 0, 0, .86);
+  padding: calc(6px + env(safe-area-inset-top, 0px)) 8px 6px;
+  background: rgba(0, 0, 0, .88);
   color: #7ee787;
   font-size: 11px;
   line-height: 1.45;

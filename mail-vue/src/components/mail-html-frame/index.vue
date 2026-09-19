@@ -63,7 +63,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['blocked', 'loaded'])
+const emit = defineEmits(['blocked', 'loaded', 'empty'])
 
 const { t } = useI18n()
 
@@ -229,6 +229,9 @@ function rebuild() {
 
   srcdoc.value = built.document
   emit('blocked', built.blocked)
+  // The mail has markup but none of it survived, or there is none at all: tell
+  // the reader so it can render the text alternative instead of a blank frame.
+  emit('empty', built.sanitizedLength === 0)
 }
 
 onMounted(() => {

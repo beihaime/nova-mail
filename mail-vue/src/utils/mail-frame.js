@@ -291,7 +291,16 @@ ${reporter}
 </body>
 </html>`
 
-  return { document, blocked, sandbox: MAIL_FRAME_SANDBOX, nonce: frameNonce }
+  return {
+    document,
+    blocked,
+    sandbox: MAIL_FRAME_SANDBOX,
+    nonce: frameNonce,
+    // How much of the body survived sanitizing. Zero for a mail whose markup the
+    // sanitizer removed entirely (or one that arrived empty); the reader uses it
+    // to fall back to the plain-text alternative instead of showing a blank frame.
+    sanitizedLength: safeHtml.length,
+  }
 }
 
 /** True when a link target may be opened outside the reader. */
@@ -319,18 +328,16 @@ export function readFrameContentHeight(doc, clientWidth) {
   if (width < MAIL_FRAME_MIN_WIDTH) return 0
 
   const content = doc.querySelector?.('[data-nova-mail-body]')
-  const contentHeight = content
+  const height = content
     ? Math.max(content.getBoundingClientRect?.().height || 0, content.offsetHeight || 0)
     : 0
 
-  const body = doc.body
-  const bodyHeight = body
-    ? Math.max(body.scrollHeight || 0, body.getBoundingClientRect?.().height || 0)
-    : 0
-
-  // A document without the wrapper (an empty or unexpected frame) still has to
-  // report something, so fall back to the body.
-  const height = contentHeight > 0 ? contentHeight : bodyHeight
+  // No wrapper, or a wrapper holding nothing: the frame has either no content or
+  // no layout yet, and there is nothing to measure. Falling back to `body` here
+  // was worse than useless — `body` is stretched to the frame's own viewport, so
+  // it reported the height the frame already had (observed: exactly 150px, the
+  // fallback) and the frame was then marked as measured and locked at it.
+  if (height <= 0) return 0
 
   // A reading this far beyond the width is a sliver-wrap artefact, not a mail.
   if (height > width * MAIL_FRAME_MAX_RATIO) return 0

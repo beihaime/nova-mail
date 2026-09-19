@@ -243,12 +243,15 @@ describe('readFrameContentHeight', () => {
     expect(readFrameContentHeight(frameDoc({ rootScroll: 301, bodyScroll: 301, bodyRect: 301, wrapRect: 286 }), 345)).toBe(286)
   })
 
-  it('falls back to the body when the document has no wrapper', () => {
-    expect(readFrameContentHeight(frameDoc({ rootScroll: 320, bodyScroll: 24 }), 375)).toBe(24)
+  it('reports nothing for a document without the wrapper', () => {
+    // `body` must never stand in: it is stretched to the frame's own viewport, so
+    // it would report the height the frame already has (observed: exactly the
+    // 150px fallback) and the frame would be marked as measured and locked there.
+    expect(readFrameContentHeight(frameDoc({ rootScroll: 320, bodyScroll: 150, bodyRect: 150 }), 375)).toBe(0)
   })
 
   it('refuses a reading taken before the frame has a usable width', () => {
-    const doc = frameDoc({ bodyScroll: 888 })
+    const doc = frameDoc({ wrapRect: 888 })
 
     expect(readFrameContentHeight(doc, 0)).toBe(0)
     expect(readFrameContentHeight(doc, MAIL_FRAME_MIN_WIDTH - 1)).toBe(0)
@@ -259,7 +262,8 @@ describe('readFrameContentHeight', () => {
     // The body is deliberately the larger value here: it must not win.
     expect(readFrameContentHeight(frameDoc({ bodyScroll: 400, wrapRect: 140 }), 375)).toBe(140)
     expect(readFrameContentHeight(frameDoc({ bodyScroll: 400, wrapOffset: 160 }), 375)).toBe(160)
-    expect(readFrameContentHeight(frameDoc({ bodyRect: 70 }), 375)).toBe(70)
+    // No wrapper at all: nothing trustworthy to report.
+    expect(readFrameContentHeight(frameDoc({ bodyRect: 70 }), 375)).toBe(0)
   })
 
   it('reports nothing for an unusable document', () => {
@@ -268,13 +272,18 @@ describe('readFrameContentHeight', () => {
     expect(readFrameContentHeight(frameDoc({}), 375)).toBe(0)
   })
 
+  it('reports how much of the body survived sanitizing', () => {
+    expect(build('<p>hello</p>').sanitizedLength).toBeGreaterThan(0)
+    expect(build('<script>alert(1)</script>').sanitizedLength).toBe(0)
+  })
+
   it('discards a reading far taller than the frame is wide (sliver wrap)', () => {
     // A one-line mail once measured 888px while the card was still zero-wide. That
     // kind of reading must never stretch the card into a wall of blank space.
-    expect(readFrameContentHeight(frameDoc({ bodyScroll: 30000 }), 375)).toBe(0)
-    expect(readFrameContentHeight(frameDoc({ bodyScroll: 22501 }), 375)).toBe(0)
+    expect(readFrameContentHeight(frameDoc({ wrapRect: 30000 }), 375)).toBe(0)
+    expect(readFrameContentHeight(frameDoc({ wrapRect: 22501 }), 375)).toBe(0)
     // A genuinely long newsletter is still accepted.
-    expect(readFrameContentHeight(frameDoc({ bodyScroll: 4000 }), 375)).toBe(4000)
+    expect(readFrameContentHeight(frameDoc({ wrapRect: 4000 }), 375)).toBe(4000)
   })
 
   it('keeps the floor small enough for a one-line mail', () => {
