@@ -1,6 +1,11 @@
 name = "${NAME}"
 main = "src/index.js"
 compatibility_date = "2025-06-04"
+# A deploy replaces the Worker's plain-text vars with the ones in this file. The
+# production config (wrangler.toml) also carries TURNSTILE_HOSTNAME, which the
+# Worker uses for both the Turnstile hostname check and the CORS allowlist —
+# without this the CI deploy would quietly drop it. Keep it in both places.
+keep_vars = true
 
 [observability]
 enabled = true
@@ -43,6 +48,7 @@ domain = "${DOMAIN}"
 admin = "${ADMIN}"
 jwt_secret = "${JWT_SECRET}"
 project_link = "${PROJECT_LINK}"
+TURNSTILE_HOSTNAME = "${CUSTOM_DOMAIN}"
 
 [build]
 command = "pnpm --prefix ../mail-vue install && pnpm --prefix ../mail-vue run build"
