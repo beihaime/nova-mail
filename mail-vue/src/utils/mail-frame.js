@@ -17,6 +17,19 @@ import { isSafeUrl, prepareMailBody } from './mail-html'
 export const MAIL_FRAME_HEIGHT_MESSAGE = 'nova-mail-frame-height'
 
 /**
+ * A frame narrower than this has not been laid out yet.
+ *
+ * Measured at zero width every line wraps to a single word or character, which
+ * inflates the content to hundreds of pixels for a one-line mail. A phone card
+ * that is still opening hits exactly this, so such a reading must be discarded
+ * rather than trusted.
+ */
+export const MAIL_FRAME_MIN_WIDTH = 80
+
+/** Below this there is no content to show yet; the fixed fallback stays. */
+export const MAIL_FRAME_MIN_HEIGHT = 8
+
+/**
  * Allow script inside the frame?
  *
  * Auto-height has one structural requirement: somebody has to read the rendered
@@ -126,6 +139,9 @@ function buildFrameStyle(theme) {
       color: ${text};
       word-break: break-word;
       overflow-wrap: anywhere;
+      /* Own formatting context: the wrapper's height then includes its
+         children's margins, which is what the height measurement reads. */
+      display: flow-root;
     }
     /* A mail laid out at a fixed pixel width must never produce a horizontal
        scrollbar: the top-level blocks are capped to the available width. */
@@ -270,12 +286,43 @@ export function isOpenableLink(href) {
   return isSafeUrl(href)
 }
 
+/**
+ * Height the mail occupies inside a frame document, in CSS pixels.
+ *
+ * Deliberately **not** `documentElement.scrollHeight`: on the root element that
+ * value is at least the viewport height, so a one-line mail measured as tall as
+ * the frame itself, and because the frame's own height feeds the next reading it
+ * could only ever grow — never shrink back. The body (and the wrapper inside it)
+ * report the content instead.
+ *
+ * @param {Document} doc the frame's content document
+ * @param {number} clientWidth the frame's laid-out width
+ * @returns {number} content height, or 0 when the frame has no usable layout yet
+ */
+export function readFrameContentHeight(doc, clientWidth) {
+  if (!doc?.documentElement) return 0
+  if ((clientWidth || 0) < MAIL_FRAME_MIN_WIDTH) return 0
+
+  const body = doc.body
+  const content = doc.querySelector?.('[data-nova-mail-body]')
+
+  return Math.max(
+    body?.scrollHeight || 0,
+    body?.getBoundingClientRect?.().height || 0,
+    content?.getBoundingClientRect?.().height || 0,
+    content?.offsetHeight || 0
+  )
+}
+
 export default {
   MAIL_FRAME_SANDBOX,
   MAIL_FRAME_HEIGHT_MESSAGE,
+  MAIL_FRAME_MIN_WIDTH,
+  MAIL_FRAME_MIN_HEIGHT,
   MAIL_FRAME_SCRIPTS,
   MAIL_FRAME_MEASURE_BY_PARENT,
   buildMailFrameDocument,
   createFrameNonce,
   isOpenableLink,
+  readFrameContentHeight,
 }

@@ -1,5 +1,5 @@
 <template>
-  <div class="mail-frame" :class="{ 'is-measured': measured }">
+  <div ref="wrapper" class="mail-frame" :class="{ 'is-measured': measured }">
     <iframe
       ref="frame"
       class="mail-frame__iframe"
@@ -33,10 +33,12 @@ import { useI18n } from 'vue-i18n'
 import {
   MAIL_FRAME_HEIGHT_MESSAGE,
   MAIL_FRAME_MEASURE_BY_PARENT,
+  MAIL_FRAME_MIN_HEIGHT,
   MAIL_FRAME_SCRIPTS,
   MAIL_FRAME_SANDBOX,
   buildMailFrameDocument,
   createFrameNonce,
+  readFrameContentHeight,
 } from '@/utils/mail-frame.js'
 
 const props = defineProps({
@@ -66,13 +68,27 @@ const emit = defineEmits(['blocked', 'loaded'])
 const { t } = useI18n()
 
 const frame = ref(null)
+const wrapper = ref(null)
 const measured = ref(false)
 const frameHeight = ref(0)
 
 const sandbox = MAIL_FRAME_SANDBOX
 const nonce = MAIL_FRAME_SCRIPTS ? createFrameNonce() : ''
 
+/**
+ * A frame that measures below this had no layout yet, not an empty message.
+ *
+ * On a phone the body is created by the tap that opens the card, so the frame
+ * document can be parsed and loaded before that card has been laid out. Accepting
+ * that first, near-zero height collapsed the message to a sliver — and with
+ * `scrolling="no"` the content was then unreachable. Keeping the previous height
+ * (or the fixed fallback) means the worst case is a scrollable pane, never a
+ * blank one.
+ */
+const MIN_MEASURED_HEIGHT = MAIL_FRAME_MIN_HEIGHT
+
 let frameObserver = null
+let wrapperObserver = null
 let timers = []
 
 const frameStyle = computed(() => (
@@ -102,17 +118,16 @@ function measureFrame() {
     doc = null
   }
 
-  if (!doc?.documentElement) return
+  // `readFrameContentHeight` also refuses a reading taken at a degenerate width:
+  // while the host is still zero-wide every line wraps per character and the mail
+  // measures hundreds of pixels tall (see the helper's contract).
+  const height = readFrameContentHeight(doc, element.clientWidth)
 
-  const height = Math.max(
-    doc.documentElement.scrollHeight || 0,
-    doc.body?.scrollHeight || 0
-  )
+  if (height < MIN_MEASURED_HEIGHT) return
 
-  if (height > 0) {
-    frameHeight.value = Math.ceil(height)
-    measured.value = true
-  }
+  const next = Math.ceil(height)
+  if (next !== frameHeight.value) frameHeight.value = next
+  measured.value = true
 }
 
 function observeFrame() {
@@ -151,6 +166,24 @@ function observeFrame() {
     image.addEventListener('load', measureFrame, { once: true })
     image.addEventListener('error', measureFrame, { once: true })
   })
+}
+
+/**
+ * Watch the host box, not just the document inside it.
+ *
+ * The frame document only reflows once the host has a width, and on a phone the
+ * host is the card that is still opening when the frame loads — so a document
+ * observer alone can miss the layout that finally gives the mail its size.
+ * Rotation, a keyboard opening and the desktop split pane resizing all land here
+ * too. `measureFrame` only writes when the value actually changed, so this
+ * cannot ping-pong with its own resize.
+ */
+function observeWrapper() {
+  if (typeof ResizeObserver === 'undefined' || !wrapper.value) return
+
+  wrapperObserver?.disconnect()
+  wrapperObserver = new ResizeObserver(() => measureFrame())
+  wrapperObserver.observe(wrapper.value)
 }
 
 function handleFrameLoad() {
@@ -200,11 +233,18 @@ function rebuild() {
 
 onMounted(() => {
   window.addEventListener('message', handleMessage)
+  window.addEventListener('resize', measureFrame)
+  window.addEventListener('orientationchange', measureFrame)
+  observeWrapper()
   rebuild()
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('message', handleMessage)
+  window.removeEventListener('resize', measureFrame)
+  window.removeEventListener('orientationchange', measureFrame)
+  wrapperObserver?.disconnect()
+  wrapperObserver = null
   releaseFrame()
 })
 
@@ -235,6 +275,7 @@ watch(
    Once measured, the exact height is set inline and no scrollbar remains. */
 .mail-frame:not(.is-measured) .mail-frame__iframe {
   height: 320px;
+  min-height: 160px;
   overflow: auto;
 }
 </style>

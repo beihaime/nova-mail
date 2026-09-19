@@ -1808,8 +1808,8 @@ const handleDelete = () => {
 }
 
 @keyframes nova-message-open {
-  from { opacity: 0; transform: translateY(-4px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* A message that arrived through realtime polling fades in with a soft ring,

@@ -2,12 +2,35 @@ import { describe, it, expect } from 'vitest'
 import {
   MAIL_FRAME_HEIGHT_MESSAGE,
   MAIL_FRAME_MEASURE_BY_PARENT,
+  MAIL_FRAME_MIN_HEIGHT,
+  MAIL_FRAME_MIN_WIDTH,
   MAIL_FRAME_SANDBOX,
   MAIL_FRAME_SCRIPTS,
   buildMailFrameDocument,
   createFrameNonce,
   isOpenableLink,
+  readFrameContentHeight,
 } from '../src/utils/mail-frame.js'
+
+/**
+ * Minimal stand-in for a frame document.
+ *
+ * The numbers come from a real measurement in headless Chrome at 375px: a
+ * one-line mail reports `documentElement.scrollHeight === 320` (the frame's own
+ * height, i.e. the viewport floor) while the body correctly reports 24.
+ */
+function frameDoc({ rootScroll = 0, bodyScroll = 0, bodyRect = 0, wrapRect = 0, wrapOffset = 0 } = {}) {
+  return {
+    documentElement: { scrollHeight: rootScroll },
+    body: {
+      scrollHeight: bodyScroll,
+      getBoundingClientRect: () => ({ height: bodyRect }),
+    },
+    querySelector: selector => (selector === '[data-nova-mail-body]'
+      ? { getBoundingClientRect: () => ({ height: wrapRect }), offsetHeight: wrapOffset }
+      : null),
+  }
+}
 
 function build(html, options = {}) {
   return buildMailFrameDocument({ html, ...options })
@@ -202,5 +225,42 @@ describe('frame helpers', () => {
     expect(isOpenableLink('https://example.com')).toBe(true)
     expect(isOpenableLink('mailto:a@b.example')).toBe(true)
     expect(isOpenableLink('javascript:alert(1)')).toBe(false)
+  })
+
+  it('gives the frame body its own formatting context, so its height includes margins', () => {
+    expect(build('<p>x</p>').document).toContain('display: flow-root')
+  })
+})
+
+describe('readFrameContentHeight', () => {
+  it('measures the body, never the root element', () => {
+    // `documentElement.scrollHeight` is floored by the viewport: on a frame that
+    // is currently 320px tall a one-line mail reads 320 there and 24 on the body.
+    expect(readFrameContentHeight(frameDoc({ rootScroll: 320, bodyScroll: 24 }), 375)).toBe(24)
+  })
+
+  it('refuses a reading taken before the frame has a usable width', () => {
+    const doc = frameDoc({ bodyScroll: 888 })
+
+    expect(readFrameContentHeight(doc, 0)).toBe(0)
+    expect(readFrameContentHeight(doc, MAIL_FRAME_MIN_WIDTH - 1)).toBe(0)
+    expect(readFrameContentHeight(doc, MAIL_FRAME_MIN_WIDTH)).toBe(888)
+  })
+
+  it('takes the largest of body and wrapper, so a collapsed margin cannot clip content', () => {
+    expect(readFrameContentHeight(frameDoc({ bodyScroll: 100, wrapRect: 140 }), 375)).toBe(140)
+    expect(readFrameContentHeight(frameDoc({ bodyScroll: 100, wrapOffset: 160 }), 375)).toBe(160)
+    expect(readFrameContentHeight(frameDoc({ bodyRect: 70 }), 375)).toBe(70)
+  })
+
+  it('reports nothing for an unusable document', () => {
+    expect(readFrameContentHeight(null, 375)).toBe(0)
+    expect(readFrameContentHeight({}, 375)).toBe(0)
+    expect(readFrameContentHeight(frameDoc({}), 375)).toBe(0)
+  })
+
+  it('keeps the floor small enough for a one-line mail', () => {
+    // 24px of content is a real message, not a not-yet-laid-out document.
+    expect(MAIL_FRAME_MIN_HEIGHT).toBeLessThan(24)
   })
 })
