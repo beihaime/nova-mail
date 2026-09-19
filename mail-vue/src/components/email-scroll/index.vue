@@ -1,15 +1,6 @@
 <template>
   <div class="email-container" :class="{ 'mobile-selecting': mobileSelecting }">
     <div v-if="type === 'email'" class="mobile-inbox-tools">
-      <label class="mobile-search">
-        <AppIcon name="search" :size="19" />
-        <input
-            v-model.trim="mobileSearch"
-            type="search"
-            :placeholder="$t('searchMail')"
-        />
-      </label>
-
       <div class="mobile-filter-bar">
         <div class="mobile-filters">
           <button
@@ -416,7 +407,9 @@ let reqLock = false
 let isMobile = ref(innerWidth < 1367)
 const isPhone = ref(innerWidth < 768)
 
-const mobileSearch = ref('')
+// The phone search field now lives in the mobile header; its query is shared
+// through the email store so the list keeps filtering here.
+const mobileSearch = computed(() => emailStore.mobileSearch)
 const mobileFilter = ref('all')
 const mobileSelecting = ref(false)
 
@@ -487,6 +480,9 @@ onMounted(() => {
 onUnmounted(() => {
   clearInterval(timer)
   clearTimeout(longPressTimer)
+  // Match the previous per-instance ref behaviour: leaving the Inbox clears
+  // the header search field.
+  if (props.type === 'email') emailStore.mobileSearch = ''
 })
 
 getEmailList()
@@ -1884,56 +1880,15 @@ ul {
     grid-template-rows: auto auto minmax(0, 1fr);
   }
 
-  /* ---------- Search ---------- */
+  /* ---------- Inbox tools (filter row) ---------- */
 
   .mobile-inbox-tools {
     display: block;
     width: 100%;
     max-width: 100%;
     min-width: 0;
-    padding-top: 6px;
+    padding-top: 0;
     background: var(--nova-surface);
-  }
-
-  .mobile-search {
-    height: 48px;
-    margin: 0 14px 6px;
-    padding: 0 16px;
-
-    display: flex;
-    align-items: center;
-    gap: 9px;
-
-    /* Gmail Android search pill. */
-    border-radius: 24px;
-
-    color: var(--mobile-secondary);
-    background: var(--nova-surface-muted);
-  }
-
-  .mobile-search :deep(.app-icon) {
-    flex: 0 0 auto;
-    width: 20px;
-    height: 20px;
-  }
-
-  .mobile-search input {
-    flex: 1;
-    width: 0;
-    height: 100%;
-
-    border: 0;
-    outline: 0;
-
-    color: var(--mobile-primary);
-    background: transparent;
-
-    font-size: 15px;
-  }
-
-  .mobile-search input::placeholder {
-    color: var(--mobile-secondary);
-    opacity: 1;
   }
 
   /* ---------- Filters ---------- */
@@ -1981,7 +1936,8 @@ ul {
     white-space: nowrap;
     text-overflow: clip;
 
-    font-size: clamp(11px, 2.9vw, 12.5px);
+    /* ~1px smaller than the previous scale, still comfortably legible. */
+    font-size: clamp(10px, 2.6vw, 11.2px);
     cursor: pointer;
   }
 

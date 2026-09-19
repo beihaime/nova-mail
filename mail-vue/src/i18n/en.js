@@ -4,6 +4,7 @@ const en = {
     withAttachments: 'Attachments',
     compose: 'Compose',
     searchMail: 'Search emails, senders, or keywords…',
+    searchShort: 'Search...',
     folders: 'Folders',
     drafts: 'Drafts',
     sent: 'Sent',

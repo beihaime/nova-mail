@@ -10,6 +10,22 @@
       <button v-if="keyword" class="search-clear" type="button" :aria-label="$t('clearSearch')" @click="clear">×</button>
 
     </label>
+    <!-- Phone-only inline search: sits between the title and the theme/avatar
+         controls instead of owning a full-width row. Kept in sync with the
+         client-side Inbox filter through the email store. -->
+    <label
+        v-show="route.name === 'email'"
+        class="mobile-inline-search"
+    >
+      <AppIcon name="search" :size="18" />
+      <input
+          v-model.trim="mobileSearch"
+          type="search"
+          :placeholder="$t('searchShort')"
+          :aria-label="$t('searchShort')"
+          @keydown.esc="mobileSearch = ''"
+      />
+    </label>
     <div class="toolbar">
       <div v-if="uiStore.dark" class="sun-icon icon-item" @click="openDark($event)">
         <AppIcon name="theme-toggle" :size="20" />
@@ -112,6 +128,12 @@ const uiStore = useUiStore();
 const accountStore = useAccountStore();
 const emailStore = useEmailStore();
 const {keyword, clear, handleKeydown} = useMailSearch();
+// Phone Inbox search field: proxies the store so the list keeps filtering in
+// email-scroll while the input lives in the header.
+const mobileSearch = computed({
+  get: () => emailStore.mobileSearch,
+  set: value => { emailStore.mobileSearch = value }
+})
 const logoutLoading = ref(false)
 const userInfoShow = ref(false)
 const userinfoRef = ref({})
@@ -303,6 +325,12 @@ function formatName(email) {
   display: none;
 }
 
+/* The inline search only exists on phones; on desktop the wide search-shell
+   owns the middle grid column. */
+.mobile-inline-search {
+  display: none;
+}
+
 @media (max-width: 767px) {
   .header,
   .header.not-send {
@@ -310,16 +338,28 @@ function formatName(email) {
     min-height: 64px;
 
     padding: 0 12px 0 10px;
-    gap: 0;
+    column-gap: 6px;
+    row-gap: 0;
 
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
+    align-items: center;
 
     background: var(--nova-surface);
   }
 
   .header-btn {
+    grid-column: 1;
     min-width: 0;
     gap: 6px;
+  }
+
+  .mobile-inline-search {
+    grid-column: 2;
+    justify-self: end;
+  }
+
+  .toolbar {
+    grid-column: 3;
   }
 
   .header-btn :deep(> div) {
@@ -334,6 +374,54 @@ function formatName(email) {
 
   .search-shell {
     display: none;
+  }
+
+  /* Narrow inline search pill: grows only into the leftover middle space and
+     caps out so it never dominates the app bar. The title keeps its width and
+     the placeholder shortens (clips) first on narrow phones. */
+  .mobile-inline-search {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+
+    width: 100%;
+    max-width: 188px;
+    min-width: 0;
+    height: 38px;
+
+    padding: 0 8px;
+    box-sizing: border-box;
+
+    border-radius: 19px;
+    color: var(--mobile-secondary);
+    background: var(--nova-surface-muted);
+  }
+
+  .mobile-inline-search :deep(.app-icon) {
+    flex: 0 0 auto;
+    width: 17px;
+    height: 17px;
+    opacity: .8;
+  }
+
+  .mobile-inline-search input {
+    flex: 1 1 auto;
+    width: 0;
+    min-width: 0;
+    height: 100%;
+
+    border: 0;
+    outline: 0;
+    background: transparent;
+
+    color: var(--mobile-primary);
+    font-size: 14px;
+    text-overflow: ellipsis;
+  }
+
+  .mobile-inline-search input::placeholder {
+    color: var(--mobile-secondary);
+    opacity: 1;
   }
 
   .toolbar {
@@ -643,13 +731,16 @@ function formatName(email) {
     height: 64px;
     min-height: 64px;
     padding: 0 12px 0 10px;
-    gap: 0;
+    column-gap: 6px;
+    row-gap: 0;
     align-items: center;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
   }
-  .header.not-send { grid-template-columns: minmax(0, 1fr) auto; }
+  .header.not-send { grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto; }
   .search-shell { display: none; }
-  .toolbar { gap: 8px; }
+  .header-btn { grid-column: 1; }
+  .mobile-inline-search { grid-column: 2; }
+  .toolbar { grid-column: 3; gap: 8px; }
   .toolbar .notice { display: none; }
   .toolbar .setting-icon { display: none; }
   .toolbar .avatar { margin-left: 0; }

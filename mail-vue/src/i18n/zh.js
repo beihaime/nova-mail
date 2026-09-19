@@ -4,6 +4,7 @@ const zh = {
     withAttachments: '带附件',
     compose: '写邮件',
     searchMail: '搜索邮件、发件人或关键词…',
+    searchShort: '搜索…',
     folders: '文件夹',
     drafts: '草稿箱',
     sent: '已发送',

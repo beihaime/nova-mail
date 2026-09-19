@@ -1,5 +1,10 @@
 <template>
-  <el-container class="layout" :class="{'has-mobile-nav': route.name !== 'content'}">
+  <el-container
+      class="layout"
+      :class="{
+        'has-mobile-nav': route.name !== 'content',
+        'aside-open': uiStore.asideShow && isMobile
+      }">
     <el-aside
         class="aside"
         :class="uiStore.asideShow ? 'aside-show' : 'el-aside-hide'">
@@ -119,6 +124,18 @@ onBeforeUnmount(() => {
   .el-aside {
     height: 100dvh;
     max-height: 100dvh;
+  }
+
+  /* Stacking-context fix.
+     `.layout` is position:fixed, so it forms a stacking context at
+     `z-index: auto`. The drawer (101) and overlay (99) live inside it, while
+     the bottom nav (20) and compose FAB (21) are siblings *outside* it — so
+     those fixed elements painted over the whole drawer no matter how high the
+     drawer's own z-index was. Raising the shell itself while the drawer is open
+     puts the drawer + scrim above every fixed mobile element. Poppers teleported
+     to <body> (Element Plus dialogs, 2000+) intentionally stay on top. */
+  .layout.aside-open {
+    z-index: 1200;
   }
 }
 

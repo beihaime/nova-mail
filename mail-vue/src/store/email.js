@@ -18,6 +18,10 @@ export const useEmailStore = defineStore('email', {
         sendScroll: null,
         detailMap: {},
         searchKeyword: '',
+        // Client-side query behind the phone Inbox search field. It lives in the
+        // store so the field can render inside the mobile header while
+        // email-scroll keeps filtering the loaded list. Not persisted.
+        mobileSearch: '',
         // Replies/forwards sent this session, shown in the conversation thread
         // immediately without waiting for a list refresh. Not persisted.
         threadMessages: [],
