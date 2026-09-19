@@ -306,8 +306,8 @@ function formatName(email) {
 @media (max-width: 767px) {
   .header,
   .header.not-send {
-    height: 72px;
-    min-height: 72px;
+    height: 64px;
+    min-height: 64px;
 
     padding: 0 12px 0 10px;
     gap: 0;
@@ -323,8 +323,8 @@ function formatName(email) {
   }
 
   .header-btn :deep(> div) {
-    width: 44px;
-    height: 44px;
+    width: 40px;
+    height: 40px;
 
     padding: 0 !important;
 
@@ -342,8 +342,8 @@ function formatName(email) {
   }
 
   .toolbar .icon-item {
-    width: 44px;
-    height: 44px;
+    width: 40px;
+    height: 40px;
   }
 
   /* Keep desktop AppIcon exactly as-is; replace it only visually on phones. */
@@ -354,6 +354,8 @@ function formatName(email) {
 
   .toolbar .mobile-theme-icon {
     display: block;
+    width: 21px;
+    height: 21px;
     color: var(--mobile-primary);
   }
 
@@ -366,16 +368,16 @@ function formatName(email) {
   }
 
   .toolbar .el-dropdown {
-    width: 44px;
-    height: 44px;
+    width: 40px;
+    height: 40px;
 
     display: grid;
     place-items: center;
   }
 
   .toolbar .avatar {
-    width: 44px;
-    height: 44px;
+    width: 42px;
+    height: 42px;
 
     margin: 0;
 
@@ -638,8 +640,8 @@ function formatName(email) {
 
 @media (max-width: 767px) {
   .header {
-    height: 72px;
-    min-height: 72px;
+    height: 64px;
+    min-height: 64px;
     padding: 0 12px 0 10px;
     gap: 0;
     align-items: center;
@@ -647,13 +649,14 @@ function formatName(email) {
   }
   .header.not-send { grid-template-columns: minmax(0, 1fr) auto; }
   .search-shell { display: none; }
+  .toolbar { gap: 8px; }
   .toolbar .notice { display: none; }
   .toolbar .setting-icon { display: none; }
-  .toolbar .avatar { margin-left: 2px; }
-  /* 40px avatar, 44px tap target — Gmail Android app-bar proportions. */
+  .toolbar .avatar { margin-left: 0; }
+  /* 40px avatar, 40px tap target — Gmail Android app-bar proportions. */
   .toolbar .avatar .avatar-text { width: 40px; height: 40px; }
   .toolbar .avatar .avatar-image { width: 40px; height: 40px; flex: 0 0 40px; }
-  .toolbar .icon-item { width: 44px; height: 44px; }
+  .toolbar .icon-item { width: 40px; height: 40px; }
   .toolbar .avatar .account-summary { display: none; }
   .breadcrumb-item { font-size: 16px; }
 }

@@ -177,7 +177,7 @@ onBeforeUnmount(() => {
 .mobile-nav { display: none; }
 
 @media (max-width: 767px) {
-  .layout.has-mobile-nav { padding-bottom: 72px; }
+  .layout.has-mobile-nav { padding-bottom: 66px; }
   .main-container { min-height: 0; }
   .mobile-nav { position: fixed; z-index: 20; display: grid; grid-template-columns: repeat(5, 1fr); align-items: end; padding: 7px 10px max(8px, env(safe-area-inset-bottom)); left: 0; right: 0; bottom: 0; min-height: 66px; background: color-mix(in srgb, var(--el-bg-color) 92%, transparent); border-top: 1px solid var(--light-border); backdrop-filter: blur(18px); }
   .mobile-nav button { min-width: 0; min-height: 48px; display: grid; place-items: center; gap: 2px; color: var(--regular-text-color); cursor: pointer; font-size: 10px; }
@@ -224,11 +224,11 @@ onBeforeUnmount(() => {
 
 @media (max-width: 767px) {
   .layout.has-mobile-nav {
-    padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(66px + env(safe-area-inset-bottom, 0px));
   }
 
   .el-header {
-    height: calc(72px + env(safe-area-inset-top, 0px));
+    height: calc(64px + env(safe-area-inset-top, 0px));
     padding-top: env(safe-area-inset-top, 0px);
     border-bottom: 0;
     background: var(--nova-surface);
@@ -245,11 +245,11 @@ onBeforeUnmount(() => {
     grid-template-columns: repeat(4, 1fr);
     align-items: center;
 
-    height: calc(72px + env(safe-area-inset-bottom, 0px));
+    height: calc(66px + env(safe-area-inset-bottom, 0px));
     min-height: 0;
 
     padding:
-      4px
+      3px
       10px
       env(safe-area-inset-bottom, 0px);
 
@@ -264,10 +264,10 @@ onBeforeUnmount(() => {
 
     display: grid;
     place-items: center;
-    gap: 3px;
+    gap: 2px;
 
     color: var(--regular-text-color);
-    font-size: 14px;
+    font-size: 13px;
     line-height: 1.1;
   }
 
@@ -299,9 +299,9 @@ onBeforeUnmount(() => {
 
     right: 16px;
     bottom: calc(
-      72px +
+      66px +
       env(safe-area-inset-bottom, 0px) +
-      16px
+      14px
     );
 
     width: 56px;

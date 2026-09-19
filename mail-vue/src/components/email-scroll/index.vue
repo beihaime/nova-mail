@@ -589,8 +589,10 @@ const itemHeight = computed(() => {
     if (props.type === 'all-email') {
       return isMobile.value ? 132 : 65;
     } else  {
+      // Phone inbox rows are 72px tall (see the .email-row.email mobile rules);
+      // keep the virtual list in lock-step so rows never overlap.
       return isPhone.value && props.type === 'email'
-        ? 86
+        ? 72
         : (isMobile.value ? 83 : 48);
     }
 })
@@ -1377,7 +1379,8 @@ function loadData() {
           width: 150px;
           height: 1rem;
           @media (max-width: 767px) {
-            width: 130px;
+            width: 120px;
+            height: .875rem;
           }
         }
       }
@@ -1400,6 +1403,7 @@ function loadData() {
         }
         @media (max-width: 767px) {
           width: 70%;
+          height: 14px;
         }
       }
 
@@ -1411,6 +1415,9 @@ function loadData() {
         }
         @media (max-width: 1366px) {
           width: 100%;
+        }
+        @media (max-width: 767px) {
+          height: 14px;
         }
       }
     }
@@ -1884,21 +1891,21 @@ ul {
     width: 100%;
     max-width: 100%;
     min-width: 0;
-    padding-top: 8px;
+    padding-top: 6px;
     background: var(--nova-surface);
   }
 
   .mobile-search {
-    height: 56px;
-    margin: 0 16px 8px;
-    padding: 0 18px;
+    height: 48px;
+    margin: 0 14px 6px;
+    padding: 0 16px;
 
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 9px;
 
     /* Gmail Android search pill. */
-    border-radius: 28px;
+    border-radius: 24px;
 
     color: var(--mobile-secondary);
     background: var(--nova-surface-muted);
@@ -1906,6 +1913,8 @@ ul {
 
   .mobile-search :deep(.app-icon) {
     flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
   }
 
   .mobile-search input {
@@ -1930,11 +1939,11 @@ ul {
   /* ---------- Filters ---------- */
 
   .mobile-filter-bar {
-    height: 44px;
+    height: 40px;
     min-width: 0;
 
-    /* Tighter than before: the 40px tabs own the row. */
-    padding: 2px 6px 2px 12px;
+    /* Tighter than before: the 36px tabs own the row. */
+    padding: 2px 6px 2px 10px;
 
     display: flex;
     align-items: center;
@@ -1949,7 +1958,7 @@ ul {
     display: grid;
     grid-template-columns: 0.7fr 0.95fr 1.45fr 0.9fr;
     align-items: center;
-    gap: 4px;
+    gap: 3px;
 
     overflow: hidden;
     white-space: nowrap;
@@ -1958,7 +1967,7 @@ ul {
   .mobile-filters button {
     width: 100%;
     min-width: 0;
-    height: 40px;
+    height: 36px;
     padding: 0 2px;
     box-sizing: border-box;
 
@@ -1972,7 +1981,7 @@ ul {
     white-space: nowrap;
     text-overflow: clip;
 
-    font-size: clamp(10px, 2.9vw, 12px);
+    font-size: clamp(11px, 2.9vw, 12.5px);
     cursor: pointer;
   }
 
@@ -1986,10 +1995,10 @@ ul {
   }
 
   .mobile-tool-button {
-    flex: 0 0 40px;
+    flex: 0 0 38px;
 
-    width: 40px;
-    height: 40px;
+    width: 38px;
+    height: 36px;
     padding: 0;
 
     display: grid;
@@ -2045,15 +2054,15 @@ ul {
     position: relative;
 
     display: grid;
-    grid-template-columns: 40px minmax(0, 1fr);
+    grid-template-columns: 36px minmax(0, 1fr);
 
     column-gap: 10px;
 
     width: 100%;
-    height: 86px;
-    min-height: 86px;
+    height: 72px;
+    min-height: 72px;
 
-    padding: 9px 12px 9px 16px;
+    padding: 6px 12px 6px 16px;
 
     box-sizing: border-box;
 
@@ -2067,7 +2076,7 @@ ul {
     content: '';
 
     position: absolute;
-    left: 66px;
+    left: 62px;
     right: 0;
     bottom: 0;
 
@@ -2091,7 +2100,7 @@ ul {
 
   .email-container.mobile-selecting
     :deep(.email-row.email) {
-    grid-template-columns: 20px 40px minmax(0, 1fr);
+    grid-template-columns: 20px 36px minmax(0, 1fr);
   }
 
   .email-container.mobile-selecting
@@ -2101,7 +2110,7 @@ ul {
     display: flex;
 
     width: 20px;
-    padding: 9px 0 0;
+    padding: 6px 0 0;
     margin: 0;
   }
 
@@ -2110,10 +2119,10 @@ ul {
   .mobile-sender-avatar {
     grid-column: 1;
 
-    width: 40px;
-    height: 40px;
-    min-width: 40px;
-    min-height: 40px;
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    min-height: 36px;
 
     display: grid;
     place-items: center;
@@ -2127,7 +2136,7 @@ ul {
     color: var(--el-color-primary);
     background: var(--nova-selected);
 
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 650;
     line-height: 1;
     text-align: center;
@@ -2173,11 +2182,11 @@ ul {
 
     gap: 4px;
 
-    line-height: 21px;
+    line-height: 19px;
 
     color: var(--mobile-primary);
 
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 500;
   }
 
@@ -2216,6 +2225,7 @@ ul {
     color: var(--mobile-tertiary);
 
     font-size: 12px;
+    line-height: 19px;
     font-weight: 400;
   }
 
@@ -2225,9 +2235,9 @@ ul {
     width: 100%;
     min-width: 0;
 
-    padding-right: 30px;
+    padding-right: 28px;
 
-    line-height: 20px;
+    line-height: 18px;
 
     overflow: hidden;
   }
@@ -2245,6 +2255,7 @@ ul {
     color: var(--mobile-primary);
 
     font-size: 14px;
+    line-height: 18px;
     font-weight: 400;
   }
 
@@ -2267,6 +2278,7 @@ ul {
     color: var(--mobile-secondary);
 
     font-size: 13px;
+    line-height: 18px;
     font-weight: 400;
   }
 
@@ -2278,7 +2290,7 @@ ul {
     position: absolute;
 
     left: 4px;
-    top: 31px;
+    top: 25px;
 
     width: 7px;
     height: 7px;
@@ -2293,11 +2305,11 @@ ul {
   .mobile-row-star {
     position: absolute;
 
-    right: -3px;
-    top: 22px;
+    right: -2px;
+    top: 14px;
 
-    width: 36px;
-    height: 36px;
+    width: 34px;
+    height: 34px;
 
     display: grid;
     place-items: center;
