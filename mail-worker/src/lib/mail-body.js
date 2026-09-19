@@ -33,6 +33,32 @@ export function isMarkdownPart(part) {
 }
 
 /**
+ * Does this text body actually hold an HTML document?
+ *
+ * Plenty of senders leave out `Content-Type` entirely, or label an HTML body
+ * `text/plain`. MIME parsing cannot invent the missing part, so the markup ends up
+ * in `text` — and storing that as plain text makes the reader escape it, which is
+ * how a message body shows up as visible `<html><body>…` source.
+ *
+ * The check is deliberately conservative: a whole document (`<!doctype html>`,
+ * `<html …`) is always markup, and otherwise at least three real tags are needed,
+ * so prose that merely mentions a tag is still treated as prose.
+ *
+ * @param {string} text
+ * @returns {boolean}
+ */
+export function looksLikeHtmlDocument(text) {
+	const value = String(text || '');
+	if (!value.trim()) return false;
+
+	if (/^\s*(?:<!doctype\s+html|<html[\s>])/i.test(value)) return true;
+
+	const tags = value.match(/<\/?(?:html|head|body|div|p|span|table|tbody|thead|tr|td|th|h[1-6]|ul|ol|li|br|img|a|strong|em|b|i|u|blockquote|font)\b[^>]*>/gi);
+
+	return Boolean(tags && tags.length >= 3);
+}
+
+/**
  * Pick the body of a parsed mail.
  *
  * `multipart/alternative` carries both `text/plain` and `text/html`; postal-mime
@@ -46,14 +72,15 @@ export function isMarkdownPart(part) {
  * with a mysterious "body.md" attachment.
  *
  * @param {{html?:string, text?:string, attachments?:object[]}} parsed postal-mime result
- * @returns {{bodyType: string, text: string, markdown: string, markdownPart: object|null}}
+ * @returns {{bodyType: string, html: string, text: string, markdown: string, markdownPart: object|null}}
  */
 export function resolveMailBody(parsed) {
-	const html = String(parsed?.html || '').trim();
+	const html = String(parsed?.html || '');
 
-	if (html) {
+	if (html.trim()) {
 		return {
 			bodyType: MAIL_BODY.HTML,
+			html,
 			text: String(parsed?.text || ''),
 			markdown: '',
 			markdownPart: null,
@@ -66,19 +93,25 @@ export function resolveMailBody(parsed) {
 	if (markdownPart) {
 		const markdown = decodePartContent(markdownPart.content);
 		if (markdown.trim()) {
-			return { bodyType: MAIL_BODY.MARKDOWN, text: markdown, markdown, markdownPart };
+			return { bodyType: MAIL_BODY.MARKDOWN, html: '', text: markdown, markdown, markdownPart };
 		}
 	}
 
 	const text = String(parsed?.text || '');
 
 	if (text.trim()) {
-		return { bodyType: MAIL_BODY.PLAIN, text, markdown: '', markdownPart: null };
+		// No HTML part, but the text is a markup document: that is the body, and it
+		// has to reach the reader as HTML or it will be shown as source.
+		if (looksLikeHtmlDocument(text)) {
+			return { bodyType: MAIL_BODY.HTML, html: text, text, markdown: '', markdownPart: null };
+		}
+
+		return { bodyType: MAIL_BODY.PLAIN, html: '', text, markdown: '', markdownPart: null };
 	}
 
 	// A body-less mail (headers only, or malformed) is stored as-is; the reader
 	// shows its "body could not be loaded" affordance.
-	return { bodyType: '', text, markdown: '', markdownPart: null };
+	return { bodyType: '', html: '', text, markdown: '', markdownPart: null };
 }
 
 /**
@@ -88,9 +121,9 @@ export function resolveMailBody(parsed) {
 export function bodyViewFor(parsed, body) {
 	return {
 		...parsed,
-		html: body?.bodyType === MAIL_BODY.HTML ? parsed?.html || '' : '',
+		html: body?.bodyType === MAIL_BODY.HTML ? body.html || '' : '',
 		text: body?.text || '',
 	};
 }
 
-export default { MAIL_BODY, resolveMailBody, bodyViewFor, isMarkdownPart, partMimeType, decodePartContent };
+export default { MAIL_BODY, resolveMailBody, bodyViewFor, isMarkdownPart, partMimeType, decodePartContent, looksLikeHtmlDocument };

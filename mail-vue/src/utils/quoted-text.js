@@ -25,6 +25,8 @@
  *    levels keep their own `.quote-block` / `blockquote` left rule.
  */
 
+import { looksLikeHtmlDocument } from './mail-body-hint.js'
+
 const MAX_DEPTH = 5
 export const MAX_PREVIEW = 180
 
@@ -251,7 +253,11 @@ export function buildMessagePreview(raw, max = MAX_PREVIEW) {
     if (text) {
         // A markdown body would otherwise show its syntax in the summary.
         const summary = raw.bodyType === BODY_TYPE_MARKDOWN ? stripMarkdown(text) : text
-        preview = plainTextPreview(summary, max)
+        // A body stored as text that is really a markup document must not put its
+        // tags in the summary either.
+        preview = looksLikeHtmlDocument(summary)
+            ? htmlPreview(summary, max)
+            : plainTextPreview(summary, max)
     }
     else if (listText) preview = truncate(firstParagraph(stripQuotedPlainText(listText)), max)
     else if (html) preview = htmlPreview(html, max)

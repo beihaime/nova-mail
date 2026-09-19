@@ -4,6 +4,7 @@ import {
 	bodyViewFor,
 	decodePartContent,
 	isMarkdownPart,
+	looksLikeHtmlDocument,
 	partMimeType,
 	resolveMailBody,
 } from '../src/lib/mail-body.js';
@@ -146,5 +147,60 @@ describe('part helpers', () => {
 	it('detects markdown parts only', () => {
 		expect(isMarkdownPart({ mimeType: 'text/markdown' })).toBe(true);
 		expect(isMarkdownPart({ mimeType: 'text/plain' })).toBe(false);
+	});
+});
+
+describe('markup that arrives in the text part', () => {
+	// Senders that omit Content-Type (or label an HTML body text/plain) leave the
+	// markup in `text`; storing that as plain text is what made the reader show
+	// visible HTML source.
+	const DOC = '<html><body><h1>Hello</h1><p>This is HTML mail.</p></body></html>'
+
+	it('treats a whole HTML document in the text part as the HTML body', () => {
+		const body = resolveMailBody({ text: DOC });
+
+		expect(body.bodyType).toBe(MAIL_BODY.HTML);
+		expect(body.html).toBe(DOC);
+	});
+
+	it('treats an <html> fragment without a doctype the same way', () => {
+		expect(resolveMailBody({ text: '<html><body>hi</body></html>' }).bodyType).toBe(MAIL_BODY.HTML);
+	});
+
+	it('treats a tag-rich fragment as markup', () => {
+		const body = resolveMailBody({ text: '<div><p>a</p><table><tr><td>b</td></tr></table></div>' });
+
+		expect(body.bodyType).toBe(MAIL_BODY.HTML);
+		expect(body.html).toContain('<table>');
+	});
+
+	it('still treats prose that merely mentions a tag as plain text', () => {
+		for (const prose of [
+			'Use <b> for bold in HTML.',
+			'Compare a < b and c > d, e.g. 3 < 4.',
+			'See <a href="x">this</a> link.',
+		]) {
+			expect(resolveMailBody({ text: prose }).bodyType, prose).toBe(MAIL_BODY.PLAIN);
+		}
+	});
+
+	it('prefers a real HTML part over markup in the text part', () => {
+		const body = resolveMailBody({ html: '<p>real</p>', text: DOC });
+
+		expect(body.html).toBe('<p>real</p>');
+	});
+
+	it('exposes the detector for callers that classify stored rows', () => {
+		expect(looksLikeHtmlDocument(DOC)).toBe(true);
+		expect(looksLikeHtmlDocument('plain sentence')).toBe(false);
+		expect(looksLikeHtmlDocument('')).toBe(false);
+	});
+
+	it('reports the effective html to the blacklist / code extractor', () => {
+		const body = resolveMailBody({ text: DOC });
+		const view = bodyViewFor({ subject: 's', text: DOC }, body);
+
+		expect(view.html).toBe(DOC);
+		expect(view.text).toBe(DOC);
 	});
 });

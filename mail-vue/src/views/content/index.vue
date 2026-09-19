@@ -252,6 +252,7 @@ import SenderAvatar from '@/components/sender-avatar/index.vue'
 import {buildThreadMessages, threadSubjectKey} from '@/utils/mail-thread.js'
 import {quotedTextToHtml, wrapHtmlQuotes} from '@/utils/quoted-text.js'
 import {MAIL_BODY_TYPE, blockRemoteResources, prepareMarkdownBody} from '@/utils/mail-html.js'
+import {looksLikeHtmlDocument} from '@/utils/mail-body-hint.js'
 import {attachmentRisk} from '@/utils/attachment-risk.js'
 import {alertNewMail} from '@/utils/new-mail-alert.js'
 
@@ -445,7 +446,11 @@ function bodyFor(message) {
   const resolved = renderedBodies[message.id]
   if (resolved) return resolved
 
-  const source = message.content || ''
+  // `content` is the body; a row stored as plain text that actually holds a
+  // markup document (a sender that omitted Content-Type) is the body too.
+  const source = String(message.content || '').trim()
+    ? message.content
+    : (looksLikeHtmlDocument(message.text) ? message.text : '')
   if (!source) return ''
 
   const label = quoteLabel.value
@@ -464,23 +469,34 @@ function bodyFor(message) {
  * written before that column existed have an empty value and are classified
  * from their data, where a non-empty `content` means HTML.
  *
+ * A body that is stored as text but *is* a markup document is rendered as HTML.
+ * That happens for mail whose sender omitted (or mislabelled) `Content-Type`, and
+ * for every row that was stored before the Worker learned to recognise it — the
+ * alternative is showing the reader the HTML source.
+ *
  * @returns {'html'|'markdown'|'plain'|'none'}
  */
 function messageBodyKind(message) {
   const type = message.bodyType || ''
   const hasHtml = !!String(message.content || '').trim()
   const hasText = !!String(message.text || '').trim()
+  const markupInText = hasText && looksLikeHtmlDocument(message.text)
 
   if (type === MAIL_BODY_TYPE.MARKDOWN) return hasText ? 'markdown' : 'none'
-  if (type === MAIL_BODY_TYPE.PLAIN) return hasText ? 'plain' : 'none'
+  if (type === MAIL_BODY_TYPE.PLAIN) {
+    if (markupInText) return 'html'
+    return hasText ? 'plain' : 'none'
+  }
   if (type === MAIL_BODY_TYPE.HTML) {
     if (hasHtml) return 'html'
-    return hasText ? 'plain' : 'none'
+    // No `content` yet (a brief list row): use the markup if the text holds it,
+    // otherwise show the text rather than an empty box.
+    return markupInText ? 'html' : (hasText ? 'plain' : 'none')
   }
 
   if (hasHtml) return 'html'
-  if (hasText) return 'plain'
-  return 'none'
+  if (markupInText) return 'html'
+  return hasText ? 'plain' : 'none'
 }
 
 // Markdown bodies, rendered once per body + label. A markdown body is not sent
@@ -722,7 +738,11 @@ async function fetchPrimaryBody() {
   const emailId = Number(current?.emailId) || 0
 
   if (!emailId) return
-  if (current.content || current.text) return
+  if (current.content) return
+  // A brief list row carries `text` but no `content`. For a plain-text mail that
+  // text is the whole body; for an HTML mail it is only the alternative part, so
+  // the real body has to be fetched instead of rendering that.
+  if (current.text && current.bodyType !== MAIL_BODY_TYPE.HTML) return
   if (emailStore.detailMap[emailId]?.content) return
   if (bodyRequesting.value === emailId) return
 
@@ -940,6 +960,18 @@ function ingestIncoming(rows) {
   // newest known message, so the first poll has nothing to ingest.
   alertNewMail(freshIds)
 }
+
+// An HTML message whose row came from the brief list projection has no `content`.
+// Load the real body instead of leaving the reader on a partial one.
+watch(
+  () => [Number(email.value?.emailId) || 0, email.value?.bodyType, Boolean(email.value?.content)],
+  ([emailId, bodyType, hasContent]) => {
+    if (!emailId || hasContent) return
+    if (bodyType !== MAIL_BODY_TYPE.HTML) return
+    fetchPrimaryBody()
+  },
+  { immediate: true }
+)
 
 async function pollOnce() {
   if (pollStopped || pollInFlight || document.hidden) return

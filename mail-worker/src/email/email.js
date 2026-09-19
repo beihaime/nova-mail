@@ -120,7 +120,9 @@ export async function email(message, env, ctx) {
 			name: email.from.name || emailUtils.getName(email.from.address),
 			subject: email.subject,
 			code,
-			content: body.bodyType === MAIL_BODY.HTML ? email.html : '',
+			// `body.html` covers both a real HTML part and a markup document that
+			// arrived in the text part (a sender that omitted Content-Type).
+			content: body.bodyType === MAIL_BODY.HTML ? body.html : '',
 			text: body.text,
 			bodyType: body.bodyType,
 			cc: email.cc ? JSON.stringify(email.cc) : '[]',
