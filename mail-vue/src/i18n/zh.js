@@ -334,6 +334,7 @@ const zh = {
     notificationSound: '新邮件通知声音',
     notificationSoundType: '通知音效',
     notificationSoundPlay: '播放',
+    notificationSoundFailed: '播放失败',
     pushNotification: '邮件通知',
     pushStatusOn: '已开启',
     pushStatusOff: '未开启',

@@ -150,6 +150,12 @@
           </el-button>
         </div>
       </div>
+
+      <!-- A browser that refuses to play leaves the reader with a silent app and
+           no explanation, and the console is not available on a phone. -->
+      <p v-if="notificationSoundStatus.lastError" class="notification-sound-error">
+        ⚠ {{ $t('notificationSoundFailed') }}: {{ notificationSoundStatus.lastError }}
+      </p>
     </div>
     <div class="del-email" v-perm="'my:delete'">
       <div class="title">{{$t('deleteUser')}}</div>
@@ -185,6 +191,7 @@ import {Icon} from '@iconify/vue';
 import {applyThemeTransition} from "@/utils/theme-transition.js";
 import {
   NOTIFICATION_SOUNDS,
+  notificationSoundStatus,
   playNotificationSound,
   preloadNotificationSound,
   setNotificationSoundType,
@@ -257,9 +264,15 @@ watch(
   }
 )
 
-function previewSound() {
+async function previewSound() {
   // An explicit click, so it plays even while the automatic sound is off.
-  playNotificationSound(settingStore.notificationSoundType, { force: true })
+  const played = await playNotificationSound(settingStore.notificationSoundType, { force: true })
+
+  // Never fail silently: the line above the button then shows why, and the
+  // message makes it obvious that the click was heard but the sound was refused.
+  if (!played) {
+    ElMessage.warning(`${t('notificationSoundFailed')}: ${notificationSoundStatus.lastError}`)
+  }
 }
 
 /* ---------- Web Push (system notifications) ---------- */
@@ -816,6 +829,16 @@ function submitPwd() {
     display: inline-flex;
     align-items: center;
     gap: 6px;
+  }
+
+  /* Why the last attempt produced no sound (blocked autoplay, a decode error…).
+     Wrapped: the reason is a technical string and can be long. */
+  .notification-sound-error {
+    margin: 8px 0 0;
+    color: var(--el-color-warning);
+    font-size: 12px;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
   }
 
   @media (max-width: 767px) {

@@ -50,6 +50,21 @@ export function notificationSoundUrl(type) {
 	return `${base}sounds/${normalizeSoundType(type)}.wav`;
 }
 
+import { reactive } from 'vue'
+
+/**
+ * Last playback outcome, for the settings page.
+ *
+ * A browser that refuses to play leaves the reader with a silent app and no
+ * explanation — and the console is not available on a phone. Surfacing the
+ * reason next to the sound selector turns "there is no sound" into something the
+ * reader can act on (and report).
+ */
+export const notificationSoundStatus = reactive({
+	lastError: '',
+	lastPlayedAt: 0,
+})
+
 /** Human-readable reason a media element refused to play. */
 function describeMediaError(media) {
 	const error = media && media.error;
@@ -74,13 +89,52 @@ function getAudio() {
 	// A deploy that returns the SPA shell (or a 404) for /sounds/*.wav makes the
 	// element fail here. Without this the app is simply silent with no clue why.
 	audio.addEventListener('error', () => {
+		const reason = describeMediaError(audio);
+		notificationSoundStatus.lastError = reason;
 		console.warn(
 			`Nova Mail: notification sound ${audio.currentSrc || audio.src} could not be loaded ` +
-			`(${describeMediaError(audio)}) — make sure the deployment serves /sounds/*.wav as audio.`
+			`(${reason}) — make sure the deployment serves /sounds/*.wav as audio.`
 		);
 	});
 
 	return audio;
+}
+
+/**
+ * Wait until the element holds data, so a retry can play without being
+ * interrupted by the load the `src` assignment started. The timeout keeps a slow
+ * network from delaying the alert forever.
+ */
+function waitForData(player, timeout = 1500) {
+	if (player.readyState >= 2) return Promise.resolve();
+
+	return new Promise(resolve => {
+		const done = () => {
+			player.removeEventListener('loadeddata', done);
+			player.removeEventListener('error', done);
+			clearTimeout(timer);
+			resolve();
+		};
+
+		const timer = setTimeout(done, timeout);
+		player.addEventListener('loadeddata', done);
+		player.addEventListener('error', done);
+	});
+}
+
+/** True for the playback failures that a retry after loading can actually fix. */
+function isRecoverable(error) {
+	return error && (error.name === 'AbortError' || error.name === 'NotSupportedError');
+}
+
+/** Restart the shared element from the beginning and play it. */
+function restart(player) {
+	// Restart from the beginning instead of queueing behind a previous play.
+	player.pause();
+	player.currentTime = 0;
+	player.muted = false;
+	player.volume = 1;
+	return player.play();
 }
 
 /** Remember the sound used when `playNotificationSound()` gets no argument. */
@@ -158,20 +212,37 @@ export async function playNotificationSound(type = currentType, { force = false 
 			player.src = notificationSoundUrl(resolved);
 		}
 
-		// Restart from the beginning instead of queueing behind a previous play.
-		player.pause();
-		player.currentTime = 0;
-		player.muted = false;
-		player.volume = 1;
+		if (player.error) throw new Error(describeMediaError(player));
 
-		await player.play();
+		try {
+			await restart(player);
+		} catch (firstError) {
+			// A `src` that has only just been assigned is still loading, and
+			// desktop browsers reject that first request with `AbortError`
+			// ("interrupted by a new load request") instead of ringing. Wait for
+			// the data and ring once it is there. `play()` is attempted *before*
+			// the wait on purpose: Safari only honours the call while the user
+			// gesture is still being handled.
+			if (!isRecoverable(firstError)) throw firstError;
+
+			await waitForData(player);
+			await restart(player);
+		}
+
+		notificationSoundStatus.lastError = '';
+		notificationSoundStatus.lastPlayedAt = Date.now();
 		return true;
 	} catch (error) {
 		// Blocked autoplay, unsupported codec, muted device… stay silent.
+		const reason =
+			`${describeMediaError(player)}` +
+			`${error && error.name ? `; ${error.name}` : ''}` +
+			`${error && error.message ? `: ${error.message}` : ''}`;
+
+		notificationSoundStatus.lastError = reason;
+
 		console.warn(
-			`Nova Mail: notification sound ${player.currentSrc || player.src} could not play ` +
-			`(${describeMediaError(player)}${error && error.name ? `; ${error.name}` : ''}` +
-			`${error && error.message ? `: ${error.message}` : ''})`
+			`Nova Mail: notification sound ${player.currentSrc || player.src} could not play (${reason})`
 		);
 		armUnlockRetry(resolved);
 		return false;
@@ -198,7 +269,13 @@ function armGestureUnlock() {
 		if (!player) return;
 
 		try {
-			if (!player.getAttribute('src')) player.src = notificationSoundUrl(currentType);
+			// Keep `loadedType` in step with the element: without this the next
+			// real alert re-assigns `src` to the same URL, which restarts the
+			// load and can make `play()` reject right when the sound is due.
+			if (!player.getAttribute('src')) {
+				loadedType = normalizeSoundType(currentType);
+				player.src = notificationSoundUrl(loadedType);
+			}
 			player.muted = true;
 
 			const settle = () => {

@@ -334,6 +334,7 @@ const en = {
     notificationSound: 'New mail sound',
     notificationSoundType: 'Notification sound',
     notificationSoundPlay: 'Play',
+    notificationSoundFailed: 'Playback failed',
     pushNotification: 'Mail notifications',
     pushStatusOn: 'Enabled',
     pushStatusOff: 'Off',
