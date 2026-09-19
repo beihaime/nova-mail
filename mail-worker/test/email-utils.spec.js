@@ -71,3 +71,34 @@ describe('emailUtils.toPreviewText', () => {
 		expect(preview).not.toContain('\n');
 	});
 });
+
+describe('emailUtils.toPreviewText (markdown)', () => {
+	const MD = 'text/markdown';
+
+	it('renders markdown syntax down to its words for the list preview', () => {
+		const preview = emailUtils.toPreviewText('# Release notes\n\n**Shipping** [today](https://x.y).', null, MD);
+
+		expect(preview).toBe('Release notes Shipping today.');
+	});
+
+	it('drops list markers, quotes, code fences and table pipes', () => {
+		const preview = emailUtils.toPreviewText(
+			'> Intro\n\n- first\n- second\n\n```js\nconst a = 1\n```\n\n| a | b |\n| --- | --- |\n| 1 | 2 |',
+			null,
+			MD,
+		);
+
+		expect(preview).not.toMatch(/[#>`*|]/);
+		expect(preview).toContain('first second');
+	});
+
+	it('unwraps images to their alt text and strips emphasis', () => {
+		expect(emailUtils.toPreviewText('![Logo](https://x/y.png) ~~old~~ *new*', null, MD))
+			.toBe('Logo old new');
+	});
+
+	it('ignores markdown flattening for non-markdown bodies', () => {
+		// A plain-text body keeps its asterisks: only markdown bodies are flattened.
+		expect(emailUtils.toPreviewText('2 * 3 = 6', null, 'text/plain')).toBe('2 * 3 = 6');
+	});
+});

@@ -325,7 +325,7 @@ const emailService = {
 	},
 
 	toListText(item) {
-		return emailUtils.toPreviewText(item.text, item.content).slice(0, EMAIL_LIST_TEXT_LEN);
+		return emailUtils.toPreviewText(item.text, item.content, item.bodyType).slice(0, EMAIL_LIST_TEXT_LEN);
 	},
 
 	applyListText(list) {

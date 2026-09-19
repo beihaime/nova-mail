@@ -1,5 +1,35 @@
 import { parseHTML } from 'linkedom';
-import { looksLikeHtmlDocument } from '../lib/mail-body.js';
+import { MAIL_BODY, looksLikeHtmlDocument } from '../lib/mail-body.js';
+
+/**
+ * Markdown syntax that must not survive into a one-line row preview.
+ *
+ * The reader renders the real markdown (markdown-it, see the client's
+ * `mail-html.js`); a list row only needs its words, so headings, list bullets,
+ * code fences, link/image wrappers and emphasis markers are flattened here.
+ */
+const MARKDOWN_NOISE = [
+	[/^[ \t]*(?:```|~~~)[^\n]*$/gm, ''],        // fenced code markers
+	[/^#{1,6}[ \t]+/gm, ''],                    // headings
+	[/^[ \t]*>[ \t]?/gm, ''],                   // block quotes
+	[/^[ \t]*(?:[-*+]|\d+\.)[ \t]+/gm, ''],     // list markers
+	[/^[ \t]*\|?[ \t]*:?-{3,}:?[ \t]*(?:\|[ \t]*:?-{3,}:?[ \t]*)*\|?[ \t]*$/gm, ''], // table rules
+	[/`{1,3}([^`]*)`{1,3}/g, '$1'],             // inline code
+	[/!\[([^\]]*)\]\([^)]*\)/g, '$1'],          // images
+	[/\[([^\]]*)\]\([^)]*\)/g, '$1'],           // links
+	[/\*\*([^*]+)\*\*/g, '$1'],                 // bold
+	[/__([^_]+)__/g, '$1'],
+	[/\*([^*\n]+)\*/g, '$1'],                   // italic
+	[/~~([^~]+)~~/g, '$1'],                     // strikethrough
+	[/^[ \t]*(?:[-*_][ \t]*){3,}$/gm, ''],      // horizontal rule
+	[/\|/g, ' '],                               // table cell separators
+]
+
+function stripMarkdown(value) {
+	let text = String(value || '');
+	for (const [pattern, replacement] of MARKDOWN_NOISE) text = text.replace(pattern, replacement);
+	return text;
+}
 
 /**
  * Plain text of a parsed DOM node.
@@ -59,20 +89,30 @@ const emailUtils = {
 	/**
 	 * One-line preview text for an Inbox row.
 	 *
-	 * Prefers the stored plain-text part, but only when it really is plain text:
-	 * senders that omit or mislabel Content-Type leave a whole HTML document in
-	 * `text`, and using it verbatim is what put `<!DOCTYPE html>` into previews.
-	 * Markup goes through `htmlToText` instead; whitespace is normalised here and
-	 * the caller truncates to the column length.
+	 * The reader renders the real body (HTML in a sandboxed frame, markdown via
+	 * markdown-it); a row only needs words, so:
+	 * - a markdown body is flattened from its syntax first;
+	 * - an HTML body (or a markup document that arrived in `text`) goes through
+	 *   `htmlToText`, so `<!DOCTYPE html>` / `<div>` can never appear;
+	 * - otherwise the plain-text part is used as-is.
+	 * Whitespace is normalised here and the caller truncates to the column length.
 	 *
 	 * @param {string} text  the message's text part
 	 * @param {string} [html] the message's html part
+	 * @param {string} [bodyType] one of MAIL_BODY (text/markdown, text/html, …)
 	 */
-	toPreviewText(text, html) {
-		const plain = this.formatText(text);
-		let source = plain && !looksLikeHtmlDocument(plain)
-			? plain
-			: this.htmlToText(html || text);
+	toPreviewText(text, html, bodyType) {
+		let source;
+
+		if (bodyType === MAIL_BODY.MARKDOWN) {
+			source = this.formatText(stripMarkdown(text));
+		} else {
+			const plain = this.formatText(text);
+			source = plain && !looksLikeHtmlDocument(plain)
+				? plain
+				: this.htmlToText(html || text);
+		}
+
 		source = source.replace(/\s+/g, ' ').trim();
 
 		// Last guard: a row preview is plain text, so tag-like fragments must never
