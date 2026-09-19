@@ -1,6 +1,6 @@
 import orm from '../entity/orm';
 import email from '../entity/email';
-import { and, asc, desc, eq, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, or, sql } from 'drizzle-orm';
 import { isDel } from '../const/entity-const';
 
 /**
@@ -252,58 +252,109 @@ export async function findExistingMessage(c, { userId, messageId }) {
 }
 
 /**
+ * Paged backfill core. IO is injected so the paging / grouping behaviour can be
+ * unit tested without a D1 instance.
+ *
+ * @param {object} io
+ * @param {(cursor:number, limit:number) => Promise<object[]>} io.readPage
+ *        rows with thread_id = '' and email_id > cursor, ascending
+ * @param {(updates: object[]) => Promise<void>} io.writeUpdates
+ * @param {(processed:number) => void} [io.onProgress]
+ */
+export async function runThreadBackfill({
+	readPage,
+	writeUpdates,
+	onProgress,
+	pageSize = 2000,
+	chunkSize = 100,
+}) {
+	const index = createThreadIndex();
+	let cursor = 0;
+	let total = 0;
+
+	while (true) {
+		const rows = await readPage(cursor, pageSize);
+		if (!rows?.length) break;
+
+		cursor = rows[rows.length - 1].emailId;
+
+		const updates = [];
+
+		for (const row of rows) {
+			// `relation` holds the References header; the resolver accepts either.
+			const resolved = resolveThreadKey({
+				userId: row.userId,
+				accountId: row.accountId,
+				messageId: row.messageId,
+				inReplyTo: row.inReplyTo,
+				references: row.relation,
+				subject: row.subject,
+			}, index);
+
+			const threadId = resolved.threadId || newThreadId();
+			updates.push({ emailId: row.emailId, threadId, parentMessageId: resolved.parentMessageId || 0 });
+			indexThreadMessage(index, row, threadId);
+		}
+
+		for (let i = 0; i < updates.length; i += chunkSize) {
+			await writeUpdates(updates.slice(i, i + chunkSize));
+		}
+
+		total += updates.length;
+		onProgress?.(total);
+
+		if (rows.length < pageSize) break;
+	}
+
+	return total;
+}
+
+/**
  * One-off migration: assign `thread_id` to every pre-existing message.
  *
  * Messages are walked oldest → newest so the original of a conversation
  * establishes the key; replies then link back through In-Reply-To /
  * References, with the normalised subject (same user + account) as the
  * compatibility fallback that matches the reader's own grouping.
+ *
+ * The walk is paged by `email_id` and the updates are batched, so a large
+ * mailbox never materialises in one query/response. Re-running is safe: already
+ * assigned rows no longer match `thread_id = ''`.
  */
 export async function backfillThreadIds(c) {
-	const rows = await orm(c)
-		.select({
-			emailId: email.emailId,
-			userId: email.userId,
-			accountId: email.accountId,
-			messageId: email.messageId,
-			inReplyTo: email.inReplyTo,
-			relation: email.relation,
-			subject: email.subject,
-		})
-		.from(email)
-		.where(eq(email.threadId, ''))
-		.orderBy(asc(email.emailId))
-		.all();
+	let pages = 0;
 
-	if (!rows.length) return 0;
+	return runThreadBackfill({
+		readPage: (cursor, limit) => orm(c)
+			.select({
+				emailId: email.emailId,
+				userId: email.userId,
+				accountId: email.accountId,
+				messageId: email.messageId,
+				inReplyTo: email.inReplyTo,
+				relation: email.relation,
+				subject: email.subject,
+			})
+			.from(email)
+			.where(and(
+				eq(email.threadId, ''),
+				gt(email.emailId, cursor),
+			))
+			.orderBy(asc(email.emailId))
+			.limit(limit)
+			.all(),
 
-	const index = createThreadIndex();
-	const updates = [];
-
-	for (const row of rows) {
-		const resolved = resolveThreadKey({
-			userId: row.userId,
-			accountId: row.accountId,
-			messageId: row.messageId,
-			inReplyTo: row.inReplyTo,
-			references: row.relation,
-			subject: row.subject,
-		}, index);
-
-		const threadId = resolved.threadId || newThreadId();
-		updates.push({ emailId: row.emailId, threadId, parentMessageId: resolved.parentMessageId || 0 });
-		indexThreadMessage(index, row, threadId);
-	}
-
-	const chunkSize = 100;
-	for (let i = 0; i < updates.length; i += chunkSize) {
-		const batch = updates.slice(i, i + chunkSize).map(item => c.env.db
+		writeUpdates: (updates) => c.env.db.batch(updates.map(item => c.env.db
 			.prepare('UPDATE email SET thread_id = ?, parent_message_id = ? WHERE email_id = ?')
-			.bind(item.threadId, item.parentMessageId, item.emailId));
-		await c.env.db.batch(batch);
-	}
+			.bind(item.threadId, item.parentMessageId, item.emailId))),
 
-	return updates.length;
+		onProgress: (processed) => {
+			pages++;
+			if (pages % 10 === 0) {
+				console.log(`会话线程回填进度：已处理 ${processed} 封邮件`);
+			}
+		},
+	});
 }
 
 const threadService = {
@@ -316,6 +367,7 @@ const threadService = {
 	resolveThreadKey,
 	resolveThreadForMessage,
 	findExistingMessage,
+	runThreadBackfill,
 	backfillThreadIds,
 };
 

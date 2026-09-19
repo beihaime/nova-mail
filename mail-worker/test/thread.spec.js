@@ -6,6 +6,7 @@ import {
   createThreadIndex,
   indexThreadMessage,
   resolveThreadKey,
+  runThreadBackfill,
 } from '../src/service/thread-service';
 
 function storedRow(overrides) {
@@ -192,5 +193,107 @@ describe('conversation assembly', () => {
     const second = indexRows(first);
 
     expect(second.map(row => row.threadId)).toEqual(first.map(row => row.threadId));
+  });
+});
+
+/**
+ * The migration rewrites every existing row, so it is exercised against an
+ * in-memory stand-in for D1: a table with a `thread_id` column plus the same
+ * paged read / batched write contract the service uses.
+ */
+function fakeTable(seedRows) {
+  // D1 fills the added column with its default, so every row starts unassigned.
+  const rows = seedRows.map(row => ({ threadId: '', parentMessageId: 0, ...row }));
+  let nextId = Math.max(0, ...rows.map(row => row.emailId)) + 1;
+  const batches = [];
+
+  return {
+    rows,
+    batches,
+    insert(row) {
+      rows.push({ ...row, emailId: nextId++, threadId: '' });
+    },
+    async readPage(cursor, limit) {
+      // Mirrors: WHERE thread_id = '' AND email_id > cursor ORDER BY email_id ASC
+      return rows
+        .filter(row => row.threadId === '' && row.emailId > cursor)
+        .sort((a, b) => a.emailId - b.emailId)
+        .slice(0, limit);
+    },
+    async writeUpdates(updates) {
+      batches.push(updates.length);
+      const byId = new Map(updates.map(item => [item.emailId, item]));
+      for (const row of rows) {
+        const update = byId.get(row.emailId);
+        if (!update) continue;
+        row.threadId = update.threadId;
+        row.parentMessageId = update.parentMessageId;
+      }
+    },
+  };
+}
+
+describe('thread backfill migration', () => {
+  function seed() {
+    return [
+      { emailId: 1, userId: 7, accountId: 3, subject: 'Nihao', messageId: '<n1@x>', inReplyTo: '', relation: '' },
+      { emailId: 2, userId: 7, accountId: 3, subject: 'Invoice', messageId: '<i1@x>', inReplyTo: '', relation: '' },
+      { emailId: 3, userId: 7, accountId: 3, subject: 'Re: Nihao', messageId: '<n2@x>', inReplyTo: '<n1@x>', relation: '' },
+      { emailId: 4, userId: 7, accountId: 3, subject: 'Re: Nihao', messageId: '<n3@x>', inReplyTo: '', relation: '<n1@x> <n2@x>' },
+      { emailId: 5, userId: 8, accountId: 9, subject: 'Re: Nihao', messageId: '<other@x>', inReplyTo: '', relation: '' },
+    ];
+  }
+
+  it('assigns one conversation per reply chain and leaves other users alone', async () => {
+    const table = fakeTable(seed());
+
+    const total = await runThreadBackfill(table);
+    expect(total).toBe(5);
+
+    const [root, invoice, reply1, reply2, otherUser] = table.rows;
+    expect(reply1.threadId).toBe(root.threadId);
+    expect(reply2.threadId).toBe(root.threadId);
+    expect(reply1.parentMessageId).toBe(1);
+    // References are newest-last, so the nearest ancestor (<n2@x>, row 3) wins.
+    expect(reply2.parentMessageId).toBe(3);
+    // Same subject in another user's mailbox stays its own conversation.
+    expect(otherUser.threadId).not.toBe(root.threadId);
+    expect(invoice.threadId).not.toBe(root.threadId);
+    expect(table.rows.every(row => row.threadId !== '')).toBe(true);
+  });
+
+  it('keeps a reply linked across a page boundary', async () => {
+    const table = fakeTable(seed());
+
+    // pageSize 2 forces the root and its reply onto different pages.
+    await runThreadBackfill({ ...table, pageSize: 2 });
+
+    const [root, , reply1] = table.rows;
+    expect(reply1.threadId).toBe(root.threadId);
+  });
+
+  it('chunks the writes and never exceeds the batch size', async () => {
+    const rows = Array.from({ length: 250 }, (_, index) => ({
+      emailId: index + 1,
+      userId: 7,
+      accountId: 3,
+      subject: `Thread ${index}`,
+      messageId: `<m${index}@x>`,
+      inReplyTo: '',
+      relation: '',
+    }));
+    const table = fakeTable(rows);
+
+    await runThreadBackfill({ ...table, pageSize: 100, chunkSize: 100 });
+
+    expect(table.batches).toEqual([100, 100, 50]);
+  });
+
+  it('is a no-op when everything is already assigned', async () => {
+    const rows = seed().map((row, index) => ({ ...row, threadId: `t${index}` }));
+    const table = fakeTable(rows);
+
+    expect(await runThreadBackfill(table)).toBe(0);
+    expect(table.batches).toEqual([]);
   });
 });
