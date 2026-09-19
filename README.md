@@ -61,7 +61,7 @@ Nova Mail is a modern web mail client based on the open-source [cloud-mail](http
 - Inbox, sent mail, drafts, starred mail, archive, spam, trash, folders, and search
 - Multiple email addresses per Nova Mail account with address switching and a dedicated address-management page
 - Compose, reply, forward, mark read/unread, star, delete, archive, attachments, and email printing
-- Sanitized rich HTML email rendering and plain-text email support
+- Sanitized rich HTML email rendering, Markdown rendering, and plain-text email support
 - GitHub OAuth login and account linking
 - Google OAuth/OIDC login and account linking
 - Cloudflare Turnstile verification for protected account operations
@@ -69,6 +69,99 @@ Nova Mail is a modern web mail client based on the open-source [cloud-mail](http
 - Cloudflare Email Workers receiving, Resend sending/status webhooks, and R2 attachment storage
 - Optional Telegram forwarding, webhook forwarding, verification-code extraction with Workers AI, and analytics
 - English and Simplified Chinese localization
+
+## Sending HTML and Markdown mail
+
+Nova Mail stores a body type per message and chooses the renderer from it, so a
+message body has to arrive as the right MIME part.
+
+| Body | MIME part | Reader | Inbox row preview |
+| --- | --- | --- | --- |
+| HTML | `text/html` | sanitized, then rendered in a sandboxed iframe | plain text, tags stripped |
+| Markdown | `text/markdown` | markdown-it, sanitized, hardened links | markdown flattened to one line |
+| Plain text | `text/plain` | escaped | used as-is |
+
+Rules:
+
+- Keep `Content-Type` in the **message headers**, followed by one blank line and
+  then the body. Never paste a whole raw message (with `MIME-Version:` /
+  `Content-Type:`) into the body of another mail — Nova unwraps a nested raw
+  message both on ingest and at read time, but sending it properly is better.
+- Prefer `multipart/alternative` with the `text/plain` part first: the row preview
+  uses it and the reader renders the `text/html` part.
+- `text/markdown` is not a body type Postal MIME knows, so the part arrives as an
+  attachment; Nova lifts it back into the body and drops it from the attachment
+  list, so it is never offered as a "body.md" file.
+- Markdown that arrives in a `text/plain` part (or with no `Content-Type`) is
+  detected from strong signals only — an ATX heading, a code fence or a real
+  markdown link — and rendered as markdown. `2 * 3 = 6` and
+  `- sent from my phone` stay plain text.
+- Remote images are blocked until the reader taps "Show images"; links are
+  sanitized and hardened. Inline CSS and table layout are the reliable way to
+  style an HTML mail — `<script>`, event handlers, external stylesheets and
+  `javascript:` URLs are stripped.
+
+### HTML mail
+
+```text
+From: Tester <tester@example.com>
+To: you@yourdomain.com
+Subject: HTML test
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="nova-demo"
+
+--nova-demo
+Content-Type: text/plain; charset=utf-8
+
+Hello from Nova Mail
+
+--nova-demo
+Content-Type: text/html; charset=utf-8
+
+<!DOCTYPE html>
+<html>
+  <body style="margin:0;padding:24px;font-family:-apple-system,'PingFang SC',sans-serif;color:#1c1c1e;">
+    <h1 style="margin:0 0 12px;font-size:22px;">Hello from Nova Mail</h1>
+    <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">This is an <strong>HTML</strong> mail with a <a href="https://example.com" style="color:#247cff;">link</a>.</p>
+    <a href="https://example.com" style="display:inline-block;padding:10px 18px;border-radius:10px;background:#247cff;color:#ffffff;text-decoration:none;">Open example.com</a>
+  </body>
+</html>
+--nova-demo--
+```
+
+A single-part mail is enough when there is no plain-text alternative:
+
+```text
+From: Tester <tester@example.com>
+To: you@yourdomain.com
+Subject: HTML test
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+
+<!DOCTYPE html>
+<html>
+  <body style="margin:0;padding:24px;font-family:-apple-system,'PingFang SC',sans-serif;color:#1c1c1e;">
+    <p style="margin:0;font-size:15px;line-height:1.6;">Hello from <strong>Nova Mail</strong>.</p>
+  </body>
+</html>
+```
+
+### Markdown mail
+
+```text
+From: Tester <tester@example.com>
+To: you@yourdomain.com
+Subject: Markdown test
+MIME-Version: 1.0
+Content-Type: text/markdown; charset=utf-8
+
+# Hello
+
+**Bold** text with a [link](https://example.com).
+```
+
+The reader renders the headings, emphasis, links, tables and code blocks; the
+Inbox row shows `Hello Bold text with a link.`
 
 ## Tech stack
 

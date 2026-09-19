@@ -66,7 +66,7 @@ Nova Mail 是一个现代化 Web 邮件客户端，基于开源项目 [maillab/c
 - 支持收件箱、已发送、草稿、星标、归档、垃圾邮件、回收站、自定义文件夹和搜索
 - 一个 Nova Mail 账户绑定多个邮箱地址，并支持地址切换和独立的地址管理页面
 - 支持写信、回复、转发、标记已读/未读、星标、删除、归档、附件和邮件打印
-- 使用 sanitizer 安全渲染富 HTML 邮件，同时支持纯文本邮件
+- 使用 sanitizer 安全渲染富 HTML 邮件，支持 Markdown 渲染，同时支持纯文本邮件
 - 支持 GitHub OAuth 登录和账户绑定
 - 支持 Google OAuth/OIDC 登录和账户绑定
 - 对受保护的账户操作使用 Cloudflare Turnstile 验证
@@ -74,6 +74,85 @@ Nova Mail 是一个现代化 Web 邮件客户端，基于开源项目 [maillab/c
 - 使用 Cloudflare Email Workers 接收邮件，使用 Resend 发送邮件并接收状态 webhook，使用 R2 保存附件
 - 可选的 Telegram 转发、Webhook 转发、Workers AI 验证码提取和分析功能
 - English 和简体中文本地化
+
+## HTML 与 Markdown 邮件
+
+Nova Mail 按每封邮件存储的 body type 选择渲染方式，所以正文必须以正确的 MIME part 发送。
+
+| 正文 | MIME 类型 | 详情页 | 列表预览 |
+| --- | --- | --- | --- |
+| HTML | `text/html` | 净化后放进沙箱 iframe 渲染 | 纯文本，剥掉标签 |
+| Markdown | `text/markdown` | markdown-it 渲染、净化、链接硬化 | markdown 展平为单行 |
+| 纯文本 | `text/plain` | 转义显示 | 原样显示 |
+
+规则：
+
+- `Content-Type` 必须写在**邮件头**里，后面留一个空行再写正文。不要把整封原始邮件（含 `MIME-Version:` / `Content-Type:`）粘进另一封邮件的正文——Nova 会在收信和读取时自动解包，但按规范发送更好。
+- 推荐使用 `multipart/alternative`，并让 `text/plain` 部分在前：列表预览用它，详情页渲染 `text/html` 部分。
+- `text/markdown` 不是 Postal MIME 认识的类型，会先落到附件里；Nova 会把它取回正文并从附件列表移除，所以不会出现莫名其妙的 `body.md` 附件。
+- 以 `text/plain`（或没有 `Content-Type`）到达的 markdown，只有在出现强信号时才会被识别为 markdown——ATX 标题、代码围栏、真实的 markdown 链接——然后按 markdown 渲染。`2 * 3 = 6`、`- sent from my phone` 仍按纯文本处理。
+- 远程图片默认拦截，读者点「显示图片」后才加载；链接会净化并硬化。HTML 邮件请使用内联样式和表格布局——`<script>`、事件属性、外链样式表和 `javascript:` 链接都会被清洗掉。
+
+### HTML 邮件
+
+```text
+From: Tester <tester@example.com>
+To: you@yourdomain.com
+Subject: HTML test
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="nova-demo"
+
+--nova-demo
+Content-Type: text/plain; charset=utf-8
+
+Hello from Nova Mail
+
+--nova-demo
+Content-Type: text/html; charset=utf-8
+
+<!DOCTYPE html>
+<html>
+  <body style="margin:0;padding:24px;font-family:-apple-system,'PingFang SC',sans-serif;color:#1c1c1e;">
+    <h1 style="margin:0 0 12px;font-size:22px;">Hello from Nova Mail</h1>
+    <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">这是一封 <strong>HTML</strong> 邮件，带一个 <a href="https://example.com" style="color:#247cff;">链接</a>。</p>
+    <a href="https://example.com" style="display:inline-block;padding:10px 18px;border-radius:10px;background:#247cff;color:#ffffff;text-decoration:none;">打开 example.com</a>
+  </body>
+</html>
+--nova-demo--
+```
+
+没有纯文本备选时，单部分邮件也够用：
+
+```text
+From: Tester <tester@example.com>
+To: you@yourdomain.com
+Subject: HTML test
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+
+<!DOCTYPE html>
+<html>
+  <body style="margin:0;padding:24px;font-family:-apple-system,'PingFang SC',sans-serif;color:#1c1c1e;">
+    <p style="margin:0;font-size:15px;line-height:1.6;">你好，这是 <strong>Nova Mail</strong> 的 HTML 邮件。</p>
+  </body>
+</html>
+```
+
+### Markdown 邮件
+
+```text
+From: Tester <tester@example.com>
+To: you@yourdomain.com
+Subject: Markdown test
+MIME-Version: 1.0
+Content-Type: text/markdown; charset=utf-8
+
+# Hello
+
+**Bold** text with a [link](https://example.com).
+```
+
+详情页会渲染标题、强调、链接、表格和代码块；列表里显示 `Hello Bold text with a link.`
 
 ## 技术栈
 
