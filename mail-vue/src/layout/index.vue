@@ -157,6 +157,10 @@ onBeforeUnmount(() => {
   min-height: 100%;
   background: var(--el-bg-color);
   overflow-y: auto;
+  /* `overflow-y: auto` promotes the `visible` x-axis to `auto` per CSS, which
+     turns this scroll port into a horizontal scroller. The app shell is a fixed
+     one-column layout, so the page must never scroll sideways. */
+  overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
 }
 

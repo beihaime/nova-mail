@@ -14,12 +14,16 @@ html, body {
        and stop the rubber-band overscroll that reveals the page behind it. */
     height: 100dvh;
     overscroll-behavior: none;
+    /* Last-resort guard: the shell is a fixed one-column layout, so a phone must
+       never be able to pan the document sideways. */
+    overflow-x: hidden;
 }
 
 #app {
     width: 100%;
     height: 100%;
     height: 100dvh;
+    overflow-x: hidden;
 }
 
 :deep(.el-input__inner:focus) {
@@ -324,6 +328,18 @@ html[data-theme-to="light"]::view-transition-old(root) {
   .el-header .search-shell,
   .header .search-shell {
     display: none !important;
+  }
+
+  /* Element Plus overlays ship desktop widths (dialog 50%, message box 420px,
+     change-password 340px). Cap them to the phone viewport so an opened overlay
+     can never exceed the screen. */
+  .el-dialog {
+    max-width: calc(100vw - 32px);
+  }
+
+  .el-message-box {
+    width: min(420px, calc(100vw - 32px)) !important;
+    max-width: calc(100vw - 32px);
   }
 }
 

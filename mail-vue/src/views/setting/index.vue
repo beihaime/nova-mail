@@ -587,6 +587,12 @@ function submitPwd() {
 </script>
 <style scoped lang="scss">
 .box {
+  /* The page owns its width so long account names / emails can never stretch it
+     past the viewport; content shrinks instead (see min-width: 0 below). */
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   padding: 40px 40px;
 
   @media (max-width: 767px) {
@@ -612,13 +618,23 @@ function submitPwd() {
 
     .item {
       display: grid;
-      grid-template-columns: 50px 1fr;
+      grid-template-columns: 50px minmax(0, 1fr);
       gap: 140px;
       position: relative;
+      /* Grid items default to `min-width: auto`, so a nowrap value (user name,
+         email) would ratchet the column open and widen the whole page. */
+      min-width: 0;
+
+      > div {
+        min-width: 0;
+      }
+
       .user-name {
         display: grid;
-        grid-template-columns: auto 1fr;
+        grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+        min-width: 0;
         span:first-child {
+          min-width: 0;
           overflow: hidden;
           white-space: nowrap;
           text-overflow: ellipsis;
@@ -640,7 +656,7 @@ function submitPwd() {
       }
 
       @media (max-width: 767px) {
-        gap: 70px;
+        gap: 24px;
       }
 
       div:first-child {
@@ -680,13 +696,27 @@ function submitPwd() {
       padding: 14px 16px;
       border: 1px solid var(--el-border-color-lighter);
       border-radius: 12px;
+      min-width: 0;
     }
 
     .connected-account-details {
       min-width: 0;
+      flex: 1 1 auto;
       display: flex;
       align-items: center;
       gap: 12px;
+
+      /* The text column must be allowed to shrink; the provider mark keeps its
+         own size via grid place-items. */
+      > div {
+        min-width: 0;
+      }
+    }
+
+    /* The action button keeps its full label — it must never be squeezed or
+       pushed off-screen by a long provider handle. */
+    .connected-account-row :deep(.el-button) {
+      flex: 0 0 auto;
     }
 
     .github-mark {
@@ -711,7 +741,20 @@ function submitPwd() {
     .google-mark { background: var(--el-bg-color); }
 
     .provider-name { font-weight: 600; }
-    .provider-status { color: var(--el-text-color-secondary); font-size: 13px; margin-top: 2px; }
+    .provider-status {
+      color: var(--el-text-color-secondary);
+      font-size: 13px;
+      margin-top: 2px;
+    }
+
+    @media (max-width: 767px) {
+      .provider-status {
+        min-width: 0;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+      }
+    }
   }
 
   .del-email {
@@ -739,6 +782,7 @@ function submitPwd() {
     padding: 14px 16px;
     border: 1px solid var(--el-border-color-lighter);
     border-radius: 12px;
+    min-width: 0;
   }
 
   .notification-label { min-width: 0; }
@@ -759,6 +803,11 @@ function submitPwd() {
     display: flex;
     align-items: center;
     gap: 10px;
+    min-width: 0;
+  }
+
+  .notification-actions :deep(.el-button) {
+    flex: 0 0 auto;
   }
 
   .notification-select { width: 150px; }
@@ -809,6 +858,14 @@ function submitPwd() {
     cursor: pointer;
   }
 
+  /* The label may truncate, but the three options always stay on one row. */
+  .theme-option > span:last-child {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
   .theme-option:hover {
     border-color: color-mix(
       in srgb,
@@ -851,12 +908,24 @@ function submitPwd() {
     .theme-options {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
     }
 
+    /* Three options must stay on one row even at 320px: at that width the
+       widest label ("System" / "跟随系统") only fits with a smaller preview,
+       tighter padding and slightly smaller type. */
     .theme-option {
       min-width: 0;
       justify-content: center;
-      padding-inline: 7px;
+      padding-inline: 5px;
+      gap: 6px;
+      font-size: 13px;
+    }
+
+    .theme-preview {
+      width: 18px;
+      height: 18px;
+      flex: 0 0 18px;
     }
   }
 

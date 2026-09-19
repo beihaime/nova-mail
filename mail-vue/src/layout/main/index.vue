@@ -158,7 +158,11 @@ const handleResize = () => {
 .main-box-hide {
   position: relative;
   display: grid;
-  grid-template-columns: 1fr;
+  /* minmax(0, 1fr), not 1fr: a plain `1fr` track keeps an `auto` minimum, so a
+     page whose content has a large min-content width (long account names,
+     connected-account rows) stretches the track past the viewport and the page
+     becomes horizontally draggable. */
+  grid-template-columns: minmax(0, 1fr);
   height: calc(100% - 60px);
 }
 
@@ -190,6 +194,7 @@ const handleResize = () => {
 
 
 .main-view {
+  min-width: 0;
   background: var(--el-bg-color);
   animation: nova-view-in var(--nova-motion-base) var(--nova-motion-ease) both;
 }
