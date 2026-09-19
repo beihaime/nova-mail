@@ -273,6 +273,11 @@ jobs:
       # disables the 邮件通知 switch ("服务端未配置"). They are uploaded as Worker
       # secrets rather than `[vars]`, so they never reach the deploy summary.
       # Rotating the pair invalidates every existing subscription.
+      # This step must never fail the run. The Worker is already deployed at this
+      # point, and Cloudflare can refuse a secret edit outright
+      # ("the latest version of your Worker isn't currently deployed") whenever the
+      # account holds an undeployed version. A red X here used to skip the database
+      # initialization below, which is far worse than a stale key pair.
       - name: 🔔 配置推送密钥 / Configure Web Push keys
         working-directory: ./mail-worker
         run: |
@@ -281,23 +286,29 @@ jobs:
             exit 0
           fi
           
-          printf '%s' "$VAPID_PUBLIC_KEY"  | pnpm wrangler secret put vapid_public_key  -c wrangler-action.toml
-          printf '%s' "$VAPID_PRIVATE_KEY" | pnpm wrangler secret put vapid_private_key -c wrangler-action.toml
+          upload() {
+            local name="$1" value="$2"
+            if printf '%s' "$value" | pnpm wrangler secret put "$name" -c wrangler-action.toml; then
+              echo "✅ uploaded $name"
+            else
+              # Known causes: a name already used by a plain Worker variable, or an
+              # undeployed version on the account. Either way the value that is
+              # already on the Worker is kept, so this is a warning, not a failure.
+              echo "::warning::could not upload $name — keeping whatever the Worker already has (see the error above)."
+            fi
+          }
           
-          # `vapid_subject` may already exist as a plain Worker variable (set in
-          # the dashboard), and a secret cannot share a name with a variable.
-          # That is not an error — the Worker only needs the value to be present.
-          printf '%s' "${VAPID_SUBJECT:-mailto:admin@example.com}" \
-            | pnpm wrangler secret put vapid_subject -c wrangler-action.toml \
-            || echo "::notice::vapid_subject already exists as a Worker variable; leaving it unchanged."
+          upload vapid_public_key "$VAPID_PUBLIC_KEY"
+          upload vapid_private_key "$VAPID_PRIVATE_KEY"
+          upload vapid_subject "${VAPID_SUBJECT:-mailto:admin@example.com}"
           
           echo "--- Worker secret names ---"
-          pnpm wrangler secret list -c wrangler-action.toml
+          pnpm wrangler secret list -c wrangler-action.toml || true
           
           if pnpm wrangler secret list -c wrangler-action.toml 2>/dev/null | grep -q vapid_public_key; then
             echo "✅ VAPID keys are on the Worker."
           else
-            echo "::warning::vapid_public_key is missing from the Worker."
+            echo "::warning::vapid_public_key is not on the Worker; Web Push will report itself unavailable."
           fi
 
       - name: ♻️ 初始化数据库 / Initialize database
