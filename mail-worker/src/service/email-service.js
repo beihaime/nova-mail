@@ -639,6 +639,18 @@ const emailService = {
 
 		emailData.recipient = JSON.stringify(recipient);
 
+		// Every message belongs to a conversation. This is assigned here too — a
+		// mail the user starts is the root of a new thread, and without a key the
+		// reply that eventually arrives (whose In-Reply-To we cannot match, since
+		// outbound Message-IDs are provider generated) would open a second one.
+		const threadHeaders = {
+			userId,
+			subject,
+			sendEmail: accountRow.email,
+			toEmail: receiveEmail[0] || '',
+			recipient,
+		};
+
 		if (sendType === 'reply') {
 			emailData.inReplyTo = emailRow.messageId;
 			emailData.relation = emailRow.messageId;
@@ -648,17 +660,28 @@ const emailService = {
 			// sent before the v3.6 migration runs simply has no thread key.
 			try {
 				const thread = await threadService.resolveThreadForMessage(c, {
-					userId,
-					accountId,
+					...threadHeaders,
 					messageId: '',
 					inReplyTo: emailRow.messageId,
 					references: emailRow.messageId,
-					subject,
 					threadId: emailRow.threadId,
 					parentMessageId: emailRow.emailId
 				});
 				emailData.threadId = thread.threadId || emailRow.threadId || threadService.newThreadId();
 				emailData.parentMessageId = thread.parentMessageId || Number(emailRow.emailId) || 0;
+			} catch (error) {
+				if (!threadService.isMissingThreadColumn(error)) throw error;
+			}
+		} else {
+			// New outbound mail: start its own conversation, unless it is a
+			// continuation the headers/subject can already place.
+			try {
+				const thread = await threadService.resolveThreadForMessage(c, {
+					...threadHeaders,
+					messageId: '',
+				});
+				emailData.threadId = thread.threadId || threadService.newThreadId();
+				emailData.parentMessageId = thread.parentMessageId || 0;
 			} catch (error) {
 				if (!threadService.isMissingThreadColumn(error)) throw error;
 			}
@@ -988,11 +1011,13 @@ const emailService = {
 			try {
 				const thread = await threadService.resolveThreadForMessage(c, {
 					userId: emailData.userId,
-					accountId: emailData.accountId,
 					messageId: emailData.messageId,
 					inReplyTo: emailData.inReplyTo,
 					references: emailData.relation,
-					subject: emailData.subject
+					subject: emailData.subject,
+					sendEmail: emailData.sendEmail,
+					toEmail: emailData.toEmail,
+					recipient: emailData.recipient
 				});
 				emailData.threadId = thread.threadId || threadService.newThreadId();
 				emailData.parentMessageId = thread.parentMessageId || 0;

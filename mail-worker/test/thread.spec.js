@@ -19,6 +19,9 @@ function storedRow(overrides) {
     messageId: '<root@mail.example>',
     inReplyTo: '',
     relation: '',
+    sendEmail: 'dev@beihaime.com',
+    toEmail: 'root@beihaime.com',
+    recipient: JSON.stringify([{ address: 'root@beihaime.com', name: '' }]),
     ...overrides,
   };
 }
@@ -112,33 +115,11 @@ describe('thread resolution priority', () => {
       accountId: 3,
       inReplyTo: '<parent@x>',
       subject: 'Nihao',
+      sendEmail: 'dev@beihaime.com',
+      toEmail: 'root@beihaime.com',
     }, index);
 
     expect(resolved.threadId).toBe('header-thread');
-  });
-
-  it('uses the normalised subject as the last resort, same user + account only', () => {
-    const index = createThreadIndex();
-    indexThreadMessage(index, storedRow({ emailId: 1, subject: 'Nihao' }), 't1');
-
-    expect(resolveThreadKey({
-      userId: 7,
-      accountId: 3,
-      subject: 'Re: Nihao',
-    }, index).threadId).toBe('t1');
-
-    // Another account (or user) with the same subject must not be merged.
-    expect(resolveThreadKey({
-      userId: 7,
-      accountId: 99,
-      subject: 'Re: Nihao',
-    }, index).threadId).toBe('');
-
-    expect(resolveThreadKey({
-      userId: 8,
-      accountId: 3,
-      subject: 'Re: Nihao',
-    }, index).threadId).toBe('');
   });
 
   it('reports "no parent" so the caller can start a new conversation', () => {
@@ -150,6 +131,8 @@ describe('thread resolution priority', () => {
       accountId: 3,
       inReplyTo: '<unknown@x>',
       subject: 'Totally different',
+      sendEmail: 'dev@beihaime.com',
+      toEmail: 'root@beihaime.com',
     }, index)).toEqual({ threadId: '', parentMessageId: 0 });
   });
 
@@ -164,6 +147,79 @@ describe('thread resolution priority', () => {
     expect(assigned[1].threadId).toBe('thread-2');
     expect(assigned[2].threadId).toBe('thread-1');
     expect(assigned[2].parentMessageId).toBe(1);
+  });
+});
+
+/**
+ * Subject is the last resort, so it has to be both useful (the user's own
+ * addresses are separate accounts) and conservative (unrelated mail often
+ * reuses a subject). Hence: per user, and only with a shared participant.
+ */
+describe('subject fallback', () => {
+  const conversation = {
+    sendEmail: 'dev@beihaime.com',
+    toEmail: 'root@beihaime.com',
+    recipient: JSON.stringify([{ address: 'root@beihaime.com', name: '' }]),
+  };
+
+  it('merges a reply that arrived at a different account of the same user', () => {
+    const index = createThreadIndex();
+    indexThreadMessage(index, storedRow({
+      emailId: 1, userId: 7, accountId: 2, subject: '邮件1', ...conversation,
+    }), 't1');
+
+    // Same people, different mailbox (accountId 10) — the exact case that used
+    // to open a second conversation.
+    expect(resolveThreadKey({
+      userId: 7, accountId: 10, subject: 'Re: 邮件1', ...conversation,
+    }, index).threadId).toBe('t1');
+  });
+
+  it('merges when the counterpart address crosses from to_email to send_email', () => {
+    const index = createThreadIndex();
+    // Sent by the user to an external address.
+    indexThreadMessage(index, storedRow({
+      emailId: 1, userId: 7, accountId: 2, subject: 'Hello',
+      sendEmail: 'me@beihaime.com',
+      toEmail: 'friend@gmail.com',
+      recipient: JSON.stringify([{ address: 'friend@gmail.com' }]),
+    }), 't1');
+
+    // The external reply: same subject, participants mirrored.
+    expect(resolveThreadKey({
+      userId: 7, accountId: 2, subject: 'Re: Hello',
+      sendEmail: 'friend@gmail.com',
+      toEmail: 'me@beihaime.com',
+      recipient: JSON.stringify([{ address: 'me@beihaime.com' }]),
+    }, index).threadId).toBe('t1');
+  });
+
+  it('never merges mail that only shares a subject', () => {
+    const index = createThreadIndex();
+    indexThreadMessage(index, storedRow({
+      emailId: 1, userId: 7, accountId: 2, subject: 'Invoice',
+      sendEmail: 'billing@shop-a.com',
+      toEmail: 'me@beihaime.com',
+      recipient: JSON.stringify([{ address: 'me@beihaime.com' }]),
+    }), 't1');
+
+    expect(resolveThreadKey({
+      userId: 7, accountId: 2, subject: 'Invoice',
+      sendEmail: 'billing@shop-b.com',
+      toEmail: 'other@beihaime.com',
+      recipient: JSON.stringify([{ address: 'other@beihaime.com' }]),
+    }, index).threadId).toBe('');
+  });
+
+  it('never merges across users', () => {
+    const index = createThreadIndex();
+    indexThreadMessage(index, storedRow({
+      emailId: 1, userId: 7, accountId: 2, subject: 'Nihao', ...conversation,
+    }), 't1');
+
+    expect(resolveThreadKey({
+      userId: 8, accountId: 2, subject: 'Re: Nihao', ...conversation,
+    }, index).threadId).toBe('');
   });
 });
 
@@ -307,5 +363,44 @@ describe('thread backfill migration', () => {
 
     expect(await runThreadBackfill(table)).toBe(0);
     expect(table.batches).toEqual([]);
+  });
+
+  /**
+   * Regression for the reported Inbox duplicate: an on-site conversation
+   * between two of the same user's addresses, where every message has an empty
+   * Message-ID (outbound ids are provider generated, so the recipient copy has
+   * nothing to link on) and the two sides live in different accounts.
+   */
+  it('groups one on-site conversation that spans two accounts', async () => {
+    const dev = 'beihaime-dev@beihaime.com';
+    const root = 'root@beihaime.com';
+    const table = fakeTable([
+      {
+        emailId: 241, userId: 2, accountId: 2, subject: '邮件1',
+        messageId: '', inReplyTo: '', relation: '',
+        sendEmail: root, toEmail: dev, recipient: JSON.stringify([{ address: dev }]),
+      },
+      {
+        emailId: 242, userId: 2, accountId: 10, subject: '邮件1',
+        messageId: '', inReplyTo: '', relation: '',
+        sendEmail: root, toEmail: dev, recipient: JSON.stringify([{ address: dev }]),
+      },
+      {
+        emailId: 243, userId: 2, accountId: 10, subject: 'Re: 邮件1',
+        messageId: '', inReplyTo: '', relation: '',
+        sendEmail: dev, toEmail: root, recipient: JSON.stringify([{ address: root }]),
+      },
+      {
+        emailId: 244, userId: 2, accountId: 2, subject: 'Re: 邮件1',
+        messageId: '', inReplyTo: '', relation: '',
+        sendEmail: dev, toEmail: root, recipient: JSON.stringify([{ address: root }]),
+      },
+    ]);
+
+    await runThreadBackfill(table);
+
+    const threads = new Set(table.rows.map(row => row.threadId));
+    expect(threads.size).toBe(1);
+    expect(table.rows.every(row => row.threadId !== '')).toBe(true);
   });
 });

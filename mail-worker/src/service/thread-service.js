@@ -94,6 +94,55 @@ export function createThreadIndex() {
 	return { byMessageId: new Map(), bySubject: new Map() };
 }
 
+// Bound on how many participants/siblings a subject bucket keeps in memory.
+const SUBJECT_BUCKET_LIMIT = 50;
+
+/**
+ * Every address a stored message involves: sender, delivered recipient and the
+ * `recipient` list. Used to keep the subject fallback from merging unrelated
+ * conversations that merely share a subject.
+ */
+export function messageAddresses(raw) {
+	const addresses = new Set();
+
+	const push = (value) => {
+		const address = String(value || '').trim().toLowerCase();
+		if (address) addresses.add(address);
+	};
+
+	push(raw?.sendEmail);
+	push(raw?.toEmail);
+
+	const list = raw?.recipient;
+	let parsed = list;
+
+	if (typeof list === 'string') {
+		try {
+			parsed = JSON.parse(list);
+		} catch {
+			parsed = null;
+		}
+	}
+
+	if (Array.isArray(parsed)) {
+		for (const item of parsed) {
+			push(typeof item === 'string' ? item : item?.address);
+		}
+	}
+
+	return addresses;
+}
+
+/** True when the two address sets share at least one participant. */
+export function sharesParticipant(left, right) {
+	if (!left?.size || !right?.size) return false;
+	const [small, large] = left.size <= right.size ? [left, right] : [right, left];
+	for (const address of small) {
+		if (large.has(address)) return true;
+	}
+	return false;
+}
+
 /** Register a stored message so later messages can link back to it. */
 export function indexThreadMessage(index, row, threadId) {
 	const messageId = normalizeMessageId(row?.messageId);
@@ -103,10 +152,17 @@ export function indexThreadMessage(index, row, threadId) {
 
 	const subjectKey = threadSubjectKey(row?.subject);
 	if (subjectKey) {
-		const key = `${row.userId ?? 0}|${row.accountId ?? 0}|${subjectKey}`;
-		if (!index.bySubject.has(key)) {
-			index.bySubject.set(key, { threadId, emailId: Number(row.emailId) || 0 });
-		}
+		// Subject buckets are per user (not per account): a conversation can span
+		// several of the user's addresses. Participant overlap keeps it honest.
+		const key = `${row.userId ?? 0}|${subjectKey}`;
+		const bucket = index.bySubject.get(key) || [];
+		bucket.push({
+			threadId,
+			emailId: Number(row.emailId) || 0,
+			addresses: messageAddresses(row),
+		});
+		if (bucket.length > SUBJECT_BUCKET_LIMIT) bucket.shift();
+		index.bySubject.set(key, bucket);
 	}
 }
 
@@ -134,11 +190,21 @@ export function resolveThreadKey(headers, index) {
 		if (hit) return { threadId: hit.threadId, parentMessageId: hit.emailId };
 	}
 
-	// Priority 4: normalised subject, same user + account only.
+	// Priority 4: normalised subject, same user only (a conversation can span
+	// several of the user's addresses), and only when the two messages actually
+	// share a participant — otherwise two unrelated "Invoice" mails would merge.
 	const subjectKey = threadSubjectKey(headers?.subject);
 	if (subjectKey) {
-		const hit = bySubject.get(`${headers?.userId ?? 0}|${headers?.accountId ?? 0}|${subjectKey}`);
-		if (hit) return { threadId: hit.threadId, parentMessageId: 0 };
+		const bucket = bySubject.get(`${headers?.userId ?? 0}|${subjectKey}`);
+		if (bucket?.length) {
+			const wanted = messageAddresses(headers);
+			// Newest sibling first: the most recent matching conversation wins.
+			for (let i = bucket.length - 1; i >= 0; i--) {
+				if (sharesParticipant(wanted, bucket[i].addresses)) {
+					return { threadId: bucket[i].threadId, parentMessageId: 0 };
+				}
+			}
+		}
 	}
 
 	return { threadId: '', parentMessageId: 0 };
@@ -173,14 +239,13 @@ async function selectByMessageIds(c, userId, ids) {
  * Live resolution for an incoming (or locally generated) message.
  *
  * @param {object} c request context (D1 binding)
- * @param {{userId:number, accountId:number, messageId?:string, inReplyTo?:string,
- *          references?:string, subject?:string, threadId?:string,
- *          parentMessageId?:number}} headers
+ * @param {{userId:number, messageId?:string, inReplyTo?:string, references?:string,
+ *          subject?:string, threadId?:string, parentMessageId?:number,
+ *          sendEmail?:string, toEmail?:string, recipient?:string|Array}} headers
  * @returns {Promise<{threadId: string, parentMessageId: number}>}
  */
 export async function resolveThreadForMessage(c, headers) {
 	const userId = Number(headers?.userId) || 0;
-	const accountId = Number(headers?.accountId) || 0;
 
 	if (userId) {
 		const candidates = [];
@@ -212,23 +277,35 @@ export async function resolveThreadForMessage(c, headers) {
 		};
 	}
 
-	// Priority 4: subject fallback over the most recent messages of this
-	// user + account. Bounded so a huge mailbox never scans everything.
+	// Priority 4: subject fallback over the user's most recent messages. It is
+	// deliberately per user (a conversation can span several of the user's
+	// addresses) and still requires a shared participant, so unrelated mail that
+	// merely reuses a subject never merges.
 	const subjectKey = threadSubjectKey(headers?.subject);
 	if (userId && subjectKey) {
 		const recent = await orm(c)
-			.select({ emailId: email.emailId, threadId: email.threadId, subject: email.subject })
+			.select({
+				emailId: email.emailId,
+				threadId: email.threadId,
+				subject: email.subject,
+				sendEmail: email.sendEmail,
+				toEmail: email.toEmail,
+				recipient: email.recipient,
+			})
 			.from(email)
 			.where(and(
 				eq(email.userId, userId),
-				eq(email.accountId, accountId),
 				eq(email.isDel, isDel.NORMAL),
 			))
 			.orderBy(desc(email.emailId))
-			.limit(50)
+			.limit(100)
 			.all();
 
-		const hit = recent.find(row => threadSubjectKey(row.subject) === subjectKey);
+		const wanted = messageAddresses(headers);
+		const hit = recent.find(row =>
+			threadSubjectKey(row.subject) === subjectKey
+			&& sharesParticipant(wanted, messageAddresses(row))
+		);
 
 		if (hit) {
 			return {
@@ -294,14 +371,12 @@ export async function runThreadBackfill({
 		const updates = [];
 
 		for (const row of rows) {
-			// `relation` holds the References header; the resolver accepts either.
+			// Spread the row so the resolver also sees the participant columns
+			// (sendEmail / toEmail / recipient) that the subject fallback needs;
+			// `relation` holds the References header.
 			const resolved = resolveThreadKey({
-				userId: row.userId,
-				accountId: row.accountId,
-				messageId: row.messageId,
-				inReplyTo: row.inReplyTo,
+				...row,
 				references: row.relation,
-				subject: row.subject,
 			}, index);
 
 			const threadId = resolved.threadId || newThreadId();
@@ -347,6 +422,10 @@ export async function backfillThreadIds(c) {
 				inReplyTo: email.inReplyTo,
 				relation: email.relation,
 				subject: email.subject,
+				// Needed by the subject fallback's participant check.
+				sendEmail: email.sendEmail,
+				toEmail: email.toEmail,
+				recipient: email.recipient,
 			})
 			.from(email)
 			.where(and(
@@ -375,8 +454,11 @@ const threadService = {
 	normalizeMessageId,
 	parseMessageIdList,
 	newThreadId,
+	isMissingThreadColumn,
 	createThreadIndex,
 	indexThreadMessage,
+	messageAddresses,
+	sharesParticipant,
 	resolveThreadKey,
 	resolveThreadForMessage,
 	findExistingMessage,
