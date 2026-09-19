@@ -28,6 +28,9 @@ jobs:
       AI_MODEL: ${{ secrets.AI_MODEL || vars.AI_MODEL || '@cf/meta/llama-3.1-8b-instruct-fast' }}
       CLOUDFLARE_EMAIL: ${{ secrets.CF_EMAIL || vars.CF_EMAIL || false }}
       ANALYSIS_CACHE: ${{ secrets.ANALYSIS_CACHE || vars.ANALYSIS_CACHE || false }}
+      VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY || vars.VAPID_PUBLIC_KEY }}
+      VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY || vars.VAPID_PRIVATE_KEY }}
+      VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT || vars.VAPID_SUBJECT }}
 
 
     outputs:
@@ -242,10 +245,13 @@ jobs:
         working-directory: ./mail-worker
         run: |
           echo "🚀 Starting deployment..."
+          # The deploy summary prints every `[vars]` entry. `domain` and
+          # `jwt_secret` are both credentials in this repository's configuration,
+          # and the logs of a public repository are public, so mask them.
           pnpm wrangler deploy -c wrangler-action.toml 2>&1 \
             | tee deploy.log \
             | grep -v "https://.*\.workers\.dev" \
-            | sed -E 's/env\.domain .*/env.domain (***)/' \
+            | sed -E -e 's/env\.domain .*/env.domain (***)/' -e 's/env\.jwt_secret .*/env.jwt_secret (***)/' \
             || true
           
           DEPLOY_EXIT_CODE=${PIPESTATUS[0]}
@@ -261,6 +267,26 @@ jobs:
           
           echo "worker_url=$WORKER_URL" >> $GITHUB_OUTPUT
           echo "✅ Setup completed."
+
+      # Web Push only works when the Worker holds a VAPID key pair; without it
+      # `GET /api/push/config` reports `enabled: false` and the settings page
+      # disables the 邮件通知 switch ("服务端未配置"). They are uploaded as Worker
+      # secrets rather than `[vars]`, so they never reach the deploy summary.
+      # Rotating the pair invalidates every existing subscription.
+      - name: 🔔 配置推送密钥 / Configure Web Push keys
+        working-directory: ./mail-worker
+        run: |
+          if [ -z "$VAPID_PUBLIC_KEY" ] || [ -z "$VAPID_PRIVATE_KEY" ]; then
+            echo "::warning::VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY are not set; Web Push stays unavailable."
+            exit 0
+          fi
+          
+          printf '%s' "$VAPID_PUBLIC_KEY"  | pnpm wrangler secret put vapid_public_key  -c wrangler-action.toml
+          printf '%s' "$VAPID_PRIVATE_KEY" | pnpm wrangler secret put vapid_private_key -c wrangler-action.toml
+          printf '%s' "${VAPID_SUBJECT:-mailto:admin@example.com}" \
+            | pnpm wrangler secret put vapid_subject -c wrangler-action.toml
+          
+          echo "✅ VAPID keys uploaded."
 
       - name: ♻️ 初始化数据库 / Initialize database
         run: |
