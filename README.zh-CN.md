@@ -217,7 +217,75 @@ cd mail-worker
 pnpm deploy
 ```
 
-部署前请检查所选 Wrangler 配置、D1 和 KV bindings、Static Assets 目录、自定义域名以及所需 secrets。数据库初始化和版本化 schema 由现有 Worker 初始化流程处理；不要重建或重置生产 D1 数据库。
+手工部署前请检查所选 Wrangler 配置、D1 和 KV bindings、Static Assets 目录、自定义域名以及所需 secrets。
+
+### GitHub Actions 流水线
+
+`.github/workflows/deploy-cloudflare.yml` 在推送到 `main` 且改动涉及 `mail-worker/**` 或 `mail-vue/**` 时触发，也可以手动启动（`workflow_dispatch`，或 `gh workflow run deploy-cloudflare.yml`）。它会依次安装依赖、用仓库 secrets 渲染 `wrangler-action.toml`、构建前端、部署 Worker、调用初始化接口，最后回读数据库 schema 以证明迁移确实生效。
+
+**fork 默认不会运行任何工作流。** GitHub 会禁用 fork 仓库的 Actions，所以第一步是打开仓库的 **Actions** 标签页，点击 *"I understand my workflows, go ahead and enable them"*。在这之前，每次 push 看起来都成功，但实际上什么都没部署，连运行记录都不会产生。
+
+#### 仓库 secrets
+
+所有值都按 `secrets.NAME || vars.NAME` 读取，因此放在 **Variables** 里也能生效 —— 但凭据请放 **Secrets**，因为 Variables 的值会原样打印进运行日志。所有值都必须是**单行**：流水线用 `sed` 把它们替换进 TOML 文件，折行粘贴会让这一步直接失败。
+
+| Secret | 必需 | 取值 | 缺失或填错的后果 |
+| --- | --- | --- | --- |
+| `CLOUDFLARE_API_TOKEN` | 是 | API token，权限见下 | 运行在「设置环境」步骤失败 |
+| `CLOUDFLARE_ACCOUNT_ID` | 是 | Cloudflare 帐户 ID | 运行在「设置环境」步骤失败 |
+| `JWT_SECRET` | 是 | 随机值，32 位以上，不能含 `?` `%` `#` `/` `\` `\|` `&` | 用于签发登录令牌；更换后所有会话失效 |
+| `ADMIN` | 是 | 管理员**邮箱**，且与真实存在的账号一致 | 该账号会被当作普通用户，没有任何管理权限 |
+| `DOMAIN` | 是 | JSON 数组，如 `["example.com"]` | 填裸域名 `example.com` 会通不过 `jq` 校验并中断运行 |
+| `D1_DATABASE_ID` | 是¹ | `pnpm wrangler d1 list`，或 `wrangler.toml` | 不填则流水线会去找名为 `$NAME` 的库，**找不到就新建一个空库** |
+| `KV_NAMESPACE_ID` | 是¹ | `pnpm wrangler kv namespace list` | 不填则会新建一个名为 `$NAME` 的 KV 命名空间，缓存计数丢失 |
+| `CUSTOM_DOMAIN` | 否 | 如 `mail.example.com` | 会删掉 `routes` 配置，且初始化接口退回 `workers.dev` 域名 |
+| `NAME` | 否 | 默认 `nova-mail` | 必须与已部署的 Worker 名称一致 |
+| `AI_MODEL`、`ANALYSIS_CACHE`、`R2_BUCKET_NAME`、`PROJECT_LINK`、`CF_EMAIL` | 否 | 见 `wrangler-action.toml` | 未设置时会移除 R2 binding 和 `project_link` |
+
+¹ 工作流里是可选的，但不填会把部署指向**新建的空资源**，而不是你已有的库和命名空间。
+
+#### API token 权限
+
+| 资源 | 权限 | 用途 |
+| --- | --- | --- |
+| 帐户 | Workers 脚本 · 编辑 | 部署 Worker |
+| 帐户 | Workers KV 存储 · 编辑 | KV binding |
+| 帐户 | D1 · 编辑 | schema 校验步骤；缺少时该步骤只发 warning |
+| 区域 | Workers 路由 · 编辑 | `custom_domain` 路由 |
+| 区域 | 区域 · 读取 | 解析该路由 |
+
+官方 "Edit Cloudflare Workers" 模板已包含两条区域权限和除 D1 之外的帐户权限 —— D1 需要手动添加。
+
+#### 数据库初始化
+
+schema 变更版本化在 `mail-worker/src/init/init.js`，由 Worker 自身的路由执行：
+
+```bash
+curl -sL https://<your-domain>/api/init/<jwt_secret>   # 返回：success
+```
+
+流水线在每次部署后都会调用它。有两点需要知道：
+
+- 每个迁移语句都包在 `try/catch` 里，所以 **返回 `success` 并不代表迁移生效** —— `ALTER TABLE` 失败只会记一条日志。因此流水线会回读 schema，发现缺列就判定失败。同样的检查也可以在 D1 控制台手工执行：`SELECT name FROM pragma_table_info('email');`
+- 该路由是幂等的，对已是最新结构的库重复执行不会有任何变化。绝不要重建或重置生产 D1 数据库。
+
+个别迁移也单独保留在 `mail-worker/migrations/` 下，便于手上没有 `jwt_secret` 时使用：
+
+```bash
+cd mail-worker
+pnpm wrangler d1 execute <database-id> --remote --file migrations/v3_8_body_type.sql
+```
+
+#### 常见故障
+
+| 现象 | 原因 |
+| --- | --- |
+| push 成功但什么都没部署，`gh run list` 没有任何记录 | fork 的 Actions 从未启用 |
+| `jq: parse error: Invalid numeric literal` / 提示 DOMAIN 必须是 JSON 数组 | `DOMAIN` 不是 JSON 数组 |
+| `sed: unterminated 's' command` | 某个被替换的 secret 里含换行（折行粘贴） |
+| `Invalid TOML document ... admin = "..."` | `ADMIN` 里不是纯邮箱 |
+| `d1 execute` 报 `Couldn't find DB with name ...` | API token 没有 D1 权限，或帐户 ID 填错 |
+| 部署成功但邮件列表为空 | Worker 被绑定到了另一个新建的 D1 数据库 |
 
 Inbound mail 由 Worker Email handler 处理；Outbound delivery 和投递状态事件使用已配置的 Resend 集成。附件在提供 R2 对象前会校验所属用户的授权。
 

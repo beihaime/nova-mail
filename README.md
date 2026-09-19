@@ -212,7 +212,75 @@ cd mail-worker
 pnpm deploy
 ```
 
-Before deployment, review the selected Wrangler configuration, D1 and KV bindings, Static Assets directory, custom domain, and required secrets. Database initialization and versioned schema setup are handled by the existing Worker initialization routes; do not recreate or reset a production D1 database.
+Before deploying by hand, review the selected Wrangler configuration, D1 and KV bindings, Static Assets directory, custom domain, and required secrets.
+
+### GitHub Actions pipeline
+
+`.github/workflows/deploy-cloudflare.yml` runs on every push to `main` that touches `mail-worker/**` or `mail-vue/**`, and can also be started manually (`workflow_dispatch`, or `gh workflow run deploy-cloudflare.yml`). It installs dependencies, renders `wrangler-action.toml` from repository secrets, builds the frontend, deploys the Worker, calls the initialization route and finally reads the database schema back to prove the migrations applied.
+
+**A fork does not run workflows until they are enabled.** GitHub disables Actions in forked repositories, so the first step is to open the repository's **Actions** tab and click *"I understand my workflows, go ahead and enable them"*. Until that is done every push looks fine while nothing is deployed and no run is even recorded.
+
+#### Repository secrets
+
+Every value is read as `secrets.NAME || vars.NAME`, so repository **variables** work too — but put credentials in **Secrets**, because variable values are printed verbatim to the run log. All values must be a single line: the pipeline substitutes them into a TOML file with `sed`, and a wrapped paste breaks that step.
+
+| Secret | Required | Value | If it is missing or wrong |
+| --- | --- | --- | --- |
+| `CLOUDFLARE_API_TOKEN` | yes | API token, see the permissions below | run fails in "Set up environment" |
+| `CLOUDFLARE_ACCOUNT_ID` | yes | Cloudflare account ID | run fails in "Set up environment" |
+| `JWT_SECRET` | yes | random, 32+ characters, no `?` `%` `#` `/` `\` `\|` `&` | signs login tokens; a new value signs every session out |
+| `ADMIN` | yes | the administrator's **email address**, matching a real account | that account is treated as an ordinary user and gets no admin rights |
+| `DOMAIN` | yes | a JSON array, e.g. `["example.com"]` | a bare `example.com` fails the `jq` validation and stops the run |
+| `D1_DATABASE_ID` | yes¹ | `pnpm wrangler d1 list`, or `wrangler.toml` | without it the pipeline looks for a database named `$NAME` and **creates an empty one** |
+| `KV_NAMESPACE_ID` | yes¹ | `pnpm wrangler kv namespace list` | without it a new KV namespace named `$NAME` is created and the cached counters are lost |
+| `CUSTOM_DOMAIN` | no | e.g. `mail.example.com` | the `routes` block is dropped and the initialization call falls back to the `workers.dev` URL |
+| `NAME` | no | defaults to `nova-mail` | must match the deployed Worker name |
+| `AI_MODEL`, `ANALYSIS_CACHE`, `R2_BUCKET_NAME`, `PROJECT_LINK`, `CF_EMAIL` | no | see `wrangler-action.toml` | the R2 binding and `project_link` are removed when unset |
+
+¹ Optional in the workflow, but leaving them out points the deployment at newly created, empty resources instead of the existing ones.
+
+#### API token permissions
+
+| Resource | Permission | Needed for |
+| --- | --- | --- |
+| Account | Workers Scripts · Edit | deploying the Worker |
+| Account | Workers KV Storage · Edit | the KV binding |
+| Account | D1 · Edit | the schema verification step; without it that step only warns |
+| Zone | Workers Routes · Edit | the `custom_domain` route |
+| Zone | Zone · Read | resolving that route |
+
+The "Edit Cloudflare Workers" template covers both zone rows and the account rows except D1 — add D1 by hand.
+
+#### Database initialization
+
+Schema setup is versioned in `mail-worker/src/init/init.js` and applied by the Worker's own route:
+
+```bash
+curl -sL https://<your-domain>/api/init/<jwt_secret>   # answers: success
+```
+
+The pipeline calls this after every deploy. Two things are worth knowing:
+
+- Each migration statement is wrapped in `try/catch`, so **`success` does not prove a migration applied** — a failed `ALTER TABLE` is only logged. That is why the pipeline reads the schema back and fails when a column is missing. The same check can be run by hand in the D1 console: `SELECT name FROM pragma_table_info('email');`
+- The route is idempotent, so re-running it against an up-to-date database changes nothing. Never recreate or reset a production D1 database.
+
+Individual migrations are also kept runnable on their own under `mail-worker/migrations/`, for when the `jwt_secret` is not at hand:
+
+```bash
+cd mail-worker
+pnpm wrangler d1 execute <database-id> --remote --file migrations/v3_8_body_type.sql
+```
+
+#### Troubleshooting
+
+| Symptom | Cause |
+| --- | --- |
+| The push succeeds, nothing is deployed, `gh run list` shows no runs | the fork's Actions were never enabled |
+| `jq: parse error: Invalid numeric literal` / "DOMAIN must be a JSON array" | `DOMAIN` is not a JSON array |
+| `sed: unterminated 's' command` | one of the substituted secrets contains a newline (a wrapped paste) |
+| `Invalid TOML document ... admin = "..."` | `ADMIN` holds something that is not a plain email address |
+| `Couldn't find DB with name ...` from `d1 execute` | the API token has no D1 permission, or the account ID is wrong |
+| The deploy succeeds but the mail list is empty | the Worker ended up bound to a different, newly created D1 database |
 
 Inbound mail is handled by the Worker Email handler, while outbound delivery and delivery-status events use the configured Resend integration. Attachments are authorized against the owning user before R2 objects are served.
 
