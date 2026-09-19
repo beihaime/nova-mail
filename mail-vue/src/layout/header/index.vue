@@ -327,7 +327,9 @@ function formatName(email) {
     grid-column: 2;
     grid-row: 1;
 
-    gap: 2px;
+    /* Phone app bar: theme toggle and avatar read as one control group with a
+       deliberate 16px seat between them, instead of touching each other. */
+    gap: 16px;
     align-items: center;
     justify-content: end;
   }
@@ -336,20 +338,19 @@ function formatName(email) {
     display: none;
   }
 
-  /* Quiet square tap targets: 38px clears the 36px minimum without turning the
-     app bar into a row of filled buttons. */
+  /* 40px tap target: a quiet square, never a filled button. */
   .toolbar .icon-item {
-    width: 38px;
-    height: 38px;
+    width: 40px;
+    height: 40px;
     border-radius: 10px;
   }
 
-  /* Phones keep the bundled sun/moon asset (dark → sun, light → moon), scaled
-     to ~21px and centred in the 38px target. */
+  /* Phones keep the bundled sun/moon asset (dark → sun, light → moon) and scale
+     the glyph itself to 24px so it stays crisp, not just the hit area. */
   .toolbar .sun-icon .app-icon,
   .toolbar .dark-icon .app-icon {
-    width: 21px;
-    height: 21px;
+    width: 24px;
+    height: 24px;
   }
 
   .toolbar .notice {
@@ -361,16 +362,16 @@ function formatName(email) {
   }
 
   .toolbar .el-dropdown {
-    width: 40px;
-    height: 40px;
+    width: 42px;
+    height: 42px;
 
     display: grid;
     place-items: center;
   }
 
   .toolbar .avatar {
-    width: 40px;
-    height: 40px;
+    width: 42px;
+    height: 42px;
 
     margin: 0;
 
@@ -378,14 +379,14 @@ function formatName(email) {
   }
 
   .toolbar .avatar .avatar-text {
-    width: 40px;
-    height: 40px;
+    width: 42px;
+    height: 42px;
   }
 
   .toolbar .avatar .avatar-image {
-    width: 40px;
-    height: 40px;
-    flex: 0 0 40px;
+    width: 42px;
+    height: 42px;
+    flex: 0 0 42px;
   }
 
   .toolbar .avatar .account-summary {
@@ -644,7 +645,7 @@ function formatName(email) {
   .header.not-send { grid-template-columns: minmax(0, 1fr) auto; }
   .search-shell { display: none; }
   .header-btn { grid-column: 1; grid-row: 1; gap: 2px; }
-  .toolbar { grid-column: 2; grid-row: 1; gap: 2px; }
+  .toolbar { grid-column: 2; grid-row: 1; gap: 16px; }
   /* Menu button: a fixed 44px tap target instead of the 50px the hamburger
      component's inline `padding: 0 15px` produced, so the title sits closer. */
   .menu-button {
@@ -654,17 +655,16 @@ function formatName(email) {
     display: grid;
     place-items: center;
   }
-  /* Phones keep the theme toggle: it sits between the title and the avatar and
-     swaps the sun/moon glyph, vertically centred on the avatar. */
+  /* Phones keep the theme toggle: a 40px target with a 24px sun/moon glyph,
+     vertically centred on the 42px avatar and seated 16px away from it. */
   .toolbar .sun-icon,
-  .toolbar .dark-icon { width: 38px; height: 38px; }
+  .toolbar .dark-icon { width: 40px; height: 40px; }
   .toolbar .notice { display: none; }
   .toolbar .setting-icon { display: none; }
   .toolbar .avatar { margin-left: 0; }
-  /* 40px avatar, 40px tap target — unchanged from the stable mobile chrome. */
-  .toolbar .avatar .avatar-text { width: 40px; height: 40px; }
-  .toolbar .avatar .avatar-image { width: 40px; height: 40px; flex: 0 0 40px; }
-  .toolbar .icon-item { width: 38px; height: 38px; }
+  .toolbar .avatar .avatar-text { width: 42px; height: 42px; }
+  .toolbar .avatar .avatar-image { width: 42px; height: 42px; flex: 0 0 42px; }
+  .toolbar .icon-item { width: 40px; height: 40px; }
   .toolbar .avatar .account-summary { display: none; }
   .breadcrumb-item { font-size: 15px; }
 }

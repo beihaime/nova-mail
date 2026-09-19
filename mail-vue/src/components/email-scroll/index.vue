@@ -130,6 +130,19 @@
                 />
               </div>
               <div v-if="!showStar"></div>
+              <!-- Reserved unread gutter. The slot always owns its track, so a
+                   read/unread flip cannot shift the avatar or the message text;
+                   only the dot inside it is conditional. -->
+              <span
+                  v-if="type === 'email'"
+                  class="mobile-unread-slot"
+                  aria-hidden="true"
+              >
+                <span
+                    v-if="item.unread === EmailUnreadEnum.UNREAD && showUnread"
+                    class="mobile-unread-dot"
+                />
+              </span>
               <span
                   v-if="type === 'email'"
                   class="mobile-sender-avatar"
@@ -1917,6 +1930,7 @@ ul {
    ========================================================= */
 
 .mobile-inbox-tools,
+.mobile-unread-slot,
 .mobile-sender-avatar,
 .mobile-row-meta,
 .mobile-row-star,
@@ -2159,12 +2173,12 @@ ul {
     position: relative;
 
     display: grid;
-    /* Avatar | message body | fixed metadata/action column. The middle track is
-       the only flexible one, so long senders/subjects truncate instead of
-       pushing the time + star around. */
-    grid-template-columns: 44px minmax(0, 1fr) 62px;
+    /* Unread gutter | avatar | message body | fixed metadata/action column.
+       Every track except the message body is fixed width, so a read/unread
+       flip or a long sender can never move the avatar, the time or the star. */
+    grid-template-columns: 16px 44px minmax(0, 1fr) 62px;
 
-    /* 44px avatar + 8px gutter; the tighter left inset pulls the whole row in. */
+    /* 8px between tracks; the tighter left inset pulls the whole row in. */
     column-gap: 8px;
 
     width: 100%;
@@ -2185,7 +2199,8 @@ ul {
     content: '';
 
     position: absolute;
-    left: 60px;
+    /* Starts under the message body: padding-left + gutter + avatar + gaps. */
+    left: 84px;
     right: 0;
     bottom: 0;
 
@@ -2209,6 +2224,7 @@ ul {
 
   .email-container.mobile-selecting
     :deep(.email-row.email) {
+    /* The checkbox replaces the unread gutter in the first track. */
     grid-template-columns: 20px 44px minmax(0, 1fr) 62px;
   }
 
@@ -2223,10 +2239,45 @@ ul {
     margin: 0;
   }
 
+  .email-container.mobile-selecting
+    .mobile-unread-slot {
+    display: none;
+  }
+
+  /* ---------- Unread gutter ---------- */
+
+  /* A permanent 16px track left of the avatar. Read rows keep the empty slot so
+     toggling read/unread never changes the row's horizontal geometry. */
+  .mobile-unread-slot {
+    grid-column: 1;
+
+    /* Match the avatar's box so the dot lines up with the avatar's centre even
+       though the row aligns its items to the top. */
+    align-self: start;
+
+    width: 100%;
+    height: 44px;
+
+    display: grid;
+    place-items: center;
+  }
+
+  .mobile-unread-dot {
+    width: 8px;
+    height: 8px;
+
+    border-radius: 999px;
+
+    /* Hugs the avatar side of the gutter instead of the screen edge. */
+    justify-self: end;
+
+    background: var(--el-color-primary);
+  }
+
   /* ---------- Sender avatar ---------- */
 
   .mobile-sender-avatar {
-    grid-column: 1;
+    grid-column: 2;
 
     width: 44px;
     height: 44px;
@@ -2251,11 +2302,6 @@ ul {
     text-align: center;
   }
 
-  .email-container.mobile-selecting
-    .mobile-sender-avatar {
-    grid-column: 2;
-  }
-
   /* stable SenderAvatar inside the sender line stays available
      for desktop, but the dedicated 40px avatar owns phone rows */
   :deep(.email-row.email .name .sender-avatar) {
@@ -2265,7 +2311,7 @@ ul {
   /* ---------- Message body ---------- */
 
   :deep(.email-row.email > .title) {
-    grid-column: 2;
+    grid-column: 3;
 
     width: 100%;
     min-width: 0;
@@ -2276,11 +2322,6 @@ ul {
     padding: 0;
 
     overflow: hidden;
-  }
-
-  .email-container.mobile-selecting
-    :deep(.email-row.email > .title) {
-    grid-column: 3;
   }
 
   :deep(.email-row.email .title .email-sender) {
@@ -2394,28 +2435,14 @@ ul {
     font-weight: 400;
   }
 
-  /* ---------- Unread blue dot ---------- */
-
-  :deep(.email-row.email.is-unread)::before {
-    content: '';
-
-    position: absolute;
-
-    left: 1px;
-    top: 17px;
-
-    width: 6px;
-    height: 6px;
-
-    border-radius: 50%;
-
-    background: var(--el-color-primary);
-  }
+  /* ---------- Unread blue dot ----------
+     The dot itself lives in the reserved `.mobile-unread-slot` track (see
+     above); no absolutely-positioned pseudo-element pins it to the edge. */
 
   /* ---------- Metadata column (time above star) ---------- */
 
   .mobile-row-meta {
-    grid-column: 3;
+    grid-column: 4;
 
     align-self: start;
 
@@ -2430,11 +2457,6 @@ ul {
     gap: 3px;
 
     padding-top: 1px;
-  }
-
-  .email-container.mobile-selecting
-    .mobile-row-meta {
-    grid-column: 4;
   }
 
   .mobile-meta-time {
