@@ -6,6 +6,14 @@ on:
     paths:
       - "mail-worker/**"
       - "mail-vue/**"
+      # The workspace root now owns the single lockfile, the shared scripts and
+      # this workflow itself. A dependency bump or a CI edit must redeploy, and
+      # must be exercised by CI — a workflow-only change used to match none of
+      # the patterns above, so it never ran and never failed either.
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - ".github/workflows/**"
   workflow_dispatch:
 
 jobs:
