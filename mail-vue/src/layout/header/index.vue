@@ -313,7 +313,7 @@ function formatName(email) {
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
 
-    background: var(--nova-surface);
+    background: var(--nova-mobile-header-bg);
   }
 
   .header-btn {

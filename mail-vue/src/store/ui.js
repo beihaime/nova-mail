@@ -8,6 +8,58 @@ import { useSettingStore } from './setting.js'
  */
 const NOTICE_SEEN_KEY = 'nova-notice-seen'
 
+/**
+ * Mobile chrome colour. `style.css` defines `--nova-mobile-header-bg` as an alias
+ * of `--nova-surface`, and the phone app bar, its `safe-area-inset-top` strip
+ * and the document background all paint from it. Reading the same token here
+ * keeps `<meta name="theme-color">` (the Android/PWA status bar) and the iOS
+ * status-bar style in lockstep with the header, so there is one colour instead
+ * of a near-black bar over a dark-grey header. The map below is only the
+ * first-paint fallback for when the token cannot be resolved yet.
+ */
+const MOBILE_HEADER_BG_TOKEN = '--nova-mobile-header-bg'
+
+const MOBILE_HEADER_BG_FALLBACK = {
+    light: '#ffffff',
+    dark: '#17191d'
+}
+
+function mobileHeaderBackground(isDark) {
+
+    const fallback =
+        isDark
+            ? MOBILE_HEADER_BG_FALLBACK.dark
+            : MOBILE_HEADER_BG_FALLBACK.light
+
+    if (
+        typeof window === 'undefined'
+        ||
+        typeof window.getComputedStyle !== 'function'
+    ) {
+        return fallback
+    }
+
+    let declared = ''
+
+    try {
+        declared =
+            window
+                .getComputedStyle(document.documentElement)
+                .getPropertyValue(MOBILE_HEADER_BG_TOKEN)
+                .trim()
+    } catch {
+        declared = ''
+    }
+
+    // Some engines hand back the unresolved `var(...)` chain, and a missing
+    // stylesheet yields an empty string — both fall back to the literal.
+    if (!declared || declared.includes('var(')) {
+        return fallback
+    }
+
+    return declared
+}
+
 function noticeSignature(settings) {
     const notice = settings || {}
 
@@ -206,11 +258,10 @@ export const useUiStore = defineStore('ui', {
                 )
 
 
+            // Android / installed-PWA status bar: match the phone header exactly.
             metaTag?.setAttribute(
                 'content',
-                effectiveDark
-                    ? '#141414'
-                    :'#FFFFFF'
+                mobileHeaderBackground(effectiveDark)
             )
 
 
@@ -220,10 +271,13 @@ export const useUiStore = defineStore('ui', {
                 )
 
 
+            // iOS ignores `theme-color`; `black-translucent` lets the app paint
+            // the status-bar strip itself, so the header/safe-area colour shows
+            // through instead of the system's pure black.
             statusBarMeta?.setAttribute(
                 'content',
                 effectiveDark
-                    ? 'black'
+                    ? 'black-translucent'
                     :'default'
             )
 

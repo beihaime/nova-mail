@@ -127,11 +127,43 @@
                 )
 
 
+            // First paint only. `style.css` owns the real value: it derives
+            // `--nova-mobile-header-bg` from `--nova-surface`, and `applyTheme()`
+            // re-reads it on every theme change. The literals below merely mirror
+            // that token for the instant before the stylesheet is available, so
+            // the very first frame already matches the phone header.
+            let mobileHeaderBg =
+                isDark
+                    ? '#17191d'
+                    : '#FFFFFF'
+
+
+            try {
+
+                const token =
+                    getComputedStyle(root)
+                        .getPropertyValue(
+                            '--nova-mobile-header-bg'
+                        )
+                        .trim()
+
+
+                if (token && !token.includes('var(')) {
+
+                    mobileHeaderBg = token
+
+                }
+
+            } catch {
+
+                // Stylesheet not ready — keep the fallback above.
+
+            }
+
+
             metaTag?.setAttribute(
                 'content',
-                isDark
-                    ? '#141414'
-                    : '#FFFFFF'
+                mobileHeaderBg
             )
 
 
@@ -141,10 +173,13 @@
                 )
 
 
+            // iOS only supports `default` / `black` / `black-translucent`, and
+            // reads this once at launch. `black-translucent` lets the header
+            // colour fill the status-bar strip instead of a pure-black band.
             statusBarMeta?.setAttribute(
                 'content',
                 isDark
-                    ? 'black'
+                    ? 'black-translucent'
                     : 'default'
             )
 
@@ -153,12 +188,15 @@
     </script>
 </head>
 <style>
+    /* Pre-stylesheet chrome. `--nova-mobile-header-bg` is defined in style.css;
+       until it loads these fallbacks keep the first paint aligned with the phone
+       header (dark grey #17191d, never pure black). */
     html {
-        background:#FFFFFF;
+        background: var(--nova-mobile-header-bg, #FFFFFF);
     }
 
     html.dark {
-        background:#141414;
+        background: var(--nova-mobile-header-bg, #17191d);
     }
 
     body {
@@ -174,11 +212,11 @@
         justify-content: center;
         align-items: center;
         z-index: 500;
-        background:#ffffff;
+        background: var(--nova-mobile-header-bg, #ffffff);
     }
 
     html.dark #loading-first {
-        background:#141414;
+        background: var(--nova-mobile-header-bg, #17191d);
     }
   .loading-hide {
     pointer-events: none;

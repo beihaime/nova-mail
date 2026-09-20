@@ -154,6 +154,13 @@ button, input, select, textarea {
     --vt-easing: ease-out;
     --nova-surface: #ffffff;
     --nova-surface-muted: #f7f8fa;
+    /* Single source of truth for the phone chrome. The mobile app bar, the
+       status-bar / `safe-area-inset-top` strip behind it and the PWA
+       `theme-color` meta all resolve to this one token, so they can never
+       drift into the two-tone band the header used to show. It aliases
+       `--nova-surface` deliberately: the dark header stays the designed dark
+       grey (#17191d) instead of being forced to pure black. */
+    --nova-mobile-header-bg: var(--nova-surface);
     --nova-divider: #e8ebef;
     /* Phone search field: a step above the page without reading as a block. */
     --nova-search-bg: #f2f2f7;
@@ -307,6 +314,15 @@ html[data-theme-to="light"]::view-transition-old(root) {
 
 /* Mobile dark-mode icon normalization */
 @media (max-width: 767px) {
+  /* Phone document chrome. The app bar paints its own `env(safe-area-inset-top)`
+     padding with the same token, but html/body must match too: otherwise the
+     Element Plus page colour (#141414 in dark) shows as a near-black band above
+     the dark-grey header on Android and in installed PWAs. */
+  html,
+  body {
+    background: var(--nova-mobile-header-bg);
+  }
+
   /* Light-mode counterparts of the phone ink scale. These previously existed
      only under html.dark, so in light mode `var(--mobile-secondary/tertiary)`
      was invalid and Sender, Subject and Preview all inherited the same colour —

@@ -261,7 +261,7 @@ onBeforeUnmount(() => {
     height: calc(60px + env(safe-area-inset-top, 0px));
     padding-top: env(safe-area-inset-top, 0px);
     border-bottom: 0;
-    background: var(--nova-surface);
+    background: var(--nova-mobile-header-bg);
   }
 
   .mobile-nav {
@@ -385,7 +385,7 @@ onBeforeUnmount(() => {
 
 @media (max-width: 767px) and (display-mode: standalone) {
   .layout {
-    background: var(--nova-surface);
+    background: var(--nova-mobile-header-bg);
   }
 }
 
