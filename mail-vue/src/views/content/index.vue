@@ -1786,40 +1786,61 @@ const handleDelete = () => {
   content: ', ';
 }
 
-/* Conversation thread (Gmail-style message cards) -------------------------- */
+/* Conversation sheet (Gmail-style) -----------------------------------------
+   The messages are ONE continuous sheet at every width, not a column of cards:
+   no gap, no per-card outer margin, a single hairline between neighbours and
+   rounding only at the two outer corners.
+
+   The `.thread-message` articles are the direct children of `.thread` (there is
+   no wrapper between them), so `:first-child` / `:last-child` / `:only-child`
+   match the real message items. The phone breakpoint only re-scales the corner
+   radius (see the 767px block). */
 .thread {
   max-width: 1100px;
-  gap: 12px;
+  gap: 0;
+}
+
+/* One surface and one hairline colour for the whole sheet. The expanded card
+   switched to `--el-bg-color` and a tinted border, and the newest collapsed
+   card did too, which cut the conversation into separate blocks and let the
+   page colour show between them. */
+.thread-message,
+.thread-message.is-expanded,
+.thread-message.is-latest:not(.is-expanded),
+.thread-message.is-mine.is-expanded {
+  background: var(--nova-surface-muted);
+  border-color: var(--nova-divider);
 }
 
 .thread-message {
-  border: 1px solid var(--nova-divider);
-  border-radius: 14px;
-  background: var(--nova-surface-muted);
-  overflow: hidden;
-  /* The card is content-driven: nothing pins it to a fixed height and a short
-     body simply makes a short card. */
+  /* Content-driven height, and never an outer gap — collapsed or expanded. */
   height: auto;
   min-height: 0;
+  margin: 0;
+  border-radius: 0;
+
+  /* Draw the sheet edges here rather than with a full border on every card: the
+     top edge doubles as the divider, so two neighbours share ONE 1px line
+     instead of stacking two. The bottom edge belongs to the last card only. */
+  border: 1px solid var(--nova-divider);
+  border-width: 1px 1px 0 1px;
+
+  overflow: hidden;
   transition:
     background-color var(--nova-motion-base) var(--nova-motion-ease),
     border-color var(--nova-motion-base) var(--nova-motion-ease);
 }
 
-.thread-message.is-expanded {
-  background: var(--el-bg-color);
-  border-color: var(--light-border);
+.thread-message:last-child {
+  border-bottom-width: 1px;
 }
 
-.thread-message.is-mine.is-expanded {
-  border-color: color-mix(in srgb, var(--el-color-primary) 34%, var(--nova-divider));
-}
-
-/* Newest message stands out even while collapsed. */
-.thread-message.is-latest:not(.is-expanded) {
-  border-color: var(--light-border);
-  background: var(--el-bg-color);
-}
+/* Top corners on the first message, bottom corners on the last, full rounding
+   when the conversation holds a single message. `:only-child` is last so it
+   wins over the two edge cases it also matches. */
+.thread-message:first-child { border-radius: 14px 14px 0 0; }
+.thread-message:last-child  { border-radius: 0 0 14px 14px; }
+.thread-message:only-child  { border-radius: 14px; }
 
 .message-head {
   display: flex;
@@ -2324,49 +2345,10 @@ const handleDelete = () => {
     padding: 0 12px 16px;
   }
 
-  /* ---- Conversation sheet (Gmail-style) ----------------------------------
-     The messages are ONE continuous sheet, not a column of cards: no gap, no
-     per-card outer margin, a single hairline between neighbours and rounding
-     only at the two outer corners.
-
-     The `.thread-message` articles are the direct children of `.thread` (there
-     is no wrapper between them), so `:first-child` / `:last-child` /
-     `:only-child` match the real message items. */
-  .thread {
-    gap: 0;
-  }
-
-  /* One surface and one hairline colour for the whole sheet. The expanded card
-     used to switch to `--el-bg-color` and a tinted border, which cut the
-     conversation into separate blocks and showed the page colour between them. */
-  .thread-message,
-  .thread-message.is-expanded,
-  .thread-message.is-latest:not(.is-expanded),
-  .thread-message.is-mine.is-expanded {
-    background: var(--nova-surface-muted);
-    border-color: var(--nova-divider);
-  }
-
-  .thread-message {
-    /* Content-driven height, and never an outer gap — collapsed or expanded. */
-    height: auto;
-    min-height: 0;
-    margin: 0;
-    border-radius: 0;
-
-    /* Draw the sheet edges here rather than with a full border on every card:
-       the top edge doubles as the divider, so two neighbours share ONE 1px line
-       instead of stacking two. The bottom edge belongs to the last card only. */
-    border-width: 1px 1px 0 1px;
-  }
-
-  .thread-message:last-child {
-    border-bottom-width: 1px;
-  }
-
-  /* Top corners on the first message, bottom corners on the last, full rounding
-     when the conversation holds a single message. `:only-child` is last so it
-     wins over the two edge cases it also matches. */
+  /* ---- Conversation sheet: phone corner radius ---------------------------
+     Zero gap, the shared hairline and the continuous surface are defined once
+     in the base rules and apply at every width; only the corner radius is
+     re-scaled here. */
   .thread-message:first-child { border-radius: 12px 12px 0 0; }
   .thread-message:last-child  { border-radius: 0 0 12px 12px; }
   .thread-message:only-child  { border-radius: 12px; }
