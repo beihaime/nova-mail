@@ -11,6 +11,9 @@ dist-ssr
 *.local
 dist
 
+# pnpm content-addressable store, when it is kept inside the checkout
+.pnpm-store/
+
 .vscode/*
 !.vscode/extensions.json
 .idea

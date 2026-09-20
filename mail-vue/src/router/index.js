@@ -3,6 +3,7 @@ import NProgress from 'nprogress';
 import {useUiStore} from "@/store/ui.js";
 import {useSettingStore} from "@/store/setting.js";
 import {cvtR2Url} from "@/utils/convert.js";
+import {AUTH_NAVIGATION, resolveAuthNavigation} from "@/router/auth-guard.js";
 
 const routes = [
     {
@@ -110,17 +111,23 @@ router.beforeEach((to, from, next) => {
 
     const token = localStorage.getItem('token')
 
-    if (!token && !to.path.startsWith('/login')) {
-        return next({name: 'login'})
+    const decision = resolveAuthNavigation({
+        token,
+        toPath: to.path,
+        fromPath: from.path,
+    })
+
+    if (decision.type === AUTH_NAVIGATION.REDIRECT_LOGIN) {
+        return next(decision.target)
     }
 
-    if (!token && to.path.startsWith('/login')) {
+    if (decision.type === AUTH_NAVIGATION.ALLOW_LOGIN) {
         loadBackground(next)
         return
     }
 
-    if (token && to.path.startsWith('/login')) {
-        return next(from.path)
+    if (decision.type === AUTH_NAVIGATION.REDIRECT_AWAY) {
+        return next(decision.target)
     }
 
     next()

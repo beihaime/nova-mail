@@ -220,40 +220,70 @@ nova-mail/
 
 ### Requirements
 
-- Node.js 18 or newer
-- pnpm
+- Node.js 20 or newer
+- pnpm 12
 - A Cloudflare account for Worker/D1/KV development
 
-The repository contains separate frontend and Worker packages. Install dependencies in each package:
+The repository is a single pnpm workspace with two packages, `mail-vue` and `mail-worker`, and one lockfile at the root. Install everything once:
 
 ```bash
 git clone https://github.com/beihaime/nova-mail.git
 cd nova-mail
 
-pnpm --dir mail-vue install
-pnpm --dir mail-worker install
+pnpm install
 ```
 
-Start the frontend development server:
+Start both development servers (the Vite dev server and `wrangler dev`) in one terminal:
 
 ```bash
-pnpm --dir mail-vue dev
+pnpm dev
 ```
 
-Start the Worker development environment in a second terminal:
+Or start them separately:
 
 ```bash
-pnpm --dir mail-worker dev
+pnpm --filter ./mail-vue dev
+pnpm --filter ./mail-worker dev
 ```
 
-The frontend package also provides:
+Build the frontend into the Worker's asset directory:
 
 ```bash
-pnpm --dir mail-vue build    # production frontend build
-pnpm --dir mail-vue preview  # preview the built frontend
+pnpm build
 ```
 
-The Worker package provides `dev`, `start`, `deploy`, and `test` scripts. The `test` script is the repository's Wrangler deployment configuration for the test environment; review `wrangler-test.toml` before using it.
+Run the test suites (frontend vitest + jsdom, and the Worker's unit and
+integration tests). `pnpm test` is the same command CI uses to gate a deploy:
+
+```bash
+pnpm test
+pnpm test:frontend
+pnpm test:worker
+```
+
+The Worker's `deploy:test` script deploys the test-environment Wrangler
+configuration; review `wrangler-test.toml` before using it.
+
+### Tests
+
+The suites are split by what they can prove:
+
+- **Frontend** (`mail-vue/test`, vitest + jsdom) — route-guard and 401
+  redirects, the list pagination cursor rules, compose validation, and the
+  mail-body render pipeline (DOMPurify output parsed back into a real DOM).
+- **Worker unit** (`mail-worker/test`, vitest in Node) — pure logic: thread
+  keys, body classification, security helpers, push payloads.
+- **Worker integration** (`mail-worker/test/integration`, vitest +
+  `@cloudflare/vitest-pool-workers`) — the real Worker inside workerd with local
+  D1/KV/R2. The schema is built by the Worker's own `dbInit.init()`, so the
+  tests run against the production schema. Covered: authentication and the
+  permission gate, mailbox list pagination and threading, delete (soft and
+  physical) with ownership checks, internal send/receive fan-out, OAuth grant
+  completion, and private-attachment authorization.
+
+`mail-worker/wrangler.vitest.toml` is the binding set used only by the
+integration suite; it declares throwaway local D1/KV/R2 resources and needs no
+Cloudflare credentials.
 
 ## Configuration
 
@@ -309,7 +339,7 @@ Before deploying by hand, review the selected Wrangler configuration, D1 and KV 
 
 ### GitHub Actions pipeline
 
-`.github/workflows/deploy-cloudflare.yml` runs on every push to `main` that touches `mail-worker/**` or `mail-vue/**`, and can also be started manually (`workflow_dispatch`, or `gh workflow run deploy-cloudflare.yml`). It installs dependencies, renders `wrangler-action.toml` from repository secrets, builds the frontend, deploys the Worker, calls the initialization route and finally reads the database schema back to prove the migrations applied.
+`.github/workflows/deploy-cloudflare.yml` runs on every push to `main` that touches `mail-worker/**` or `mail-vue/**`, and can also be started manually (`workflow_dispatch`, or `gh workflow run deploy-cloudflare.yml`). A `Test` job runs `pnpm install --frozen-lockfile` and `pnpm test` first, and the deploy job declares `needs: Test`, so a failing test blocks the release before anything reaches Cloudflare. The deploy job then renders `wrangler-action.toml` from repository secrets, builds the frontend, deploys the Worker, calls the initialization route and finally reads the database schema back to prove the migrations applied.
 
 **A fork does not run workflows until they are enabled.** GitHub disables Actions in forked repositories, so the first step is to open the repository's **Actions** tab and click *"I understand my workflows, go ahead and enable them"*. Until that is done every push looks fine while nothing is deployed and no run is even recorded.
 

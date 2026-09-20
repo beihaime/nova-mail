@@ -368,6 +368,7 @@ import { useScroll } from '@vueuse/core'
 import SenderAvatar from '@/components/sender-avatar/index.vue'
 import { MAIL_BODY_TYPE, unwrapNestedMessage, looksLikeMarkdownDocument } from '@/utils/mail-html.js'
 import { stripMarkdown } from '@/utils/quoted-text.js'
+import { nextPageCursor, isLastPage, canRequestPage } from '@/utils/mail-pagination.js'
 
 const props = defineProps({
   getEmailList: Function,
@@ -1130,13 +1131,13 @@ function getEmailList(refresh = false) {
 
   if (reqLock) return;
 
-  let emailId = emailList.length > 0 ? emailList.at(-1).emailId : 0;
+  let emailId = nextPageCursor(emailList);
 
   reqLock = true
 
   if (!refresh) {
 
-    if (loading.value || noLoading.value) {
+    if (!canRequestPage({ loading: loading.value, noLoading: noLoading.value })) {
       reqLock = false
       return
     }
@@ -1180,8 +1181,8 @@ function getEmailList(refresh = false) {
     emailList.push(...list);
     if (refresh) scrollbarRef.value?.setScrollTop(0);
 
-    noLoading.value = data.list.length < queryParam.size;
-    followLoading.value = data.list.length >= queryParam.size;
+    noLoading.value = isLastPage(data.list.length, queryParam.size);
+    followLoading.value = !noLoading.value;
 
     total.value = data.total;
   }).catch(error => {

@@ -5,11 +5,13 @@
 	"type": "module",
 	"scripts": {
 		"dev": "wrangler dev --config wrangler-dev.toml",
-		"test": "wrangler deploy --config wrangler-test.toml",
+		"test": "pnpm run test:unit && pnpm run test:integration",
+		"test:unit": "vitest run --config vitest.unit.config.js",
+		"test:integration": "vitest run --config vitest.integration.config.js",
 		"deploy": "wrangler deploy",
+		"deploy:test": "wrangler deploy --config wrangler-test.toml",
 		"start": "wrangler dev",
-		"threads:rebuild": "node scripts/rebuild-threads.mjs",
-		"test:unit": "vitest run --config vitest.unit.config.js"
+		"threads:rebuild": "node scripts/rebuild-threads.mjs"
 	},
 	"devDependencies": {
 		"@cloudflare/vitest-pool-workers": "^0.7.5",

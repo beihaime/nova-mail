@@ -120,6 +120,7 @@ import {useI18n} from "vue-i18n";
 import router from "@/router/index.js";
 import {ElMessageBox} from "element-plus";
 import {accountList} from "@/request/account.js";
+import {validateCompose} from "@/utils/compose-validate.js";
 
 defineExpose({
   open,
@@ -296,49 +297,24 @@ function chooseFile() {
 
 async function sendEmail() {
 
-  if (form.receiveEmail.length === 0) {
-    ElMessage({
-      message: t('emptyRecipientMsg'),
-      type: 'error',
-      plain: true,
-    })
-    return
-  }
-
-  if (!form.subject) {
-    ElMessage({
-      message: t('emptySubjectMsg'),
-      type: 'error',
-      plain: true,
-    })
-    return
-  }
-
   if (!form.content) {
-    form.content = editor.value.getContent();
+    // The editor is only mounted while the composer is open; reading it
+    // defensively keeps a stray call from throwing before validation runs.
+    form.content = editor.value?.getContent ? editor.value.getContent() : form.content;
   }
 
-  if (!form.content) {
-    ElMessage({
-      message: t('emptyContentMsg'),
-      type: 'error',
-      plain: true,
-    })
-    return
-  }
+  const problem = validateCompose({
+    recipientCount: form.receiveEmail.length,
+    subject: form.subject,
+    content: form.content,
+    attachmentCount: form.attachments.length,
+    manyType: form.manyType,
+    sending,
+  })
 
-  if (form.manyType === 'divide' && form.attachments.length > 0) {
+  if (problem) {
     ElMessage({
-      message: t('noSeparateSendMsg'),
-      type: 'error',
-      plain: true,
-    })
-    return
-  }
-
-  if (sending) {
-    ElMessage({
-      message: t('sendingErrorMsg'),
+      message: t(problem),
       type: 'error',
       plain: true,
     })

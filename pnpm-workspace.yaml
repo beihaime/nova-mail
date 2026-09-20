@@ -1,0 +1,18 @@
+# Single pnpm workspace for the two halves of Nova Mail.
+#
+# The Worker serves the built SPA, so the two packages are released together and
+# are managed together: one lockfile at the root, `pnpm -r test` runs both
+# suites, and `pnpm dev` starts the Vite dev server next to `wrangler dev`.
+packages:
+  - mail-vue
+  - mail-worker
+
+# Native/post-install build scripts are denied by default; these are the packages
+# that legitimately need one. The list is the union of what each package used to
+# declare in its own workspace file.
+allowBuilds:
+  '@parcel/watcher': true
+  esbuild: true
+  sharp: true
+  vue-demi: true
+  workerd: true
