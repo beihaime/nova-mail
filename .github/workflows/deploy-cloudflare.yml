@@ -23,10 +23,9 @@ jobs:
 
       - name: ⚙ 设置 pnpm / Set up pnpm
         uses: pnpm/action-setup@v4.1.0
-        with:
-          # Matches `packageManager` in the root package.json and the pnpm that
-          # generated the root lockfile.
-          version: 12
+        # No `version:` here on purpose. The action reads `packageManager` from
+        # the root package.json, and declaring both makes it fail with
+        # "Multiple versions of pnpm specified".
 
       - name: ⚙ 设置 Node.js / Set up Node.js
         uses: actions/setup-node@v4
@@ -76,8 +75,8 @@ jobs:
 
       - name: ⚙ 设置 pnpm / Set up pnpm
         uses: pnpm/action-setup@v4.1.0
-        with:
-          version: 12
+        # Version comes from `packageManager` in the root package.json; see the
+        # Test job above.
 
       - name: ⚙ 设置 Node.js / Set up Node.js
         uses: actions/setup-node@v4
