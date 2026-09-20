@@ -134,13 +134,15 @@ describe('sanitizeMailHtml', () => {
     expect(sanitizeMailHtml('<div><p>unclosed')).toContain('unclosed')
   })
 
+  // Sanitized twice on purpose (it must be idempotent); see the note on the
+  // large-body frame test for why the timeout is explicit.
   it('processes a huge body without throwing', () => {
     const huge = `<div style="color:red">${'<p>line</p>'.repeat(40000)}</div>`
     const html = sanitizeMailHtml(huge)
 
     expect(html.length).toBeGreaterThan(100000)
     expect(sanitizeMailHtml(huge)).toBe(html)
-  })
+  }, 30000)
 })
 
 describe('isSafeUrl', () => {

@@ -183,13 +183,17 @@ describe('frame document', () => {
     expect(document).toContain('&lt;script&gt;')
   })
 
+  // Deliberately enormous input, so the assertion is "does not truncate or
+  // hang", not "is fast". The 5s default is too tight for a shared CI runner
+  // (this takes ~1.5s locally and exceeded 5s there); the explicit budget keeps
+  // the intent without turning a slow machine into a red build.
   it('builds a very large body without truncating it', () => {
     const huge = `<div>${'<p>line</p>'.repeat(50000)}</div>`
     const { document } = build(huge)
 
     expect(document.length).toBeGreaterThan(huge.length)
     expect(document).toContain('<p>line</p>')
-  })
+  }, 30000)
 
   it('produces an empty, still-valid document for an empty body', () => {
     const { document, blocked } = build('')
