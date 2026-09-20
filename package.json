@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "pnpm --parallel --filter ./mail-vue --filter ./mail-worker run dev",
     "build": "pnpm --filter ./mail-vue run build",
-    "test": "pnpm -r run test",
+    "test": "pnpm -r --no-bail run test",
     "test:frontend": "pnpm --filter ./mail-vue run test",
     "test:worker": "pnpm --filter ./mail-worker run test",
     "test:worker:unit": "pnpm --filter ./mail-worker run test:unit",
