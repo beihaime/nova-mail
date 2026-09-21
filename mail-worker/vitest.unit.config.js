@@ -12,6 +12,7 @@ export default defineConfig({
 			'test/email-utils.spec.js',
 			'test/web-push.spec.js',
 			'test/push-service.spec.js',
+			'test/sender-avatar.spec.js',
 		],
 		environment: 'node',
 	},

@@ -20,7 +20,11 @@ const publicRoutes = new Set([
 	'POST /oauth/google/complete',
 	'GET /oauth/github/login',
 	'GET /oauth/github/callback',
-	'POST /oauth/github/complete'
+	'POST /oauth/github/complete',
+	// Capability-signed avatar bytes. `<img>` cannot send the bearer token, so
+	// this one route is public; the id it carries is an HMAC-signed descriptor
+	// that only `GET /avatar` (authenticated) can mint.
+	'GET /avatar/image'
 ]);
 
 function isPublicRoute(c) {

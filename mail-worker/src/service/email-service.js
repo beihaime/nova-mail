@@ -25,6 +25,7 @@ import { att } from '../entity/att';
 import telegramService from './telegram-service';
 import { MAIL_BODY } from '../lib/mail-body';
 import threadService from './thread-service';
+import senderAvatarService from './sender-avatar-service';
 import pushService from './push-service';
 
 const MAX_SEARCH_LENGTH = 200;
@@ -241,6 +242,10 @@ const emailService = {
 			this.applyListText(list);
 		}
 
+		// Sender avatars ride along with every list row (cheap local + cache path;
+		// unresolved rows are marked `pending` and finished by GET /avatar).
+		await senderAvatarService.attach(c, list);
+
 		if (!latestEmail) {
 			latestEmail = {
 				emailId: 0,
@@ -316,6 +321,7 @@ const emailService = {
 			.all();
 
 		await this.emailAddAtt(c, messages);
+		await senderAvatarService.attach(c, messages);
 
 		return {
 			threadId,
@@ -722,6 +728,8 @@ const emailService = {
 		if (allInternal) {
 			await this.HandleOnSiteEmail(c, receiveEmail, emailResult, attList);
 		}
+
+		await senderAvatarService.attach(c, [emailResult]);
 
 		const dateStr = dayjs().format('YYYY-MM-DD');
 		let daySendTotal = await c.env.kv.get(kvConst.SEND_DAY_COUNT + dateStr);
@@ -1152,6 +1160,7 @@ const emailService = {
 		for (const item of list) {
 			item.listText = this.toListText(item);
 		}
+		await senderAvatarService.attach(c, list);
 		return list;
 	},
 
@@ -1263,6 +1272,8 @@ const emailService = {
 			this.applyListText(list);
 		}
 
+		await senderAvatarService.attach(c, list);
+
 		if (!latestEmail) {
 			latestEmail = {
 				emailId: 0,
@@ -1292,6 +1303,7 @@ const emailService = {
 		for (const item of list) {
 			item.listText = this.toListText(item);
 		}
+		await senderAvatarService.attach(c, list);
 		return list;
 	},
 

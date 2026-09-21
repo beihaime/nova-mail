@@ -15,8 +15,14 @@ function sqlStripWhitespace(column) {
 		'> <', '><'))`;
 }
 
-/** 完整查询：全部字段 */
-const { authResults: _authResults, ...safeEmailColumns } = getTableColumns(email);
+/**
+ * 完整查询：全部字段。
+ *
+ * `auth_results` and `bimi_selector` are server-internal inputs to the sender
+ * avatar resolver (lib/bimi.js, service/sender-avatar-service.js); they are
+ * stripped here so no API response can leak them.
+ */
+const { authResults: _authResults, bimiSelector: _bimiSelector, ...safeEmailColumns } = getTableColumns(email);
 export const emailListColumns = safeEmailColumns;
 
 /** 摘要查询：列表 + 详情头部；有 text 则不读 content，没有才查 content（去空白），响应里不返回 content */

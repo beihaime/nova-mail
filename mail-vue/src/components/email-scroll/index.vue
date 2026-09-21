@@ -147,10 +147,12 @@
                     class="mobile-unread-dot"
                 />
               </span>
-              <span
-                  v-if="type === 'email'"
+              <SenderAvatar
+                  v-if="type === 'email' && isPhone"
                   class="mobile-sender-avatar"
-              >{{ (item.name || item.sendEmail || '?').trim().charAt(0).toUpperCase() }}</span>
+                  :email="item"
+                  :size="40"
+              />
               <div class="title" :class="accountShow ? 'title-column' : 'title-column'">
 
                 <div class="email-sender" :style=" (showStatus ? 'gap: 10px;' : '') + ((item.unread === EmailUnreadEnum.UNREAD && showUnread)  ? 'font-weight: bold' : '')">

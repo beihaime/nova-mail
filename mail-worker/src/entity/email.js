@@ -27,6 +27,10 @@ export const email = sqliteTable('email', {
 	// Direct parent message id (RFC In-Reply-To / References hit), 0 when unknown.
 	parentMessageId: integer('parent_message_id').default(0).notNull(),
 	authResults: text('auth_results').default('').notNull(),
+	// Sender's `BIMI-Selector:` header, already validated to a DNS label (or '').
+	// The avatar resolver needs it to pick `selector._bimi.<domain>`; it never
+	// leaves the server (see lib/email-list-columns.js).
+	bimiSelector: text('bimi_selector').default('').notNull(),
 	type: integer('type').default(0).notNull(),
 	status: integer('status').default(0).notNull(),
 	resendEmailId: text('resend_email_id'),

@@ -38,8 +38,25 @@ const dbInit = {
 		await this.v3_6DB(c);
 		await this.v3_7DB(c);
 		await this.v3_8DB(c);
+		await this.v3_9DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
+	},
+
+	/**
+	 * v3.9 — sender avatar resolution.
+	 *
+	 * `bimi_selector` stores the message's validated `BIMI-Selector:` header so
+	 * the avatar resolver can query `selector._bimi.<domain>` instead of always
+	 * `default._bimi.<domain>`. Existing rows fall back to `default`, which is
+	 * the BIMI default selector anyway.
+	 */
+	async v3_9DB(c) {
+		try {
+			await c.env.db.prepare(`ALTER TABLE email ADD COLUMN bimi_selector TEXT NOT NULL DEFAULT '';`).run();
+		} catch (e) {
+			console.warn(`跳过 BIMI selector 字段：${e.message}`);
+		}
 	},
 
 	/**

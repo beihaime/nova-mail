@@ -7,6 +7,7 @@ import email from '../entity/email';
 import { emailListColumns, emailBriefColumns } from '../lib/email-list-columns';
 import { isDel } from '../const/entity-const';
 import attService from "./att-service";
+import senderAvatarService from './sender-avatar-service';
 import { t } from '../i18n/i18n'
 const starService = {
 
@@ -76,6 +77,8 @@ const starService = {
 				delete emailRow.content;
 			});
 		}
+
+		await senderAvatarService.attach(c, list);
 
 		return { list };
 	},

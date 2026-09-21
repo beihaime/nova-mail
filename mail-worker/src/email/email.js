@@ -14,6 +14,7 @@ import aiService from '../service/ai-service';
 import webhookService from '../service/webhook-service';
 import pushService from '../service/push-service';
 import { MAIL_BODY, bodyViewFor, resolveMailBody } from '../lib/mail-body';
+import { parseBimiSelectorHeader } from '../lib/bimi';
 
 export async function email(message, env, ctx) {
 
@@ -134,6 +135,9 @@ export async function email(message, env, ctx) {
 			// Raw Authentication-Results headers are sender-controlled and are kept
 			// empty until a trusted ingress verifier provides provenance.
 			authResults: '',
+			// Sender's `BIMI-Selector:` header, validated to a DNS label. It only
+			// chooses which `_bimi` record to read and never proves a brand.
+			bimiSelector: extractBimiSelector(email.headers),
 			userId: account ? account.userId : 0,
 			accountId: account ? account.accountId : 0,
 			isDel: isDel.DELETE,
@@ -232,8 +236,24 @@ export async function email(message, env, ctx) {
 }
 
 
-function checkBlock(blackSubjectStr, blackContentStr, blackFromStr, email) {
+/**
+ * The message's validated `BIMI-Selector:` value, or '' when it is absent or
+ * malformed (the resolver then uses the `default` selector).
+ *
+ * postal-mime exposes the header list as `{ key, value }` pairs with the
+ * original casing, so the lookup is case-insensitive.
+ */
+function extractBimiSelector(headers) {
+	if (!Array.isArray(headers)) return '';
+	for (const header of headers) {
+		if (String(header?.key || '').trim().toLowerCase() !== 'bimi-selector') continue;
+		const selector = parseBimiSelectorHeader(header.value);
+		if (selector) return selector;
+	}
+	return '';
+}
 
+function checkBlock(blackSubjectStr, blackContentStr, blackFromStr, email) {
 	const blackFromList = blackFromStr ? blackFromStr.split(',') : []
 	const blackContentList = blackContentStr ? blackContentStr.split(',') : []
 	const blackSubjectList = blackSubjectStr ? blackSubjectStr.split(',') : []
