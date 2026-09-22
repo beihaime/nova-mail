@@ -10,9 +10,10 @@ import emailUtils from '../utils/email-utils';
 import roleService from '../service/role-service';
 import userService from '../service/user-service';
 import telegramService from '../service/telegram-service';
-import { normalizeAttachmentFilename, normalizeMimeType } from '../utils/outgoing-mail-validation';
+import { isSafeInlineMimeType, normalizeAttachmentFilename, normalizeMimeType } from '../utils/outgoing-mail-validation';
 import aiService from '../service/ai-service';
 import webhookService from '../service/webhook-service';
+import { assertAttachmentLimits, MAIL_LIMITS } from '../const/mail-limits';
 
 export async function email(message, env, ctx) {
 
@@ -45,15 +46,27 @@ export async function email(message, env, ctx) {
 		}
 
 		const reader = message.raw.getReader();
-		let content = '';
+		const chunks = [];
+		let rawBytes = 0;
 
 		while (true) {
 			const { done, value } = await reader.read();
 			if (done) break;
-			content += new TextDecoder().decode(value);
+			rawBytes += value.byteLength;
+			if (rawBytes > MAIL_LIMITS.MAX_RAW_INBOUND_BYTES) {
+				await reader.cancel();
+				message.setReject('Message exceeds the size limit');
+				return;
+			}
+			chunks.push(value);
 		}
+		const raw = new Uint8Array(rawBytes);
+		let offset = 0;
+		for (const chunk of chunks) { raw.set(chunk, offset); offset += chunk.byteLength; }
+		const content = new TextDecoder().decode(raw);
 
 		const email = await PostalMime.parse(content);
+		assertAttachmentLimits(email.attachments || []);
 
 
 		const blockFlag = checkBlock(blackSubject, blackContent, blackFrom, email);
@@ -135,6 +148,7 @@ export async function email(message, env, ctx) {
 			let attachment = { ...item };
 			attachment.filename = normalizeAttachmentFilename(attachment.filename || 'attachment');
 			attachment.mimeType = normalizeMimeType(attachment.mimeType);
+			if (attachment.contentId && !isSafeInlineMimeType(attachment.mimeType)) attachment.contentId = null;
 			attachment.key = constant.ATTACHMENT_PREFIX + await fileUtils.getBuffHash(attachment.content) + fileUtils.getExtFileName(item.filename);
 			attachment.size = item.content.length ?? item.content.byteLength;
 			attachments.push(attachment);

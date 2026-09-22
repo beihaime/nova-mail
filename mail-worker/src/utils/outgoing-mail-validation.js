@@ -1,7 +1,9 @@
 import BizError from '../error/biz-error';
+import { assertEncodedAttachmentLimit, assertOutboundMailLimits, MAIL_LIMITS } from '../const/mail-limits';
 
 const CONTROL = /[\u0000-\u001F\u007F-\u009F]/u;
 const MIME_TOKEN = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+\/[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
+const SAFE_INLINE_MIME = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
 
 function fail(message) { throw new BizError(message); }
 
@@ -23,21 +25,30 @@ function isMailbox(value) {
 export function normalizeAttachmentFilename(filename) {
 	if (typeof filename !== 'string' || CONTROL.test(filename)) fail('Invalid attachment filename');
 	const normalized = filename.normalize('NFC').split(/[\\/]+/).pop().trim();
-	if (!normalized || normalized === '.' || normalized === '..') fail('Invalid attachment filename');
+	if (!normalized || normalized === '.' || normalized === '..' || normalized.length > MAIL_LIMITS.MAX_FILENAME_LENGTH) fail('Invalid attachment filename');
 	return normalized;
+}
+
+export function contentDisposition(filename, inline = false) {
+	const safeName = normalizeAttachmentFilename(filename);
+	const fallback = safeName.replace(/[\\"]/g, '\\$&').replace(/[^\x20-\x7E]/g, '_');
+	return `${inline ? 'inline' : 'attachment'}; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(safeName)}`;
 }
 
 export function normalizeMimeType(value) {
 	if (!value) return 'application/octet-stream';
-	if (typeof value !== 'string' || CONTROL.test(value)) fail('Invalid attachment MIME type');
+	if (typeof value !== 'string' || CONTROL.test(value) || value.length > MAIL_LIMITS.MAX_MIME_TYPE_LENGTH) fail('Invalid attachment MIME type');
 	const mimeType = value.trim().toLowerCase();
 	if (!MIME_TOKEN.test(mimeType)) fail('Invalid attachment MIME type');
 	return mimeType;
 }
 
+export function isSafeInlineMimeType(value) { return SAFE_INLINE_MIME.has(value); }
+
 export function normalizeBase64(value) {
 	if (typeof value !== 'string' || !value || CONTROL.test(value)) fail('Invalid attachment content');
 	const content = value.startsWith('data:') ? value.slice(value.indexOf(',') + 1) : value;
+	assertEncodedAttachmentLimit(content);
 	if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(content)) fail('Invalid attachment content');
 	return content;
 }
@@ -51,6 +62,7 @@ export function normalizeAttachment(attachment) {
 	if (contentId != null) {
 		if (typeof contentId !== 'string' || !/^[A-Za-z0-9._-]{1,200}$/.test(contentId.replace(/^<|>$/g, ''))) fail('Invalid attachment content ID');
 		contentId = contentId.replace(/^<|>$/g, '');
+		if (!isSafeInlineMimeType(mimeType)) fail('Unsafe inline attachment type');
 	}
 	return { ...attachment, filename, mimeType, type: mimeType, content, contentId };
 }
@@ -69,9 +81,13 @@ export function validateOutgoingMail(params) {
 		return address;
 	});
 	const subject = requireSafeHeader(params.subject, 'subject');
+	if (subject.length > MAIL_LIMITS.MAX_SUBJECT_LENGTH) fail('Subject exceeds the size limit');
 	const name = params.name == null || params.name === '' ? null : requireSafeHeader(params.name, 'sender name');
+	if (name && name.length > MAIL_LIMITS.MAX_DISPLAY_NAME_LENGTH) fail('Sender name exceeds the size limit');
 	if (params.text != null && (typeof params.text !== 'string' || params.text.includes('\0'))) fail('Invalid plain-text body');
 	if (params.content != null && (typeof params.content !== 'string' || params.content.includes('\0'))) fail('Invalid HTML body');
 	if (params.attachments != null && !Array.isArray(params.attachments)) fail('Invalid attachment list');
-	return { ...params, receiveEmail, subject, name, text: params.text || '', content: params.content || '', attachments: (params.attachments || []).map(normalizeAttachment) };
+	const message = { ...params, receiveEmail, subject, name, text: params.text || '', content: params.content || '', attachments: (params.attachments || []).map(normalizeAttachment) };
+	assertOutboundMailLimits(message);
+	return message;
 }

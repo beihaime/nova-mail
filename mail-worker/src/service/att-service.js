@@ -9,7 +9,7 @@ import { parseHTML } from 'linkedom';
 import { v4 as uuidv4 } from 'uuid';
 import domainUtils from '../utils/domain-uitls';
 import settingService from "./setting-service";
-import { normalizeAttachmentFilename, normalizeMimeType } from '../utils/outgoing-mail-validation';
+import { contentDisposition, isSafeInlineMimeType, normalizeAttachmentFilename, normalizeMimeType } from '../utils/outgoing-mail-validation';
 
 const attService = {
 
@@ -18,15 +18,16 @@ const attService = {
 		for (let attachment of attachments) {
 			attachment.filename = normalizeAttachmentFilename(attachment.filename || 'attachment');
 			attachment.mimeType = normalizeMimeType(attachment.mimeType);
+			if (attachment.contentId && !isSafeInlineMimeType(attachment.mimeType)) attachment.contentId = null;
 
 			let metadate = {
 				contentType: attachment.mimeType,
 			}
 
 			if (!attachment.contentId) {
-				metadate.contentDisposition = `attachment;filename=${attachment.filename}`
+				metadate.contentDisposition = contentDisposition(attachment.filename)
 			} else {
-				metadate.contentDisposition = `inline;filename=${attachment.filename}`
+				metadate.contentDisposition = contentDisposition(attachment.filename, true)
 				metadate.cacheControl = `max-age=259200`
 			}
 
@@ -172,7 +173,7 @@ const attService = {
 		for (let att of attList) {
 			await r2Service.putObj(c, att.key, att.buff, {
 				contentType: att.type,
-				contentDisposition: `attachment;filename=${att.filename}`
+				contentDisposition: contentDisposition(att.filename)
 			});
 		}
 
@@ -183,6 +184,7 @@ const attService = {
 		for (let attData of attDataList) {
 			attData.filename = normalizeAttachmentFilename(attData.filename || 'attachment');
 			attData.mimeType = normalizeMimeType(attData.mimeType);
+			if (attData.contentId && !isSafeInlineMimeType(attData.mimeType)) attData.contentId = null;
 			attData.userId = userId;
 			attData.emailId = emailId;
 			attData.accountId = accountId;
@@ -193,7 +195,7 @@ const attService = {
 			await r2Service.putObj(c, attData.key, attData.buff, {
 				contentType: attData.mimeType,
 				cacheControl: `max-age=259200`,
-				contentDisposition: `inline;filename=${attData.filename}`
+				contentDisposition: contentDisposition(attData.filename, true)
 			});
 			delete attData.buff;
 		}

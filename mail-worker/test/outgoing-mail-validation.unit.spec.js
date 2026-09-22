@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeAttachment, normalizeAttachmentFilename, safeMessageId, validateOutgoingMail } from '../src/utils/outgoing-mail-validation';
+import { contentDisposition, normalizeAttachment, normalizeAttachmentFilename, safeMessageId, validateOutgoingMail } from '../src/utils/outgoing-mail-validation';
 
 const validMessage = {
 	receiveEmail: ['person@example.net'],
@@ -34,7 +34,9 @@ describe('outgoing mail validation', () => {
 	it('rejects malformed base64 and leaves no path or header syntax in attachment metadata', () => {
 		expect(() => normalizeAttachment({ filename: '../../file\r\nX: y', contentType: 'application/pdf', content: 'c2FmZQ==' })).toThrow();
 		expect(() => normalizeAttachment({ filename: 'file.txt', contentType: 'text/plain', content: 'not base64!' })).toThrow();
+		expect(() => normalizeAttachment({ filename: 'active.svg', contentType: 'image/svg+xml', contentId: 'cid1', content: 'c2FmZQ==' })).toThrow('Unsafe inline');
 		const attachment = normalizeAttachment({ filename: '../../folder\\file.txt', contentType: 'application/octet-stream', content: 'c2FmZQ==' });
 		expect(attachment.filename).toBe('file.txt');
+		expect(contentDisposition('evil"; inline.txt')).toContain("filename*=UTF-8''evil%22%3B%20inline.txt");
 	});
 });

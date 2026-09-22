@@ -24,6 +24,7 @@ import account from "../entity/account";
 import { att } from '../entity/att';
 import telegramService from './telegram-service';
 import { safeMessageId, validateOutgoingMail } from '../utils/outgoing-mail-validation';
+import { MAIL_LIMITS } from '../const/mail-limits';
 
 const emailService = {
 
@@ -266,6 +267,9 @@ const emailService = {
 		const { resendTokens, r2Domain, send, domainList } = await settingService.query(c);
 
 		let { imageDataList, html } = await attService.toImageUrlHtml(c, content);
+		if (imageDataList.length + attachments.length > MAIL_LIMITS.MAX_ATTACHMENT_COUNT) {
+			throw new BizError(t('attLimit'));
+		}
 
 		//判断是否关闭发件功能
 		if (send === settingConst.send.CLOSE) {
@@ -438,17 +442,11 @@ const emailService = {
 
 		//保存内嵌附件
 		if (imageDataList.length > 0) {
-			if (imageDataList.length > 10) {
-				throw new BizError(t('imageAttLimit'));
-			}
 			await attService.saveArticleAtt(c, imageDataList, userId, accountId, emailResult.emailId);
 		}
 
 		//保存普通附件
 		if (attachments?.length > 0) {
-			if (attachments.length > 10) {
-				throw new BizError(t('attLimit'));
-			}
 			await attService.saveSendAtt(c, attachments, userId, accountId, emailResult.emailId);
 		}
 
