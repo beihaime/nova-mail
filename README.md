@@ -177,7 +177,7 @@ curl --fail-with-body -X POST https://your-worker.example/api/bootstrap \
   -H "X-Bootstrap-Token: $BOOTSTRAP_TOKEN"
 ```
 
-The bootstrap token is consumed atomically and cannot be used again. Rotate or remove `BOOTSTRAP_TOKEN` after the successful initialization.
+The bootstrap token is consumed atomically and cannot be used again. After a successful initialization, remove `BOOTSTRAP_TOKEN` from the deployed Worker (or rotate it immediately); it is needed only for a genuinely new D1 installation.
 
 For more detailed deployment steps, refer to the upstream project docs and adjust according to this repository’s `wrangler.toml`.
 

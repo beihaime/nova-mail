@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { runBootstrap } from '../src/init/bootstrap';
+import { isApplicationInitialized, runBootstrap } from '../src/init/bootstrap';
 
 function createContext(token, db) {
 	return {
@@ -9,10 +9,18 @@ function createContext(token, db) {
 	};
 }
 
-function createDatabase() {
+function createDatabase({ initialized = false, settingTableExists = true } = {}) {
 	let claimed = false;
 	return {
 		prepare(query) {
+			if (query.includes('FROM setting')) {
+				return {
+					first: async () => {
+						if (!settingTableExists) throw new Error('D1_ERROR: no such table: setting');
+						return initialized ? { initialized: 1 } : null;
+					}
+				};
+			}
 			return {
 				bind() {
 					return {
@@ -33,6 +41,11 @@ function createDatabase() {
 }
 
 describe('bootstrap authorization', () => {
+	it('treats a missing setting table as a fresh database, but a setting record as authoritative initialization', async () => {
+		await expect(isApplicationInitialized(createDatabase({ settingTableExists: false }))).resolves.toBe(false);
+		await expect(isApplicationInitialized(createDatabase({ initialized: true }))).resolves.toBe(true);
+	});
+
 	it('does not run initialization when the independent bootstrap token is absent or wrong', async () => {
 		const db = createDatabase();
 		const initialize = async () => {
@@ -53,6 +66,33 @@ describe('bootstrap authorization', () => {
 
 		await expect(runBootstrap(createContext('a'.repeat(48), db), initialize)).resolves.toMatchObject({ status: 200 });
 		await expect(runBootstrap(createContext('a'.repeat(48), db), initialize)).resolves.toMatchObject({ status: 409 });
+		expect(calls).toBe(1);
+	});
+
+	it('rejects a legacy initialized installation that has no bootstrap marker', async () => {
+		const db = createDatabase({ initialized: true });
+		const initialize = async () => {
+			throw new Error('must not be called');
+		};
+
+		await expect(runBootstrap(createContext('a'.repeat(48), db), initialize))
+			.resolves.toMatchObject({ status: 409 });
+	});
+
+	it('allows a fresh database to be claimed only once under repeated requests', async () => {
+		const db = createDatabase();
+		let calls = 0;
+		const initialize = async (c) => {
+			calls += 1;
+			return c.text('success');
+		};
+
+		const responses = await Promise.all([
+			runBootstrap(createContext('a'.repeat(48), db), initialize),
+			runBootstrap(createContext('a'.repeat(48), db), initialize)
+		]);
+
+		expect(responses.map(response => response.status).sort()).toEqual([200, 409]);
 		expect(calls).toBe(1);
 	});
 });

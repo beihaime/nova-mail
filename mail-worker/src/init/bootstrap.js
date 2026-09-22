@@ -1,5 +1,9 @@
 const BOOTSTRAP_STATE_KEY = 'schema-bootstrap-v1';
 
+function isMissingTable(error) {
+	return /no such table/i.test(String(error?.message || error));
+}
+
 async function matchesBootstrapToken(provided, expected) {
 	if (typeof expected !== 'string' || expected.length < 32 || typeof provided !== 'string') {
 		return false;
@@ -38,6 +42,22 @@ async function claimBootstrap(db) {
 	return results[1].meta.changes === 1;
 }
 
+/**
+ * A populated setting record is created by the initial schema setup and is
+ * retained by every supported Nova Mail installation.  Unlike the bootstrap
+ * marker, it also exists on installations created before this mechanism.
+ */
+async function isApplicationInitialized(db) {
+	try {
+		return Boolean(await db.prepare('SELECT 1 AS initialized FROM setting LIMIT 1').first());
+	} catch (error) {
+		if (isMissingTable(error)) {
+			return false;
+		}
+		throw error;
+	}
+}
+
 async function releaseBootstrap(db) {
 	await db.prepare('DELETE FROM bootstrap_state WHERE bootstrap_key = ?')
 		.bind(BOOTSTRAP_STATE_KEY)
@@ -52,6 +72,12 @@ async function runBootstrap(c, initialize) {
 		return c.text('Not found', 404);
 	}
 
+	// Do this before creating bootstrap_state so legacy installations are not
+	// mutated merely by receiving an attempted bootstrap request.
+	if (await isApplicationInitialized(c.env.db)) {
+		return c.text('Bootstrap has already been completed', 409);
+	}
+
 	if (!await claimBootstrap(c.env.db)) {
 		return c.text('Bootstrap has already been completed', 409);
 	}
@@ -64,4 +90,4 @@ async function runBootstrap(c, initialize) {
 	}
 }
 
-export { matchesBootstrapToken, runBootstrap };
+export { isApplicationInitialized, matchesBootstrapToken, runBootstrap };
