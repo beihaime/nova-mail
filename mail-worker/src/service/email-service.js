@@ -23,6 +23,7 @@ import domainUtils from '../utils/domain-uitls';
 import account from "../entity/account";
 import { att } from '../entity/att';
 import telegramService from './telegram-service';
+import { safeMessageId, validateOutgoingMail } from '../utils/outgoing-mail-validation';
 
 const emailService = {
 
@@ -248,6 +249,7 @@ const emailService = {
 
 	//邮件发送
 	async send(c, params, userId) {
+		params = validateOutgoingMail(params);
 
 		let {
 			accountId, //发送账号id
@@ -492,10 +494,11 @@ const emailService = {
 			sendForm.attachments = attachments;
 		}
 
-		if (params.sendType === 'reply' && params.messageId) {
+		const messageId = safeMessageId(params.messageId);
+		if (params.sendType === 'reply' && messageId) {
 			sendForm.headers = {
-				'in-reply-to': params.messageId,
-				'references': params.messageId
+				'in-reply-to': messageId,
+				'references': messageId
 			};
 		}
 
@@ -512,7 +515,7 @@ const emailService = {
 		const resend = new Resend(resendToken);
 
 		const sendForm = {
-			from: `${params.name} <${params.accountEmail}>`,
+			from: `"${params.name.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}" <${params.accountEmail}>`,
 			to: [...params.receiveEmail],
 			subject: params.subject,
 			text: params.text,
@@ -520,10 +523,11 @@ const emailService = {
 			attachments: await this.toResendAttachments(params.attachments)
 		};
 
-		if (params.sendType === 'reply') {
+		const messageId = safeMessageId(params.messageId);
+		if (params.sendType === 'reply' && messageId) {
 			sendForm.headers = {
-				'in-reply-to': params.messageId,
-				'references': params.messageId
+				'in-reply-to': messageId,
+				'references': messageId
 			};
 		}
 

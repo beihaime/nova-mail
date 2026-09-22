@@ -9,12 +9,15 @@ import { parseHTML } from 'linkedom';
 import { v4 as uuidv4 } from 'uuid';
 import domainUtils from '../utils/domain-uitls';
 import settingService from "./setting-service";
+import { normalizeAttachmentFilename, normalizeMimeType } from '../utils/outgoing-mail-validation';
 
 const attService = {
 
 	async addAtt(c, attachments) {
 
 		for (let attachment of attachments) {
+			attachment.filename = normalizeAttachmentFilename(attachment.filename || 'attachment');
+			attachment.mimeType = normalizeMimeType(attachment.mimeType);
 
 			let metadate = {
 				contentType: attachment.mimeType,
@@ -151,6 +154,8 @@ const attService = {
 		const attDataList = [];
 
 		for (let att of attList) {
+			att.filename = normalizeAttachmentFilename(att.filename || 'attachment');
+			att.type = normalizeMimeType(att.type || att.mimeType || att.contentType);
 			att.buff = fileUtils.base64ToUint8Array(att.content);
 			att.key = constant.ATTACHMENT_PREFIX + await fileUtils.getBuffHash(att.buff) + fileUtils.getExtFileName(att.filename);
 			const attData = { userId, accountId, emailId };
@@ -176,6 +181,8 @@ const attService = {
 	async saveArticleAtt(c, attDataList, userId, accountId, emailId) {
 
 		for (let attData of attDataList) {
+			attData.filename = normalizeAttachmentFilename(attData.filename || 'attachment');
+			attData.mimeType = normalizeMimeType(attData.mimeType);
 			attData.userId = userId;
 			attData.emailId = emailId;
 			attData.accountId = accountId;

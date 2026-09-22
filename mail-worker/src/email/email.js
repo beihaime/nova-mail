@@ -10,6 +10,7 @@ import emailUtils from '../utils/email-utils';
 import roleService from '../service/role-service';
 import userService from '../service/user-service';
 import telegramService from '../service/telegram-service';
+import { normalizeAttachmentFilename, normalizeMimeType } from '../utils/outgoing-mail-validation';
 import aiService from '../service/ai-service';
 import webhookService from '../service/webhook-service';
 
@@ -132,6 +133,8 @@ export async function email(message, env, ctx) {
 
 		for (let item of email.attachments) {
 			let attachment = { ...item };
+			attachment.filename = normalizeAttachmentFilename(attachment.filename || 'attachment');
+			attachment.mimeType = normalizeMimeType(attachment.mimeType);
 			attachment.key = constant.ATTACHMENT_PREFIX + await fileUtils.getBuffHash(attachment.content) + fileUtils.getExtFileName(item.filename);
 			attachment.size = item.content.length ?? item.content.byteLength;
 			attachments.push(attachment);
