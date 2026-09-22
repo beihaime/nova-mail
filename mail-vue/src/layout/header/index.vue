@@ -492,8 +492,9 @@ function formatName(email) {
      that scrolls — never the menu. */
   .address-list { flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto; padding: 0 8px 8px; }
   .address-option {
-    /* 50px per alias: a comfortable tap target without loose spacing. */
-    width: 100%; height: 50px; display: flex; align-items: center; gap: 8px; padding: 0 7px;
+    /* 43px again on the wide menu: a mouse-driven list reads better compact.
+       Phones keep the taller touch row (see the 767px block). */
+    width: 100%; height: 43px; display: flex; align-items: center; gap: 8px; padding: 0 7px;
     text-align: left; color: var(--el-text-color-primary); border-radius: 8px; cursor: pointer;
     transition: background-color .14s ease;
     .address-email { min-width: 0; flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -717,6 +718,11 @@ function formatName(email) {
     /* `dvh` tracks the collapsing browser chrome; engines without dynamic
        viewport units fall back to the vh rule above the breakpoint. */
     max-height: min(75dvh, 720px);
+
+    .address-option {
+      /* Phone rows keep the touch height (48-52px band). */
+      height: 50px;
+    }
 
     .address-list {
       /* Native touch scrolling, no desktop scrollbar chrome, and no scroll
