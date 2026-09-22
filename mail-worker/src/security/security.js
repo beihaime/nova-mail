@@ -13,11 +13,14 @@ const publicRoutes = new Set([
 	'POST /register',
 	'GET /setting/websiteConfig',
 	'POST /webhooks',
-	'POST /oauth/linuxDo/login',
-	'POST /oauth/google/login',
+	'GET /oauth/linuxdo/login',
+	'GET /oauth/linuxdo/callback',
+	'GET /oauth/google/login',
+	'GET /oauth/google/callback',
 	'GET /oauth/github/login',
 	'GET /oauth/github/callback',
 	'POST /oauth/github/complete',
+	'POST /oauth/complete',
 	'POST /bootstrap'
 ]);
 

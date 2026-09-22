@@ -183,7 +183,7 @@ import {cvtR2Url} from "@/utils/convert.js";
 import {loginUserInfo} from "@/request/my.js";
 import {permsToRouter} from "@/perm/perm.js";
 import {useI18n} from "vue-i18n";
-import {githubOauthComplete, oauthBindUser, oauthLinuxDoLogin, oauthGoogleLogin} from "@/request/ouath.js";
+import {githubOauthComplete, oauthBindUser, oauthComplete} from "@/request/ouath.js";
 
 const {t} = useI18n();
 const accountStore = useAccountStore();
@@ -196,15 +196,6 @@ const bindLoading = ref(false)
 const oauthLoading = ref(false);
 const showBindForm = ref(false);
 const show = ref('login')
-
-const oauthKeys = ['linuxdo', 'google']
-
-const oauthProvider = computed(() => {
-  const fromState = route.query.state
-  if (oauthKeys.includes(fromState)) return fromState
-  const fromStore = sessionStorage.getItem('oauthProvider')
-  return oauthKeys.includes(fromStore) ? fromStore : null
-})
 
 const oauthProviders = computed(() => {
   const allProviders = [
@@ -355,19 +346,8 @@ const getEmailName = (email) => {
 }
 
 function oauthLogin(provider) {
-  const clientId = settingStore.settings[provider + 'ClientId']
-  const redirectUri = encodeURIComponent(window.location.origin + '/login')
-  sessionStorage.setItem('oauthProvider', provider)
-  const authorizeUrls = {
-    linuxdo: `https://connect.linux.do/oauth2/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=openid+profile+email&state=${provider}`,
-    google: `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=openid+profile+email&state=${provider}`,
-  }
-  window.location.href = authorizeUrls[provider]
-}
-
-const loginFns = {
-  linuxdo: oauthLinuxDoLogin,
-  google: oauthGoogleLogin,
+  const apiBase = (import.meta.env.VITE_BASE_URL || '/api').replace(/\/$/, '')
+  window.location.assign(`${apiBase}/oauth/${provider}/login`)
 }
 
 oauthGetUser();
@@ -376,51 +356,25 @@ async function oauthGetUser() {
 
   const params = new URLSearchParams(window.location.search)
   const githubStatus = params.get('github')
+  const oauthStatus = params.get('oauth')
   const grant = params.get('grant')
-  if (githubStatus) {
+  if (githubStatus || oauthStatus) {
     window.history.replaceState({}, '', window.location.origin + window.location.pathname)
-    if (githubStatus === 'complete' && grant) {
+    const status = githubStatus || oauthStatus
+    if (status === 'complete' && grant) {
       oauthLoading.value = true
       try {
-        const data = await githubOauthComplete(grant)
+        const data = githubStatus ? await githubOauthComplete(grant) : await oauthComplete(grant)
         await saveToken(data.token)
       } catch {
         oauthLoading.value = false
       }
       return
     }
-    const messageKey = githubStatus === 'unlinked' ? 'githubNotLinked' : 'githubLoginFailed'
+    const messageKey = status === 'unlinked' ? 'githubNotLinked' : 'githubLoginFailed'
     ElMessage({ message: t(messageKey), type: 'warning', plain: true })
     return
   }
-  const code = params.get('code')
-  if (!code || !oauthProvider.value) return
-
-  const provider = oauthProvider.value
-  oauthLoading.value = true
-  sessionStorage.removeItem('oauthProvider')
-  window.history.replaceState({}, '', window.location.origin + window.location.pathname)
-
-  loginFns[provider](code, window.location.origin + '/login').then(data => {
-
-    bindForm.bindToken = data.bindToken;
-
-    if (!data.token) {
-      showBindForm.value = true
-      oauthLoading.value = false
-      ElMessage({
-        message: '请注册绑定一个邮箱',
-        type: 'warning',
-        duration: 4000,
-        plain: true,
-      })
-      return;
-    }
-
-    saveToken(data.token);
-  }).catch(() => {
-    oauthLoading.value = false
-  })
 }
 
 function startGithubLogin() {

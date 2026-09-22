@@ -26,6 +26,7 @@ const dbInit = {
 		await this.v3_2DB(c);
 		await this.v3_3DB(c);
 		await this.v3_4DB(c);
+		await this.v3_5DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
 	},
@@ -57,6 +58,26 @@ const dbInit = {
 			await c.env.db.prepare(`UPDATE setting SET github_client_secret = ''`).run();
 		} catch (e) {
 			console.warn(`跳过 GitHub 旧密钥清理：${e.message}`);
+		}
+	},
+
+	async v3_5DB(c) {
+		try {
+			await c.env.db.batch([
+				c.env.db.prepare(`CREATE TABLE IF NOT EXISTS oauth_transactions (
+					state TEXT PRIMARY KEY, provider TEXT NOT NULL, intent TEXT NOT NULL,
+					browser_token TEXT NOT NULL, code_verifier TEXT, nonce TEXT,
+					user_id INTEGER, session_token TEXT, expires_at INTEGER NOT NULL
+				)`),
+				c.env.db.prepare(`CREATE TABLE IF NOT EXISTS oauth_login_grants (
+					grant TEXT PRIMARY KEY, transaction_state TEXT NOT NULL, browser_token TEXT NOT NULL,
+					token TEXT NOT NULL, expires_at INTEGER NOT NULL
+				)`),
+				c.env.db.prepare(`CREATE INDEX IF NOT EXISTS idx_oauth_transactions_expiry ON oauth_transactions(expires_at)`),
+				c.env.db.prepare(`CREATE INDEX IF NOT EXISTS idx_oauth_login_grants_expiry ON oauth_login_grants(expires_at)`)
+			]);
+		} catch (e) {
+			console.warn(`跳过 OAuth 事务表：${e.message}`);
 		}
 	},
 

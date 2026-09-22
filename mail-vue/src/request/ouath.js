@@ -1,9 +1,5 @@
 import http from '@/axios/index.js';
 
-export function oauthLinuxDoLogin(code, redirectUri) {
-    return http.post('/oauth/linuxDo/login',{code, redirectUri})
-}
-
 export function githubOauthComplete(grant) {
     return http.post('/oauth/github/complete', { grant })
 }
@@ -20,9 +16,7 @@ export function disconnectGithubAccount() {
     return http.delete('/oauth/github/account')
 }
 
-export function oauthGoogleLogin(code, redirectUri) {
-    return http.post('/oauth/google/login',{code, redirectUri})
-}
+export function oauthComplete(grant) { return http.post('/oauth/complete', { grant }) }
 
 export function oauthBindUser(form) {
     return http.put('/oauth/bindUser', form)
