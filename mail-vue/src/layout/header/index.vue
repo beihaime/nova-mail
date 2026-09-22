@@ -349,17 +349,18 @@ function formatName(email) {
   /* Phones keep the bundled sun/moon assets (dark → sun, light → moon). Their
      art carries different internal transparent padding (the sun fills ~76% of
      its canvas, the moon ~63%), so each box is scaled to land both glyphs on
-     the same ~25px optical size instead of matching raw box widths. That keeps
-     the toggle at the avatar's and title's visual weight rather than dominating
-     them; the 44px `.icon-item` above still owns the touch target. */
+     the same ~20px optical size instead of matching raw box widths. ~20px keeps
+     the toggle on the same scale as the rest of the phone chrome (bottom nav
+     22px, compose 21px) instead of dominating the title and the avatar; the
+     44px `.icon-item` above still owns the touch target. */
   .toolbar .sun-icon .app-icon {
-    width: 34px;
-    height: 34px;
+    width: 26px;
+    height: 26px;
   }
 
   .toolbar .dark-icon .app-icon {
-    width: 40px;
-    height: 40px;
+    width: 32px;
+    height: 32px;
   }
 
   .toolbar .notice {
@@ -665,7 +666,7 @@ function formatName(email) {
     place-items: center;
   }
   /* Phones keep the theme toggle: a 44px target whose sun/moon glyph is scaled
-     to ~28px optical size (per-asset boxes live in the block above), still
+     to ~20px optical size (per-asset boxes live in the block above), still
      vertically centred on the 42px avatar and seated 16px away from it. */
   .toolbar .sun-icon,
   .toolbar .dark-icon { width: 44px; height: 44px; }
