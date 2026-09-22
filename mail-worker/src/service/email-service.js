@@ -347,7 +347,7 @@ const emailService = {
 		//如果是回复邮件
 		if (sendType === 'reply') {
 
-			emailRow = await this.selectById(c, emailId);
+			emailRow = await this.selectById(c, emailId, userId);
 
 			if (!emailRow) {
 				throw new BizError(t('notExistEmailReply'));
@@ -817,9 +817,10 @@ const emailService = {
 		return document.toString();
 	},
 
-	selectById(c, emailId) {
+	selectById(c, emailId, userId) {
 		return orm(c).select().from(email).where(
 			and(eq(email.emailId, emailId),
+				userId === undefined ? undefined : eq(email.userId, userId),
 				eq(email.isDel, isDel.NORMAL)))
 			.get();
 	},
