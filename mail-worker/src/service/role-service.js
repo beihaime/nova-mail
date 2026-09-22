@@ -12,7 +12,7 @@ import { t } from '../i18n/i18n.js';
 import emailUtils from '../utils/email-utils';
 import permService from './perm-service';
 import userContext from '../security/user-context';
-import { canDelegateRole } from '../security/role-authorization';
+import { canAssignRole, canDelegateRole } from '../security/role-authorization';
 
 function normalizePermIds(permIds) {
 	if (!Array.isArray(permIds)) {
@@ -147,6 +147,11 @@ const roleService = {
 		}
 
 		const defRoleRow = await orm(c).select().from(role).where(eq(role.isDefault, roleConst.isDefault.OPEN)).get();
+		const affectedUsers = await orm(c).select().from(user).where(eq(user.type, roleId)).all();
+
+		for (const affectedUser of affectedUsers) {
+			await this.assertCanAssignRole(c, userId, affectedUser, defRoleRow);
+		}
 
 		await userService.updateAllUserType(c, defRoleRow.roleId, roleId);
 
@@ -177,6 +182,41 @@ const roleService = {
 
 	selectById(c, roleId) {
 		return orm(c).select().from(role).where(eq(role.roleId, roleId)).get();
+	},
+
+	/**
+	 * Authorize every user.type assignment in one place.  A role-management
+	 * permission permits delegation only within the caller's effective
+	 * permissions and quotas; it is never a blanket promotion capability.
+	 */
+	async assertCanAssignRole(c, actorUserId, targetUser, destinationRole) {
+		if (!destinationRole) {
+			throw new BizError(t('roleNotExist'));
+		}
+
+		const actorUser = await orm(c).select().from(user).where(eq(user.userId, actorUserId)).get();
+		if (!actorUser) {
+			throw new BizError(t('unauthorized'), 403);
+		}
+
+		const [actorRole, actorPermIds, targetPermIds, destinationPerms] = await Promise.all([
+			this.selectByUserId(c, actorUserId),
+			permService.userPermIds(c, actorUserId),
+			targetUser?.type ? this.rolePermIds(c, targetUser.type) : Promise.resolve([]),
+			this.rolePerms(c, destinationRole.roleId)
+		]);
+
+		if (!canAssignRole({
+			actor: { ...actorUser, role: actorRole?.roleId ? actorRole : null },
+			targetUser,
+			destinationRole,
+			actorPermIds,
+			targetPermIds,
+			destinationPerms,
+			configuredAdmin: c.env.admin
+		})) {
+			throw new BizError(t('unauthorized'), 403);
+		}
 	},
 
 	async authorizeRoleChanges(c, userId, requestedRole, existingRole) {
@@ -216,6 +256,14 @@ const roleService = {
 		const permissions = await orm(c).select({ permId: rolePerm.permId }).from(rolePerm)
 			.where(eq(rolePerm.roleId, roleId)).all();
 		return permissions.map(item => item.permId);
+	},
+
+	rolePerms(c, roleId) {
+		return orm(c).select({ permId: perm.permId, permKey: perm.permKey, type: perm.type })
+			.from(rolePerm)
+			.leftJoin(perm, eq(perm.permId, rolePerm.permId))
+			.where(eq(rolePerm.roleId, roleId))
+			.all();
 	},
 
 	selectByIdsHasPermKey(c, types, permKey) {

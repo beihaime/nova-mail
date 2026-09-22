@@ -149,6 +149,9 @@ const publicService = {
 				type = roleRow ? roleRow.roleId : type;
 			}
 
+			const destinationRole = await roleService.selectById(c, type);
+			await roleService.assertCanAssignRole(c, userContext.getUserId(c), { email }, destinationRole);
+
 			const userName = emailUtils.getName(email);
 
 			userList.push(

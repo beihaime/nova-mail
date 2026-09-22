@@ -20,6 +20,7 @@ import {oauth} from "../entity/oauth";
 import oauthService from "./oauth-service";
 import settingService from './setting-service';
 import starService from './star-service';
+import userContext from '../security/user-context';
 
 const userService = {
 
@@ -296,6 +297,12 @@ const userService = {
 		if (!roleRow) {
 			throw new BizError(t('roleNotExist'));
 		}
+		const targetUser = await this.selectById(c, userId);
+		if (!targetUser) {
+			throw new BizError(t('notExist'));
+		}
+
+		await roleService.assertCanAssignRole(c, userContext.getUserId(c), targetUser, roleRow);
 
 		await orm(c)
 			.update(user)
@@ -354,6 +361,8 @@ const userService = {
 		if (!role) {
 			throw new BizError(t('roleNotExist'));
 		}
+
+		await roleService.assertCanAssignRole(c, userContext.getUserId(c), { email }, role);
 
 		const { salt, hash } = await saltHashUtils.hashPassword(password);
 

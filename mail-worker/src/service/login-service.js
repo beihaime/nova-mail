@@ -74,13 +74,13 @@ const loginService = {
 		let regKeyId = 0;
 
 		if (regKey === settingConst.regKey.OPEN) {
-			const result = await this.handleOpenRegKey(c, regKey, code);
+			const result = await this.handleOpenRegKey(c, code, email);
 			type = result?.type;
 			regKeyId = result?.regKeyId;
 		}
 
 		if (regKey === settingConst.regKey.OPTIONAL) {
-			const result = await this.handleOpenOptional(c, regKey, code);
+			const result = await this.handleOpenOptional(c, code, email);
 			type = result?.type;
 			regKeyId = result?.regKeyId;
 		}
@@ -152,7 +152,7 @@ const loginService = {
 
 	},
 
-	async handleOpenRegKey(c, regKey, code) {
+	async handleOpenRegKey(c, code, email) {
 
 		if (!code) {
 			throw new BizError(t('emptyRegKey'));
@@ -175,10 +175,13 @@ const loginService = {
 			throw new BizError(t('regKeyExpire'));
 		}
 
+		const roleRow = await roleService.selectById(c, regKeyRow.roleId);
+		await roleService.assertCanAssignRole(c, regKeyRow.userId, { email }, roleRow);
+
 		return { type: regKeyRow.roleId, regKeyId: regKeyRow.regKeyId };
 	},
 
-	async handleOpenOptional(c, regKey, code) {
+	async handleOpenOptional(c, code, email) {
 
 		if (!code) {
 			return null;
@@ -194,6 +197,13 @@ const loginService = {
 		const expireTime = toUtc(regKeyRow.expireTime).tz('Asia/Shanghai').startOf('day');
 
 		if (regKeyRow.count <= 0 || expireTime.isBefore(today)) {
+			return null;
+		}
+
+		const roleRow = await roleService.selectById(c, regKeyRow.roleId);
+		try {
+			await roleService.assertCanAssignRole(c, regKeyRow.userId, { email }, roleRow);
+		} catch {
 			return null;
 		}
 
