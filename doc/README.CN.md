@@ -156,6 +156,7 @@ pnpm dev
 ```bash
 cd mail-worker
 pnpm wrangler secret put jwt_secret
+pnpm wrangler secret put BOOTSTRAP_TOKEN
 pnpm wrangler secret put TURNSTILE_SECRET_KEY
 # 如使用 Resend
 pnpm wrangler secret put RESEND_API_KEY
@@ -168,6 +169,15 @@ pnpm deploy
 ```
 
 前端静态资源会通过 `wrangler.toml` 中的 `[assets]` 配置随 Workers 一起发布。
+
+仅当数据库为新建时，在部署完成后执行一次数据库初始化。`BOOTSTRAP_TOKEN` 必须是与 JWT 签名密钥独立生成的随机密钥；它通过请求头传递，不会出现在 URL 中：
+
+```bash
+curl --fail-with-body -X POST https://your-worker.example/api/bootstrap \
+  -H "X-Bootstrap-Token: $BOOTSTRAP_TOKEN"
+```
+
+该令牌会被原子性地消耗，无法再次使用。初始化成功后请轮换或删除 `BOOTSTRAP_TOKEN`。
 
 更详细的部署说明可参考原项目文档，并结合本仓库的 `wrangler.toml` 进行调整。
 

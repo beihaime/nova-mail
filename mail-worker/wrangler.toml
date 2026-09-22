@@ -43,6 +43,8 @@ crons = ["0 * * * *"]	#每小时执行；resetDaySendCount 仅在 UTC 0 点生�
 #admin = ""					#管理员的邮箱	示例: admin@example.com
 # JWT secret is a Worker secret, not a [vars] value:
 # pnpm wrangler secret put jwt_secret
+# Required only to initialize a new D1 database. Generate an independent, random value:
+# pnpm wrangler secret put BOOTSTRAP_TOKEN
 # Turnstile verification is server-side only. Configure this in Workers secrets:
 # pnpm wrangler secret put TURNSTILE_SECRET_KEY
 TURNSTILE_HOSTNAME = "mail.beihaime.com"

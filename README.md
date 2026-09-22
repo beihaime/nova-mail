@@ -156,6 +156,7 @@ pnpm dev
 ```bash
 cd mail-worker
 pnpm wrangler secret put jwt_secret
+pnpm wrangler secret put BOOTSTRAP_TOKEN
 pnpm wrangler secret put TURNSTILE_SECRET_KEY
 # If using Resend
 pnpm wrangler secret put RESEND_API_KEY
@@ -168,6 +169,15 @@ pnpm deploy
 ```
 
 Frontend static assets are published together with the Worker via the `[assets]` config in `wrangler.toml`.
+
+For a new database only, initialize the schema once after deployment. `BOOTSTRAP_TOKEN` must be a separately generated random secret; it is never the JWT signing secret and is sent in a request header rather than a URL:
+
+```bash
+curl --fail-with-body -X POST https://your-worker.example/api/bootstrap \
+  -H "X-Bootstrap-Token: $BOOTSTRAP_TOKEN"
+```
+
+The bootstrap token is consumed atomically and cannot be used again. Rotate or remove `BOOTSTRAP_TOKEN` after the successful initialization.
 
 For more detailed deployment steps, refer to the upstream project docs and adjust according to this repository’s `wrangler.toml`.
 

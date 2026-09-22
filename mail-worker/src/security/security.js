@@ -18,13 +18,13 @@ const publicRoutes = new Set([
 	'POST /oauth/google/login',
 	'GET /oauth/github/login',
 	'GET /oauth/github/callback',
-	'POST /oauth/github/complete'
+	'POST /oauth/github/complete',
+	'POST /bootstrap'
 ]);
 
 function isPublicRoute(c) {
 	const route = `${c.req.method} ${c.req.path}`;
 	return publicRoutes.has(route)
-		|| (c.req.method === 'GET' && c.req.path.startsWith('/init/'))
 		|| (c.req.method === 'GET' && c.req.path.startsWith('/telegram/getEmail/'));
 }
 
