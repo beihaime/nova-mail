@@ -183,6 +183,10 @@ The bootstrap token is consumed atomically and cannot be used again. After a suc
 
 Webhook destinations must use HTTPS. Nova Mail rejects local, private, link-local, reserved, metadata, and other unsafe literal IP destinations, and it never follows webhook redirects. Cloudflare Workers' standard `fetch` API does not expose DNS answers or let this Worker pin a checked DNS address to the later outbound connection. Therefore, an arbitrary public hostname can still be a DNS-rebinding/private-DNS risk where the deployment permits access to private networks. For that deployment model, configure an administrator-managed hostname allowlist or route webhooks through a controlled outbound proxy/Cloudflare egress policy; do not treat the in-Worker URL filter as DNS-rebinding protection.
 
+### Attachment storage
+
+Mail attachments are private objects. Do not configure an R2 custom domain, S3 bucket policy, or CDN rule that publicly serves the `attachments/` prefix. Nova Mail retrieves attachments only through its authenticated `/api/oss/*` authorization path; reserve public storage paths such as `static/` for non-sensitive UI assets.
+
 For more detailed deployment steps, refer to the upstream project docs and adjust according to this repository’s `wrangler.toml`.
 
 ---

@@ -35,7 +35,7 @@
             <el-alert v-if="email.status === 5" :closable="false" :title="$t('delayed')" class="email-msg" type="warning" show-icon />
           </div>
           <el-scrollbar class="htm-scrollbar" :class="!email.attList?.length ? 'bottom-distance' : ''">
-            <ShadowHtml class="shadow-html" :html="formatImage(email.content)" v-if="email.content" />
+            <ShadowHtml class="shadow-html" :html="renderedContent" v-if="email.content" />
             <pre v-else class="email-text" >{{email.text}}</pre>
           </el-scrollbar>
           <div class="att" v-if="email.attList?.length > 0">
@@ -55,9 +55,7 @@
                 <div class="att-size">{{ formatBytes(att.size) }}</div>
                 <div class="opt-icon att-icon">
                   <Icon v-if="isImage(att.filename)" icon="hugeicons:view" width="22" height="22" @click="showImage(att.key)"/>
-                  <a :href="cvtR2Url(att.key)" download>
-                    <AppIcon name="download-outline" :size="22" />
-                  </a>
+                  <AppIcon name="download-outline" :size="22" @click="downloadAttachment(att)" />
                 </div>
               </div>
             </div>
@@ -89,7 +87,8 @@ import {useAccountStore} from "@/store/account.js";
 import {formatDetailDate} from "@/utils/day.js";
 import {starAdd, starCancel} from "@/request/star.js";
 import {getExtName, formatBytes} from "@/utils/file-utils.js";
-import {cvtR2Url,toOssDomain} from "@/utils/convert.js";
+import {toOssDomain} from "@/utils/convert.js";
+import {downloadPrivateAttachment, fetchPrivateAttachmentUrl} from "@/utils/private-attachment.js";
 import {getIconByName} from "@/utils/icon-utils.js";
 import {useSettingStore} from "@/store/setting.js";
 import {allEmailDelete} from "@/request/all-email.js";
@@ -111,6 +110,8 @@ const email = computed(() => emailStore.contentData.email || {
 })
 const showPreview = ref(false)
 const srcList = reactive([])
+const renderedContent = ref('')
+let privateObjectUrls = []
 
 const { t } = useI18n()
 watch(() => accountStore.currentAccountId, () => {
@@ -161,6 +162,7 @@ onUnmounted(() => {
   emailStore.contentData.showUnread = false;
   readRequesting = false
   window.removeEventListener('keydown', handleKeyDown);
+  revokePrivateObjectUrls()
 })
 
 function handleKeyDown(event) {
@@ -184,18 +186,53 @@ function toMessage(message) {
   return  message ? JSON.parse(message).message : '';
 }
 
-function formatImage(content) {
-  content = content || '';
-  const domain = settingStore.settings.r2Domain;
-  return  content.replace(/{{domain}}/g, toOssDomain(domain) + '/');
+function revokePrivateObjectUrls() {
+  privateObjectUrls.forEach(url => URL.revokeObjectURL(url))
+  privateObjectUrls = []
 }
 
-function showImage(key) {
+function attachmentKeyFromUrl(src) {
+  if (!src) return null
+  if (src.startsWith('attachments/')) return src
+  const domain = toOssDomain(settingStore.settings.r2Domain)
+  return domain && src.startsWith(domain + '/') ? src.slice(domain.length + 1) : null
+}
+
+async function renderPrivateImages(content, attachments) {
+  revokePrivateObjectUrls()
+  const document = new DOMParser().parseFromString((content || '').replace(/{{domain}}/g, ''), 'text/html')
+  const attachmentKeys = new Set((attachments || []).map(item => item.key))
+
+  for (const image of document.querySelectorAll('img[src]')) {
+    const key = attachmentKeyFromUrl(image.getAttribute('src'))
+    if (!key || !attachmentKeys.has(key)) continue
+    try {
+      const url = await fetchPrivateAttachmentUrl(key)
+      privateObjectUrls.push(url)
+      image.setAttribute('src', url)
+    } catch {
+      image.removeAttribute('src')
+    }
+  }
+
+  renderedContent.value = document.body.innerHTML
+}
+
+watch(() => [email.value.content, email.value.attList], ([content, attachments]) => {
+  renderPrivateImages(content, attachments)
+}, { immediate: true, deep: true })
+
+async function showImage(key) {
   if (!isImage(key)) return;
-  const url = cvtR2Url(key)
+  const url = await fetchPrivateAttachmentUrl(key)
+  privateObjectUrls.push(url)
   srcList.length = 0
   srcList.push(url)
   showPreview.value = true
+}
+
+function downloadAttachment(att) {
+  downloadPrivateAttachment(att.key, att.filename)
 }
 
 function isImage(filename) {

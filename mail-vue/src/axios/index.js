@@ -15,6 +15,9 @@ http.interceptors.request.use(config => {
 })
 
 http.interceptors.response.use((res) => {
+		if (res.config.responseType === 'blob') {
+			return res.data
+		}
 
         return new Promise((resolve, reject) => {
 
@@ -117,5 +120,4 @@ http.interceptors.response.use((res) => {
     })
 
 export default http
-
 

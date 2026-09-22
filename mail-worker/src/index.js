@@ -17,7 +17,9 @@ export default {
 			return app.fetch(req, env, ctx);
 		}
 
-		 if (['/static/','/attachments/'].some(p => url.pathname.startsWith(p))) {
+		 // Static UI assets are public. Email attachments are private and must go
+		 // through the authenticated /api/oss/* handler below.
+		 if (url.pathname.startsWith('/static/')) {
 			 return await kvObjService.toObjResp( { env }, url.pathname.substring(1));
 		 }
 
