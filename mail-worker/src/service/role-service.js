@@ -10,12 +10,42 @@ import user from '../entity/user';
 import verifyUtils from '../utils/verify-utils';
 import { t } from '../i18n/i18n.js';
 import emailUtils from '../utils/email-utils';
+import permService from './perm-service';
+import userContext from '../security/user-context';
+import { canDelegateRole } from '../security/role-authorization';
+
+function normalizePermIds(permIds) {
+	if (!Array.isArray(permIds)) {
+		throw new BizError(t('unauthorized'), 403);
+	}
+
+	const normalized = [...new Set(permIds.map(Number))];
+	if (normalized.some(permId => !Number.isInteger(permId) || permId <= 0)) {
+		throw new BizError(t('unauthorized'), 403);
+	}
+	return normalized;
+}
+
+function roleValues(params, banEmail, availDomain) {
+	const allowedFields = ['name', 'description', 'banEmailType', 'sort', 'sendCount', 'sendType', 'accountCount'];
+	const values = { banEmail, availDomain };
+	for (const field of allowedFields) {
+		if (params[field] !== undefined) {
+			values[field] = params[field];
+		}
+	}
+	return values;
+}
 
 const roleService = {
 
 	async add(c, params, userId) {
 
 		let { name, permIds, banEmail, availDomain } = params;
+		permIds = normalizePermIds(permIds);
+		if (!Array.isArray(banEmail) || !Array.isArray(availDomain)) {
+			throw new BizError(t('unauthorized'), 403);
+		}
 
 		if (!name) {
 			throw new BizError(t('emptyRoleName'));
@@ -33,13 +63,14 @@ const roleService = {
 
 		availDomain = availDomain.join(',');
 
-		roleRow = await orm(c).insert(role).values({...params, banEmail, availDomain, userId}).returning().get();
+		const permissions = await this.authorizeRoleChanges(c, userId, { ...params, permIds, banEmail, availDomain });
+		roleRow = await orm(c).insert(role).values({...roleValues(params, banEmail, availDomain), userId}).returning().get();
 
 		if (permIds.length === 0) {
 			return;
 		}
 
-		const rolePermList = permIds.map(permId => ({ permId, roleId: roleRow.roleId }));
+		const rolePermList = permissions.map(permission => ({ permId: permission.permId, roleId: roleRow.roleId }));
 
 		await orm(c).insert(rolePerm).values(rolePermList).run();
 
@@ -62,15 +93,17 @@ const roleService = {
 		return roleList;
 	},
 
-	async setRole(c, params) {
+	async setRole(c, params, userId) {
 
 		let { name, permIds, roleId, banEmail, availDomain } = params;
+		permIds = normalizePermIds(permIds);
+		if (!Array.isArray(banEmail) || !Array.isArray(availDomain)) {
+			throw new BizError(t('unauthorized'), 403);
+		}
 
 		if (!name) {
 			throw new BizError(t('emptyRoleName'));
 		}
-
-		delete params.isDefault
 
 		const notEmailIndex = banEmail.findIndex(item => (!verifyUtils.isEmail(item) && !verifyUtils.isDomain(item)) && item !== "*")
 
@@ -82,17 +115,23 @@ const roleService = {
 
 		availDomain = availDomain.join(',')
 
-		await orm(c).update(role).set({...params, banEmail, availDomain}).where(eq(role.roleId, roleId)).run();
+		const roleRow = await orm(c).select().from(role).where(eq(role.roleId, roleId)).get();
+		if (!roleRow) {
+			throw new BizError(t('roleNotExist'));
+		}
+		const permissions = await this.authorizeRoleChanges(c, userId, { ...params, permIds, banEmail, availDomain }, roleRow);
+
+		await orm(c).update(role).set(roleValues(params, banEmail, availDomain)).where(eq(role.roleId, roleId)).run();
 		await orm(c).delete(rolePerm).where(eq(rolePerm.roleId, roleId)).run();
 
-		if (permIds.length > 0) {
-			const rolePermList = permIds.map(permId => ({ permId, roleId: roleId }));
+		if (permissions.length > 0) {
+			const rolePermList = permissions.map(permission => ({ permId: permission.permId, roleId: roleId }));
 			await orm(c).insert(rolePerm).values(rolePermList).run();
 		}
 
 	},
 
-	async delete(c, params) {
+	async delete(c, params, userId) {
 
 		const { roleId } = params;
 
@@ -101,6 +140,7 @@ const roleService = {
 		if (!roleRow) {
 			throw new BizError(t('notExist'));
 		}
+		await this.authorizeRoleChanges(c, userId, { permIds: [] }, roleRow);
 
 		if (roleRow.isDefault) {
 			throw new BizError(t('delDefRole'));
@@ -123,7 +163,10 @@ const roleService = {
 		return await orm(c).select().from(role).where(eq(role.isDefault, roleConst.isDefault.OPEN)).get();
 	},
 
-	async setDefault(c, params) {
+	async setDefault(c, params, userId) {
+		if (userContext.getUser(c).email !== c.env.admin) {
+			throw new BizError(t('unauthorized'), 403);
+		}
 		const roleRow = await orm(c).select().from(role).where(eq(role.roleId, params.roleId)).get();
 		if (!roleRow) {
 			throw new BizError(t('roleNotExist'));
@@ -134,6 +177,45 @@ const roleService = {
 
 	selectById(c, roleId) {
 		return orm(c).select().from(role).where(eq(role.roleId, roleId)).get();
+	},
+
+	async authorizeRoleChanges(c, userId, requestedRole, existingRole) {
+		const permissions = await permService.permsByIds(c, requestedRole.permIds);
+		if (permissions.length !== requestedRole.permIds.length) {
+			throw new BizError(t('unauthorized'), 403);
+		}
+
+		if (userContext.getUser(c).email === c.env.admin) {
+			return permissions;
+		}
+
+		if (existingRole && existingRole.userId !== userId) {
+			throw new BizError(t('unauthorized'), 403);
+		}
+
+		const [actorPermIds, actorRole, existingPermissions] = await Promise.all([
+			permService.userPermIds(c, userId),
+			this.selectByUserId(c, userId),
+			existingRole ? permService.permsByIds(c, await this.rolePermIds(c, existingRole.roleId)) : Promise.resolve([])
+		]);
+		if (!actorRole) {
+			throw new BizError(t('unauthorized'), 403);
+		}
+
+		const requestedButtonPermIds = permissions.filter(item => item.type === permConst.type.BUTTON).map(item => item.permId);
+		const requestedPermKeys = permissions.filter(item => item.type === permConst.type.BUTTON).map(item => item.permKey);
+		const existingButtonPermIds = existingPermissions.filter(item => item.type === permConst.type.BUTTON).map(item => item.permId);
+		if (!canDelegateRole({ actorPermIds, existingPermIds: existingButtonPermIds, requestedButtonPermIds, requestedPermKeys, actorRole, requestedRole })) {
+			throw new BizError(t('unauthorized'), 403);
+		}
+
+		return permissions;
+	},
+
+	async rolePermIds(c, roleId) {
+		const permissions = await orm(c).select({ permId: rolePerm.permId }).from(rolePerm)
+			.where(eq(rolePerm.roleId, roleId)).all();
+		return permissions.map(item => item.permId);
 	},
 
 	selectByIdsHasPermKey(c, types, permKey) {

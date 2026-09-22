@@ -1,6 +1,6 @@
 import orm from '../entity/orm';
 import perm from '../entity/perm';
-import { eq, ne, and, asc } from 'drizzle-orm';
+import { eq, ne, and, asc, inArray } from 'drizzle-orm';
 import rolePerm from '../entity/role-perm';
 import user from '../entity/user';
 import role from '../entity/role';
@@ -31,6 +31,26 @@ const permService = {
 			.where(and(eq(user.userId,userId),eq(perm.type,permConst.type.BUTTON)))
 			.all();
 		return userPerms.map(perm => perm.permKey);
+	},
+
+	async userPermIds(c, userId) {
+		const userPerms = await orm(c).select({permId: perm.permId}).from(user)
+			.leftJoin(role, eq(role.roleId,user.type))
+			.rightJoin(rolePerm, eq(rolePerm.roleId,role.roleId))
+			.leftJoin(perm, eq(rolePerm.permId,perm.permId))
+			.where(and(eq(user.userId,userId),eq(perm.type,permConst.type.BUTTON)))
+			.all();
+		return userPerms.map(item => item.permId);
+	},
+
+	permsByIds(c, permIds) {
+		if (permIds.length === 0) {
+			return Promise.resolve([]);
+		}
+		return orm(c).select({ permId: perm.permId, permKey: perm.permKey, type: perm.type })
+			.from(perm)
+			.where(inArray(perm.permId, permIds))
+			.all();
 	}
 }
 
