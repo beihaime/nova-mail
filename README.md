@@ -179,6 +179,10 @@ curl --fail-with-body -X POST https://your-worker.example/api/bootstrap \
 
 The bootstrap token is consumed atomically and cannot be used again. After a successful initialization, remove `BOOTSTRAP_TOKEN` from the deployed Worker (or rotate it immediately); it is needed only for a genuinely new D1 installation.
 
+### Webhook outbound security
+
+Webhook destinations must use HTTPS. Nova Mail rejects local, private, link-local, reserved, metadata, and other unsafe literal IP destinations, and it never follows webhook redirects. Cloudflare Workers' standard `fetch` API does not expose DNS answers or let this Worker pin a checked DNS address to the later outbound connection. Therefore, an arbitrary public hostname can still be a DNS-rebinding/private-DNS risk where the deployment permits access to private networks. For that deployment model, configure an administrator-managed hostname allowlist or route webhooks through a controlled outbound proxy/Cloudflare egress policy; do not treat the in-Worker URL filter as DNS-rebinding protection.
+
 For more detailed deployment steps, refer to the upstream project docs and adjust according to this repository’s `wrangler.toml`.
 
 ---
