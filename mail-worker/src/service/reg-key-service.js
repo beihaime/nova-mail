@@ -86,12 +86,33 @@ const regKeyService = {
 		return regKeyList;
 	},
 
-	async reduceCount(c, code, count) {
-		await orm(c).update(regKey).set({
-			count: sql`${regKey.count}
-	  -
-	  ${count}`
-		}).where(eq(regKey.code, code)).run();
+	/**
+	 * D1 executes a batch as one transaction. The conditional decrement is the
+	 * first write; the two inserts are gated by SQLite changes() and therefore
+	 * cannot run unless that exact decrement succeeded. A uniqueness/account
+	 * failure rolls the batch back, restoring the key count as well.
+	 */
+	async redeemAndCreateUser(c, { code, email, password, salt }) {
+		const today = formatDetailDate(toUtc().tz('Asia/Shanghai').startOf('day'));
+		const results = await c.env.db.batch([
+			c.env.db.prepare(`
+				UPDATE reg_key SET count = count - 1
+				WHERE code = ? AND count > 0
+				  AND datetime(expire_time, '+8 hours') >= datetime(?)
+			`).bind(code, today),
+			c.env.db.prepare(`
+				INSERT INTO user (email, type, password, salt, reg_key_id)
+				SELECT ?, role_id, ?, ?, rege_key_id FROM reg_key
+				WHERE code = ? AND changes() = 1
+			`).bind(email, password, salt, code),
+			c.env.db.prepare(`
+				INSERT INTO account (user_id, email, name)
+				SELECT user_id, email, ? FROM user
+				WHERE email COLLATE NOCASE = ? AND changes() = 1
+			`).bind(email.split('@')[0], email)
+		]);
+		if (results[1].meta.changes !== 1 || results[2].meta.changes !== 1) return null;
+		return await c.env.db.prepare('SELECT * FROM user WHERE email COLLATE NOCASE = ?').bind(email).first();
 	},
 
 	async history(c, params) {

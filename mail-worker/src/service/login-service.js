@@ -96,22 +96,15 @@ const loginService = {
 		}
 
 		let defType = null;
-
-		if (!type) {
-			const roleRow = await roleService.selectDefaultRole(c);
-			defType = roleRow.roleId;
-		}
-
-		const roleRow = await roleService.selectById(c, type || defType);
-
-		if (!roleService.hasAvailDomainPerm(roleRow.availDomain, email)) {
-			if (type) {
-				throw new BizError(t('noDomainPermRegKey'), 403);
+		const resolveRole = async () => {
+			if (!type) defType = (await roleService.selectDefaultRole(c)).roleId;
+			const roleRow = await roleService.selectById(c, type || defType);
+			if (!roleService.hasAvailDomainPerm(roleRow.availDomain, email)) {
+				throw new BizError(t(type ? 'noDomainPermRegKey' : 'noDomainPermReg'), 403);
 			}
-			if (defType) {
-				throw new BizError(t('noDomainPermReg'), 403);
-			}
-		}
+			return roleRow;
+		};
+		await resolveRole();
 
 		let regVerifyOpen = false;
 
@@ -129,15 +122,29 @@ const loginService = {
 
 		const { salt, hash } = await saltHashUtils.hashPassword(password);
 
-		const userId = await userService.insert(c, { email, regKeyId, password: hash, salt, type: type || defType });
+		let userId;
+		if (type) {
+			const userRow = await regKeyService.redeemAndCreateUser(c, { code, email, password: hash, salt });
+			if (userRow) {
+				userId = userRow.userId;
+			} else if (regKey === settingConst.regKey.OPEN) {
+				throw new BizError(t('noRegKeyCount'));
+			} else {
+				// Optional keys may be exhausted by a concurrent registration. Fall
+				// back to the ordinary default-role registration path.
+				type = null;
+				regKeyId = 0;
+				defType = null;
+				await resolveRole();
+			}
+		}
 
-		await accountService.insert(c, { userId: userId, email, name: emailUtils.getName(email) });
+		if (!userId) {
+			userId = await userService.insert(c, { email, regKeyId, password: hash, salt, type: type || defType });
+			await accountService.insert(c, { userId, email, name: emailUtils.getName(email) });
+		}
 
 		await userService.updateUserInfo(c, userId, true);
-
-		if (regKey !== settingConst.regKey.CLOSE && type) {
-			await regKeyService.reduceCount(c, code, 1);
-		}
 
 		if (registerVerify === settingConst.registerVerify.COUNT && !regVerifyOpen) {
 			const row = await verifyRecordService.increaseRegCount(c);
