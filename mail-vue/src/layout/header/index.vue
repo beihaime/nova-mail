@@ -64,16 +64,11 @@
                     :class="{ selected: address.accountId === currentAccount.accountId }"
                     @click="selectAccount(address)"
                 >
-                  <!-- Desktop keeps its leading selection checkbox. Phones hide
-                       this whole track so every address shares one left text
-                       baseline, and show the mark on the trailing edge instead
-                       (`.address-state-check`). -->
-                  <AppIcon v-if="address.accountId === currentAccount.accountId" class="address-lead-check" name="checkbox-checked" :size="16" />
-                  <span v-else class="address-check-placeholder" aria-hidden="true"></span>
                   <span class="address-email">{{ address.email }}</span>
                   <!-- Trailing status: the current-address check, then the
                        primary badge. Both shrink-proof, so neither can move the
-                       address text. -->
+                       address text — every address keeps one shared left
+                       baseline. -->
                   <span
                       v-if="address.accountId === currentAccount.accountId"
                       class="address-state-check"
@@ -474,6 +469,8 @@ function formatName(email) {
     align-items: flex-start;
     gap: 10px;
     padding: 12px 15px 10px;
+    /* Fixed header: it must not be squeezed by a long address list. */
+    flex: 0 0 auto;
     strong, span { display: block; }
     strong { font-size: 14px; color: var(--el-text-color-primary); font-weight: 680; }
     span { margin-top: 2px; font-size: 12px; color: var(--regular-text-color); }
@@ -488,24 +485,29 @@ function formatName(email) {
   .account-dropdown-avatar-image { display: block; object-fit: cover; border: 0; }
   .address-section-label { display: block; align-self: flex-start; width: 100%; color: var(--regular-text-color); font-size: 11px; font-weight: 650; letter-spacing: .08em; text-align: left; text-transform: uppercase; }
   .address-section { display: flex; flex: 1 1 auto; min-height: 0; flex-direction: column; padding-top: 11px; }
-  .address-section-label { padding: 1px 15px 8px; }
-  .address-list { padding: 0 15px 7px; max-height: min(360px, calc(100vh - 285px)); overflow: auto; }
+  /* Hairline under the section label: the top edge of the scrolling region. */
+  .address-section-label { padding: 1px 15px 8px; border-bottom: 1px solid var(--nova-divider-soft, color-mix(in srgb, var(--nova-divider) 55%, transparent)); }
+  /* The list owns the whole leftover column and scrolls itself: aliases are laid
+     out flat (no collapsing, no paging, no "view all"), so it is always the list
+     that scrolls — never the menu. */
+  .address-list { flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto; padding: 0 8px 8px; }
   .address-option {
-    width: 100%; height: 43px; display: flex; align-items: center; gap: 8px; padding: 0 10px;
+    /* 50px per alias: a comfortable tap target without loose spacing. */
+    width: 100%; height: 50px; display: flex; align-items: center; gap: 8px; padding: 0 7px;
     text-align: left; color: var(--el-text-color-primary); border-radius: 8px; cursor: pointer;
     transition: background-color .14s ease;
     .address-email { min-width: 0; flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
     &:hover { background: var(--nova-hover); }
     &.selected { color: var(--el-color-primary); font-weight: 600; background: var(--nova-selected); }
-    .app-icon, .address-check-placeholder { width: 16px; height: 16px; flex: 0 0 16px; }
   }
   .primary-badge { flex: 0 0 auto; padding: 2px 6px; border-radius: 5px; color: var(--el-color-primary); background: color-mix(in srgb, var(--el-color-primary) 10%, transparent); font-size: 10px; font-weight: 650; }
-  /* Trailing current-address check: phones only (see the 767px block). The wide
-     menu keeps its leading checkbox, so nothing changes there. */
-  .address-state-check { display: none; }
+  /* Trailing current-address check. Shrink-proof like the badge, so the trailing
+     status can never move the address text. */
+  .address-state-check { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 16px; width: 16px; height: 16px; margin-left: 2px; }
+  .address-state-icon { display: block; }
   .address-loading { padding: 16px; color: var(--regular-text-color); text-align: center; }
   .account-dropdown-actions { flex: 0 0 auto; border-top: 1px solid var(--nova-divider); padding: 7px; display: grid; }
-  .account-dropdown-actions button { min-height: 36px; display: flex; align-items: center; gap: 9px; padding: 0 10px; border-radius: 8px; text-align: left; color: var(--el-text-color-primary); cursor: pointer; }
+  .account-dropdown-actions button { min-height: 36px; display: flex; align-items: center; gap: 9px; padding: 0 8px; border-radius: 8px; text-align: left; color: var(--el-text-color-primary); cursor: pointer; }
   .account-dropdown-actions button:hover { background: var(--nova-hover); }
   .account-dropdown-actions .sign-out { color: #d84a4a; }
 }
@@ -700,55 +702,28 @@ function formatName(email) {
 }
 
 /* ---- Mobile Account Sheet -------------------------------------------------
-   One column that never grows past 75dvh: the account header (and the section
-   label) stay put, the address list is the only scrolling region, and the
-   actions stay pinned to the bottom. Every address is laid out flat — no
-   collapsing, no paging, no "view all" — so the list is what scrolls.
+   The layout is shared with the wide account menu above: one column capped in
+   height, a fixed account header, the address list as the only scrolling region
+   and fixed actions. Phones only add the phone-specific chrome — a viewport
+   relative cap, native touch scrolling, no desktop scrollbar and the fade that
+   replaces it.
 
-   One 15px text gutter runs through the whole sheet: the account header, the
-   "Mail addresses" label, the addresses themselves and the action rows all
-   start on the same x, and only the rounded row backgrounds are inset from it
-   (8px of sheet padding + 7px of row padding = the 15px gutter). */
+   One 15px text gutter runs through the whole menu on both breakpoints: the
+   "Mail addresses" label, the addresses and the action rows all start on the
+   same x, and only the rounded row backgrounds are inset from it (8px of list
+   padding + 7px of row padding = the 15px gutter). */
 @media (max-width: 767px) {
   .user-details {
     /* `dvh` tracks the collapsing browser chrome; engines without dynamic
        viewport units fall back to the vh rule above the breakpoint. */
     max-height: min(75dvh, 720px);
 
-    .account-dropdown-head {
-      /* Fixed header: it must not be squeezed by a long address list. */
-      flex: 0 0 auto;
-    }
-
-    /* Phones drop the leading checkbox track entirely, which is what puts every
-       address on one identical left baseline. The selection mark moves to the
-       trailing edge instead. */
-    .address-option .address-lead-check,
-    .address-option .address-check-placeholder {
-      display: none;
-    }
-
-    .address-option {
-      /* 50px per alias: a comfortable tap target without the loose spacing the
-         old 43px rows plus outer padding produced. */
-      height: 50px;
-      padding: 0 7px;
-    }
-
     .address-list {
-      /* The list owns the whole leftover column and scrolls itself. */
-      flex: 1 1 auto;
-      min-height: 0;
-      max-height: none;
-      overflow-y: auto;
-
       /* Native touch scrolling, no desktop scrollbar chrome, and no scroll
          chaining onto the page behind the sheet. */
       -webkit-overflow-scrolling: touch;
       overscroll-behavior: contain;
       scrollbar-width: none;
-
-      padding: 0 8px 8px;
 
       /* Content fade at both ends, so the region reads as scrollable without a
          visible scrollbar. A mask carries alpha only, so it needs no colour at
@@ -762,25 +737,6 @@ function formatName(email) {
       height: 0;
       display: none;
     }
-
-    /* Hairline under the section label: the top edge of the scrolling region. */
-    .address-section-label {
-      border-bottom: 1px solid var(--nova-divider-soft, color-mix(in srgb, var(--nova-divider) 55%, transparent));
-    }
-
-    .address-state-check {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      flex: 0 0 16px;
-      width: 16px;
-      height: 16px;
-      margin-left: 2px;
-    }
-
-    .address-state-icon { display: block; }
-
-    .account-dropdown-actions button { padding: 0 8px; }
   }
 }
 
