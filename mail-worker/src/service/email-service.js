@@ -34,6 +34,22 @@ function normalizeSearchKeyword(value) {
 	return String(value || '').trim().slice(0, MAX_SEARCH_LENGTH);
 }
 
+/**
+ * Normalise an `emailIds` argument to positive integers.
+ *
+ * The delete route takes a comma-separated query string while the read/archive
+ * routes take a JSON array, so both shapes are accepted here. Anything that is
+ * not a positive integer is dropped rather than reaching SQL as `NaN`, which
+ * would silently match nothing.
+ */
+function toEmailIdList(emailIds) {
+	const raw = Array.isArray(emailIds) ? emailIds : String(emailIds ?? '').split(',');
+
+	return raw
+		.map(value => Number(value))
+		.filter(value => Number.isInteger(value) && value > 0);
+}
+
 function emailKeywordFilters(keyword) {
 	if (!keyword) return [];
 
@@ -58,7 +74,7 @@ const emailService = {
 
 	async list(c, params, userId) {
 
-		let { emailId, type, accountId, size, timeSort, allReceive, full, keyword } = params;
+		let { emailId, type, accountId, size, timeSort, allReceive, full, keyword, archived } = params;
 
 		size = Number(size);
 		type = Number(type);
@@ -68,6 +84,9 @@ const emailService = {
 		allReceive = Number(allReceive);
 		full = Number(full);
 		keyword = normalizeSearchKeyword(keyword);
+		// The Archive view asks for `archived=1`; every other list keeps the
+		// default and never sees archived mail.
+		archived = Number(archived) === 1 ? 1 : 0;
 
 		if (isNaN(type)) {
 			type = 0;
@@ -96,8 +115,8 @@ const emailService = {
 			allReceive = accountRow.allReceive;
 		}
 
-		const filters = this.emailListFilters({ userId, accountId, type, allReceive, emailId, timeSort, keyword });
-		const countFilters = this.emailListFilters({ userId, accountId, type, allReceive, withCursor: false, keyword });
+		const filters = this.emailListFilters({ userId, accountId, type, allReceive, emailId, timeSort, keyword, archived });
+		const countFilters = this.emailListFilters({ userId, accountId, type, allReceive, withCursor: false, keyword, archived });
 		const columns = full ? emailListColumns : emailBriefColumns;
 
 		// The Inbox (received mail) is a conversation list: rows are collapsed to
@@ -224,6 +243,10 @@ const emailService = {
 				eq(email.userId, userId),
 				eq(email.type, type),
 				eq(email.isDel, isDel.NORMAL),
+				// Match the view being listed: the Inbox's poll cursor must skip
+				// archived mail, and the Archive view must not be seeded with an
+				// Inbox id it would then page against.
+				eq(email.archived, archived),
 				allReceive ? undefined : eq(email.accountId, accountId),
 				...emailKeywordFilters(keyword)
 			))
@@ -343,11 +366,14 @@ const emailService = {
 		return list;
 	},
 
-	emailListFilters({ userId, accountId, type, allReceive, emailId, timeSort, keyword, withCursor = true }) {
+	emailListFilters({ userId, accountId, type, allReceive, emailId, timeSort, keyword, archived = 0, withCursor = true }) {
 		const conditions = [
 			eq(email.userId, userId),
 			eq(email.type, type),
 			eq(email.isDel, isDel.NORMAL),
+			// One flag, two views: the Inbox asks for `archived = 0` and the
+			// Archive view for `archived = 1`, so neither can leak into the other.
+			eq(email.archived, archived),
 			eq(account.isDel, isDel.NORMAL),
 		];
 		if (!allReceive) {
@@ -420,10 +446,59 @@ const emailService = {
 			if (ownedIds.length) {
 				await this.physicsDelete(c, { emailIds: ownedIds.join(',') });
 			}
-			return;
+			// Reported to the client so the swipe action only offers "Undo" when
+			// the row still exists. With `sync_delete` on, the delete is final by
+			// the user's own configuration and nothing can bring it back.
+			return { soft: false };
 		}
 
 		await orm(c).update(email).set({ isDel: isDel.DELETE }).where(
+			and(
+				eq(email.userId, userId),
+				inArray(email.emailId, emailIdList)))
+			.run();
+
+		return { soft: true };
+	},
+
+	/**
+	 * Take messages out of the Inbox without deleting them (mobile swipe right).
+	 *
+	 * Only the caller's own, not-yet-deleted rows are touched. Archiving is
+	 * reversible at any time through `unarchive`/`restore`.
+	 */
+	async archive(c, params, userId) {
+		return this.setArchived(c, params, userId, 1);
+	},
+
+	async unarchive(c, params, userId) {
+		return this.setArchived(c, params, userId, 0);
+	},
+
+	async setArchived(c, params, userId, archived) {
+		const emailIdList = toEmailIdList(params?.emailIds);
+		if (!emailIdList.length) return;
+
+		await orm(c).update(email).set({ archived }).where(
+			and(
+				eq(email.userId, userId),
+				eq(email.isDel, isDel.NORMAL),
+				inArray(email.emailId, emailIdList)))
+			.run();
+	},
+
+	/**
+	 * Bring soft-deleted messages back (the swipe delete's "Undo").
+	 *
+	 * A row that was physically deleted does not exist any more, so this matches
+	 * nothing and is a no-op — the client only offers Undo when `delete` reported
+	 * `soft: true`.
+	 */
+	async restore(c, params, userId) {
+		const emailIdList = toEmailIdList(params?.emailIds);
+		if (!emailIdList.length) return;
+
+		await orm(c).update(email).set({ isDel: isDel.NORMAL }).where(
 			and(
 				eq(email.userId, userId),
 				inArray(email.emailId, emailIdList)))
@@ -1149,6 +1224,9 @@ const emailService = {
 					gt(email.emailId, emailId),
 					eq(email.userId, userId),
 					eq(email.isDel, isDel.NORMAL),
+					// Archiving the newest message must not make the poll hand it
+					// back to the list it was just removed from.
+					eq(email.archived, 0),
 					eq(account.isDel, isDel.NORMAL),
 					allReceive ? undefined : eq(email.accountId, accountId),
 					eq(email.type, emailConst.type.RECEIVE)

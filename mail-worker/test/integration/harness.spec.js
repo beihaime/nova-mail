@@ -31,6 +31,8 @@ describe('integration harness', () => {
 		expect(columns).toContain('body_type');
 		expect(columns).toContain('thread_id');
 		expect(columns).toContain('parent_message_id');
+		// v3.10, behind the mobile swipe actions.
+		expect(columns).toContain('archived');
 	});
 
 	it('binds a usable JWT secret and the test mail domain', async () => {

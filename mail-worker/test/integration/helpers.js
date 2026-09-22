@@ -195,3 +195,21 @@ export async function updateSetting(patch) {
 export async function openSend() {
 	await updateSetting({ send: settingConst.send.OPEN });
 }
+
+/**
+ * A role that grants no permissions at all.
+ *
+ * The seeded default role carries `email:delete`, which is the capability the
+ * swipe routes reuse, so proving they are gated needs a role with no
+ * `role_perm` rows.
+ */
+export async function createPermissionlessRole() {
+	const row = await env.db
+		.prepare(
+			"INSERT INTO role (name, is_default, send_count, send_type, account_count) VALUES (?, 0, NULL, 'count', 0) RETURNING role_id",
+		)
+		.bind(`no-perms-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`)
+		.first();
+
+	return row.role_id;
+}

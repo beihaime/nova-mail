@@ -349,15 +349,17 @@ function formatName(email) {
   /* Phones keep the bundled sun/moon assets (dark → sun, light → moon). Their
      art carries different internal transparent padding (the sun fills ~76% of
      its canvas, the moon ~63%), so each box is scaled to land both glyphs on
-     the same ~28px optical size instead of matching raw box widths. */
+     the same ~25px optical size instead of matching raw box widths. That keeps
+     the toggle at the avatar's and title's visual weight rather than dominating
+     them; the 44px `.icon-item` above still owns the touch target. */
   .toolbar .sun-icon .app-icon {
-    width: 38px;
-    height: 38px;
+    width: 34px;
+    height: 34px;
   }
 
   .toolbar .dark-icon .app-icon {
-    width: 44px;
-    height: 44px;
+    width: 40px;
+    height: 40px;
   }
 
   .toolbar .notice {

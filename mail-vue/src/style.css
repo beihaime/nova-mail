@@ -425,3 +425,51 @@ html.dark .inbox-star-icon.is-active {
     color: #ffcc00 !important;
     opacity: 1 !important;
 }
+
+
+/* Undo snackbar for the mobile swipe actions.
+ *
+ * Element Plus teleports the message outside the component tree, so the scoped
+ * styles in `components/email-scroll` cannot reach it; the layout of the action
+ * itself has to live here. Colours come from the shared theme tokens so the
+ * snackbar follows light/dark like every other surface. */
+
+.el-message.nova-undo-message {
+    border-color: var(--nova-divider);
+
+    background: var(--nova-surface);
+
+    color: var(--nova-primary, var(--el-text-color-primary));
+}
+
+.nova-undo-snackbar {
+    display: inline-flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.nova-undo-text {
+    min-width: 0;
+}
+
+.nova-undo-action {
+    flex: 0 0 auto;
+
+    padding: 2px 4px;
+
+    border: 0;
+
+    background: none;
+
+    color: var(--el-color-primary);
+
+    font: inherit;
+    font-weight: 600;
+
+    cursor: pointer;
+}
+
+.nova-undo-action:hover,
+.nova-undo-action:focus-visible {
+    text-decoration: underline;
+}

@@ -39,8 +39,31 @@ const dbInit = {
 		await this.v3_7DB(c);
 		await this.v3_8DB(c);
 		await this.v3_9DB(c);
+		await this.v3_10DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
+	},
+
+	/**
+	 * v3.10 — archive flag for the mobile swipe actions.
+	 *
+	 * `archived = 1` takes a message out of the Inbox without deleting it, so the
+	 * undo snackbar can bring it back. Deleted mail keeps `is_del = 1` and is
+	 * unaffected; the two flags are independent.
+	 */
+	async v3_10DB(c) {
+		try {
+			await c.env.db.prepare(`ALTER TABLE email ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;`).run();
+		} catch (e) {
+			console.warn(`跳过归档字段添加：${e.message}`);
+		}
+
+		// Every Inbox page filters on (`user_id`, `archived`).
+		try {
+			await c.env.db.prepare(`CREATE INDEX IF NOT EXISTS idx_email_user_archived ON email(user_id, archived);`).run();
+		} catch (e) {
+			console.warn(`跳过归档索引创建：${e.message}`);
+		}
 	},
 
 	/**

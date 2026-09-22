@@ -62,6 +62,18 @@ const routes = [
                     menu: true
                 }
             },
+            {
+                // Where the mobile swipe-to-archive action sends a message. It is
+                // the only view that queries `archived = 1`.
+                path: '/archive',
+                name: 'archive',
+                component: () => import('@/views/archive/index.vue'),
+                meta: {
+                    title: 'archive',
+                    name: 'archive',
+                    menu: true
+                }
+            },
         ]
 
     },

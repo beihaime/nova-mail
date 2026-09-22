@@ -1697,7 +1697,12 @@ const handleDelete = () => {
 .sender-line {
   display: flex;
   align-items: baseline;
-  flex-wrap: nowrap;
+  /* The name and the address share one line while they fit. If the address
+     cannot fit next to the name, it drops to a line of its own and gets the
+     full width of the block instead of being ellipsised beside the name.
+     Phones render this wrapper as `display: contents`, so the rule is
+     desktop-only: the mobile grid lays the same two items out itself. */
+  flex-wrap: wrap;
   gap: 5px;
   min-width: 0;
   line-height: 1.35;
@@ -2207,6 +2212,12 @@ const handleDelete = () => {
      The address no longer competes with the name for the first row, so the
      name gets every pixel the time and star do not need.
 
+     Rows 2 and 3 span `2 / -1`: every column the avatar does not occupy belongs
+     to them, so the address always ends at the header's right content edge and
+     the ellipsis only lands after the whole remaining width has been used. The
+     avatar, time and star keep intrinsic (`auto`) tracks — none of them can
+     take a flexible share away from the address row.
+
      `display: contents` drops the desktop wrappers (`.sender-details`,
      `.sender-line`) out of the box tree so their children become grid items.
      It is scoped to this media query: desktop keeps its flex layout. */
@@ -2258,18 +2269,23 @@ const handleDelete = () => {
   }
 
   .message-head .sender-email {
-    grid-column: 2 / 5;
+    /* Every column right of the avatar: the address owns the whole remaining
+       row, so it is only ellipsised once that width is exhausted. */
+    grid-column: 2 / -1;
     grid-row: 2;
+    justify-self: stretch;
     min-width: 0;
     max-width: 100%;
     overflow: hidden;
+    /* Still ONE compact line: a phone header must not grow two lines for a
+       long address. The metadata panel below shows the complete address. */
     white-space: nowrap;
     text-overflow: ellipsis;
     font-size: 12px;
   }
 
   .message-head .recipient-toggle {
-    grid-column: 2 / 5;
+    grid-column: 2 / -1;
     grid-row: 3;
     margin-top: 4px;
     max-width: 100%;
@@ -2278,14 +2294,14 @@ const handleDelete = () => {
   /* Row 3 while collapsed. The expanded card swaps in the recipient-toggle /
      metadata panel, which occupy the same grid cell. */
   .message-head .message-recipient-preview {
-    grid-column: 2 / 5;
+    grid-column: 2 / -1;
     grid-row: 3;
     margin-top: 4px;
     font-size: 12px;
   }
 
   .message-head .message-details {
-    grid-column: 2 / 5;
+    grid-column: 2 / -1;
     grid-row: 3;
     margin-top: 8px;
   }
@@ -2297,9 +2313,12 @@ const handleDelete = () => {
     display: none;
   }
 
-  /* ---- Metadata box: fixed label column, adaptive value column ----------
-     `normal` wrapping keeps addresses intact; each address is nowrap with an
-     ellipsis, so nothing is ever split one or two characters per line. */
+  /* ---- Metadata box: fixed label column, full-width value column ---------
+     The panel is the place that shows the COMPLETE sender/recipient addresses,
+     so nothing in a value is nowrap or ellipsised. A long address wraps onto as
+     many lines as it needs (`overflow-wrap: anywhere` breaks inside the address
+     itself) instead of being cut or pushing the card wider. The label keeps its
+     fixed 54px column and the value takes everything that is left. */
   .message-details {
     width: 100%;
     max-width: 100%;
@@ -2319,18 +2338,23 @@ const handleDelete = () => {
 
   .message-details .detail-value {
     min-width: 0;
-    word-break: normal;
-    overflow-wrap: normal;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
+  /* Addresses are plain inline text: they wrap, they are never clipped, and a
+     very long one breaks inside itself rather than overflowing the card. */
   .message-details .detail-name,
   .message-details .detail-email,
   .message-details .detail-address {
-    display: inline-block;
-    max-width: 100%;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    display: inline;
+    max-width: none;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   /* ---- Body spacing: never glued to the header --------------------------

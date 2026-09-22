@@ -37,6 +37,11 @@ export const email = sqliteTable('email', {
 	message: text('message'),
 	unread: integer('unread').default(0).notNull(),
 	createTime: text('create_time').default(sql`CURRENT_TIMESTAMP`).notNull(),
-	isDel: integer('is_del').default(0).notNull()
+	isDel: integer('is_del').default(0).notNull(),
+	// Mobile swipe-to-archive. `1` hides the message from the Inbox without
+	// destroying it, so the undo snackbar can put it back. Archiving never sets
+	// `is_del`, and restoring a deleted message never clears `archived` — the
+	// two states are independent.
+	archived: integer('archived').default(0).notNull()
 });
 export default email

@@ -45,7 +45,8 @@
       <div class="mobile-filter-bar">
         <!-- Four equal cells that together fill the row: every chip owns the
              same width and centres its own content, so the group reads as one
-             balanced segmented control rather than four ragged pills. -->
+             balanced segmented control rather than four ragged pills. All four
+             are text-only, so no chip carries more visual weight than another. -->
         <div class="mobile-filters">
           <button
               v-for="filter in mobileFilters"
@@ -53,12 +54,6 @@
               :class="{ active: mobileFilter === filter.key }"
               @click="selectMobileFilter(filter.key)"
           >
-            <AppIcon
-                v-if="filter.icon"
-                class="mobile-filter-icon"
-                :name="filter.icon"
-                :size="13"
-            />
             <span class="mobile-filter-label">{{ filter.label }}</span>
           </button>
         </div>
@@ -117,20 +112,38 @@
                         :key="keyCount"
         >
           <template #default="{ data: item, index }" >
-            <div :class="['email-row', props.type, {
-                  'right-checked': item.rightChecked,
-                  'is-unread': item.unread === EmailUnreadEnum.UNREAD && showUnread
-                }]"
-                 :data-checked="item.checked"
-                 @click="jumpDetails(item)"
-                 v-if="!item.expand"
+            <div v-if="!item.expand"
                  :key="item.emailId"
-                 @contextmenu="handleContextmenu($event, item)"
-                 @pointerdown="startLongPress($event, item)"
-                 @pointerup="stopLongPress"
-                 @pointerleave="stopLongPress"
-                 @pointercancel="stopLongPress"
+                 class="swipe-shell"
             >
+              <!-- Action layer. It sits *under* the card (the card is opaque and
+                   later in the DOM), so it is only visible where the card has
+                   been dragged away. Never receives pointer input itself, and is
+                   only built where the gesture is actually available. -->
+              <div v-if="props.type === 'email' && swipeActionsReady" class="swipe-actions" aria-hidden="true">
+                <div class="swipe-action swipe-action-archive">
+                  <AppIcon name="archive-nav" :size="22"/>
+                  <span>{{ t('archive') }}</span>
+                </div>
+                <div class="swipe-action swipe-action-delete">
+                  <AppIcon name="trash-nav" :size="22"/>
+                  <span>{{ t('delete') }}</span>
+                </div>
+              </div>
+              <div :class="['email-row', props.type, {
+                    'right-checked': item.rightChecked,
+                    'is-unread': item.unread === EmailUnreadEnum.UNREAD && showUnread
+                  }]"
+                   :data-checked="item.checked"
+                   @click="jumpDetails(item)"
+                   @click.capture="onRowClickCapture"
+                   @contextmenu="handleContextmenu($event, item)"
+                   @pointerdown="onRowPointerDown($event, item)"
+                   @pointermove="onRowPointerMove"
+                   @pointerup="onRowPointerUp"
+                   @pointerleave="onRowPointerLeave"
+                   @pointercancel="onRowPointerCancel"
+              >
               <el-checkbox :class=" props.type === 'all-email' ? 'all-email-checkbox' : 'checkbox'"
                            v-model="item.checked"
                            :disabled="!item.checked && isSelectMax"
@@ -241,6 +254,7 @@
                   />
                 </button>
               </div>
+            </div>
             </div>
             <skeletonBlock v-else-if="item.expand === 'loading'"
                            :rows="1"
@@ -381,11 +395,26 @@ import SenderAvatar from '@/components/sender-avatar/index.vue'
 import { MAIL_BODY_TYPE, unwrapNestedMessage, looksLikeMarkdownDocument } from '@/utils/mail-html.js'
 import { stripMarkdown } from '@/utils/quoted-text.js'
 import { nextPageCursor, isLastPage, canRequestPage } from '@/utils/mail-pagination.js'
+import {
+  SWIPE_ACTION,
+  SWIPE_AXIS,
+  SWIPE_UNDO_MS,
+  clampSwipeOffset,
+  resolveSwipeAxis,
+  resolveSwipeRelease,
+  swipeActionForOffset,
+} from '@/utils/swipe-actions.js'
+import { showUndoSnackbar } from '@/utils/undo-snackbar.js'
 
 const props = defineProps({
   getEmailList: Function,
   emailDelete: Function,
   emailRead: Function,
+  // Mobile swipe actions. Optional: without them the gesture stays disabled, so
+  // the other lists (Sent, Starred, drafts) keep their current behaviour.
+  emailArchive: Function,
+  emailUnarchive: Function,
+  emailRestore: Function,
   starAdd: Function,
   starCancel: Function,
   cancelSuccess: Function,
@@ -479,9 +508,7 @@ const mobileFilters = computed(() => [
   { key: 'all', label: t('all') },
   { key: 'unread', label: t('unreadMail') },
   { key: 'attachments', label: t('withAttachments') },
-  // `starred-nav` is the project's existing Starred star (the same asset the
-  // sidebar folder list shows); the chip reuses it instead of a new glyph.
-  { key: 'starred', label: t('starred'), icon: 'starred-nav' }
+  { key: 'starred', label: t('starred') }
 ])
 
 let longPressTimer = null
@@ -654,6 +681,285 @@ function startLongPress(event, item) {
 
 function stopLongPress() {
   clearTimeout(longPressTimer)
+}
+
+/* ------------------------------------------------------------ swipe actions
+ *
+ * Mobile-only gesture behind the Inbox rows: dragging the card right reveals
+ * Archive, dragging it left reveals Delete. The card is the top layer and
+ * follows the finger; `.swipe-actions` sits underneath and is uncovered by the
+ * movement, so the action area never has to be positioned from JS.
+ *
+ * The axis/commit maths lives in `utils/swipe-actions.js` and is unit tested.
+ * Everything here is deliberately imperative (direct style writes, no reactive
+ * state) because a pointermove must not re-render the virtual list, and only
+ * one row may be mid-gesture at a time.
+ */
+
+/** Slight overshoot so the card settles back like a spring, not a slide. */
+const SWIPE_SPRING = 'transform 280ms cubic-bezier(0.22, 1.18, 0.32, 1)'
+const SWIPE_SETTLE = 'transform 180ms ease-out, opacity 180ms ease-out'
+
+let swipeGesture = null
+
+/** True while a drag is in progress, so the click that follows never opens mail. */
+let swipeBlockClick = false
+
+const swipeActionsReady = computed(() =>
+  typeof props.emailDelete === 'function' &&
+  typeof props.emailArchive === 'function' &&
+  typeof props.emailUnarchive === 'function' &&
+  typeof props.emailRestore === 'function'
+)
+
+function swipeEnabled() {
+  return isPhone.value
+    && props.type === 'email'
+    && !mobileSelecting.value
+    && swipeActionsReady.value
+}
+
+function clearSwipeVisuals(gesture, { keepAction = false } = {}) {
+  const { rowEl, shellEl } = gesture
+  if (rowEl) {
+    rowEl.style.transition = ''
+    rowEl.style.transform = ''
+    rowEl.style.opacity = ''
+  }
+  shellEl?.classList.remove('is-swiping', 'is-removing')
+  if (!keepAction) shellEl?.removeAttribute('data-swipe-action')
+}
+
+/** Snap a row that is mid-gesture back to rest before starting a new one. */
+function abandonSwipe() {
+  if (!swipeGesture) return
+  clearSwipeVisuals(swipeGesture)
+  swipeGesture = null
+}
+
+function onRowPointerDown(event, item) {
+  startLongPress(event, item)
+
+  if (!swipeEnabled() || event.pointerType === 'mouse') return
+
+  // One mail item at a time: the previous drag snaps back immediately.
+  abandonSwipe()
+
+  const rowEl = event.currentTarget
+  swipeBlockClick = false
+  swipeGesture = {
+    pointerId: event.pointerId,
+    rowEl,
+    shellEl: rowEl.closest('.swipe-shell'),
+    item,
+    startX: event.clientX,
+    startY: event.clientY,
+    dx: 0,
+    dy: 0,
+    axis: null,
+  }
+
+  rowEl.style.transition = 'none'
+}
+
+function onRowPointerMove(event) {
+  const gesture = swipeGesture
+  if (!gesture || event.pointerId !== gesture.pointerId) return
+
+  gesture.dx = event.clientX - gesture.startX
+  gesture.dy = event.clientY - gesture.startY
+
+  if (!gesture.axis) {
+    gesture.axis = resolveSwipeAxis({ dx: gesture.dx, dy: gesture.dy })
+    if (!gesture.axis) return
+  }
+
+  // Vertical: this is the page scrolling, so let go of the gesture entirely.
+  if (gesture.axis !== SWIPE_AXIS.HORIZONTAL) {
+    gesture.rowEl.style.transition = ''
+    swipeGesture = null
+    return
+  }
+
+  // A horizontal drag is never also a long press.
+  stopLongPress()
+
+  if (!gesture.captured) {
+    // Touch pointers are captured implicitly, pen pointers are not; taking the
+    // capture explicitly keeps move/up coming even if the finger leaves the row.
+    gesture.captured = true
+    try {
+      gesture.rowEl.setPointerCapture(event.pointerId)
+    } catch {
+      // A pointer that already went away cannot be captured; the gesture still
+      // finishes through pointerup/pointercancel.
+    }
+  }
+
+  // The drag owns this movement now: no text selection, no native panning.
+  if (event.cancelable) event.preventDefault()
+
+  swipeBlockClick = true
+
+  const width = gesture.shellEl?.offsetWidth || 0
+  const offset = clampSwipeOffset(gesture.dx, width)
+
+  gesture.rowEl.style.transform = `translate3d(${offset}px, 0, 0)`
+  gesture.shellEl?.classList.add('is-swiping')
+  gesture.shellEl?.setAttribute('data-swipe-action', swipeActionForOffset(offset) || '')
+}
+
+function onRowPointerUp(event) {
+  stopLongPress()
+
+  const gesture = swipeGesture
+  if (!gesture || event.pointerId !== gesture.pointerId) return
+  swipeGesture = null
+
+  if (gesture.axis !== SWIPE_AXIS.HORIZONTAL) return
+
+  const { action, commit } = resolveSwipeRelease({
+    dx: gesture.dx,
+    dy: gesture.dy,
+    width: gesture.shellEl?.offsetWidth || 0,
+  })
+
+  if (commit && action) commitSwipe(gesture, action)
+  else springBackSwipe(gesture)
+}
+
+function onRowPointerLeave() {
+  stopLongPress()
+
+  // Touch pointers are implicitly captured, so a locked horizontal drag keeps
+  // reporting even when the finger leaves the row. Only an undecided gesture is
+  // abandoned here.
+  if (swipeGesture && swipeGesture.axis !== SWIPE_AXIS.HORIZONTAL) {
+    swipeGesture.rowEl.style.transition = ''
+    swipeGesture = null
+  }
+}
+
+function onRowPointerCancel() {
+  stopLongPress()
+
+  if (!swipeGesture) return
+  const gesture = swipeGesture
+  swipeGesture = null
+  springBackSwipe(gesture)
+}
+
+/**
+ * Swallow the click a drag produces.
+ *
+ * Registered in the capture phase so it runs before the row's own controls: a
+ * swipe that happens to end over the star or the checkbox must not toggle it.
+ * `jumpDetails`'s check stays as a backstop for clicks synthesised without a
+ * real pointer sequence.
+ */
+function onRowClickCapture(event) {
+  if (!swipeBlockClick) return
+
+  swipeBlockClick = false
+  event.stopPropagation()
+  event.preventDefault()
+}
+
+function springBackSwipe(gesture) {
+  const { rowEl, shellEl } = gesture
+  if (!rowEl) return
+
+  rowEl.style.transition = SWIPE_SPRING
+  rowEl.style.transform = 'translate3d(0, 0, 0)'
+
+  const settle = () => {
+    rowEl.style.transition = ''
+    rowEl.style.transform = ''
+    rowEl.removeEventListener('transitionend', settle)
+  }
+  rowEl.addEventListener('transitionend', settle)
+
+  shellEl?.classList.remove('is-swiping')
+  shellEl?.removeAttribute('data-swipe-action')
+}
+
+function commitSwipe(gesture, action) {
+  const { rowEl, shellEl, item } = gesture
+  const width = shellEl?.offsetWidth || 0
+  const direction = action === SWIPE_ACTION.ARCHIVE ? 1 : -1
+  const index = emailList.findIndex(row => row.emailId === item.emailId)
+
+  shellEl?.classList.add('is-removing')
+  rowEl.style.transition = SWIPE_SETTLE
+  rowEl.style.transform = `translate3d(${direction * width}px, 0, 0)`
+  rowEl.style.opacity = '0'
+
+  const request = action === SWIPE_ACTION.ARCHIVE
+    ? props.emailArchive([item.emailId])
+    : props.emailDelete([item.emailId])
+
+  request.then(data => {
+    // The row is only dropped once the server confirmed it.
+    deleteEmail([item.emailId])
+    showSwipeOutcome({
+      item,
+      index,
+      action,
+      // A delete with `sync_delete` on is physical, so there is nothing to
+      // undo; the server reports which one happened.
+      canUndo: action === SWIPE_ACTION.ARCHIVE || data?.soft === true,
+    })
+  }).catch(error => {
+    console.error(error)
+    // Refused: put the card back exactly where it was.
+    rowEl.style.transition = SWIPE_SPRING
+    rowEl.style.transform = 'translate3d(0, 0, 0)'
+    rowEl.style.opacity = '1'
+    shellEl?.classList.remove('is-removing')
+    shellEl?.classList.remove('is-swiping')
+    shellEl?.removeAttribute('data-swipe-action')
+    ElMessage({
+      message: t('swipeActionFailMsg'),
+      type: 'error',
+      plain: true,
+    })
+  })
+}
+
+function showSwipeOutcome({ item, index, action, canUndo }) {
+  const message = action === SWIPE_ACTION.ARCHIVE ? t('archiveSuccessMsg') : t('delSuccessMsg')
+
+  if (!canUndo) {
+    ElMessage({ message, type: 'success', plain: true })
+    return
+  }
+
+  showUndoSnackbar({
+    message,
+    undoLabel: t('undo'),
+    duration: SWIPE_UNDO_MS,
+    onUndo: () => undoSwipedEmail({ item, index, action }),
+  })
+}
+
+function undoSwipedEmail({ item, index, action }) {
+  const request = action === SWIPE_ACTION.ARCHIVE
+    ? props.emailUnarchive([item.emailId])
+    : props.emailRestore([item.emailId])
+
+  request.then(() => {
+    // Put it back where it was; `index` may be stale if the list changed in the
+    // meantime, so clamp instead of trusting it.
+    const position = Math.max(0, Math.min(index, emailList.length))
+    emailList.splice(position, 0, item)
+  }).catch(error => {
+    console.error(error)
+    ElMessage({
+      message: t('undoFailMsg'),
+      type: 'error',
+      plain: true,
+    })
+  })
 }
 
 const itemHeight = computed(() => {
@@ -1118,6 +1424,12 @@ function updateCheckStatus() {
 }
 
 function jumpDetails(email) {
+  // A horizontal drag ends with a click too; it must never open the message.
+  if (swipeBlockClick) {
+    swipeBlockClick = false
+    return
+  }
+
   if (longPressTriggered) {
     longPressTriggered = false
     return
@@ -1964,7 +2276,10 @@ ul {
 .mobile-sender-avatar,
 .mobile-row-meta,
 .mobile-row-star,
-.mobile-filter-empty {
+.mobile-filter-empty,
+/* Swipe actions are a phone-only affordance; the media query below lays them
+   out. Without this the desktop layout would show both action panels. */
+.swipe-actions {
   display: none;
 }
 
@@ -2150,20 +2465,6 @@ ul {
     background: var(--nova-selected);
 
     font-weight: 650;
-  }
-
-  /* The Starred chip's glyph is a project SVG (dark art, inverted by the global
-     dark-theme filter). A touch of opacity lands it on the same grey tier as
-     the inactive label instead of reading as a second, heavier icon. */
-  .mobile-filters button .mobile-filter-icon {
-    flex: 0 0 13px;
-    width: 13px;
-    height: 13px;
-    opacity: .65;
-  }
-
-  .mobile-filters button.active .mobile-filter-icon {
-    opacity: .8;
   }
 
   .mobile-filter-label {
@@ -2405,7 +2706,10 @@ ul {
 
     padding: 0;
 
-    overflow: hidden;
+    /* Not `hidden`: the preview line below is allowed to reach into the gutter
+       the timestamp leaves (see `.email-content`). Every line inside already
+       clips itself with its own ellipsis, so nothing else can escape. */
+    overflow: visible;
   }
 
   :deep(.email-row.email .title .email-sender) {
@@ -2472,7 +2776,9 @@ ul {
 
     line-height: 18px;
 
-    overflow: hidden;
+    /* See `.title`: the snippet needs to escape this box, the subject does not
+       (it owns its own ellipsis). */
+    overflow: visible;
   }
 
   :deep(.email-row.email .email-subject) {
@@ -2500,7 +2806,21 @@ ul {
   :deep(.email-row.email .email-text .email-content) {
     display: block;
 
-    width: 100%;
+    /* The row's grid gives the body column everything up to the metadata
+       column, but that column carries `padding-left: 8px` so its timestamp does
+       not sit flush against the Subject. That 8px is dead space on the preview
+       line: the timestamp occupies the row's FIRST line and the star hangs off
+       the right edge well below it, so the third line has room the subject line
+       does not.
+
+       Borrowing exactly that padding puts the snippet's ellipsis on the first
+       character of the timestamp in the common case, and in the narrowest case
+       (`HH:mm` is ~35px, i.e. narrower than the 36px star) it stops on the
+       star's own left edge. Going further would run under the star, whose tap
+       target is transparent, so the text would show through beside the glyph. */
+    width: calc(100% + 8px);
+    max-width: none;
+
     min-width: 0;
 
     padding: 0;
@@ -2641,6 +2961,89 @@ ul {
   .noLoading {
     padding: 20px 0 14px;
     font-size: 13px;
+  }
+
+  /* ---------- Swipe actions ----------
+   *
+   * `.swipe-shell` is the virtual-list item. It clips the horizontal travel and
+   * owns the axis contract: `touch-action: pan-y` keeps vertical scrolling
+   * native while horizontal movement reaches the pointermove handler instead of
+   * being consumed by the browser's own panning.
+   *
+   * The action panels sit *under* the card. The card keeps its own background
+   * (`--nova-surface`, opaque) and is later in the DOM, so it hides the panels
+   * at rest and uncovers them as it moves. Reusing the existing row element is
+   * what leaves its radius, padding, divider and dark-mode colours untouched.
+   */
+  :deep(.swipe-shell) {
+    position: relative;
+
+    display: block;
+
+    overflow: hidden;
+
+    touch-action: pan-y;
+  }
+
+  :deep(.swipe-actions) {
+    position: absolute;
+    inset: 0;
+
+    display: flex;
+    align-items: stretch;
+    justify-content: space-between;
+
+    /* Below the card, and never a click target: the gesture owns this area. */
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  :deep(.swipe-action) {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+
+    width: 96px;
+
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  /* Archive (revealed by dragging right) and Delete (dragging left) are told
+     apart by a tint of the shared accent colours over the muted surface. A
+     saturated fill would fight the monochrome archive/trash SVGs, which are
+     dark glyphs that the theme inverts. */
+  :deep(.swipe-action-archive) {
+    color: var(--el-color-primary);
+    background: color-mix(in srgb, var(--el-color-primary) 12%, var(--nova-surface-muted));
+  }
+
+  :deep(.swipe-action-delete) {
+    color: var(--el-color-danger);
+    background: color-mix(in srgb, var(--el-color-danger) 14%, var(--nova-surface-muted));
+  }
+
+  /* The card paints over the panels. */
+  :deep(.swipe-shell > .email-row.email) {
+    position: relative;
+    z-index: 1;
+  }
+
+  :deep(.swipe-shell.is-swiping > .email-row.email) {
+    will-change: transform;
+  }
+
+  /* The tap highlight belongs to a tap, not to a drag. */
+  :deep(.swipe-shell.is-swiping > .email-row.email:active) {
+    background: var(--nova-surface);
+  }
+
+  /* Emphasise whichever action the current drag would commit to. */
+  :deep(.swipe-shell[data-swipe-action='archive'] .swipe-action-archive),
+  :deep(.swipe-shell[data-swipe-action='delete'] .swipe-action-delete) {
+    filter: brightness(1.05);
   }
 }
 

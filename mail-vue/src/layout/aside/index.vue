@@ -29,6 +29,13 @@
           <AppIcon name="starred-nav" :size="19" />
           <span class="menu-name">{{$t('starred')}}</span>
         </el-menu-item>
+        <!-- Only users who may archive (the swipe action reuses `email:delete`)
+             can ever have anything in here. -->
+        <el-menu-item @click="router.push({name: 'archive'})" index="archive" v-perm="'email:delete'"
+                      :class="route.meta.name === 'archive' ? 'choose-item' : ''">
+          <AppIcon name="archive-nav" :size="19" />
+          <span class="menu-name">{{$t('archive')}}</span>
+        </el-menu-item>
         <el-menu-item @click="router.push({name: 'setting'})" index="setting"
                       :class="route.meta.name === 'setting' ? 'choose-item' : ''">
           <AppIcon name="settings-top" :size="19" />
