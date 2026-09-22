@@ -13,7 +13,6 @@ const publicRoutes = new Set([
 	'POST /register',
 	'GET /setting/websiteConfig',
 	'POST /webhooks',
-	'POST /public/genToken',
 	'POST /oauth/linuxDo/login',
 	'POST /oauth/google/login',
 	'GET /oauth/github/login',
@@ -103,17 +102,6 @@ app.use('*', async (c, next) => {
 	if (isPublicRoute(c)) {
 		return await next();
 	}
-
-	if (path.startsWith('/public')) {
-
-		const userPublicToken = await c.env.kv.get(KvConst.PUBLIC_KEY);
-		const publicToken = c.req.header(constant.TOKEN_HEADER);
-		if (publicToken !== userPublicToken) {
-			throw new BizError(t('publicTokenFail'), 401);
-		}
-		return await next();
-	}
-
 
 	const jwt = c.req.header(constant.TOKEN_HEADER);
 

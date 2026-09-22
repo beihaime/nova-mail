@@ -1,6 +1,5 @@
 import BizError from '../error/biz-error';
 import orm from '../entity/orm';
-import { v4 as uuidv4 } from 'uuid';
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import saltHashUtils from '../utils/crypto-utils';
 import cryptoUtils from '../utils/crypto-utils';
@@ -10,15 +9,20 @@ import verifyUtils from '../utils/verify-utils';
 import { t } from '../i18n/i18n';
 import reqUtils from '../utils/req-utils';
 import dayjs from 'dayjs';
-import { isDel, roleConst } from '../const/entity-const';
+import { roleConst } from '../const/entity-const';
 import email from '../entity/email';
-import userService from './user-service';
-import KvConst from '../const/kv-const';
 import rateLimitUtils from '../utils/rate-limit-utils';
+import userContext from '../security/user-context';
 
 const publicService = {
+	assertAdmin(c) {
+		if (userContext.getUser(c).email !== c.env.admin) {
+			throw new BizError(t('notAdmin'), 403);
+		}
+	},
 
 	async emailList(c, params) {
+		this.assertAdmin(c);
 		await rateLimitUtils.publicApi(c);
 
 		let { toEmail, content, subject, sendName, sendEmail, timeSort, num, size, type, isDel } = params;
@@ -99,6 +103,7 @@ const publicService = {
 	},
 
 	async addUser(c, params) {
+		this.assertAdmin(c);
 		await rateLimitUtils.publicApi(c);
 
 		const { list } = params;
@@ -189,34 +194,6 @@ const publicService = {
 		}
 	},
 
-	async genToken(c, params) {
-		await rateLimitUtils.genToken(c);
-		await this.verifyUser(c, params);
-
-		const uuid = uuidv4();
-
-		await c.env.kv.put(KvConst.PUBLIC_KEY, uuid);
-
-		return { token: uuid };
-	},
-
-	async verifyUser(c, params) {
-		const { email, password } = params;
-
-		const userRow = await userService.selectByEmailIncludeDel(c, email);
-
-		if (email !== c.env.admin) {
-			throw new BizError(t('notAdmin'));
-		}
-
-		if (!userRow || userRow.isDel === isDel.DELETE) {
-			throw new BizError(t('notExistUser'));
-		}
-
-		if (!await cryptoUtils.verifyPassword(password, userRow.salt, userRow.password)) {
-			throw new BizError(t('IncorrectPwd'));
-		}
-	}
 };
 
 export default publicService;
