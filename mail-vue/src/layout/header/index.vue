@@ -338,19 +338,26 @@ function formatName(email) {
     display: none;
   }
 
-  /* 40px tap target: a quiet square, never a filled button. */
+  /* 44px tap target: a quiet square, never a filled button. The header keeps
+     its 60px height because the target is centred inside it, not stacked. */
   .toolbar .icon-item {
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
     border-radius: 10px;
   }
 
-  /* Phones keep the bundled sun/moon asset (dark → sun, light → moon) and scale
-     the glyph itself to 24px so it stays crisp, not just the hit area. */
-  .toolbar .sun-icon .app-icon,
+  /* Phones keep the bundled sun/moon assets (dark → sun, light → moon). Their
+     art carries different internal transparent padding (the sun fills ~76% of
+     its canvas, the moon ~63%), so each box is scaled to land both glyphs on
+     the same ~28px optical size instead of matching raw box widths. */
+  .toolbar .sun-icon .app-icon {
+    width: 38px;
+    height: 38px;
+  }
+
   .toolbar .dark-icon .app-icon {
-    width: 24px;
-    height: 24px;
+    width: 44px;
+    height: 44px;
   }
 
   .toolbar .notice {
@@ -655,16 +662,17 @@ function formatName(email) {
     display: grid;
     place-items: center;
   }
-  /* Phones keep the theme toggle: a 40px target with a 24px sun/moon glyph,
+  /* Phones keep the theme toggle: a 44px target whose sun/moon glyph is scaled
+     to ~28px optical size (per-asset boxes live in the block above), still
      vertically centred on the 42px avatar and seated 16px away from it. */
   .toolbar .sun-icon,
-  .toolbar .dark-icon { width: 40px; height: 40px; }
+  .toolbar .dark-icon { width: 44px; height: 44px; }
   .toolbar .notice { display: none; }
   .toolbar .setting-icon { display: none; }
   .toolbar .avatar { margin-left: 0; }
   .toolbar .avatar .avatar-text { width: 42px; height: 42px; }
   .toolbar .avatar .avatar-image { width: 42px; height: 42px; flex: 0 0 42px; }
-  .toolbar .icon-item { width: 40px; height: 40px; }
+  .toolbar .icon-item { width: 44px; height: 44px; }
   .toolbar .avatar .account-summary { display: none; }
   .breadcrumb-item { font-size: 15px; }
 }

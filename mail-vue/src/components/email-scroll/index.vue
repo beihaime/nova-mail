@@ -19,22 +19,10 @@
               @click="mobileSearchInput = ''"
           >×</button>
         </label>
-      </div>
 
-      <div class="mobile-filter-bar">
-        <div class="mobile-filters">
-          <button
-              v-for="filter in mobileFilters"
-              :key="filter.key"
-              :class="{ active: mobileFilter === filter.key }"
-              @click="selectMobileFilter(filter.key)"
-          >
-            {{ filter.label }}
-          </button>
-        </div>
-
-        <!-- Right-hand group: sort + multi-select, kept together so the row
-             balances against the filter chips instead of crowding them. -->
+        <!-- Sort + multi-select live beside the search field so the filter bar
+             below can hand all four filters an equal share of the full row
+             width instead of splitting it with an action group. -->
         <div class="mobile-filter-actions">
           <button
               class="mobile-tool-button mobile-sort"
@@ -50,6 +38,28 @@
               @click="toggleMobileSelection"
           >
             <Icon icon="solar:menu-dots-bold" width="21" height="21" />
+          </button>
+        </div>
+      </div>
+
+      <div class="mobile-filter-bar">
+        <!-- Four equal cells that together fill the row: every chip owns the
+             same width and centres its own content, so the group reads as one
+             balanced segmented control rather than four ragged pills. -->
+        <div class="mobile-filters">
+          <button
+              v-for="filter in mobileFilters"
+              :key="filter.key"
+              :class="{ active: mobileFilter === filter.key }"
+              @click="selectMobileFilter(filter.key)"
+          >
+            <AppIcon
+                v-if="filter.icon"
+                class="mobile-filter-icon"
+                :name="filter.icon"
+                :size="13"
+            />
+            <span class="mobile-filter-label">{{ filter.label }}</span>
           </button>
         </div>
       </div>
@@ -468,7 +478,10 @@ const mobileSelecting = ref(false)
 const mobileFilters = computed(() => [
   { key: 'all', label: t('all') },
   { key: 'unread', label: t('unreadMail') },
-  { key: 'attachments', label: t('withAttachments') }
+  { key: 'attachments', label: t('withAttachments') },
+  // `starred-nav` is the project's existing Starred star (the same asset the
+  // sidebar folder list shows); the chip reuses it instead of a new glyph.
+  { key: 'starred', label: t('starred'), icon: 'starred-nav' }
 ])
 
 let longPressTimer = null
@@ -575,7 +588,8 @@ const visibleList = computed(() => {
       (mobileFilter.value === 'unread' &&
         item.unread === EmailUnreadEnum.UNREAD) ||
       (mobileFilter.value === 'attachments' &&
-        !!emailStore.detailMap[item.emailId]?.attList?.length)
+        !!emailStore.detailMap[item.emailId]?.attList?.length) ||
+      (mobileFilter.value === 'starred' && !!item.isStar)
 
     const matchesSearch =
       !query ||
@@ -1984,10 +1998,18 @@ ul {
     /* Page gutter shared with the app bar and mail rows. */
     padding: 2px 12px 8px;
     box-sizing: border-box;
+
+    /* Search field on the left, sort + multi-select on the right; the field
+       keeps every pixel the two 32px tools do not need. */
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
 
   .mobile-search {
-    width: 100%;
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
     height: 44px;
 
     display: flex;
@@ -2072,16 +2094,12 @@ ul {
     height: 40px;
     min-width: 0;
 
-    /* Page gutter on the left, tight on the right: the chips own the left half
-       and the action group is pinned to the right edge. */
-    padding: 2px 8px 5px 12px;
+    /* Symmetric page gutter: the four chips fill the row edge to edge, so the
+       group is centred in the bar instead of leaning left. */
+    padding: 2px 12px 5px;
 
     display: flex;
     align-items: center;
-    /* Two clear groups: filters left, sort + more right. */
-    justify-content: space-between;
-    /* Minimum air between the groups when the chips grow. */
-    gap: 10px;
 
     border-bottom: 1px solid var(--nova-divider-soft, color-mix(in srgb, var(--nova-divider) 55%, transparent));
   }
@@ -2090,26 +2108,30 @@ ul {
     flex: 1 1 auto;
     min-width: 0;
 
-    /* Content-sized chips in a plain flex row, so the group stays left and the
-       actions keep their own space instead of being crowded. */
-    display: flex;
+    /* One equal column per filter: `minmax(0, 1fr)` lets a long label shrink
+       instead of pushing its neighbours out of line, so the four cells stay
+       identical whether or not one of them is active. */
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     align-items: center;
-    gap: 2px;
-
-    overflow: hidden;
-    white-space: nowrap;
+    gap: 0;
   }
 
   .mobile-filters button {
     /* Every chip carries the same box whether or not it is active, so toggling
-       a filter cannot shift its neighbours. */
-    flex: 0 0 auto;
-    width: auto;
+       a filter cannot shift its neighbours. The content is centred inside the
+       cell, which keeps the labels optically on the row's centre line. */
+    width: 100%;
     max-width: 100%;
     min-width: 0;
     height: 32px;
-    padding: 0 8px;
+    padding: 0 4px;
     box-sizing: border-box;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
 
     border: 0;
     border-radius: 999px;
@@ -2118,10 +2140,8 @@ ul {
     background: transparent;
 
     overflow: hidden;
-    white-space: nowrap;
-    text-overflow: clip;
 
-    font-size: clamp(11.5px, 3.1vw, 13px);
+    font-size: clamp(10.5px, 3.15vw, 12.5px);
     cursor: pointer;
   }
 
@@ -2132,7 +2152,29 @@ ul {
     font-weight: 650;
   }
 
-  /* Sort + multi-select behave as one right-aligned unit. */
+  /* The Starred chip's glyph is a project SVG (dark art, inverted by the global
+     dark-theme filter). A touch of opacity lands it on the same grey tier as
+     the inactive label instead of reading as a second, heavier icon. */
+  .mobile-filters button .mobile-filter-icon {
+    flex: 0 0 13px;
+    width: 13px;
+    height: 13px;
+    opacity: .65;
+  }
+
+  .mobile-filters button.active .mobile-filter-icon {
+    opacity: .8;
+  }
+
+  .mobile-filter-label {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  /* Sort + multi-select behave as one right-aligned unit beside the search
+     field (see `.mobile-search-row`). */
   .mobile-filter-actions {
     flex: 0 0 auto;
 
@@ -2206,8 +2248,14 @@ ul {
        Tracks are flush (no column gap): the avatar sits at the start of its
        50px track, so its trailing 10px is the avatar -> text gap and the body
        column gets every remaining pixel. Every track except the body is fixed,
-       so a read/unread flip or a long sender can never move anything. */
-    grid-template-columns: 16px 50px minmax(0, 1fr) 72px;
+       so a read/unread flip or a long sender can never move anything.
+
+       The metadata track is `max-content` rather than a fixed 72px: it takes
+       exactly the width of that row's own timestamp, so Subject/Snippet run
+       right up to the first character of the time text and only then ellipsis.
+       The avatar and the body's left edge are untouched — the extra width is
+       taken from the metadata column alone, never from the left. */
+    grid-template-columns: 16px 50px minmax(0, 1fr) max-content;
 
     column-gap: 0;
 
@@ -2215,8 +2263,6 @@ ul {
     height: 80px;
     min-height: 80px;
 
-    /* The right inset is trimmed to 8px to pay for the wider time column, so
-       the message body still ends up wider than before. */
     padding: 10px 8px 10px 8px;
 
     box-sizing: border-box;
@@ -2258,7 +2304,7 @@ ul {
   .email-container.mobile-selecting
     :deep(.email-row.email) {
     /* The checkbox replaces the unread gutter in the first track. */
-    grid-template-columns: 20px 50px minmax(0, 1fr) 72px;
+    grid-template-columns: 20px 50px minmax(0, 1fr) max-content;
   }
 
   .email-container.mobile-selecting
@@ -2484,11 +2530,14 @@ ul {
 
     align-self: start;
 
-    /* Fixed 72px: `2024/01/15` measures 70.08px at 14px, so a year-old date
-       needs the extra 2px of slack or `text-overflow` clips it to "2024/01/…".
-       Never allowed to grow into the message body. */
-    width: 72px;
-    min-width: 72px;
+    /* Sized by its own content (see the row's grid-template-columns) so the
+       body can run right up to the timestamp. 8px of left padding is the only
+       gap between the ellipsised Subject/Snippet and the time's first digit.
+       The cap is a safety valve for an unexpected relative-time fallback: a
+       runaway label ellipsises instead of eating the message body. */
+    width: auto;
+    min-width: 0;
+    max-width: 96px;
 
     display: flex;
     flex-direction: column;
@@ -2500,6 +2549,7 @@ ul {
     gap: 2px;
 
     padding-top: 1px;
+    padding-left: 8px;
   }
 
   .mobile-meta-time {
