@@ -54,14 +54,19 @@ const webhookService = {
 				const res = await fetch(webhookUrl, {
 					method: 'POST',
 					headers,
-					body
+					body,
+					// Do not let an approved public endpoint redirect this signed payload
+					// (or the webhook secret) to an internal address.
+					redirect: 'manual'
 				});
 
 				if (res.ok) {
 					return;
 				}
 
-				lastError = `status: ${res.status} response: ${await res.text()}`;
+				lastError = res.status >= 300 && res.status < 400
+					? `redirect rejected: ${res.status}`
+					: `status: ${res.status}`;
 			} catch (e) {
 				lastError = e.message;
 			}
