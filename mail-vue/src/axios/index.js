@@ -49,6 +49,16 @@ http.interceptors.response.use((res) => {
                 })
                 reject(data)
 
+            } else if (data.code === 429) {
+                ElMessage({
+                    message: data.message || i18n.global.t('tooManyRequests'),
+                    type: 'warning',
+                    plain: true,
+                    grouping: true,
+                    repeatNum: -4,
+                })
+                reject(data)
+
             } else if (data.code === 502) {
                 ElMessage({
                     dangerouslyUseHTMLString: true,
@@ -73,6 +83,17 @@ http.interceptors.response.use((res) => {
         })
     },
     (error) => {
+
+        if (error.status === 429) {
+            ElMessage({
+                message: (error.response && error.response.data && error.response.data.message) || i18n.global.t('tooManyRequests'),
+                type: 'warning',
+                plain: true,
+                grouping: true,
+                repeatNum: -4,
+            })
+            return Promise.reject(error)
+        }
 
         if (error.status === 403) {
             location.reload();

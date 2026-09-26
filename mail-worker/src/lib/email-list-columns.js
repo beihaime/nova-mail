@@ -15,8 +15,15 @@ function sqlStripWhitespace(column) {
 		'> <', '><'))`;
 }
 
-/** 完整查询：全部字段 */
-export const emailListColumns = getTableColumns(email);
+/**
+ * 完整查询：全部字段。
+ *
+ * `auth_results` and `bimi_selector` are server-internal inputs to the sender
+ * avatar resolver (lib/bimi.js, service/sender-avatar-service.js); they are
+ * stripped here so no API response can leak them.
+ */
+const { authResults: _authResults, bimiSelector: _bimiSelector, ...safeEmailColumns } = getTableColumns(email);
+export const emailListColumns = safeEmailColumns;
 
 /** 摘要查询：列表 + 详情头部；有 text 则不读 content，没有才查 content（去空白），响应里不返回 content */
 export const emailBriefColumns = {
@@ -33,6 +40,12 @@ export const emailBriefColumns = {
 	unread: email.unread,
 	createTime: email.createTime,
 	isDel: email.isDel,
+	// The renderer is chosen from this value, and the list preview needs it too:
+	// markdown must not be shown with its syntax characters.
+	bodyType: email.bodyType,
+	// The Inbox is rendered one row per conversation, so the client needs the
+	// conversation key on brief rows too (kept on A7 upgrades / realtime upserts).
+	threadId: email.threadId,
 	content: sql`CASE WHEN trim(coalesce(${email.text}, '')) != '' THEN NULL ELSE ${sqlStripWhitespace(email.content)} END`.as('content'),
 	text: sql`substr(coalesce(${email.text}, ''), 1, ${EMAIL_LIST_TEXT_LEN})`.as('text'),
 };

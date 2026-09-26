@@ -27,7 +27,7 @@
           <span class="phone-time">
             <el-skeleton animated>
               <template #template>
-                <el-skeleton-item variant="text" style="width: 50px;height: 1rem;"/>
+                <el-skeleton-item variant="text" class="phone-time-skeleton"/>
               </template>
             </el-skeleton>
           </span>
@@ -118,6 +118,18 @@ import {Icon} from "@iconify/vue";
 :deep(.el-skeleton__item) {
   position: relative;
   top: 2px;
+}
+
+/* Phone inbox rows are 72px with a 14px preview line, so tighten the skeleton
+   to the same rhythm. Desktop/tablet keep their original placeholder sizes. */
+@media (max-width: 767px) {
+  :deep(.el-skeleton__item) {
+    top: 1px;
+  }
+  .phone-time-skeleton {
+    width: 46px;
+    height: .875rem;
+  }
 }
 
 @media (max-width: 1366px) {

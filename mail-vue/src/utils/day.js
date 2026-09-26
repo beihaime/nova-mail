@@ -80,6 +80,49 @@ export function formatDetailDate(time) {
     }
 }
 
+/**
+ * Compact timestamp for the mobile conversation header.
+ *
+ * Today → clock time ("7:37 AM" / "07:37"), otherwise a short date
+ * ("Sep 19" / "9月19日"). The desktop reader keeps the full
+ * `formatDetailDate` string; this is only used under the 767px breakpoint.
+ */
+export function formatCompactDate(time) {
+    const d = dayjs.utc(time).tz(timeZone);
+    const now = dayjs();
+
+    if (now.isSame(d, 'day')) {
+        return settingStore.lang === 'en' ? d.format('h:mm A') : d.format('HH:mm');
+    }
+
+    if (now.year() === d.year()) {
+        return settingStore.lang === 'en' ? d.format('MMM D') : d.format('M月D日');
+    }
+
+    return settingStore.lang === 'en' ? d.format('MMM D, YYYY') : d.format('YYYY年M月D日');
+}
+
+/**
+ * Fixed clock label for the mobile Inbox list.
+ *
+ * Today's mail always reads as a zero-padded 24-hour `HH:mm` ("08:05") instead
+ * of `fromNow`'s relative wording ("51 min ago" / "1 hour ago"), so the right
+ * column scans as one aligned set of timestamps. Anything older keeps the same
+ * calendar label the list already showed.
+ *
+ * Deliberately language-independent: the list shows a clock, not prose.
+ */
+export function formatListClock(time) {
+    const d = dayjs.utc(time).tz(timeZone);
+    const now = dayjs();
+
+    if (now.isSame(d, 'day')) return d.format('HH:mm');
+
+    return now.year() === d.year()
+        ? d.format('MMM D')
+        : d.format('YYYY/MM/DD');
+}
+
 export function tzDayjs(time) {
     return dayjs.utc(time).tz(timeZone)
 }

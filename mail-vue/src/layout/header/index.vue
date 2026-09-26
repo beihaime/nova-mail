@@ -1,19 +1,15 @@
 <template>
   <div class="header" :class="!hasPerm('email:send') ? 'not-send' : ''">
     <div class="header-btn">
-      <hanburger @click="changeAside"></hanburger>
+      <hanburger class="menu-button" @click="changeAside"></hanburger>
       <span class="breadcrumb-item">{{ $t(route.meta.title) }}</span>
     </div>
-    <label class="search-shell">
+    <label class="search-shell desktop-search-only">
       <AppIcon name="search" :size="18" />
-      <input :placeholder="$t('searchMail')" type="search" />
-      <kbd>⌘ K</kbd>
+      <input v-model="keyword" :placeholder="$t('searchMail')" type="search" @keydown="handleKeydown" />
+      <button v-if="keyword" class="search-clear" type="button" :aria-label="$t('clearSearch')" @click="clear">×</button>
+
     </label>
-      <div v-perm="'email:send'" class="writer-box" @click="openSend">
-        <div class="writer">
-        <AppIcon name="compose" :size="18" />
-      </div>
-    </div>
     <div class="toolbar">
       <div v-if="uiStore.dark" class="sun-icon icon-item" @click="openDark($event)">
         <AppIcon name="theme-toggle" :size="20" />
@@ -21,12 +17,25 @@
       <div v-else class="dark-icon icon-item" @click="openDark($event)">
         <AppIcon name="theme-toggle" :size="20" />
       </div>
-      <div class="notice icon-item" @click="openNotice">
+      <div
+          class="notice icon-item"
+          role="button"
+          :aria-label="$t('noticeTitle')"
+          :title="$t('noticeTitle')"
+          @click="openNotice"
+      >
         <AppIcon name="notifications" :size="20" />
+        <!-- Data-driven unread dot: nothing renders at 0/null/undefined. -->
+        <span
+            v-if="Number(uiStore.unreadNotifications) > 0"
+            class="notice-dot"
+            aria-hidden="true"
+        ></span>
       </div>
       <el-dropdown ref="userinfoRef" @visible-change="e => userInfoShow = e" :teleported="false" popper-class="detail-dropdown">
-        <div class="avatar" @click="openAccountSwitcher" >
-          <div class="avatar-text">
+        <div class="avatar" @click.stop="openAccountSwitcher" >
+          <img v-if="currentAvatar" class="avatar-image" :src="currentAvatar" alt="" @error="handleAvatarError" />
+          <div v-else class="avatar-text">
             <div>{{ formatName(currentAccount.email || userStore.user.email) }}</div>
           </div>
           <div class="account-summary">
@@ -38,15 +47,12 @@
         <template #dropdown>
           <div class="user-details">
             <div class="account-dropdown-head">
-              <div class="account-dropdown-avatar">{{ formatName(primaryAddress) }}</div>
+              <img v-if="currentAvatar" class="account-dropdown-avatar account-dropdown-avatar-image" :src="currentAvatar" alt="" @error="handleAvatarError" />
+              <div v-else class="account-dropdown-avatar">{{ formatName(primaryAddress) }}</div>
               <div>
                 <strong>{{ accountDisplayName }}</strong>
                 <span>{{ $t('accountLabel') }}</span>
               </div>
-            </div>
-            <div class="primary-address">
-              <span>{{ $t('primaryAddress') }}</span>
-              <button @click="copyEmail(primaryAddress)">{{ primaryAddress }}</button>
             </div>
             <div class="address-section">
               <div class="address-section-label">{{ $t('mailAddresses') }}</div>
@@ -58,9 +64,20 @@
                     :class="{ selected: address.accountId === currentAccount.accountId }"
                     @click="selectAccount(address)"
                 >
-                  <AppIcon v-if="address.accountId === currentAccount.accountId" name="checkbox-checked" :size="16" />
-                  <span v-else class="address-check-placeholder"></span>
                   <span class="address-email">{{ address.email }}</span>
+                  <!-- Trailing status: the current-address check, then the
+                       primary badge. Both shrink-proof, so neither can move the
+                       address text — every address keeps one shared left
+                       baseline. -->
+                  <span
+                      v-if="address.accountId === currentAccount.accountId"
+                      class="address-state-check"
+                      aria-hidden="true"
+                  >
+                    <svg class="address-state-icon" viewBox="0 0 16 16" width="16" height="16" focusable="false" aria-hidden="true">
+                      <path d="M3.4 8.5 6.6 11.6 12.7 5.2" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                  </span>
                   <small v-if="address.email === primaryAddress" class="primary-badge">{{ $t('primary') }}</small>
                 </button>
               </div>
@@ -85,14 +102,16 @@ import {logout} from "@/request/login.js";
 import {useUiStore} from "@/store/ui.js";
 import {useUserStore} from "@/store/user.js";
 import {useRoute} from "vue-router";
-import {computed, onMounted, ref} from "vue";
+import {computed, onMounted, ref, watch} from "vue";
 import {useSettingStore} from "@/store/setting.js";
 import {hasPerm} from "@/perm/perm.js"
 import {useI18n} from "vue-i18n";
 import {setExtend} from "@/utils/day.js"
+import {applyThemeTransition} from "@/utils/theme-transition.js"
 import {accountList} from "@/request/account.js";
 import {useAccountStore} from "@/store/account.js";
 import {useEmailStore} from "@/store/email.js";
+import {useMailSearch} from "@/composables/use-mail-search.js";
 
 const {t} = useI18n();
 const route = useRoute();
@@ -101,6 +120,7 @@ const userStore = useUserStore();
 const uiStore = useUiStore();
 const accountStore = useAccountStore();
 const emailStore = useEmailStore();
+const {keyword, clear, handleKeydown} = useMailSearch();
 const logoutLoading = ref(false)
 const userInfoShow = ref(false)
 const userinfoRef = ref({})
@@ -109,6 +129,7 @@ const accounts = ref([])
 const currentAccount = computed(() => accountStore.currentAccount || {})
 const primaryAddress = computed(() => userStore.user.email || currentAccount.value.email || '')
 const accountDisplayName = computed(() => userStore.user.name || formatName(primaryAddress.value))
+const currentAvatar = computed(() => userStore.githubAvatar || userStore.googleAvatar)
 
 const accountCount = computed(() => {
   return userStore.user.role.accountCount
@@ -181,7 +202,11 @@ function userInfoHide() {
 
 function openAccountSwitcher() {
   if (window.innerWidth < 768) {
-    uiStore.accountShow = true
+    // The mobile account list used to open alongside this dropdown. Keep the
+    // profile interaction single-owned by the account popover; the full
+    // address-management page remains available through Manage addresses.
+    uiStore.accountShow = false
+    userInfoHide()
     return
   }
   userInfoHide()
@@ -201,7 +226,7 @@ function selectAccount(account) {
 
 function openManageAddresses() {
   userinfoRef.value.handleClose()
-  uiStore.accountShow = true
+  router.push({ name: 'addresses' })
 }
 
 async function loadAccounts() {
@@ -219,24 +244,14 @@ onMounted(() => {
   loadAccounts().catch(() => {
     accounts.value = []
   })
+  userStore.refreshGithubAccount()
+  userStore.refreshGoogleAccount()
+  uiStore.refreshNotifications()
 })
 
-async function copyEmail(email) {
-  try {
-    await navigator.clipboard.writeText(email);
-    ElMessage({
-      message: t('copySuccessMsg'),
-      type: 'success',
-      plain: true,
-    })
-  } catch (err) {
-    console.error(`${t('copyFailMsg')}:`, err);
-    ElMessage({
-      message: t('copyFailMsg'),
-      type: 'error',
-      plain: true,
-    })
-  }
+function handleAvatarError() {
+  if (userStore.githubAvatar) userStore.githubAvatar = ''
+  else userStore.googleAvatar = ''
 }
 
 function changeLang(lang) {
@@ -245,52 +260,24 @@ function changeLang(lang) {
 }
 
 function openNotice() {
+  // Opening the announcement clears the unread dot for this visitor.
+  uiStore.markNotificationsRead()
   uiStore.showNotice()
 }
 
+// The dot reflects the configured announcement, so keep it in sync whenever the
+// notice settings arrive or change.
+watch(
+  () => [
+    settingStore.settings.notice,
+    settingStore.settings.noticeTitle,
+    settingStore.settings.noticeContent
+  ],
+  () => uiStore.refreshNotifications()
+)
+
 function openDark(e) {
-
-  const nextIsDark = !uiStore.dark
-  const root = document.documentElement
-
-  if (!document.startViewTransition) {
-    switchDark(nextIsDark, root);
-    return
-  }
-
-  const x = e.clientX
-  const y = e.clientY
-
-  const maxX = Math.max(x, window.innerWidth - x)
-  const maxY = Math.max(y, window.innerHeight - y)
-  const endRadius = Math.hypot(maxX, maxY)
-
-  // 标记切换目标，供 CSS 选择器使用
-  root.setAttribute('data-theme-to', nextIsDark ? 'dark' : 'light')
-  root.style.setProperty('--vt-x', `${x}px`)
-  root.style.setProperty('--vt-y', `${y}px`)
-  root.style.setProperty('--vt-end-radius', `${endRadius + 10}px`)
-
-  const transition = document.startViewTransition(() => {
-    switchDark(nextIsDark, root);
-  })
-
-  transition.finished.finally(() => {
-    // 清理标记
-    root.removeAttribute('data-theme-to')
-  })
-}
-
-function switchDark(nextIsDark, root) {
-  root.setAttribute('class', nextIsDark ? 'dark' : '')
-  const metaTag = document.getElementById('theme-color-meta');
-  const isMobile =  !window.matchMedia("(pointer: fine) and (hover: hover)").matches;
-  metaTag.setAttribute('content', nextIsDark ? (isMobile ? '#141414' : '#000000') : (isMobile ? '#191A23' : '#F1F1F1'));
-  uiStore.dark = nextIsDark
-}
-
-function openSend() {
-  uiStore.writerRef.open()
+  applyThemeTransition(uiStore.dark ? 'light' : 'dark', e)
 }
 
 function changeAside() {
@@ -316,11 +303,152 @@ function formatName(email) {
 .detail-dropdown {
   color: var(--el-text-color-primary) !important;
 }
+
+
+/* Mobile Header v2.
+   Desktop behavior, mail search, OAuth avatars and account switching remain
+   owned by the stable implementation above. */
+
+@media (max-width: 767px) {
+  .header,
+  .header.not-send {
+    height: 60px;
+    min-height: 60px;
+
+    padding: 0 12px;
+    column-gap: 6px;
+    row-gap: 0;
+
+    /* The title owns the free row; the toolbar keeps its intrinsic width. The
+       Inbox search now lives on its own row underneath the app bar. */
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+
+    background: var(--nova-mobile-header-bg);
+  }
+
+  .header-btn {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+    gap: 2px;
+  }
+
+  .toolbar {
+    grid-column: 2;
+    grid-row: 1;
+
+    /* Phone app bar: theme toggle and avatar read as one control group with a
+       deliberate 16px seat between them, instead of touching each other. */
+    gap: 16px;
+    align-items: center;
+    justify-content: end;
+  }
+
+  .search-shell {
+    display: none;
+  }
+
+  /* 44px tap target: a quiet square, never a filled button. The header keeps
+     its 60px height because the target is centred inside it, not stacked. */
+  .toolbar .icon-item {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+  }
+
+  /* Phones keep the bundled sun/moon assets (dark → sun, light → moon). Their
+     art carries different internal transparent padding (the sun fills ~76% of
+     its canvas, the moon ~63%), so each box is scaled to land both glyphs on
+     the same ~20px optical size instead of matching raw box widths. ~20px keeps
+     the toggle on the same scale as the rest of the phone chrome (bottom nav
+     22px, compose 21px) instead of dominating the title and the avatar; the
+     44px `.icon-item` above still owns the touch target. */
+  .toolbar .sun-icon .app-icon {
+    width: 26px;
+    height: 26px;
+  }
+
+  .toolbar .dark-icon .app-icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .toolbar .notice {
+    display: none;
+  }
+
+  .toolbar .setting-icon {
+    display: none;
+  }
+
+  .toolbar .el-dropdown {
+    width: 42px;
+    height: 42px;
+
+    display: grid;
+    place-items: center;
+  }
+
+  .toolbar .avatar {
+    width: 42px;
+    height: 42px;
+
+    margin: 0;
+
+    justify-content: center;
+  }
+
+  .toolbar .avatar .avatar-text {
+    width: 42px;
+    height: 42px;
+  }
+
+  .toolbar .avatar .avatar-image {
+    width: 42px;
+    height: 42px;
+    flex: 0 0 42px;
+  }
+
+  .toolbar .avatar .account-summary {
+    display: none;
+  }
+
+  .breadcrumb-item {
+    min-width: 0;
+
+    font-size: 20px;
+    font-weight: 600;
+
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+}
+
+
+
+/* Mobile uses the Inbox search field instead of the desktop header search. */
+@media (max-width: 767px) {
+  .header > .search-shell {
+    display: none !important;
+  }
+}
+
+
+
+@media (max-width: 767px) {
+  .desktop-search-only {
+    display: none !important;
+  }
+}
+
 </style>
 <style lang="scss" scoped>
 
 :deep(.el-popper.is-pure) {
   border: 1px solid var(--nova-divider);
+  background: var(--nova-surface);
   border-radius: 14px;
   box-shadow: 0 14px 34px color-mix(in srgb, #101828 14%, transparent);
   overflow: hidden;
@@ -334,42 +462,53 @@ function formatName(email) {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  animation: nova-popover-in var(--nova-motion-base) var(--nova-motion-ease) forwards;
 
   .account-dropdown-head {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 10px;
-    padding: 15px 16px 12px;
+    padding: 12px 15px 10px;
+    /* Fixed header: it must not be squeezed by a long address list. */
+    flex: 0 0 auto;
     strong, span { display: block; }
     strong { font-size: 14px; color: var(--el-text-color-primary); font-weight: 680; }
     span { margin-top: 2px; font-size: 12px; color: var(--regular-text-color); }
+    > div:not(.account-dropdown-avatar) { align-self: flex-start; min-width: 0; text-align: left; }
   }
 
   .account-dropdown-avatar {
-    width: 34px; height: 34px; display: grid; place-items: center; flex: 0 0 34px;
+    width: 38px; height: 38px; display: grid; place-items: center; flex: 0 0 38px;
     border-radius: 50%; color: var(--el-color-primary); background: var(--nova-selected);
     border: 1px solid color-mix(in srgb, var(--el-color-primary) 18%, var(--nova-divider)); font-weight: 700;
   }
-  .primary-address { padding: 0 16px 14px; border-bottom: 1px solid var(--nova-divider); }
-  .primary-address span, .address-section-label { display: block; color: var(--regular-text-color); font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-  .primary-address button { display: block; max-width: 100%; padding: 5px 0 0; color: var(--el-text-color-primary); font-size: 13px; font-weight: 560; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
-  .primary-address button:hover { color: var(--el-color-primary); }
+  .account-dropdown-avatar-image { display: block; object-fit: cover; border: 0; }
+  .address-section-label { display: block; align-self: flex-start; width: 100%; color: var(--regular-text-color); font-size: 11px; font-weight: 650; letter-spacing: .08em; text-align: left; text-transform: uppercase; }
   .address-section { display: flex; flex: 1 1 auto; min-height: 0; flex-direction: column; padding-top: 11px; }
-  .address-section-label { padding: 0 16px 6px; }
-  .address-list { padding: 0 7px 7px; max-height: min(360px, calc(100vh - 285px)); overflow: auto; }
+  /* Hairline under the section label: the top edge of the scrolling region. */
+  .address-section-label { padding: 1px 15px 8px; border-bottom: 1px solid var(--nova-divider-soft, color-mix(in srgb, var(--nova-divider) 55%, transparent)); }
+  /* The list owns the whole leftover column and scrolls itself: aliases are laid
+     out flat (no collapsing, no paging, no "view all"), so it is always the list
+     that scrolls — never the menu. */
+  .address-list { flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto; padding: 0 8px 8px; }
   .address-option {
-    width: 100%; height: 42px; display: flex; align-items: center; gap: 9px; padding: 0 9px;
+    /* 43px again on the wide menu: a mouse-driven list reads better compact.
+       Phones keep the taller touch row (see the 767px block). */
+    width: 100%; height: 43px; display: flex; align-items: center; gap: 8px; padding: 0 7px;
     text-align: left; color: var(--el-text-color-primary); border-radius: 8px; cursor: pointer;
     transition: background-color .14s ease;
     .address-email { min-width: 0; flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
     &:hover { background: var(--nova-hover); }
     &.selected { color: var(--el-color-primary); font-weight: 600; background: var(--nova-selected); }
-    .app-icon, .address-check-placeholder { width: 16px; height: 16px; flex: 0 0 16px; }
   }
   .primary-badge { flex: 0 0 auto; padding: 2px 6px; border-radius: 5px; color: var(--el-color-primary); background: color-mix(in srgb, var(--el-color-primary) 10%, transparent); font-size: 10px; font-weight: 650; }
+  /* Trailing current-address check. Shrink-proof like the badge, so the trailing
+     status can never move the address text. */
+  .address-state-check { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 16px; width: 16px; height: 16px; margin-left: 2px; }
+  .address-state-icon { display: block; }
   .address-loading { padding: 16px; color: var(--regular-text-color); text-align: center; }
   .account-dropdown-actions { flex: 0 0 auto; border-top: 1px solid var(--nova-divider); padding: 7px; display: grid; }
-  .account-dropdown-actions button { min-height: 36px; display: flex; align-items: center; gap: 9px; padding: 0 10px; border-radius: 8px; text-align: left; color: var(--el-text-color-primary); cursor: pointer; }
+  .account-dropdown-actions button { min-height: 36px; display: flex; align-items: center; gap: 9px; padding: 0 8px; border-radius: 8px; text-align: left; color: var(--el-text-color-primary); cursor: pointer; }
   .account-dropdown-actions button:hover { background: var(--nova-hover); }
   .account-dropdown-actions .sign-out { color: #d84a4a; }
 }
@@ -382,7 +521,7 @@ function formatName(email) {
   height: 100%;
   gap: 12px;
   padding: 0 14px;
-  grid-template-columns: minmax(92px, auto) minmax(220px, 1fr) auto auto;
+  grid-template-columns: minmax(92px, auto) minmax(220px, 1fr) auto;
 }
 
 .header.not-send {
@@ -402,39 +541,13 @@ function formatName(email) {
   border-radius: 10px;
   transition: border-color .16s ease, box-shadow .16s ease;
   .app-icon { opacity: .68; }
+  :global(.dark .search-shell .app-icon) { filter: var(--nova-ui-icon-filter); opacity: 1; }
   input { width: 100%; min-width: 0; color: inherit; }
   input::placeholder { color: var(--regular-text-color); opacity: .92; }
+  .search-clear { flex: 0 0 auto; width: 22px; height: 22px; border-radius: 50%; color: var(--regular-text-color); font-size: 17px; line-height: 20px; cursor: pointer; animation: nova-fade-scale-in var(--nova-motion-fast) var(--nova-motion-ease) forwards; }
+  .search-clear:hover { color: var(--el-text-color-primary); background: var(--nova-hover); }
   &:focus-within { border-color: var(--el-color-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--el-color-primary) 12%, transparent); }
   kbd { padding: 2px 6px; white-space: nowrap; font-size: 11px; color: var(--regular-text-color); background: var(--base-fill); border-radius: 5px; }
-}
-
-.writer-box {
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-left: 2px;
-
-  .writer {
-    width: 34px;
-    height: 34px;
-    border-radius: 9px;
-    color: #ffffff;
-    background: var(--el-color-primary);
-    transition: filter .16s ease, transform .16s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    .writer-text {
-      margin-left: 15px;
-      font-size: 14px;
-      font-weight: bold;;
-    }
-  }
-  &:hover .writer { filter: brightness(.94); }
-  &:active .writer { transform: scale(.96); }
-  .app-icon { width: 18px; height: 18px; }
 }
 
 .header-btn {
@@ -476,7 +589,33 @@ function formatName(email) {
     background: var(--base-fill);
   }
 
-  .notice { margin-right: 4px; }
+  :global(.dark .toolbar .icon-item .app-icon) {
+    filter: var(--nova-ui-icon-filter) !important;
+    opacity: 1 !important;
+  }
+
+  :global(.dark .toolbar .icon-item:hover .app-icon) {
+    filter: var(--nova-ui-icon-filter-hover) !important;
+    opacity: 1 !important;
+  }
+
+  .notice {
+    position: relative;
+    margin-right: 4px;
+  }
+
+  /* Only rendered when the store reports an unread notification. */
+  .notice-dot {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--el-color-danger);
+    box-shadow: 0 0 0 2px var(--nova-surface);
+    pointer-events: none;
+  }
 
   .avatar {
     display: flex;
@@ -493,6 +632,14 @@ function formatName(email) {
       align-items: center;
       border-radius: 50%;
       border: 1px solid var(--nova-divider);
+    }
+
+    .avatar-image {
+      width: 33px;
+      height: 33px;
+      flex: 0 0 33px;
+      border-radius: 50%;
+      object-fit: cover;
     }
 
     .setting-icon {
@@ -518,15 +665,85 @@ function formatName(email) {
 }
 
 @media (max-width: 767px) {
-  .header { height: auto; min-height: 58px; padding: 8px 12px; gap: 8px; grid-template-columns: auto 1fr auto; }
-  .header.not-send { grid-template-columns: auto 1fr; }
+  .header {
+    height: 60px;
+    min-height: 60px;
+    padding: 0 12px;
+    column-gap: 6px;
+    row-gap: 0;
+    align-items: center;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .header.not-send { grid-template-columns: minmax(0, 1fr) auto; }
   .search-shell { display: none; }
-  .writer-box { margin-left: 0; }
+  .header-btn { grid-column: 1; grid-row: 1; gap: 2px; }
+  .toolbar { grid-column: 2; grid-row: 1; gap: 16px; }
+  /* Menu button: a fixed 44px tap target instead of the 50px the hamburger
+     component's inline `padding: 0 15px` produced, so the title sits closer. */
+  .menu-button {
+    width: 44px;
+    height: 44px;
+    padding: 0 !important;
+    display: grid;
+    place-items: center;
+  }
+  /* Phones keep the theme toggle: a 44px target whose sun/moon glyph is scaled
+     to ~20px optical size (per-asset boxes live in the block above), still
+     vertically centred on the 42px avatar and seated 16px away from it. */
+  .toolbar .sun-icon,
+  .toolbar .dark-icon { width: 44px; height: 44px; }
   .toolbar .notice { display: none; }
   .toolbar .setting-icon { display: none; }
-  .toolbar .avatar { margin-left: 2px; }
+  .toolbar .avatar { margin-left: 0; }
+  .toolbar .avatar .avatar-text { width: 42px; height: 42px; }
+  .toolbar .avatar .avatar-image { width: 42px; height: 42px; flex: 0 0 42px; }
+  .toolbar .icon-item { width: 44px; height: 44px; }
   .toolbar .avatar .account-summary { display: none; }
-  .breadcrumb-item { font-size: 16px; }
+  .breadcrumb-item { font-size: 15px; }
+}
+
+/* ---- Mobile Account Sheet -------------------------------------------------
+   The layout is shared with the wide account menu above: one column capped in
+   height, a fixed account header, the address list as the only scrolling region
+   and fixed actions. Phones only add the phone-specific chrome — a viewport
+   relative cap, native touch scrolling, no desktop scrollbar and the fade that
+   replaces it.
+
+   One 15px text gutter runs through the whole menu on both breakpoints: the
+   "Mail addresses" label, the addresses and the action rows all start on the
+   same x, and only the rounded row backgrounds are inset from it (8px of list
+   padding + 7px of row padding = the 15px gutter). */
+@media (max-width: 767px) {
+  .user-details {
+    /* `dvh` tracks the collapsing browser chrome; engines without dynamic
+       viewport units fall back to the vh rule above the breakpoint. */
+    max-height: min(75dvh, 720px);
+
+    .address-option {
+      /* Phone rows keep the touch height (48-52px band). */
+      height: 50px;
+    }
+
+    .address-list {
+      /* Native touch scrolling, no desktop scrollbar chrome, and no scroll
+         chaining onto the page behind the sheet. */
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      scrollbar-width: none;
+
+      /* Content fade at both ends, so the region reads as scrollable without a
+         visible scrollbar. A mask carries alpha only, so it needs no colour at
+         all — identical in light and dark. */
+      -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
+      mask-image: linear-gradient(to bottom, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
+    }
+
+    .address-list::-webkit-scrollbar {
+      width: 0;
+      height: 0;
+      display: none;
+    }
+  }
 }
 
 .el-tooltip__trigger:first-child:focus-visible {

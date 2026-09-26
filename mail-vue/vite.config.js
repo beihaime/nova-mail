@@ -24,15 +24,23 @@ export default defineConfig(({mode}) => {
                     'icons/nova-mail-maskable-192.png',
                     'icons/nova-mail-maskable-512.png',
                 ],
-                manifest: {
-                    name: 'Nova Mail',
-                    short_name: 'Nova Mail',
-                    description: 'Nova Mail — your mail, your rules.',
-                    start_url: '/',
-                    scope: '/',
-                    display: 'standalone',
-                    background_color: '#F6F8FC',
-                    theme_color: '#F6F8FC',
+                // Install/launch defaults only: the manifest is static, so it cannot
+                // follow the in-app theme. #17191d is the dark value of the
+                // `--nova-mobile-header-bg` token (light is #FFFFFF) so the splash
+                // and first frame match the dark-grey phone header, not pure black.
+                // Runtime status-bar colour is driven by
+                // <meta name="theme-color">, which applyTheme() keeps in sync with
+                // the effective light/dark theme.
+                manifest:{
+                    name:'Nova Mail',
+                    short_name:'Nova Mail',
+                    description:'Nova Mail — your mail, your rules.',
+                    start_url:'/',
+                    scope:'/',
+                    display:'standalone',
+                    background_color:'#17191d',
+                    theme_color:'#17191d',
+
                     icons: [
                         {
                             src: '/icons/nova-mail-192.png',
@@ -68,6 +76,9 @@ export default defineConfig(({mode}) => {
                     cleanupOutdatedCaches: true,
                     clientsClaim: true,
                     skipWaiting: true,
+                    // Pull the Web Push handlers into the generated worker rather
+                    // than running a second service worker for notifications.
+                    importScripts: ['push-sw.js'],
                 }
             }),
             AutoImport({

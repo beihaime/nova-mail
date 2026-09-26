@@ -16,7 +16,23 @@ export const useEmailStore = defineStore('email', {
             showUnread: false
         },
         sendScroll: null,
+        // The Archive view's list ref, so marking mail read reaches whichever
+        // folder is open (see `markListRead`).
+        archiveScroll: null,
         detailMap: {},
+        searchKeyword: '',
+        // Client-side query behind the phone Inbox search field. It lives in the
+        // store so the field can render inside the mobile header while
+        // email-scroll keeps filtering the loaded list. Not persisted.
+        mobileSearch: '',
+        // Replies/forwards sent this session, shown in the conversation thread
+        // immediately without waiting for a list refresh. Not persisted.
+        threadMessages: [],
+        // Highest email id already announced by a notification sound. Shared by
+        // the Inbox poll, the reader poll and the global watcher so the same
+        // mail never rings twice (e.g. right after switching route). Session
+        // only, never persisted.
+        notifyCursor: 0,
     }),
     persist: {
         pick: ['contentData'],
@@ -67,12 +83,49 @@ export const useEmailStore = defineStore('email', {
             }
         },
         markListRead(emailId) {
-            const scrolls = [this.emailScroll, this.starScroll, this.sendScroll]
+            const scrolls = [this.emailScroll, this.starScroll, this.sendScroll, this.archiveScroll]
             for (const scroll of scrolls) {
                 const list = scroll?.emailList
                 if (!list?.length) continue
                 const item = list.find(e => e.emailId === emailId)
                 if (item) item.unread = EmailUnreadEnum.READ
+            }
+        },
+        /**
+         * Merge a freshly fetched full email row (with `content`) into the
+         * store so the reader renders its body.
+         */
+        mergeFullEmail(row) {
+            if (!row?.emailId) return
+
+            this.detailMap[row.emailId] = row
+
+            if (Number(this.contentData.email?.emailId) === Number(row.emailId)) {
+                this.contentData.email = row
+            }
+        },
+        /**
+         * Show a freshly sent reply/forward inside its conversation thread
+         * straight away, instead of waiting for the list to be refetched.
+         * Expects the email row returned by `POST /email/send`.
+         */
+        appendThreadMessage(email) {
+            if (!email) return
+
+            const emailId = Number(email.emailId) || 0
+            if (emailId && this.threadMessages.some(item => Number(item.emailId) === emailId)) {
+                return
+            }
+
+            this.threadMessages.push({
+                ...email,
+                emailId,
+                attList: email.attList || [],
+                local: true,
+            })
+
+            if (this.threadMessages.length > 50) {
+                this.threadMessages.splice(0, this.threadMessages.length - 50)
             }
         },
     },

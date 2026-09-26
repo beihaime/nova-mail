@@ -1,16 +1,34 @@
 <template>
-  <div id="login-box" :style=" background ? 'background: var(--el-bg-color)' : ''" v-loading="oauthLoading" element-loading-text="登录中...">
-    <div id="background-wrap" v-if="!settingStore.settings.background">
-      <div class="x1 cloud"></div>
-      <div class="x2 cloud"></div>
-      <div class="x3 cloud"></div>
-      <div class="x4 cloud"></div>
-      <div class="x5 cloud"></div>
+  <div id="login-box" :class="{ 'has-custom-background': hasCustomBackground }" :style="background" v-loading="oauthLoading" element-loading-text="登录中...">
+    <div class="login-scene" aria-hidden="true">
+      <div class="login-sky-glow"></div>
     </div>
-    <div v-else :style="background"></div>
+    <header class="login-brand">
+      <img :src="brandMark" alt="Nova Mail" />
+      <div>
+        <strong>Nova Mail</strong>
+        <span>{{ $t('loginTagline') }}</span>
+      </div>
+    </header>
+
+    <button
+        class="login-theme-toggle"
+        type="button"
+        :aria-label="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
+        :title="isDark ? 'Light mode' : 'Dark mode'"
+        @click="toggleLoginTheme"
+    >
+      <Icon
+          :icon="isDark ? 'solar:sun-2-linear' : 'solar:moon-linear'"
+          width="21"
+          height="21"
+      />
+    </button>
+
+    <div class="login-quiet-tagline">{{ $t('quietTagline') }}</div>
     <div class="form-wrapper">
       <div class="container">
-        <span class="form-title">{{ settingStore.settings.title }}</span>
+        <span class="form-title">{{ show === 'login' ? $t('welcomeBack') : $t('createAccount') }}</span>
         <span class="form-desc" v-if="show === 'login'">{{ $t('loginTitle') }}</span>
         <span class="form-desc" v-else>{{ $t('regTitle') }}</span>
         <div v-show="show === 'login'">
@@ -39,15 +57,20 @@
               </div>
             </template>
           </el-input>
-          <el-input v-model="form.password" :placeholder="$t('password')" type="password" autocomplete="off" @keyup.enter="submit">
+          <el-input v-model="form.password" :placeholder="$t('password')" :type="showPassword ? 'text' : 'password'" autocomplete="off" @keyup.enter="submit">
+            <template #suffix>
+              <button
+                  type="button"
+                  class="pwd-toggle"
+                  :aria-label="showPassword ? $t('hidePassword') : $t('showPassword')"
+                  :title="showPassword ? $t('hidePassword') : $t('showPassword')"
+                  @click="showPassword = !showPassword"
+              >
+                <AppIcon :name="showPassword ? 'eye' : 'eye-off'" :size="18"/>
+              </button>
+            </template>
           </el-input>
-          <div
-              v-if="settingStore.settings.siteKey"
-              ref="loginTurnstileRef"
-              class="login-turnstile"
-          ></div>
-          <div v-else class="turnstile-unavailable">{{ $t('verifyModuleFailed') }}</div>
-          <el-button class="btn" type="primary" @click="submit" :loading="loginLoading" :disabled="!loginVerifyToken || loginLoading"
+          <el-button class="btn" type="primary" @click="submit" :loading="loginLoading" :disabled="loginLoading"
           >{{ $t('loginBtn') }}
           </el-button>
           <div class="oauth-divider"><span>{{ $t('orContinueWith') }}</span></div>
@@ -107,16 +130,6 @@
           <el-button class="btn" style="margin: 0" type="primary" @click="submitRegister" :loading="registerLoading"
           >{{ $t('regBtn') }}
           </el-button>
-          <div class="oauth-divider"><span>{{ $t('orContinueWith') }}</span></div>
-          <el-button class="btn github-login" @click="startGithubLogin">
-            <Icon icon="codicon:github-inverted" width="18" height="18" style="margin-right: 10px" />
-            {{ $t('continueWithGithub') }}
-          </el-button>
-          <el-button v-for="p in oauthProviders" :key="p.key" class="btn" style="margin-top: 10px" @click="oauthLogin(p.key)">
-            <el-avatar v-if="p.iconType === 'image'" :src="p.icon" :size="18" style="margin-right: 10px" />
-            <Icon v-else :icon="p.icon" width="18" height="18" style="margin-right: 10px" />
-            {{ p.label }}
-          </el-button>
         </div>
         <template v-if="settingStore.settings.register === 0">
           <div class="switch" @click="show = 'register'" v-if="show === 'login'">{{ $t('noAccount') }}
@@ -160,16 +173,14 @@
         </el-button>
       </div>
     </el-dialog>
-    <a v-show="settingStore.settings.projectLink" class="github" href="https://github.com/maillab/cloud-mail">
-      <Icon icon="mingcute:github-line" color="#1890ff" width="20" height="20" />
-    </a>
+    <footer class="login-copyright">© {{ new Date().getFullYear() }} Nova Mail</footer>
   </div>
 </template>
 
 <script setup>
 import router from "@/router";
 import {useRoute} from "vue-router";
-import {computed, nextTick, onMounted, reactive, ref, watch} from "vue";
+import {computed, nextTick, reactive, ref} from "vue";
 import {login} from "@/request/login.js";
 import {register} from "@/request/login.js";
 import {websiteConfig} from "@/request/setting.js";
@@ -180,10 +191,17 @@ import {useUserStore} from "@/store/user.js";
 import {useUiStore} from "@/store/ui.js";
 import {Icon} from "@iconify/vue";
 import {cvtR2Url} from "@/utils/convert.js";
+import {applyThemeTransition} from "@/utils/theme-transition.js";
 import {loginUserInfo} from "@/request/my.js";
 import {permsToRouter} from "@/perm/perm.js";
 import {useI18n} from "vue-i18n";
-import {githubOauthComplete, oauthBindUser, oauthComplete} from "@/request/ouath.js";
+import {githubOauthComplete, googleOauthComplete, oauthBindUser, oauthComplete} from "@/request/ouath.js";
+import brandMark from '@/icons/svg/brand-mark.svg'
+// Imported (not a /public URL) so Vite emits a content-hashed file: replacing the
+// artwork produces a new URL and therefore bypasses any cached copy. Public
+// assets keep a stable URL and were previously served with `immutable`, which
+// kept the old dark background alive for up to 7 days after a swap.
+import loginDarkBackground from '@/assets/login-dark.png'
 
 const {t} = useI18n();
 const accountStore = useAccountStore();
@@ -191,15 +209,37 @@ const userStore = useUserStore();
 const uiStore = useUiStore();
 const settingStore = useSettingStore();
 const route = useRoute();
+const isDark = computed(() => {
+  if (uiStore.themeMode === 'dark') {
+    return true
+  }
+
+  if (uiStore.themeMode === 'system') {
+    return window.matchMedia(
+        '(prefers-color-scheme: dark)'
+    ).matches
+  }
+
+  return false
+})
+
 const loginLoading = ref(false)
 const bindLoading = ref(false)
 const oauthLoading = ref(false);
 const showBindForm = ref(false);
 const show = ref('login')
+// Password visibility toggle (eye / eye-off), off by default.
+const showPassword = ref(false)
 
+function toggleLoginTheme(event) {
+  applyThemeTransition(
+      isDark.value ? 'light' : 'dark',
+      event
+  )
+}
 const oauthProviders = computed(() => {
   const allProviders = [
-    { key: 'google', label: 'Google', icon: 'devicon:google', iconType: 'iconify' },
+    { key: 'google', label: t('continueWithGoogle'), icon: 'devicon:google', iconType: 'iconify' },
     { key: 'linuxdo', label: 'LinuxDo', icon: '/image/linuxdo.webp', iconType: 'image' },
   ]
   return allProviders.filter(p => settingStore.settings[p.key + 'Switch'] === 0)
@@ -226,9 +266,6 @@ const registerForm = reactive({
 })
 const domainList = settingStore.domainList;
 const registerLoading = ref(false)
-const loginVerifyToken = ref('')
-const loginTurnstileRef = ref(null)
-let loginTurnstileId = null
 suffix.value = domainList[0]
 const verifyShow = ref(false)
 let verifyToken = ''
@@ -239,57 +276,6 @@ let verifyErrorCount = 0
 window.onTurnstileSuccess = (token) => {
   verifyToken = token;
 };
-
-window.onLoginTurnstileSuccess = (token) => {
-  loginVerifyToken.value = token
-}
-
-window.onLoginTurnstileExpired = () => {
-  loginVerifyToken.value = ''
-}
-
-window.onLoginTurnstileError = () => {
-  loginVerifyToken.value = ''
-}
-
-watch(() => uiStore.dark, () => {
-  loginVerifyToken.value = ''
-  if (!loginTurnstileId || !window.turnstile) return
-  window.turnstile.remove(loginTurnstileId)
-  loginTurnstileId = null
-  nextTick(renderLoginTurnstile)
-})
-
-watch(() => settingStore.settings.siteKey, () => {
-  nextTick(renderLoginTurnstile)
-})
-
-onMounted(() => {
-  const waitForTurnstile = () => {
-    renderLoginTurnstile()
-    if (!loginTurnstileId && !window.turnstile) {
-      window.setTimeout(waitForTurnstile, 120)
-    }
-  }
-  waitForTurnstile()
-})
-
-function renderLoginTurnstile() {
-  if (!loginTurnstileRef.value || !window.turnstile || loginTurnstileId || !settingStore.settings.siteKey) return
-  try {
-    loginTurnstileId = window.turnstile.render(loginTurnstileRef.value, {
-      sitekey: settingStore.settings.siteKey,
-      theme: uiStore.dark ? 'dark' : 'light',
-      callback: window.onLoginTurnstileSuccess,
-      'expired-callback': window.onLoginTurnstileExpired,
-      'error-callback': window.onLoginTurnstileError,
-    })
-  } catch (error) {
-    // The explicit API should not race Vue. Keep the failure recoverable in
-    // case the script was blocked or the browser restored an old DOM node.
-    console.warn('Turnstile render failed', error)
-  }
-}
 
 window.onTurnstileError = (e) => {
   if (verifyErrorCount >= 4) {
@@ -318,19 +304,47 @@ window.loadBefore = (e) => {
 
 const loginOpacity = computed(() => {
   const opacity = settingStore.settings.loginOpacity
-  return uiStore.dark ? `rgba(0, 0, 0, ${opacity})` : `rgba(255, 255, 255, ${opacity})`
+
+  return isDark.value
+      ? `rgba(0,0,0,${opacity})`
+      : `rgba(255,255,255,${opacity})`
 })
 
 const hideLoginDomain = computed(() => settingStore.settings.loginDomain === 1)
 
+// 自定义背景只在浅色模式展示，深色模式固定使用内置深色背景图
+const hasCustomBackground = computed(
+    () => !isDark.value && !!settingStore.settings.background
+)
+
 const background = computed(() => {
 
-  return settingStore.settings.background ? {
-    'background-image': `url(${cvtR2Url(settingStore.settings.background)})`,
-    'background-repeat': 'no-repeat',
-    'background-size': 'cover',
-    'background-position': 'center'
-  } : ''
+  // 深色登录背景优先：切换主题时同步切换背景图
+  if (isDark.value) {
+    return {
+      'background-image':
+          `url(${loginDarkBackground})`,
+      'background-repeat': 'no-repeat',
+      'background-size': 'cover',
+      'background-position': 'center center'
+    }
+  }
+
+
+  // 浅色模式：优先用户自定义背景
+  if (settingStore.settings.background) {
+    return {
+      'background-image':
+          `url(${cvtR2Url(settingStore.settings.background)})`,
+      'background-repeat': 'no-repeat',
+      'background-size': 'cover',
+      'background-position': 'center'
+    }
+  }
+
+
+  // 默认浅色场景：#login-box 浅色底 + .login-scene 渐变
+  return {}
 })
 
 const openSelect = () => {
@@ -372,6 +386,23 @@ async function oauthGetUser() {
       return
     }
     const messageKey = status === 'unlinked' ? 'githubNotLinked' : 'githubLoginFailed'
+    ElMessage({ message: t(messageKey), type: 'warning', plain: true })
+    return
+  }
+  const googleStatus = params.get('google')
+  if (googleStatus) {
+    window.history.replaceState({}, '', window.location.origin + window.location.pathname)
+    if (googleStatus === 'complete' && grant) {
+      oauthLoading.value = true
+      try {
+        const data = await googleOauthComplete(grant)
+        await saveToken(data.token)
+      } catch {
+        oauthLoading.value = false
+      }
+      return
+    }
+    const messageKey = googleStatus === 'unlinked' ? 'googleNotLinked' : googleStatus === 'denied' ? 'googleAuthorizationCancelled' : 'googleLoginFailed'
     ElMessage({ message: t(messageKey), type: 'warning', plain: true })
     return
   }
@@ -474,22 +505,10 @@ const submit = () => {
     return
   }
 
-  if (!loginVerifyToken.value) {
-    ElMessage({ message: t('botVerifyMsg'), type: 'error', plain: true })
-    renderLoginTurnstile()
-    return
-  }
-
-  // Turnstile tokens are single-use. Consume it before the request so a
-  // second click or a delayed retry can never submit the same token twice.
-  const verificationToken = loginVerifyToken.value
-  loginVerifyToken.value = ''
   loginLoading.value = true
-  login(email, form.password, verificationToken).then(async data => {
+  login(email, form.password).then(async data => {
     await saveToken(data.token)
   }).catch(() => {
-    loginVerifyToken.value = ''
-    window.turnstile?.reset(loginTurnstileId)
   }).finally(() => {
     loginLoading.value = false
   })
@@ -691,12 +710,15 @@ function submitRegister() {
 
 .form-wrapper {
   position: fixed;
-  right: 0;
-  height: 100%;
   z-index: 10;
+  top: 24px;
+  right: 24px;
+  bottom: 24px;
+  width: clamp(390px, 30vw, 460px);
   display: flex;
   align-items: center;
   justify-content: center;
+  animation: nova-login-card-in 300ms var(--nova-motion-ease) 60ms forwards;
   @media (max-width: 767px) {
     width: 100%;
   }
@@ -709,23 +731,25 @@ function submitRegister() {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  width: 450px;
+  width: 100%;
   height: 100%;
-  border-left: 1px solid var(--login-border);
+  border: 1px solid var(--login-border);
+  border-radius: 28px;
   box-shadow: var(--el-box-shadow-light);
+  backdrop-filter: blur(20px);
   @media (max-width: 1024px) {
     padding: 20px 18px;
-    width: 384px;
-    margin-left: 18px;
+    width: 100%;
+    margin-left: 0;
   }
   @media (max-width: 767px) {
     border: 1px solid var(--login-border);
     padding: 20px 18px;
-    border-radius: 6px;
+    border-radius: 22px;
     height: fit-content;
     width: 100%;
-    margin-right: 18px;
-    margin-left: 18px;
+    margin-right: 0;
+    margin-left: 0;
   }
 
   .btn {
@@ -776,6 +800,49 @@ function submitRegister() {
   }
 }
 
+/* Show / hide password toggle, rendered inside the password input suffix.
+   Element Plus already right-aligns and vertically centres `.el-input__suffix`,
+   so the input keeps its existing size. */
+.pwd-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  opacity: .75;
+  transition:
+    background-color var(--nova-motion-fast) var(--nova-motion-ease),
+    opacity var(--nova-motion-fast) var(--nova-motion-ease),
+    transform var(--nova-motion-fast) var(--nova-motion-ease);
+}
+
+.pwd-toggle:hover,
+.pwd-toggle:focus-visible {
+  opacity: 1;
+  background: var(--base-fill);
+}
+
+.pwd-toggle:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--el-color-primary-light-5);
+}
+
+.pwd-toggle:active {
+  transform: scale(.9);
+}
+
+/* eye.svg / eye-off.svg are fixed dark raster artwork: the shared AppIcon dark
+   filter inverts them in dark mode, and hover/focus brightens them further. */
+:global(html.dark .pwd-toggle:hover .app-icon),
+:global(html.dark .pwd-toggle:focus-visible .app-icon) {
+  filter: var(--nova-ui-icon-filter-hover) !important;
+}
+
 :deep(.el-select-dropdown__item) {
   padding: 0 10px;
 }
@@ -823,6 +890,10 @@ function submitRegister() {
   padding-right: 4px !important;
   background: var(--el-bg-color);
   border-radius: 0 8px 8px 0;
+  /* The username field yields before the domain chip at any width (login,
+     register and the OAuth bind dialog), so "@beihaime.com" is never clipped. */
+  flex: 0 0 auto;
+  max-width: none;
 }
 
 :deep(.el-button+.el-button) {
@@ -884,16 +955,144 @@ function submitRegister() {
   width: 180px;
 }
 
-
 #login-box {
-  background: linear-gradient(to bottom, #2980b9, #6dd5fa, #fff);
-  font: 100% Arial, sans-serif;
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  overflow-x: hidden;
-  display: grid;
-  grid-template-columns: 1fr;
+  position: relative;
+  min-height:100%;
+  background:#dbeafe;
+}
+
+.login-scene {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: radial-gradient(circle at 22% 18%, rgba(255,255,255,.72), transparent 34%), linear-gradient(160deg, rgba(255,255,255,.18), rgba(15,23,42,.22));
+}
+
+.login-sky-glow {
+  position: absolute;
+  inset: -20%;
+  background: radial-gradient(ellipse at 30% 18%, rgba(255,255,255,.55), transparent 42%);
+}
+
+.login-mountain {
+  position: absolute;
+  left: -8%;
+  right: 28%;
+  bottom: -18%;
+  height: 62%;
+  transform: skewX(-12deg) rotate(-4deg);
+  background: linear-gradient(145deg, rgba(30,64,175,.35), rgba(15,23,42,.82));
+}
+
+.login-mountain-far { opacity: .48; bottom: -8%; transform: skewX(-18deg) rotate(8deg); background: linear-gradient(145deg, rgba(96,165,250,.7), rgba(30,41,59,.72)); }
+.login-mountain-near { opacity: .72; left: 16%; right: -14%; bottom: -28%; height: 54%; transform: skewX(14deg) rotate(-8deg); background: linear-gradient(145deg, rgba(15,23,42,.42), rgba(2,6,23,.92)); }
+
+.login-brand {
+  position: fixed;
+  z-index: 5;
+  top: 30px;
+  left: 34px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  animation: nova-login-brand-in 300ms var(--nova-motion-ease) forwards;
+
+  color: #334155;
+  text-shadow: none;
+
+  img {
+    width: 38px;
+    height: 38px;
+    object-fit: contain;
+  }
+
+  strong {
+    display: block;
+    font-size: 18px;
+    letter-spacing: -.02em;
+    color: #334155;
+  }
+
+  span {
+    display: block;
+    margin-top: 3px;
+    font-size: 12px;
+    color: #64748b;
+    opacity: 1;
+  }
+}
+
+@keyframes nova-login-brand-in {
+  from { opacity: 0; transform: translate3d(0, -4px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes nova-login-card-in {
+  from { opacity: 0; transform: translate3d(0, 10px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+.login-copyright { position: fixed; z-index: 5; left: 34px; bottom: 24px; color: rgba(255,255,255,.72); font-size: 12px; }
+.login-quiet-tagline {
+  position: fixed;
+  z-index: 5;
+  left: 34px;
+  top: 150px;
+  color: #475569;
+  font-size: 14px;
+  letter-spacing: .12em;
+}
+
+@media (max-width: 767px) {
+  #login-box { min-height: 100dvh; height: auto; overflow-y: auto; padding: 126px 16px 56px; box-sizing: border-box; }
+  .login-brand { top: 22px; left: 22px; }
+  .login-copyright { left: 22px; bottom: 14px; }
+  .login-quiet-tagline { left: 24px; top: 94px; font-size: 12px; letter-spacing: .1em; }
+  .form-wrapper { position: relative; top: auto; right: auto; bottom: auto; left: auto; width: 100%; max-width: 420px; margin: 0 auto; }
+  .login-scene { opacity: .72; }
+  .container { width: 100%; padding: 24px; height: auto; min-height: 0; border-radius: 28px; background: rgba(232,243,255,.78); box-shadow: 0 18px 50px rgba(30,80,140,.16); }
+  :global(html.dark #login-box div.container) { background: rgba(20,28,43,.82); }
+  .form-title { font-size: 24px !important; line-height: 1.2; letter-spacing: -.02em; }
+  .form-desc { margin-top: 4px; margin-bottom: 18px; font-size: 14px; line-height: 1.4; }
+  .container .el-input { width: 100%; min-width: 0; height: 50px; margin-bottom: 14px; font-size: 16px; }
+  .container .el-input :deep(.el-input__wrapper) { min-width: 0; width: 100%; }
+  .container .el-input :deep(.el-input__inner) { min-width: 0; width: 100%; height: 48px; font-size: 16px; }
+  .container .email-input :deep(.el-input__wrapper) { min-width: 0; }
+  /* Email row on phones: the username field flexes, while the domain picker
+     keeps its natural (content) width so "@beihaime.com" is never truncated.
+     The previous `max-width: 45%` clamped the append below its content width,
+     which pushed the label and the chevron outside the rounded box on narrow
+     screens (320-390px). Applies to every .email-input (login, register and the
+     OAuth bind dialog); the font inherits so it always matches its own input. */
+  .email-input :deep(.el-input-group__append) {
+    flex: 0 0 auto;
+    min-width: 0;
+    max-width: none;
+    padding-left: 8px !important;
+    padding-right: 6px !important;
+    white-space: nowrap;
+  }
+  .email-input :deep(.el-input-group__append > div) {
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
+  }
+  /* The append also hosts the invisible el-select; only lay out the visible
+     label + chevron row as a centred flex line. */
+  .email-input :deep(.el-input-group__append > div > div:not(.select)) {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    white-space: nowrap;
+  }
+  .email-input :deep(.el-input-group__append .setting-icon) {
+    top: 0;
+    flex: 0 0 auto;
+  }
+  .container .btn { width: 100%; min-width: 0; height: 50px; border-radius: 11px; font-size: 15px; }
+  .oauth-divider { margin: 16px 0 12px; }
+  .switch { margin-top: 18px; }
 }
 
 
@@ -968,6 +1167,108 @@ function submitRegister() {
   width: 180px;
   right: 50px;
   top: -90px;
+}
+
+
+/* Login theme toggle */
+.login-theme-toggle {
+  position: fixed;
+  z-index: 30;
+  top: max(24px, env(safe-area-inset-top));
+  right: 28px;
+
+  width: 42px;
+  height: 42px;
+
+  display: grid;
+  place-items: center;
+
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, .30);
+  border-radius: 50%;
+
+  color: #1c1c1e;
+  background: rgba(255, 255, 255, .72);
+
+  backdrop-filter: blur(16px) saturate(1.1);
+  box-shadow: 0 6px 20px rgba(15, 23, 42, .12);
+
+  cursor: pointer;
+
+  transition:
+    background-color .18s ease,
+    border-color .18s ease,
+    color .18s ease,
+    transform .18s ease;
+}
+
+.login-theme-toggle:hover {
+  transform: translateY(-1px);
+}
+
+.login-theme-toggle:active {
+  transform: scale(.96);
+}
+
+:global(html.dark .login-theme-toggle) {
+  color: #f2f2f7;
+  background: rgba(28, 28, 30, .66);
+  border-color: rgba(255, 255, 255, .12);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .24);
+}
+
+@media (max-width: 767px) {
+  .login-theme-toggle {
+    top: calc(16px + env(safe-area-inset-top, 0px));
+    right: 16px;
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/* Dark login scene tuning */
+
+/* Dark fallback while the dark artwork decodes (and if it fails to load). */
+:global(html.dark #login-box:not(.has-custom-background)) {
+  background-color: #081426;
+}
+
+:global(html.dark #login-box:not(.has-custom-background) .login-scene) {
+  background:
+    linear-gradient(
+      rgba(4, 12, 28, .10),
+      rgba(4, 12, 28, .20)
+    );
+}
+
+:global(html.dark #login-box:not(.has-custom-background) .login-sky-glow),
+:global(html.dark #login-box:not(.has-custom-background) .login-mountain) {
+  opacity: 0;
+}
+
+:global(html.dark #login-box .container) {
+  background: rgba(16, 23, 35, .76);
+  border-color: rgba(255, 255, 255, .10);
+  box-shadow: 0 20px 55px rgba(0, 0, 0, .24);
+  backdrop-filter: blur(20px) saturate(1.08);
+}
+
+:global(html.dark .login-brand),
+:global(html.dark .login-quiet-tagline),
+:global(html.dark .login-copyright) {
+  color: rgba(242, 242, 247, .94);
+}
+
+:global(html.dark .login-brand strong) {
+  color: #f2f2f7;
+}
+
+:global(html.dark .login-brand span) {
+  color: #a1a1aa;
+}
+
+:global(html.dark .login-quiet-tagline) {
+  color: #d1d5db;
 }
 
 </style>

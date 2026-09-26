@@ -2,5 +2,7 @@
   Cache-Control: public, max-age=31556952, immutable
 /tinymce/*
   Cache-Control: public, max-age=604800, immutable
+# /public files are not content-hashed, so they must not be `immutable`:
+# replacing e.g. an image would otherwise stay invisible for the whole max-age.
 /image/*
-  Cache-Control: public, max-age=604800, immutable
+  Cache-Control: public, max-age=3600

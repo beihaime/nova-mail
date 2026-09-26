@@ -10,11 +10,20 @@
 html, body {
     width: 100%;
     height: 100%;
+    /* Fill the dynamic viewport on mobile (no gap under the browser chrome)
+       and stop the rubber-band overscroll that reveals the page behind it. */
+    height: 100dvh;
+    overscroll-behavior: none;
+    /* Last-resort guard: the shell is a fixed one-column layout, so a phone must
+       never be able to pan the document sideways. */
+    overflow-x: hidden;
 }
 
 #app {
     width: 100%;
     height: 100%;
+    height: 100dvh;
+    overflow-x: hidden;
 }
 
 :deep(.el-input__inner:focus) {
@@ -145,10 +154,31 @@ button, input, select, textarea {
     --vt-easing: ease-out;
     --nova-surface: #ffffff;
     --nova-surface-muted: #f7f8fa;
+    /* Single source of truth for the phone chrome. The mobile app bar, the
+       status-bar / `safe-area-inset-top` strip behind it and the PWA
+       `theme-color` meta all resolve to this one token, so they can never
+       drift into the two-tone band the header used to show. It aliases
+       `--nova-surface` deliberately: the dark header stays the designed dark
+       grey (#17191d) instead of being forced to pure black. */
+    --nova-mobile-header-bg: var(--nova-surface);
     --nova-divider: #e8ebef;
+    /* Phone search field: a step above the page without reading as a block. */
+    --nova-search-bg: #f2f2f7;
+    --nova-search-border: color-mix(in srgb, var(--nova-divider) 72%, transparent);
+    /* Structure-only divider: list rows, filter and nav hairlines. */
+    --nova-divider-soft: color-mix(in srgb, var(--nova-divider) 60%, transparent);
+    /* Quoted-reply hierarchy line (Gmail style). */
+    --nova-quote-line: #c7cdd4;
     --nova-hover: #f3f7fc;
     --nova-selected: #eaf3ff;
     --nova-shadow: 0 10px 32px rgba(23, 35, 52, .08);
+    --nova-overlay: rgba(0,0,0,.45);
+    --nova-ui-icon-filter: none;
+    --nova-ui-icon-filter-hover: none;
+    --nova-motion-fast: 140ms;
+    --nova-motion-base: 180ms;
+    --nova-motion-slow: 240ms;
+    --nova-motion-ease: cubic-bezier(.2, .8, .2, 1);
 }
 
 .dark {
@@ -180,9 +210,55 @@ button, input, select, textarea {
     --nova-surface: #17191d;
     --nova-surface-muted: #1d2025;
     --nova-divider: #2c3037;
+    /* Dark search field must stay a hair above the page: a 5.5% white veil plus
+       a barely-there outline, never a bright block. */
+    --nova-search-bg: rgba(255, 255, 255, 0.055);
+    --nova-search-border: rgba(255, 255, 255, 0.07);
+    /* Dark dividers must stay quiet: same token, lower opacity. */
+    --nova-divider-soft: color-mix(in srgb, var(--nova-divider) 45%, transparent);
+    /* Quoted-reply hierarchy line (Gmail style). */
+    --nova-quote-line: #4b5563;
     --nova-hover: #202833;
     --nova-selected: #17385f;
     --nova-shadow: 0 10px 32px rgba(0, 0, 0, .22);
+    --nova-overlay: rgba(0,0,0,.25);
+    /* The UI SVGs are raster-backed assets, so they cannot inherit currentColor. */
+    --nova-ui-icon-filter: brightness(0) invert(78%);
+    --nova-ui-icon-filter-hover: brightness(0) invert(92%);
+}
+
+/* Keep the product responsive without making routine mail actions feel animated. */
+button:not(:disabled),
+.el-button:not(.is-disabled) {
+    transition: background-color var(--nova-motion-fast) var(--nova-motion-ease),
+                border-color var(--nova-motion-fast) var(--nova-motion-ease),
+                color var(--nova-motion-fast) var(--nova-motion-ease),
+                box-shadow var(--nova-motion-fast) var(--nova-motion-ease),
+                transform var(--nova-motion-fast) var(--nova-motion-ease);
+}
+
+@keyframes nova-view-in {
+    from { opacity: 0; transform: translate3d(8px, 0, 0); }
+    to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes nova-popover-in {
+    from { opacity: 0; transform: translate3d(0, -6px, 0) scale(.98); }
+    to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@keyframes nova-fade-scale-in {
+    from { opacity: 0; transform: scale(.9); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: .01ms !important;
+    }
 }
 
 /* Shared Nova Mail surface language.  Component styles keep the existing behavior. */
@@ -234,4 +310,166 @@ html[data-theme-to="light"]::view-transition-old(root) {
 @keyframes vt-radial-out {
     from { clip-path: circle(var(--vt-end-radius, 0px) at var(--vt-x) var(--vt-y)); }
     to   { clip-path: circle(0px at var(--vt-x) var(--vt-y)); }
+}
+
+/* Mobile dark-mode icon normalization */
+@media (max-width: 767px) {
+  /* Phone document chrome. The app bar paints its own `env(safe-area-inset-top)`
+     padding with the same token, but html/body must match too: otherwise the
+     Element Plus page colour (#141414 in dark) shows as a near-black band above
+     the dark-grey header on Android and in installed PWAs. */
+  html,
+  body {
+    background: var(--nova-mobile-header-bg);
+  }
+
+  /* Light-mode counterparts of the phone ink scale. These previously existed
+     only under html.dark, so in light mode `var(--mobile-secondary/tertiary)`
+     was invalid and Sender, Subject and Preview all inherited the same colour —
+     which is why the list had no visual hierarchy. */
+  :root {
+    --mobile-primary: #1c1c1e;
+    --mobile-secondary: #6b7280;
+    --mobile-tertiary: #9aa1ab;
+  }
+
+  html.dark {
+    --mobile-primary: #f2f2f7;
+    --mobile-secondary: #aeaeb2;
+    --mobile-tertiary: #8e8e93;
+  }
+
+  html.dark .mobile-nav button {
+    color: var(--mobile-secondary);
+  }
+
+  html.dark .mobile-nav button.active {
+    color: var(--el-color-primary);
+  }
+
+  html.dark .mobile-nav button:not(.active) .app-icon,
+  html.dark .mobile-search .app-icon,
+  html.dark .mobile-tool-button .app-icon,
+  html.dark .mobile-row-star .app-icon {
+    filter: brightness(0) invert(1) !important;
+    opacity: .72;
+  }
+
+  html.dark .mobile-nav button.active .app-icon {
+    opacity: 1;
+  }
+}
+
+/* Mobile Inbox has its own search field. */
+@media (max-width: 767px) {
+  .el-header .search-shell,
+  .header .search-shell {
+    display: none !important;
+  }
+
+  /* Element Plus overlays ship desktop widths (dialog 50%, message box 420px,
+     change-password 340px). Cap them to the phone viewport so an opened overlay
+     can never exceed the screen. */
+  .el-dialog {
+    max-width: calc(100vw - 32px);
+  }
+
+  .el-message-box {
+    width: min(420px, calc(100vw - 32px)) !important;
+    max-width: calc(100vw - 32px);
+  }
+}
+
+
+/* ===== DEBUG ICON VISIBILITY ===== */
+
+html.dark .app-icon,
+html.dark .iconify,
+html.dark svg {
+    filter: none !important;
+    opacity: 1 !important;
+}
+
+
+html.dark .app-icon:not(.preserve-color) {
+    filter: none !important;
+}
+
+
+html.dark .iconify {
+    color: #ffffff !important;
+}
+
+
+
+
+/* Nova unified dark icon visibility */
+
+html.dark .app-icon:not(.preserve-color) {
+    filter: brightness(0) invert(82%) !important;
+    opacity: .9 !important;
+}
+
+
+html.dark .iconify {
+    color: #D1D1D6 !important;
+    opacity: .9 !important;
+}
+
+
+/* Keep active colored icons */
+
+html.dark .star-active-icon,
+html.dark .inbox-star-icon.is-active {
+    filter: none !important;
+    color: #ffcc00 !important;
+    opacity: 1 !important;
+}
+
+
+/* Undo snackbar for the mobile swipe actions.
+ *
+ * Element Plus teleports the message outside the component tree, so the scoped
+ * styles in `components/email-scroll` cannot reach it; the layout of the action
+ * itself has to live here. Colours come from the shared theme tokens so the
+ * snackbar follows light/dark like every other surface. */
+
+.el-message.nova-undo-message {
+    border-color: var(--nova-divider);
+
+    background: var(--nova-surface);
+
+    color: var(--nova-primary, var(--el-text-color-primary));
+}
+
+.nova-undo-snackbar {
+    display: inline-flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.nova-undo-text {
+    min-width: 0;
+}
+
+.nova-undo-action {
+    flex: 0 0 auto;
+
+    padding: 2px 4px;
+
+    border: 0;
+
+    background: none;
+
+    color: var(--el-color-primary);
+
+    font: inherit;
+    font-weight: 600;
+
+    cursor: pointer;
+}
+
+.nova-undo-action:hover,
+.nova-undo-action:focus-visible {
+    text-decoration: underline;
 }

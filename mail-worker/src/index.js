@@ -17,8 +17,12 @@ export default {
 			return app.fetch(req, env, ctx);
 		}
 
-		 // Static UI assets are public. Email attachments are private and must go
-		 // through the authenticated /api/oss/* handler below.
+		 // Private mail attachments are only served by the authenticated routes
+		 // (/api/oss/<key> and /api/attachments/<id>). A bare /attachments/…
+		 // path is not an API call, so it must never reach storage.
+		 if (url.pathname.startsWith('/attachments/')) {
+			 return new Response('Not found', { status: 404, headers: { 'Cache-Control': 'no-store' } });
+		 }
 		 if (url.pathname.startsWith('/static/')) {
 			 return await kvObjService.toObjResp( { env }, url.pathname.substring(1));
 		 }

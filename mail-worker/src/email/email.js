@@ -14,6 +14,9 @@ import { isSafeInlineMimeType, normalizeAttachmentFilename, normalizeMimeType } 
 import aiService from '../service/ai-service';
 import webhookService from '../service/webhook-service';
 import { assertAttachmentLimits, MAIL_LIMITS } from '../const/mail-limits';
+import pushService from '../service/push-service';
+import { MAIL_BODY, bodyViewFor, resolveMailBody } from '../lib/mail-body';
+import { parseBimiSelectorHeader } from '../lib/bimi';
 
 export async function email(message, env, ctx) {
 
@@ -68,8 +71,13 @@ export async function email(message, env, ctx) {
 		const email = await PostalMime.parse(content);
 		assertAttachmentLimits(email.attachments || []);
 
+		// Which body the reader has to render: html / markdown / plain. The
+		// blacklist and the code extractor see the effective body too, so a
+		// markdown-only mail is not silently skipped.
+		const body = resolveMailBody(email);
+		const bodyView = bodyViewFor(email, body);
 
-		const blockFlag = checkBlock(blackSubject, blackContent, blackFrom, email);
+		const blockFlag = checkBlock(blackSubject, blackContent, blackFrom, bodyView);
 
 		if (blockFlag) {
 			message.setReject('Message rejected');
@@ -118,7 +126,7 @@ export async function email(message, env, ctx) {
 		}
 
 		const toName = email.to.find(item => item.address === message.to)?.name || '';
-		const code = await aiService.extractCode({ env }, email, { aiCode, aiCodeFilter });
+		const code = await aiService.extractCode({ env }, bodyView, { aiCode, aiCodeFilter });
 
 		const params = {
 			toEmail: message.to,
@@ -127,14 +135,23 @@ export async function email(message, env, ctx) {
 			name: email.from.name || emailUtils.getName(email.from.address),
 			subject: email.subject,
 			code,
-			content: email.html,
-			text: email.text,
+			// `body.html` covers both a real HTML part and a markup document that
+			// arrived in the text part (a sender that omitted Content-Type).
+			content: body.bodyType === MAIL_BODY.HTML ? body.html : '',
+			text: body.text,
+			bodyType: body.bodyType,
 			cc: email.cc ? JSON.stringify(email.cc) : '[]',
 			bcc: email.bcc ? JSON.stringify(email.bcc) : '[]',
 			recipient: JSON.stringify(email.to),
 			inReplyTo: email.inReplyTo,
 			relation: email.references,
 			messageId: email.messageId,
+			// Raw Authentication-Results headers are sender-controlled and are kept
+			// empty until a trusted ingress verifier provides provenance.
+			authResults: '',
+			// Sender's `BIMI-Selector:` header, validated to a DNS label. It only
+			// chooses which `_bimi` record to read and never proves a brand.
+			bimiSelector: extractBimiSelector(email.headers),
 			userId: account ? account.userId : 0,
 			accountId: account ? account.accountId : 0,
 			isDel: isDel.DELETE,
@@ -145,6 +162,12 @@ export async function email(message, env, ctx) {
 		const cidAttachments = [];
 
 		for (let item of email.attachments) {
+			// The markdown body arrives as a part (see resolveMailBody); it is the
+			// message itself, never a file the reader may download.
+			if (body.markdownPart && item === body.markdownPart) {
+				continue;
+			}
+
 			let attachment = { ...item };
 			attachment.filename = normalizeAttachmentFilename(attachment.filename || 'attachment');
 			attachment.mimeType = normalizeMimeType(attachment.mimeType);
@@ -174,6 +197,16 @@ export async function email(message, env, ctx) {
 		}
 
 		emailRow = await emailService.completeReceive({ env }, account ? emailConst.status.RECEIVE : emailConst.status.NOONE, emailRow.emailId);
+
+		// Notify the owner's devices. `waitUntil` keeps delivery off the critical
+		// path: the mail is already stored, and push failures are swallowed.
+		if (account?.userId) {
+			pushService.scheduleNewMail({ env, executionCtx: ctx }, account.userId, {
+				emailId: emailRow.emailId,
+				from: emailRow.sendEmail,
+				subject: emailRow.subject,
+			});
+		}
 
 
 		if (ruleType === settingConst.ruleType.RULE) {
@@ -219,8 +252,25 @@ export async function email(message, env, ctx) {
 	}
 }
 
-function checkBlock(blackSubjectStr, blackContentStr, blackFromStr, email) {
 
+/**
+ * The message's validated `BIMI-Selector:` value, or '' when it is absent or
+ * malformed (the resolver then uses the `default` selector).
+ *
+ * postal-mime exposes the header list as `{ key, value }` pairs with the
+ * original casing, so the lookup is case-insensitive.
+ */
+function extractBimiSelector(headers) {
+	if (!Array.isArray(headers)) return '';
+	for (const header of headers) {
+		if (String(header?.key || '').trim().toLowerCase() !== 'bimi-selector') continue;
+		const selector = parseBimiSelectorHeader(header.value);
+		if (selector) return selector;
+	}
+	return '';
+}
+
+function checkBlock(blackSubjectStr, blackContentStr, blackFromStr, email) {
 	const blackFromList = blackFromStr ? blackFromStr.split(',') : []
 	const blackContentList = blackContentStr ? blackContentStr.split(',') : []
 	const blackSubjectList = blackSubjectStr ? blackSubjectStr.split(',') : []

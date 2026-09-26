@@ -99,7 +99,42 @@ function initEditor() {
     content_style: `:root {
          --scrollbar-track-color: ${uiStore.dark ? '#141414' : '#FFFFFF'};
          --scrollbar-thumb-color: ${uiStore.dark ? '#8D9095' : '#A8ABB2'};
-    }`,
+         /* Quoted-email theme tokens. The editor lives in its own iframe, so the
+            parent document's CSS variables are not reachable from here. */
+         --nova-quote-bg: ${uiStore.dark ? '#1D1E1F' : '#FFFFFF'};
+         --nova-quote-fg: ${uiStore.dark ? '#E5EAF3' : '#303133'};
+         --nova-quote-border: ${uiStore.dark ? '#4b5563' : '#c7cdd4'};
+         --nova-quote-link: ${uiStore.dark ? '#66B1FF' : '#0E70DF'};
+    }
+    /* Gmail-style quoted-reply hierarchy, both themes. The reply/forward quote
+       is inserted as a blockquote with an inline 1px grey border, so these need
+       !important. Nesting indents on its own because every level matches. */
+    blockquote, .mceNonEditable, .nova-quoted {
+        margin: 6px 0 0 8px !important;
+        padding-left: 12px !important;
+        border-left: 2px solid var(--nova-quote-border) !important;
+    }${uiStore.dark ? `
+    /* /tinymce/css/index.css hard-codes .mceNonEditable { background:#FFFFFF }
+       for light mode, which left the quoted reply/forward block pure white on
+       the dark editor surface. Re-skin it, plus the quoted email's own
+       light-mode colours, for dark mode only. This is display-only: getContent()
+       still returns the quoted HTML untouched, so the outgoing message keeps
+       its original format. */
+    .mceNonEditable, .nova-quoted {
+        background: var(--nova-quote-bg) !important;
+        color: var(--nova-quote-fg) !important;
+    }
+    .mceNonEditable *:not(img), .nova-quoted *:not(img) {
+        background-color: transparent !important;
+        border-color: var(--nova-quote-border) !important;
+    }
+    .mceNonEditable *:not(a), .nova-quoted *:not(a) {
+        color: inherit !important;
+    }
+    .mceNonEditable a, .nova-quoted a {
+        color: var(--nova-quote-link) !important;
+    }
+    ` : ''}`,
     plugins: 'link image advlist lists  emoticons fullscreen  table preview code',
     toolbar: 'bold emoticons forecolor backcolor italic fontsize | alignleft aligncenter alignright alignjustify | outdent indent |  bullist numlist | link image  | table code preview fullscreen',
     toolbar_mode: 'scrolling',

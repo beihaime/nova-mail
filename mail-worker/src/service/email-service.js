@@ -24,13 +24,59 @@ import account from "../entity/account";
 import { att } from '../entity/att';
 import telegramService from './telegram-service';
 import { safeMessageId, validateOutgoingMail } from '../utils/outgoing-mail-validation';
-import { MAIL_LIMITS } from '../const/mail-limits';
+import { MAIL_LIMITS, assertAttachmentLimits } from '../const/mail-limits';
+import { MAIL_BODY } from '../lib/mail-body';
+import threadService from './thread-service';
+import senderAvatarService from './sender-avatar-service';
+import pushService from './push-service';
+
+const MAX_SEARCH_LENGTH = 200;
+
+function normalizeSearchKeyword(value) {
+	return String(value || '').trim().slice(0, MAX_SEARCH_LENGTH);
+}
+
+/**
+ * Normalise an `emailIds` argument to positive integers.
+ *
+ * The delete route takes a comma-separated query string while the read/archive
+ * routes take a JSON array, so both shapes are accepted here. Anything that is
+ * not a positive integer is dropped rather than reaching SQL as `NaN`, which
+ * would silently match nothing.
+ */
+function toEmailIdList(emailIds) {
+	const raw = Array.isArray(emailIds) ? emailIds : String(emailIds ?? '').split(',');
+
+	return raw
+		.map(value => Number(value))
+		.filter(value => Number.isInteger(value) && value > 0);
+}
+
+function emailKeywordFilters(keyword) {
+	if (!keyword) return [];
+
+	// Escape LIKE metacharacters so a user-entered '%' or '_' remains a literal
+	// search term. The value is still bound through Drizzle's SQL parameters.
+	const escaped = keyword.replace(/[\\%_]/g, '\\$&');
+	const pattern = `%${escaped}%`;
+	const like = (column) => sql`lower(coalesce(${column}, '')) LIKE lower(${pattern}) ESCAPE '\\'`;
+
+	return [or(
+		like(email.name),
+		like(email.sendEmail),
+		like(email.subject),
+		like(email.text),
+		like(email.content),
+		like(email.toEmail),
+		like(email.recipient)
+	)];
+}
 
 const emailService = {
 
 	async list(c, params, userId) {
 
-		let { emailId, type, accountId, size, timeSort, allReceive, full } = params;
+		let { emailId, type, accountId, size, timeSort, allReceive, full, keyword, archived } = params;
 
 		size = Number(size);
 		type = Number(type);
@@ -39,6 +85,10 @@ const emailService = {
 		accountId = Number(accountId);
 		allReceive = Number(allReceive);
 		full = Number(full);
+		keyword = normalizeSearchKeyword(keyword);
+		// The Archive view asks for `archived=1`; every other list keeps the
+		// default and never sees archived mail.
+		archived = Number(archived) === 1 ? 1 : 0;
 
 		if (isNaN(type)) {
 			type = 0;
@@ -67,44 +117,124 @@ const emailService = {
 			allReceive = accountRow.allReceive;
 		}
 
-		const filters = this.emailListFilters({ userId, accountId, type, allReceive, emailId, timeSort });
-		const countFilters = this.emailListFilters({ userId, accountId, type, allReceive, withCursor: false });
+		const filters = this.emailListFilters({ userId, accountId, type, allReceive, emailId, timeSort, keyword, archived });
+		const countFilters = this.emailListFilters({ userId, accountId, type, allReceive, withCursor: false, keyword, archived });
 		const columns = full ? emailListColumns : emailBriefColumns;
 
-		const query = orm(c)
-			.select({
-				...columns,
-				starId: star.starId
-			})
-			.from(email)
-			.leftJoin(
-				star,
-				and(
-					eq(star.emailId, email.emailId),
-					eq(star.userId, userId)
+		// The Inbox (received mail) is a conversation list: rows are collapsed to
+		// the newest message of each thread so a reply updates and re-orders its
+		// conversation instead of appearing as a second Inbox item. Sent and the
+		// other folders stay message-per-row.
+		const groupByThread = type === emailConst.type.RECEIVE;
+
+		// Conversation key. Legacy rows without a thread id stay separate
+		// (`e:<email_id>`) instead of collapsing into one bucket.
+		const threadKey = sql`coalesce(nullif(${email.threadId}, ''), 'e:' || ${email.emailId})`;
+		const newestMessageId = sql`max(${email.emailId})`;
+
+		let list;
+		let totalRow;
+
+		if (groupByThread) {
+			// 1) Pick the representative (newest) message of every conversation.
+			const representativeQuery = orm(c)
+				.select({ emailId: sql`${newestMessageId}`.as('emailId') })
+				.from(email)
+				.innerJoin(
+					account,
+					eq(account.accountId, email.accountId)
 				)
-			)
-			.innerJoin(
-				account,
-				eq(account.accountId, email.accountId)
-			)
-			.where(and(...filters));
+				.where(and(...filters))
+				.groupBy(threadKey);
 
-		if (timeSort) {
-			query.orderBy(asc(email.emailId));
+			if (emailId) {
+				representativeQuery.having(
+					timeSort ? sql`${newestMessageId} > ${emailId}` : sql`${newestMessageId} < ${emailId}`
+				);
+			}
+
+			representativeQuery
+				.orderBy(timeSort ? sql`${newestMessageId} asc` : sql`${newestMessageId} desc`)
+				.limit(size);
+
+			const representatives = await representativeQuery.all();
+			const representativeIds = representatives.map(row => row.emailId);
+
+			if (representativeIds.length) {
+				// 2) Hydrate them with the requested column set.
+				const rows = await orm(c)
+					.select({
+						...columns,
+						starId: star.starId
+					})
+					.from(email)
+					.leftJoin(
+						star,
+						and(
+							eq(star.emailId, email.emailId),
+							eq(star.userId, userId)
+						)
+					)
+					.innerJoin(
+						account,
+						eq(account.accountId, email.accountId)
+					)
+					.where(inArray(email.emailId, representativeIds))
+					.all();
+
+				// `IN (…)` does not preserve order, so re-apply the thread order.
+				const order = new Map(representativeIds.map((id, index) => [id, index]));
+				rows.sort((a, b) => order.get(a.emailId) - order.get(b.emailId));
+				list = rows;
+			} else {
+				list = [];
+			}
+
+			totalRow = await orm(c)
+				.select({ total: sql`count(distinct ${threadKey})` })
+				.from(email)
+				.innerJoin(
+					account,
+					eq(account.accountId, email.accountId)
+				)
+				.where(and(...countFilters))
+				.get();
 		} else {
-			query.orderBy(desc(email.emailId));
+			const query = orm(c)
+				.select({
+					...columns,
+					starId: star.starId
+				})
+				.from(email)
+				.leftJoin(
+					star,
+					and(
+						eq(star.emailId, email.emailId),
+						eq(star.userId, userId)
+					)
+				)
+				.innerJoin(
+					account,
+					eq(account.accountId, email.accountId)
+				)
+				.where(and(...filters));
+
+			if (timeSort) {
+				query.orderBy(asc(email.emailId));
+			} else {
+				query.orderBy(desc(email.emailId));
+			}
+
+			list = await query.limit(size).all();
+
+			totalRow = await orm(c).select({ total: count() }).from(email)
+				.innerJoin(
+					account,
+					eq(account.accountId, email.accountId)
+				)
+				.where(and(...countFilters))
+				.get();
 		}
-
-		const listQuery = query.limit(size).all();
-
-		const totalQuery = orm(c).select({ total: count() }).from(email)
-			.innerJoin(
-				account,
-				eq(account.accountId, email.accountId)
-			)
-			.where(and(...countFilters))
-			.get();
 
 		const latestEmailQuery = orm(c).select({
 			emailId: email.emailId,
@@ -115,11 +245,16 @@ const emailService = {
 				eq(email.userId, userId),
 				eq(email.type, type),
 				eq(email.isDel, isDel.NORMAL),
-				allReceive ? undefined : eq(email.accountId, accountId)
+				// Match the view being listed: the Inbox's poll cursor must skip
+				// archived mail, and the Archive view must not be seeded with an
+				// Inbox id it would then page against.
+				eq(email.archived, archived),
+				allReceive ? undefined : eq(email.accountId, accountId),
+				...emailKeywordFilters(keyword)
 			))
 			.orderBy(desc(email.emailId)).limit(1).get();
 
-		let [list, totalRow, latestEmail] = await Promise.all([listQuery, totalQuery, latestEmailQuery]);
+		let latestEmail = await latestEmailQuery;
 
 		list = list.map(item => ({
 			...item,
@@ -132,6 +267,10 @@ const emailService = {
 			this.applyListText(list);
 		}
 
+		// Sender avatars ride along with every list row (cheap local + cache path;
+		// unresolved rows are marked `pending` and finished by GET /avatar).
+		await senderAvatarService.attach(c, list);
+
 		if (!latestEmail) {
 			latestEmail = {
 				emailId: 0,
@@ -143,9 +282,81 @@ const emailService = {
 		return { list, total: totalRow.total, latestEmail };
 	},
 
+	/**
+	 * Every message of one conversation, oldest → newest.
+	 *
+	 * The Inbox only carries the newest message of a thread, so the reader calls
+	 * this to rebuild the whole conversation: the original, every received
+	 * reply and the user's own replies.
+	 */
+	async thread(c, params, userId) {
+		const emailId = Number(params.emailId) || 0;
+		let threadId = String(params.threadId || '').trim();
+
+		// Legacy rows may still be missing a thread id; fall back to resolving it
+		// from the anchor message, then to the single-message key.
+		const legacyThreadKey = sql`coalesce(nullif(${email.threadId}, ''), 'e:' || ${email.emailId})`;
+
+		if (!threadId && emailId) {
+			const anchor = await orm(c)
+				.select({
+					emailId: email.emailId,
+					threadId: email.threadId,
+					messageId: email.messageId,
+					inReplyTo: email.inReplyTo,
+					relation: email.relation,
+					subject: email.subject,
+					userId: email.userId,
+					accountId: email.accountId,
+				})
+				.from(email)
+				.where(and(eq(email.emailId, emailId), eq(email.userId, userId)))
+				.get();
+
+			if (!anchor) {
+				throw new BizError(t('notExistEmailReply'));
+			}
+
+			if (anchor.threadId) {
+				threadId = anchor.threadId;
+			} else {
+				const resolved = await threadService.resolveThreadForMessage(c, anchor);
+				threadId = resolved.threadId || `e:${anchor.emailId}`;
+			}
+		}
+
+		if (!threadId) {
+			return { threadId: '', subject: '', messages: [] };
+		}
+
+		const messages = await orm(c)
+			.select({ ...emailListColumns })
+			.from(email)
+			.innerJoin(
+				account,
+				eq(account.accountId, email.accountId)
+			)
+			.where(and(
+				eq(email.userId, userId),
+				eq(legacyThreadKey, threadId),
+				eq(email.isDel, isDel.NORMAL),
+				eq(account.isDel, isDel.NORMAL),
+			))
+			.orderBy(asc(email.emailId))
+			.all();
+
+		await this.emailAddAtt(c, messages);
+		await senderAvatarService.attach(c, messages);
+
+		return {
+			threadId,
+			subject: messages[0]?.subject || '',
+			messages,
+		};
+	},
+
 	toListText(item) {
-		const raw = emailUtils.formatText(item.text) || emailUtils.htmlToText(item.content);
-		return raw.replace(/\s+/g, ' ').trim().slice(0, EMAIL_LIST_TEXT_LEN);
+		return emailUtils.toPreviewText(item.text, item.content, item.bodyType).slice(0, EMAIL_LIST_TEXT_LEN);
 	},
 
 	applyListText(list) {
@@ -157,11 +368,14 @@ const emailService = {
 		return list;
 	},
 
-	emailListFilters({ userId, accountId, type, allReceive, emailId, timeSort, withCursor = true }) {
+	emailListFilters({ userId, accountId, type, allReceive, emailId, timeSort, keyword, archived = 0, withCursor = true }) {
 		const conditions = [
 			eq(email.userId, userId),
 			eq(email.type, type),
 			eq(email.isDel, isDel.NORMAL),
+			// One flag, two views: the Inbox asks for `archived = 0` and the
+			// Archive view for `archived = 1`, so neither can leak into the other.
+			eq(email.archived, archived),
 			eq(account.isDel, isDel.NORMAL),
 		];
 		if (!allReceive) {
@@ -170,6 +384,7 @@ const emailService = {
 		if (withCursor && emailId) {
 			conditions.push(timeSort ? gt(email.emailId, emailId) : lt(email.emailId, emailId));
 		}
+		conditions.push(...emailKeywordFilters(keyword));
 		return conditions;
 	},
 
@@ -233,7 +448,10 @@ const emailService = {
 			if (ownedIds.length) {
 				await this.physicsDelete(c, { emailIds: ownedIds.join(',') });
 			}
-			return;
+			// Reported to the client so the swipe action only offers "Undo" when
+			// the row still exists. With `sync_delete` on, the delete is final by
+			// the user's own configuration and nothing can bring it back.
+			return { soft: false };
 		}
 
 		await orm(c).update(email).set({ isDel: isDel.DELETE }).where(
@@ -241,10 +459,92 @@ const emailService = {
 				eq(email.userId, userId),
 				inArray(email.emailId, emailIdList)))
 			.run();
+
+		return { soft: true };
 	},
 
-	receive(c, params, cidAttList, r2domain) {
-		params.content = this.imgReplace(params.content, cidAttList, r2domain)
+	/**
+	 * Take messages out of the Inbox without deleting them (mobile swipe right).
+	 *
+	 * Only the caller's own, not-yet-deleted rows are touched. Archiving is
+	 * reversible at any time through `unarchive`/`restore`.
+	 */
+	async archive(c, params, userId) {
+		return this.setArchived(c, params, userId, 1);
+	},
+
+	async unarchive(c, params, userId) {
+		return this.setArchived(c, params, userId, 0);
+	},
+
+	async setArchived(c, params, userId, archived) {
+		const emailIdList = toEmailIdList(params?.emailIds);
+		if (!emailIdList.length) return;
+
+		await orm(c).update(email).set({ archived }).where(
+			and(
+				eq(email.userId, userId),
+				eq(email.isDel, isDel.NORMAL),
+				inArray(email.emailId, emailIdList)))
+			.run();
+	},
+
+	/**
+	 * Bring soft-deleted messages back (the swipe delete's "Undo").
+	 *
+	 * A row that was physically deleted does not exist any more, so this matches
+	 * nothing and is a no-op — the client only offers Undo when `delete` reported
+	 * `soft: true`.
+	 */
+	async restore(c, params, userId) {
+		const emailIdList = toEmailIdList(params?.emailIds);
+		if (!emailIdList.length) return;
+
+		await orm(c).update(email).set({ isDel: isDel.NORMAL }).where(
+			and(
+				eq(email.userId, userId),
+				inArray(email.emailId, emailIdList)))
+			.run();
+	},
+
+	/**
+	 * Persist an incoming message.
+	 *
+	 * Two things happen before the insert:
+	 *  - Message-ID dedupe: a Cloudflare / webhook retry of the same message
+	 *    must not create a second row.
+	 *  - Thread resolution: the message joins the conversation of its parent
+	 *    (In-Reply-To → References → subject fallback), otherwise it starts one.
+	 *
+	 * If the v3.6 migration has not run yet (the Worker is deployed a few
+	 * seconds before a schema upgrade adds the columns), the mail is still stored —
+	 * just without a conversation key — so nothing is rejected or lost.
+	 */
+	async receive(c, params, cidAttList, r2domain) {
+		let thread = { threadId: '', parentMessageId: 0 };
+		let supportsThreads = true;
+
+		try {
+			const existing = await threadService.findExistingMessage(c, params);
+			if (existing) {
+				return existing;
+			}
+
+			thread = await threadService.resolveThreadForMessage(c, params);
+		} catch (error) {
+			if (!threadService.isMissingThreadColumn(error)) {
+				throw error;
+			}
+			supportsThreads = false;
+		}
+
+		if (supportsThreads) {
+			params.threadId = thread.threadId || threadService.newThreadId();
+			params.parentMessageId = thread.parentMessageId || 0;
+		}
+
+		params.content = this.imgReplace(params.content, cidAttList, r2domain);
+
 		return orm(c).insert(email).values({ ...params }).returning().get();
 	},
 
@@ -265,11 +565,6 @@ const emailService = {
 		} = params;
 
 		const { resendTokens, r2Domain, send, domainList } = await settingService.query(c);
-
-		let { imageDataList, html } = await attService.toImageUrlHtml(c, content);
-		if (imageDataList.length + attachments.length > MAIL_LIMITS.MAX_ATTACHMENT_COUNT) {
-			throw new BizError(t('attLimit'));
-		}
 
 		//判断是否关闭发件功能
 		if (send === settingConst.send.CLOSE) {
@@ -340,6 +635,12 @@ const emailService = {
 		if (!useCloudflareEmail && !resendToken && !allInternal) {
 			throw new BizError(t('noSendProvider'));
 		}
+		// Only resolve user-supplied object keys after sender ownership and send permission checks.
+		let { imageDataList, html } = await attService.toImageUrlHtml(c, content, userId);
+		if (imageDataList.length + attachments.length > MAIL_LIMITS.MAX_ATTACHMENT_COUNT) {
+			throw new BizError(t('attLimit'));
+		}
+		assertAttachmentLimits([...imageDataList, ...attachments]);
 
 		//没有发件人名字自动截取
 		if (!name) {
@@ -413,6 +714,9 @@ const emailService = {
 		emailData.subject = subject;
 		emailData.content = html;
 		emailData.text = text;
+		// Outbound mail written in the composer is HTML; a text-only body is
+		// stored as plain so the reader escapes it instead of rendering markup.
+		emailData.bodyType = html && html.trim() ? MAIL_BODY.HTML : MAIL_BODY.PLAIN;
 		emailData.accountId = accountId;
 		emailData.status = useCloudflareEmail ? emailConst.status.DELIVERED : emailConst.status.SENT;
 		emailData.type = emailConst.type.SEND;
@@ -427,9 +731,52 @@ const emailService = {
 
 		emailData.recipient = JSON.stringify(recipient);
 
+		// Every message belongs to a conversation. This is assigned here too — a
+		// mail the user starts is the root of a new thread, and without a key the
+		// reply that eventually arrives (whose In-Reply-To we cannot match, since
+		// outbound Message-IDs are provider generated) would open a second one.
+		const threadHeaders = {
+			userId,
+			subject,
+			sendEmail: accountRow.email,
+			toEmail: receiveEmail[0] || '',
+			recipient,
+		};
+
 		if (sendType === 'reply') {
 			emailData.inReplyTo = emailRow.messageId;
 			emailData.relation = emailRow.messageId;
+
+			// Keep the reply inside the conversation it answers so the reader can
+			// reload the whole thread (and the Inbox never splits it). A reply
+			// sent before the v3.6 migration runs simply has no thread key.
+			try {
+				const thread = await threadService.resolveThreadForMessage(c, {
+					...threadHeaders,
+					messageId: '',
+					inReplyTo: emailRow.messageId,
+					references: emailRow.messageId,
+					threadId: emailRow.threadId,
+					parentMessageId: emailRow.emailId
+				});
+				emailData.threadId = thread.threadId || emailRow.threadId || threadService.newThreadId();
+				emailData.parentMessageId = thread.parentMessageId || Number(emailRow.emailId) || 0;
+			} catch (error) {
+				if (!threadService.isMissingThreadColumn(error)) throw error;
+			}
+		} else {
+			// New outbound mail: start its own conversation, unless it is a
+			// continuation the headers/subject can already place.
+			try {
+				const thread = await threadService.resolveThreadForMessage(c, {
+					...threadHeaders,
+					messageId: '',
+				});
+				emailData.threadId = thread.threadId || threadService.newThreadId();
+				emailData.parentMessageId = thread.parentMessageId || 0;
+			} catch (error) {
+				if (!threadService.isMissingThreadColumn(error)) throw error;
+			}
 		}
 
 		//如果权限有发送次数增加用户发送次数
@@ -457,6 +804,8 @@ const emailService = {
 		if (allInternal) {
 			await this.HandleOnSiteEmail(c, receiveEmail, emailResult, attList);
 		}
+
+		await senderAvatarService.attach(c, [emailResult]);
 
 		const dateStr = dayjs().format('YYYY-MM-DD');
 		let daySendTotal = await c.env.kv.get(kvConst.SEND_DAY_COUNT + dateStr);
@@ -746,7 +1095,40 @@ const emailService = {
 
 		for (const emailData of receiveEmailList) {
 
+			// The recipient's copy belongs to the *recipient's* conversation: it
+			// is resolved again in their own mailbox instead of inheriting the
+			// sender's thread key.
+			try {
+				const thread = await threadService.resolveThreadForMessage(c, {
+					userId: emailData.userId,
+					messageId: emailData.messageId,
+					inReplyTo: emailData.inReplyTo,
+					references: emailData.relation,
+					subject: emailData.subject,
+					sendEmail: emailData.sendEmail,
+					toEmail: emailData.toEmail,
+					recipient: emailData.recipient
+				});
+				emailData.threadId = thread.threadId || threadService.newThreadId();
+				emailData.parentMessageId = thread.parentMessageId || 0;
+			} catch (error) {
+				if (!threadService.isMissingThreadColumn(error)) throw error;
+				// Pre-migration schema: store the copy without a conversation key.
+				delete emailData.threadId;
+				delete emailData.parentMessageId;
+			}
+
 			const emailRow = await orm(c).insert(email).values(emailData).returning().get();
+
+			// The recipient may be a different user of this instance: notify their
+			// devices too, so on-site mail behaves like an external delivery.
+			if (emailRow.userId > 0 && emailRow.status === emailConst.status.RECEIVE) {
+				pushService.scheduleNewMail(c, emailRow.userId, {
+					emailId: emailRow.emailId,
+					from: emailRow.sendEmail,
+					subject: emailRow.subject,
+				});
+			}
 
 			//设置附件保存
 			for (const attRow of attList) {
@@ -846,6 +1228,9 @@ const emailService = {
 					gt(email.emailId, emailId),
 					eq(email.userId, userId),
 					eq(email.isDel, isDel.NORMAL),
+					// Archiving the newest message must not make the poll hand it
+					// back to the list it was just removed from.
+					eq(email.archived, 0),
 					eq(account.isDel, isDel.NORMAL),
 					allReceive ? undefined : eq(email.accountId, accountId),
 					eq(email.type, emailConst.type.RECEIVE)
@@ -857,6 +1242,7 @@ const emailService = {
 		for (const item of list) {
 			item.listText = this.toListText(item);
 		}
+		await senderAvatarService.attach(c, list);
 		return list;
 	},
 
@@ -968,6 +1354,8 @@ const emailService = {
 			this.applyListText(list);
 		}
 
+		await senderAvatarService.attach(c, list);
+
 		if (!latestEmail) {
 			latestEmail = {
 				emailId: 0,
@@ -997,6 +1385,7 @@ const emailService = {
 		for (const item of list) {
 			item.listText = this.toListText(item);
 		}
+		await senderAvatarService.attach(c, list);
 		return list;
 	},
 

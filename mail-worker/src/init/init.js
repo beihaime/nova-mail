@@ -1,4 +1,5 @@
 import settingService from '../service/setting-service';
+import threadService from '../service/thread-service';
 import emailUtils from '../utils/email-utils';
 import {emailConst} from "../const/entity-const";
 
@@ -27,8 +28,169 @@ const dbInit = {
 		await this.v3_3DB(c);
 		await this.v3_4DB(c);
 		await this.v3_5DB(c);
+		await this.v3_6DB(c);
+		await this.v3_7DB(c);
+		await this.v3_8DB(c);
+		await this.v3_9DB(c);
+		await this.v3_10DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
+	},
+
+	/**
+	 * v3.10 — archive flag for the mobile swipe actions.
+	 *
+	 * `archived = 1` takes a message out of the Inbox without deleting it, so the
+	 * undo snackbar can bring it back. Deleted mail keeps `is_del = 1` and is
+	 * unaffected; the two flags are independent.
+	 */
+	async v3_10DB(c) {
+		try {
+			await c.env.db.prepare(`ALTER TABLE email ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;`).run();
+		} catch (e) {
+			console.warn(`跳过归档字段添加：${e.message}`);
+		}
+
+		// Every Inbox page filters on (`user_id`, `archived`).
+		try {
+			await c.env.db.prepare(`CREATE INDEX IF NOT EXISTS idx_email_user_archived ON email(user_id, archived);`).run();
+		} catch (e) {
+			console.warn(`跳过归档索引创建：${e.message}`);
+		}
+	},
+
+	/**
+	 * v3.9 — sender avatar resolution.
+	 *
+	 * `bimi_selector` stores the message's validated `BIMI-Selector:` header so
+	 * the avatar resolver can query `selector._bimi.<domain>` instead of always
+	 * `default._bimi.<domain>`. Existing rows fall back to `default`, which is
+	 * the BIMI default selector anyway.
+	 */
+	async v3_9DB(c) {
+		try {
+			await c.env.db.prepare(`ALTER TABLE email ADD COLUMN bimi_selector TEXT NOT NULL DEFAULT '';`).run();
+		} catch (e) {
+			console.warn(`跳过 BIMI selector 字段：${e.message}`);
+		}
+	},
+
+	/**
+	 * v3.8 — body type.
+	 *
+	 * The reader needs to know whether `content` is HTML, markdown or plain text
+	 * before it renders anything, because HTML goes through the sandboxed iframe
+	 * and must never touch the application DOM. Existing rows are classified from
+	 * their data: a stored HTML body means text/html, everything else text/plain.
+	 */
+	async v3_8DB(c) {
+		try {
+			await c.env.db.prepare(`ALTER TABLE email ADD COLUMN body_type TEXT NOT NULL DEFAULT '';`).run();
+		} catch (e) {
+			console.warn(`跳过字段添加：${e.message}`);
+		}
+
+		try {
+			await c.env.db.prepare(
+				`UPDATE email SET body_type = CASE WHEN content IS NOT NULL AND TRIM(content) != '' THEN 'text/html' ELSE 'text/plain' END WHERE body_type = '' OR body_type IS NULL;`
+			).run();
+		} catch (e) {
+			console.error('邮件正文类型回填失败：', e);
+		}
+	},
+
+	/**
+	 * v3.7 — Web Push subscriptions.
+	 *
+	 * One row per browser/PWA that enabled notifications. `endpoint` is unique:
+	 * subscribing again from the same browser updates that row (including the
+	 * owning user, if a different account signs in on it) instead of leaving a
+	 * stale duplicate behind.
+	 */
+	async v3_7DB(c) {
+		await c.env.db.prepare(`
+		  CREATE TABLE IF NOT EXISTS push_subscription (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id INTEGER NOT NULL,
+			endpoint TEXT NOT NULL,
+			p256dh TEXT NOT NULL,
+			auth TEXT NOT NULL,
+			user_agent TEXT NOT NULL DEFAULT '',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+		  )
+		`).run();
+
+		const INDEX_SQL_LIST = [
+			`CREATE UNIQUE INDEX IF NOT EXISTS idx_push_subscription_endpoint ON push_subscription(endpoint);`,
+			`CREATE INDEX IF NOT EXISTS idx_push_subscription_user ON push_subscription(user_id);`,
+		];
+
+		for (const sql of INDEX_SQL_LIST) {
+			try {
+				await c.env.db.prepare(sql).run();
+			} catch (e) {
+				console.warn(`跳过索引创建：${e.message}`);
+			}
+		}
+	},
+
+	/**
+	 * v3.6 — conversations.
+	 *
+	 * Stores the conversation key on each message so the Inbox can return one
+	 * row per conversation, then backfills every pre-existing message (this is
+	 * what collapses the duplicate rows already in the Inbox) and adds the
+	 * indexes the thread lookups rely on.
+	 */
+	async v3_6DB(c) {
+		const ADD_COLUMN_SQL_LIST = [
+			`ALTER TABLE email ADD COLUMN thread_id TEXT NOT NULL DEFAULT '';`,
+			`ALTER TABLE email ADD COLUMN parent_message_id INTEGER NOT NULL DEFAULT 0;`,
+		];
+
+		for (const sql of ADD_COLUMN_SQL_LIST) {
+			try {
+				await c.env.db.prepare(sql).run();
+			} catch (e) {
+				console.warn(`跳过字段添加：${e.message}`);
+			}
+		}
+
+		// Assign thread ids to every message that does not have one yet. Safe to
+		// re-run: after the first pass the query returns nothing.
+		try {
+			const total = await threadService.backfillThreadIds(c);
+			if (total > 0) {
+				console.log(`会话线程回填完成：${total} 封邮件`);
+			}
+		} catch (e) {
+			console.error('会话线程回填失败：', e);
+		}
+
+		const INDEX_SQL_LIST = [
+			`CREATE INDEX IF NOT EXISTS idx_email_thread ON email(user_id, thread_id, email_id);`,
+			`CREATE INDEX IF NOT EXISTS idx_email_message_id ON email(user_id, message_id);`,
+		];
+
+		for (const sql of INDEX_SQL_LIST) {
+			try {
+				await c.env.db.prepare(sql).run();
+			} catch (e) {
+				console.warn(`跳过索引创建：${e.message}`);
+			}
+		}
+
+		// Best-effort uniqueness guard so a webhook / Cloudflare retry cannot
+		// insert the same message twice. Legacy duplicate rows would make this
+		// fail, in which case the application-level check still applies.
+		try {
+			await c.env.db.prepare(
+				`CREATE UNIQUE INDEX IF NOT EXISTS idx_email_message_id_unique ON email(user_id, message_id) WHERE message_id != '';`
+			).run();
+		} catch (e) {
+			console.warn(`跳过 Message-ID 唯一索引（存在历史重复）：${e.message}`);
+		}
 	},
 
 	async v3_4DB(c) {
@@ -62,6 +224,11 @@ const dbInit = {
 	},
 
 	async v3_5DB(c) {
+		try {
+			await c.env.db.prepare(`ALTER TABLE email ADD COLUMN auth_results TEXT NOT NULL DEFAULT '';`).run();
+		} catch (e) {
+			console.warn(`跳过邮件认证字段：${e.message}`);
+		}
 		try {
 			await c.env.db.batch([
 				c.env.db.prepare(`CREATE TABLE IF NOT EXISTS oauth_transactions (
@@ -325,7 +492,7 @@ const dbInit = {
 				type INTEGER NOT NULL DEFAULT 0,
 				update_time DATETIME DEFAULT CURRENT_TIMESTAMP
       )`,
-			`ALTER TABLE setting ADD COLUMN notice_title TEXT NOT NULL DEFAULT 'Cloud Mail';`,
+			`ALTER TABLE setting ADD COLUMN notice_title TEXT NOT NULL DEFAULT 'Nova Mail';`,
 			`ALTER TABLE setting ADD COLUMN notice_content TEXT NOT NULL DEFAULT '';`,
 			`ALTER TABLE setting ADD COLUMN notice_type TEXT NOT NULL DEFAULT 'none';`,
 			`ALTER TABLE setting ADD COLUMN notice_duration INTEGER NOT NULL DEFAULT 0;`,
@@ -732,7 +899,7 @@ const dbInit = {
 			  INSERT INTO setting (
 				register, receive, add_email, many_email, title, auto_refresh, register_verify, add_email_verify
 			  )
-			  SELECT 0, 0, 0, 0, 'Cloud Mail', 0, 1, 1
+			  SELECT 0, 0, 0, 0, 'Nova Mail', 0, 1, 1
 			  WHERE NOT EXISTS (SELECT 1 FROM setting)
 			`).run();
 		} catch (e) {

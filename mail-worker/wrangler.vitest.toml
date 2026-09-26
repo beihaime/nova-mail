@@ -1,0 +1,45 @@
+# Wrangler configuration dedicated to the integration test suite.
+#
+# `@cloudflare/vitest-pool-workers` boots this config inside Miniflare/workerd,
+# so the bindings here are throwaway, local-only resources. No `[assets]` block
+# is declared on purpose: the SPA bundle is not needed to exercise the API, and
+# requiring a `dist/` build would make the suite fail on a clean checkout.
+#
+# The D1 schema is created by the Worker's own `dbInit.init()` (the same code the
+# production one-time `/api/bootstrap` route runs), so there is no migrations_dir to
+# keep in sync with `src/init/init.js`.
+name = "nova-mail-vitest"
+main = "src/index.js"
+# Pinned to the newest date the workerd build shipped with
+# `@cloudflare/vitest-pool-workers` understands; a later date only makes
+# Miniflare warn and fall back.
+compatibility_date = "2025-03-10"
+compatibility_flags = ["nodejs_compat"]
+keep_vars = true
+
+[[d1_databases]]
+binding = "db"
+database_name = "nova-mail-vitest"
+database_id = "00000000-0000-0000-0000-000000000001"
+
+[[kv_namespaces]]
+binding = "kv"
+id = "00000000000000000000000000000001"
+
+[[r2_buckets]]
+binding = "r2"
+bucket_name = "nova-mail-vitest"
+
+# No `[ai]` binding: the pool's workerd build cannot resolve the external AI
+# worker, and none of the auth/mail paths under test call it.
+
+[vars]
+# Matches what `dbInit.init`/the auth helpers expect. Test-only value: it never
+# leaves the local workerd instance.
+jwt_secret = "nova-mail-integration-test-secret-0123456789"
+domain = ["example.com"]
+admin = "admin@example.com"
+ai_model = ""
+analysis_cache = false
+orm_log = false
+TURNSTILE_HOSTNAME = "mail.example.com"

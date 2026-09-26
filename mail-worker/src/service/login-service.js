@@ -20,6 +20,9 @@ import { toUtc } from '../utils/date-uitil';
 import { t } from '../i18n/i18n.js';
 import verifyRecordService from './verify-record-service';
 import rateLimitUtils from '../utils/rate-limit-utils';
+import orm from '../entity/orm';
+import user from '../entity/user';
+import { and, eq } from 'drizzle-orm';
 
 const loginService = {
 
@@ -226,9 +229,11 @@ const loginService = {
 		}
 
 		// Rate-limit password login only (OAuth uses createSession directly).
+		// Browser navigation to the login page is protected by Cloudflare's
+		// Managed Challenge. Keep the API path independent from the Turnstile
+		// widget so a solved edge challenge does not require a second token.
 		if (!noVerifyPwd) {
 			await rateLimitUtils.login(c);
-			await turnstileService.verify(c, token);
 		}
 
 		const userRow = await userService.selectByEmailIncludeDel(c, email);
@@ -245,8 +250,20 @@ const loginService = {
 			throw new BizError(t('isBanUser'));
 		}
 
-		if (!await cryptoUtils.verifyPassword(password, userRow.salt, userRow.password) && !noVerifyPwd) {
+		if (!noVerifyPwd && !await cryptoUtils.verifyPassword(password, userRow.salt, userRow.password)) {
 			throw new BizError(t('IncorrectPwd'));
+		}
+		if (!noVerifyPwd && cryptoUtils.isLegacyPasswordHash(userRow.password)) {
+			const { salt, hash } = await cryptoUtils.hashPassword(password);
+			const upgraded = await orm(c).update(user).set({ password: hash, salt })
+				.where(and(eq(user.userId, userRow.userId), eq(user.password, userRow.password)))
+				.returning({ userId: user.userId }).get();
+			if (!upgraded) {
+				// A concurrent password change invalidates the credentials we just checked.
+				throw new BizError(t('IncorrectPwd'));
+			}
+			userRow.password = hash;
+			userRow.salt = salt;
 		}
 
 		return await this.createSession(c, userRow);

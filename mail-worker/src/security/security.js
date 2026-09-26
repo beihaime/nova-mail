@@ -21,7 +21,12 @@ const publicRoutes = new Set([
 	'GET /oauth/github/callback',
 	'POST /oauth/github/complete',
 	'POST /oauth/complete',
-	'POST /bootstrap'
+	'POST /oauth/google/complete',
+	'POST /bootstrap',
+	// Capability-signed avatar bytes. `<img>` cannot send the bearer token, so
+	// this one route is public; the id it carries is an HMAC-signed descriptor
+	// that only `GET /avatar` (authenticated) can mint.
+	'GET /avatar/image'
 ]);
 
 function isPublicRoute(c) {
@@ -33,6 +38,12 @@ function isPublicRoute(c) {
 const requirePerms = [
 	'/email/send',
 	'/email/delete',
+	// The mobile swipe actions mutate a mailbox the same way delete does, so
+	// they reuse the existing `email:delete` capability instead of introducing a
+	// new permission key that would have to be seeded into every role.
+	'/email/archive',
+	'/email/unarchive',
+	'/email/restore',
 	'/account/list',
 	'/account/delete',
 	'/account/add',
@@ -70,8 +81,10 @@ const requirePerms = [
 	'/regKey/history'
 ];
 
-const premKey = {
-	'email:delete': ['/email/delete'],
+// Maps a stored permission key to the API routes it unlocks. The name now
+// matches `perm.perm_key` and `permKeyToPaths` below; it previously did not.
+const permKey = {
+	'email:delete': ['/email/delete', '/email/archive', '/email/unarchive', '/email/restore'],
 	'email:send': ['/email/send'],
 	'account:add': ['/account/add'],
 	'account:query': ['/account/list'],
@@ -164,7 +177,7 @@ function permKeyToPaths(permKeys) {
 	const paths = [];
 
 	for (const key of permKeys) {
-		const routeList = premKey[key];
+		const routeList = permKey[key];
 		if (routeList && Array.isArray(routeList)) {
 			paths.push(...routeList);
 		}

@@ -1,5 +1,65 @@
 <template>
-  <div class="email-container">
+  <div class="email-container" :class="{ 'mobile-selecting': mobileSelecting }">
+    <div v-if="type === 'email'" class="mobile-inbox-tools">
+      <div class="mobile-search-row">
+        <label class="mobile-search">
+          <AppIcon name="search" :size="18" />
+          <input
+              v-model.trim="mobileSearchInput"
+              type="search"
+              :placeholder="t('searchShort')"
+              :aria-label="t('searchShort')"
+              @keydown.esc="mobileSearchInput = ''"
+          />
+          <button
+              v-if="mobileSearchInput"
+              class="mobile-search-clear"
+              type="button"
+              :aria-label="t('clearSearch')"
+              @click="mobileSearchInput = ''"
+          >×</button>
+        </label>
+
+        <!-- Sort + multi-select live beside the search field so the filter bar
+             below can hand all four filters an equal share of the full row
+             width instead of splitting it with an action group. -->
+        <div class="mobile-filter-actions">
+          <button
+              class="mobile-tool-button mobile-sort"
+              :aria-label="t('sortByTime')"
+              @click="mobileSortClick"
+          >
+            <Icon icon="solar:sort-vertical-linear" width="21" height="21" />
+          </button>
+
+          <button
+              class="mobile-tool-button"
+              :aria-label="mobileSelecting ? t('cancel') : t('multiSelect')"
+              @click="toggleMobileSelection"
+          >
+            <Icon icon="solar:menu-dots-bold" width="21" height="21" />
+          </button>
+        </div>
+      </div>
+
+      <div class="mobile-filter-bar">
+        <!-- Four equal cells that together fill the row: every chip owns the
+             same width and centres its own content, so the group reads as one
+             balanced segmented control rather than four ragged pills. All four
+             are text-only, so no chip carries more visual weight than another. -->
+        <div class="mobile-filters">
+          <button
+              v-for="filter in mobileFilters"
+              :key="filter.key"
+              :class="{ active: mobileFilter === filter.key }"
+              @click="selectMobileFilter(filter.key)"
+          >
+            <span class="mobile-filter-label">{{ filter.label }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
     <div class="header-actions">
       <el-checkbox
           v-model="checkAll"
@@ -28,9 +88,23 @@
     </div>
 
     <div ref="scroll" class="scroll">
+      <div
+          v-if="type === 'email' &&
+                isPhone &&
+                !loading &&
+                emailList.length &&
+                !visibleList.some(item => !item.expand)"
+          class="mobile-filter-empty"
+      >
+        {{
+          mobileFilter === 'attachments' && !attachmentDataReady
+            ? $t('checkingAttachments')
+            : $t('noMessagesFound')
+        }}
+      </div>
       <UseVirtualList ref="scrollbarRef"
                         @scroll="onScroll"
-                        :list="list"
+                        :list="visibleList"
                         :options="{ itemHeight: itemHeight, overscan: 15 }"
                         class="virtual"
                         style="height: 100%"
@@ -38,22 +112,70 @@
                         :key="keyCount"
         >
           <template #default="{ data: item, index }" >
-            <div :class="['email-row', props.type, { 'right-checked': item.rightChecked }]"
-                 :data-checked="item.checked"
-                 @click="jumpDetails(item)"
-                 v-if="!item.expand"
+            <div v-if="!item.expand"
                  :key="item.emailId"
-                 @contextmenu="handleContextmenu($event, item)"
+                 class="swipe-shell"
             >
+              <!-- Action layer. It sits *under* the card (the card is opaque and
+                   later in the DOM), so it is only visible where the card has
+                   been dragged away. Never receives pointer input itself, and is
+                   only built where the gesture is actually available. -->
+              <div v-if="props.type === 'email' && swipeActionsReady" class="swipe-actions" aria-hidden="true">
+                <div class="swipe-action swipe-action-archive">
+                  <AppIcon name="archive-nav" :size="22"/>
+                  <span>{{ t('archive') }}</span>
+                </div>
+                <div class="swipe-action swipe-action-delete">
+                  <AppIcon name="trash-nav" :size="22"/>
+                  <span>{{ t('delete') }}</span>
+                </div>
+              </div>
+              <div :class="['email-row', props.type, {
+                    'right-checked': item.rightChecked,
+                    'is-unread': item.unread === EmailUnreadEnum.UNREAD && showUnread
+                  }]"
+                   :data-checked="item.checked"
+                   @click="jumpDetails(item)"
+                   @click.capture="onRowClickCapture"
+                   @contextmenu="handleContextmenu($event, item)"
+                   @pointerdown="onRowPointerDown($event, item)"
+                   @pointermove="onRowPointerMove"
+                   @pointerup="onRowPointerUp"
+                   @pointerleave="onRowPointerLeave"
+                   @pointercancel="onRowPointerCancel"
+              >
               <el-checkbox :class=" props.type === 'all-email' ? 'all-email-checkbox' : 'checkbox'"
                            v-model="item.checked"
                            :disabled="!item.checked && isSelectMax"
                            @click.stop></el-checkbox>
               <div @click.stop="starChange(item)" class="pc-star" v-if="showStar">
-                <AppIcon v-if="item.isStar" name="star-filled" :size="20"/>
-                <AppIcon v-else name="star-outline" :size="18"/>
+                <Icon
+                    :class="['inbox-star-icon', { 'is-active': item.isStar }]"
+                    :icon="item.isStar ? 'solar:star-bold' : 'solar:star-linear'"
+                    width="19"
+                    height="19"
+                />
               </div>
               <div v-if="!showStar"></div>
+              <!-- Reserved unread gutter. The slot always owns its track, so a
+                   read/unread flip cannot shift the avatar or the message text;
+                   only the dot inside it is conditional. -->
+              <span
+                  v-if="type === 'email'"
+                  class="mobile-unread-slot"
+                  aria-hidden="true"
+              >
+                <span
+                    v-if="item.unread === EmailUnreadEnum.UNREAD && showUnread"
+                    class="mobile-unread-dot"
+                />
+              </span>
+              <SenderAvatar
+                  v-if="type === 'email' && isPhone"
+                  class="mobile-sender-avatar"
+                  :email="item"
+                  :size="40"
+              />
               <div class="title" :class="accountShow ? 'title-column' : 'title-column'">
 
                 <div class="email-sender" :style=" (showStatus ? 'gap: 10px;' : '') + ((item.unread === EmailUnreadEnum.UNREAD && showUnread)  ? 'font-weight: bold' : '')">
@@ -70,11 +192,9 @@
                   <div v-else></div>
                   <span class="name">
                     <span>
+                      <SenderAvatar v-if="!isPhone" :email="item" :size="28" />
                       <div class="unread" v-if="isMobile && (item.unread === EmailUnreadEnum.UNREAD && showUnread) "/>
                       <slot name="name" :email="item"> {{ item.name }}</slot>
-                    </span>
-                    <span>
-                      <AppIcon v-if="item.isStar" name="star-filled" :size="18"/>
                     </span>
                   </span>
                   <span class="phone-time">{{ item.formatCreateTime }}</span>
@@ -90,8 +210,12 @@
                         </slot>
                       </span>
                     </span>
-                    <span class="email-content">{{ item.listText || item.text || '\u200B' }}</span>
+                    <!-- Keep list previews sourced from the list payload only.  The
+                         detail `text` field is populated when a message is opened
+                         and must never leak back into a row. -->
+                    <span v-if="listPreview(item)" class="email-content">{{ listPreview(item) }}</span>
                   </div>
+
                   <div class="user-info" v-if="showUserInfo">
                     <div class="user">
                       <span>
@@ -111,6 +235,26 @@
               <div class="email-right" :style="showUserInfo ? 'align-self: start;':''">
                 <span class="email-time" :style="(item.unread === EmailUnreadEnum.UNREAD && showUnread) ? 'font-weight: bold' : ''">{{ item.formatCreateTime }}</span>
               </div>
+              <!-- Fixed right-hand metadata/action column (time above star).
+                   Both share one centred flex column so the star never drifts
+                   with the timestamp's width. -->
+              <div v-if="type === 'email'" class="mobile-row-meta">
+                <span class="mobile-meta-time">{{ listClock(item) }}</span>
+                <button
+                    v-if="showStar"
+                    class="mobile-row-star"
+                    :aria-label="t('star')"
+                    @click.stop="starChange(item)"
+                >
+                  <Icon
+                      :class="['inbox-star-icon', { 'is-active': item.isStar }]"
+                      :icon="item.isStar ? 'solar:star-bold' : 'solar:star-linear'"
+                      width="19"
+                      height="19"
+                  />
+                </button>
+              </div>
+            </div>
             </div>
             <skeletonBlock v-else-if="item.expand === 'loading'"
                            :rows="1"
@@ -139,7 +283,7 @@
                        :showUserInfo="showUserInfo"
                        :type="type"/>
       <div class="empty" v-if="noLoading && emailList.length === 0 && !loading">
-        <el-empty :image-size="isMobile ? 120 : null" :description="$t('noMessagesFound')"/>
+        <el-empty :image-size="isMobile ? 120 : null" :description="$t(loadError ? 'searchFailed' : (props.searching ? 'noSearchResults' : 'noMessagesFound'))"/>
       </div>
     </div>
     <el-dropdown
@@ -242,16 +386,35 @@ import {useEmailStore} from "@/store/email.js";
 import {useUiStore} from "@/store/ui.js";
 import {useSettingStore} from "@/store/setting.js";
 import {sleep} from "@/utils/time-utils.js"
-import {fromNow} from "@/utils/day.js";
+import {fromNow, formatListClock} from "@/utils/day.js";
 import {useI18n} from "vue-i18n";
 import {EmailUnreadEnum} from "@/enums/email-enum.js";
 import { UseVirtualList } from '@vueuse/components'
 import { useScroll } from '@vueuse/core'
+import SenderAvatar from '@/components/sender-avatar/index.vue'
+import { MAIL_BODY_TYPE, unwrapNestedMessage, looksLikeMarkdownDocument } from '@/utils/mail-html.js'
+import { stripMarkdown } from '@/utils/quoted-text.js'
+import { nextPageCursor, isLastPage, canRequestPage } from '@/utils/mail-pagination.js'
+import {
+  SWIPE_ACTION,
+  SWIPE_AXIS,
+  SWIPE_UNDO_MS,
+  clampSwipeOffset,
+  resolveSwipeAxis,
+  resolveSwipeRelease,
+  swipeActionForOffset,
+} from '@/utils/swipe-actions.js'
+import { showUndoSnackbar } from '@/utils/undo-snackbar.js'
 
 const props = defineProps({
   getEmailList: Function,
   emailDelete: Function,
   emailRead: Function,
+  // Mobile swipe actions. Optional: without them the gesture stays disabled, so
+  // the other lists (Sent, Starred, drafts) keep their current behaviour.
+  emailArchive: Function,
+  emailUnarchive: Function,
+  emailRestore: Function,
   starAdd: Function,
   starCancel: Function,
   cancelSuccess: Function,
@@ -295,15 +458,26 @@ const props = defineProps({
   showUnread: {
     type: Boolean,
     default: false
+  },
+  searching: {
+    type: Boolean,
+    default: false
   }
 })
 
-const emit = defineEmits(['jump', 'refresh-before', 'delete-draft', 'right-search'])
+const emit = defineEmits([
+  'jump',
+  'refresh-before',
+  'delete-draft',
+  'right-search',
+  'mobile-sort'
+])
 const {t} = useI18n()
 const settingStore = useSettingStore()
 const uiStore = useUiStore();
 const emailStore = useEmailStore();
 const loading = ref(false);
+const loadError = ref(false);
 const followLoading = ref(false);
 const noLoading = ref(false);
 const emailList = reactive([])
@@ -318,6 +492,27 @@ const latestEmail = ref(null)
 const scrollbarRef = ref(null)
 let reqLock = false
 let isMobile = ref(innerWidth < 1367)
+const isPhone = ref(innerWidth < 768)
+
+// The phone search field sits on its own row under the Inbox header and shares
+// its query through the email store so the list keeps filtering here.
+const mobileSearch = computed(() => emailStore.mobileSearch)
+const mobileSearchInput = computed({
+  get: () => emailStore.mobileSearch,
+  set: value => { emailStore.mobileSearch = value }
+})
+const mobileFilter = ref('all')
+const mobileSelecting = ref(false)
+
+const mobileFilters = computed(() => [
+  { key: 'all', label: t('all') },
+  { key: 'unread', label: t('unreadMail') },
+  { key: 'attachments', label: t('withAttachments') },
+  { key: 'starred', label: t('starred') }
+])
+
+let longPressTimer = null
+let longPressTriggered = false
 let skeletonRows = 0
 const timePaddingRight = ref('');
 const keyCount = ref(0);
@@ -375,12 +570,17 @@ onMounted(() => {
 
 onUnmounted(() => {
   clearInterval(timer)
+  clearTimeout(longPressTimer)
+  // Match the previous per-instance ref behaviour: leaving the Inbox clears
+  // the header search field.
+  if (props.type === 'email') emailStore.mobileSearch = ''
 })
 
 getEmailList()
 
 window.onresize = () => {
   isMobile.value = innerWidth < 1367
+  isPhone.value = innerWidth < 768
 }
 
 function onScroll(e) {
@@ -396,11 +596,381 @@ const list = computed(() => {
   return [...emailList, ...expandList]
 })
 
+const attachmentDataReady = computed(() =>
+  emailList.every(item => !!emailStore.detailMap[item.emailId])
+)
+
+const visibleList = computed(() => {
+  if (!isPhone.value || props.type !== 'email') {
+    return list.value
+  }
+
+  const query = mobileSearch.value.toLocaleLowerCase()
+
+  return list.value.filter(item => {
+    if (item.expand) return true
+
+    const matchesFilter =
+      mobileFilter.value === 'all' ||
+      (mobileFilter.value === 'unread' &&
+        item.unread === EmailUnreadEnum.UNREAD) ||
+      (mobileFilter.value === 'attachments' &&
+        !!emailStore.detailMap[item.emailId]?.attList?.length) ||
+      (mobileFilter.value === 'starred' && !!item.isStar)
+
+    const matchesSearch =
+      !query ||
+      [
+        item.name,
+        item.sendEmail,
+        item.subject,
+        item.listText
+      ].some(value =>
+        String(value || '').toLocaleLowerCase().includes(query)
+      )
+
+    return matchesFilter && matchesSearch
+  })
+})
+
+function selectMobileFilter(filter) {
+  mobileFilter.value = filter
+}
+
+/**
+ * Right-hand list timestamp.
+ *
+ * A fixed 24-hour clock ("08:05") for today's mail, a short date otherwise —
+ * never `fromNow`'s relative wording, which made a column of rows read as
+ * prose instead of a scannable set of timestamps.
+ */
+function listClock(item) {
+  return item?.createTime ? formatListClock(item.createTime) : (item?.formatCreateTime || '')
+}
+
+function mobileSortClick() {
+  emit('mobile-sort')
+}
+
+function toggleMobileSelection() {
+  mobileSelecting.value = !mobileSelecting.value
+
+  if (!mobileSelecting.value) {
+    handleCheckAllChange(false)
+  }
+}
+
+function startLongPress(event, item) {
+  if (
+    !isPhone.value ||
+    props.type !== 'email' ||
+    event.pointerType === 'mouse'
+  ) {
+    return
+  }
+
+  longPressTriggered = false
+  clearTimeout(longPressTimer)
+
+  longPressTimer = setTimeout(() => {
+    mobileSelecting.value = true
+    item.checked = true
+    longPressTriggered = true
+  }, 500)
+}
+
+function stopLongPress() {
+  clearTimeout(longPressTimer)
+}
+
+/* ------------------------------------------------------------ swipe actions
+ *
+ * Mobile-only gesture behind the Inbox rows: dragging the card right reveals
+ * Archive, dragging it left reveals Delete. The card is the top layer and
+ * follows the finger; `.swipe-actions` sits underneath and is uncovered by the
+ * movement, so the action area never has to be positioned from JS.
+ *
+ * The axis/commit maths lives in `utils/swipe-actions.js` and is unit tested.
+ * Everything here is deliberately imperative (direct style writes, no reactive
+ * state) because a pointermove must not re-render the virtual list, and only
+ * one row may be mid-gesture at a time.
+ */
+
+/** Slight overshoot so the card settles back like a spring, not a slide. */
+const SWIPE_SPRING = 'transform 280ms cubic-bezier(0.22, 1.18, 0.32, 1)'
+const SWIPE_SETTLE = 'transform 180ms ease-out, opacity 180ms ease-out'
+
+let swipeGesture = null
+
+/** True while a drag is in progress, so the click that follows never opens mail. */
+let swipeBlockClick = false
+
+const swipeActionsReady = computed(() =>
+  typeof props.emailDelete === 'function' &&
+  typeof props.emailArchive === 'function' &&
+  typeof props.emailUnarchive === 'function' &&
+  typeof props.emailRestore === 'function'
+)
+
+function swipeEnabled() {
+  return isPhone.value
+    && props.type === 'email'
+    && !mobileSelecting.value
+    && swipeActionsReady.value
+}
+
+function clearSwipeVisuals(gesture, { keepAction = false } = {}) {
+  const { rowEl, shellEl } = gesture
+  if (rowEl) {
+    rowEl.style.transition = ''
+    rowEl.style.transform = ''
+    rowEl.style.opacity = ''
+  }
+  shellEl?.classList.remove('is-swiping', 'is-removing')
+  if (!keepAction) shellEl?.removeAttribute('data-swipe-action')
+}
+
+/** Snap a row that is mid-gesture back to rest before starting a new one. */
+function abandonSwipe() {
+  if (!swipeGesture) return
+  clearSwipeVisuals(swipeGesture)
+  swipeGesture = null
+}
+
+function onRowPointerDown(event, item) {
+  startLongPress(event, item)
+
+  if (!swipeEnabled() || event.pointerType === 'mouse') return
+
+  // One mail item at a time: the previous drag snaps back immediately.
+  abandonSwipe()
+
+  const rowEl = event.currentTarget
+  swipeBlockClick = false
+  swipeGesture = {
+    pointerId: event.pointerId,
+    rowEl,
+    shellEl: rowEl.closest('.swipe-shell'),
+    item,
+    startX: event.clientX,
+    startY: event.clientY,
+    dx: 0,
+    dy: 0,
+    axis: null,
+  }
+
+  rowEl.style.transition = 'none'
+}
+
+function onRowPointerMove(event) {
+  const gesture = swipeGesture
+  if (!gesture || event.pointerId !== gesture.pointerId) return
+
+  gesture.dx = event.clientX - gesture.startX
+  gesture.dy = event.clientY - gesture.startY
+
+  if (!gesture.axis) {
+    gesture.axis = resolveSwipeAxis({ dx: gesture.dx, dy: gesture.dy })
+    if (!gesture.axis) return
+  }
+
+  // Vertical: this is the page scrolling, so let go of the gesture entirely.
+  if (gesture.axis !== SWIPE_AXIS.HORIZONTAL) {
+    gesture.rowEl.style.transition = ''
+    swipeGesture = null
+    return
+  }
+
+  // A horizontal drag is never also a long press.
+  stopLongPress()
+
+  if (!gesture.captured) {
+    // Touch pointers are captured implicitly, pen pointers are not; taking the
+    // capture explicitly keeps move/up coming even if the finger leaves the row.
+    gesture.captured = true
+    try {
+      gesture.rowEl.setPointerCapture(event.pointerId)
+    } catch {
+      // A pointer that already went away cannot be captured; the gesture still
+      // finishes through pointerup/pointercancel.
+    }
+  }
+
+  // The drag owns this movement now: no text selection, no native panning.
+  if (event.cancelable) event.preventDefault()
+
+  swipeBlockClick = true
+
+  const width = gesture.shellEl?.offsetWidth || 0
+  const offset = clampSwipeOffset(gesture.dx, width)
+
+  gesture.rowEl.style.transform = `translate3d(${offset}px, 0, 0)`
+  gesture.shellEl?.classList.add('is-swiping')
+  gesture.shellEl?.setAttribute('data-swipe-action', swipeActionForOffset(offset) || '')
+}
+
+function onRowPointerUp(event) {
+  stopLongPress()
+
+  const gesture = swipeGesture
+  if (!gesture || event.pointerId !== gesture.pointerId) return
+  swipeGesture = null
+
+  if (gesture.axis !== SWIPE_AXIS.HORIZONTAL) return
+
+  const { action, commit } = resolveSwipeRelease({
+    dx: gesture.dx,
+    dy: gesture.dy,
+    width: gesture.shellEl?.offsetWidth || 0,
+  })
+
+  if (commit && action) commitSwipe(gesture, action)
+  else springBackSwipe(gesture)
+}
+
+function onRowPointerLeave() {
+  stopLongPress()
+
+  // Touch pointers are implicitly captured, so a locked horizontal drag keeps
+  // reporting even when the finger leaves the row. Only an undecided gesture is
+  // abandoned here.
+  if (swipeGesture && swipeGesture.axis !== SWIPE_AXIS.HORIZONTAL) {
+    swipeGesture.rowEl.style.transition = ''
+    swipeGesture = null
+  }
+}
+
+function onRowPointerCancel() {
+  stopLongPress()
+
+  if (!swipeGesture) return
+  const gesture = swipeGesture
+  swipeGesture = null
+  springBackSwipe(gesture)
+}
+
+/**
+ * Swallow the click a drag produces.
+ *
+ * Registered in the capture phase so it runs before the row's own controls: a
+ * swipe that happens to end over the star or the checkbox must not toggle it.
+ * `jumpDetails`'s check stays as a backstop for clicks synthesised without a
+ * real pointer sequence.
+ */
+function onRowClickCapture(event) {
+  if (!swipeBlockClick) return
+
+  swipeBlockClick = false
+  event.stopPropagation()
+  event.preventDefault()
+}
+
+function springBackSwipe(gesture) {
+  const { rowEl, shellEl } = gesture
+  if (!rowEl) return
+
+  rowEl.style.transition = SWIPE_SPRING
+  rowEl.style.transform = 'translate3d(0, 0, 0)'
+
+  const settle = () => {
+    rowEl.style.transition = ''
+    rowEl.style.transform = ''
+    rowEl.removeEventListener('transitionend', settle)
+  }
+  rowEl.addEventListener('transitionend', settle)
+
+  shellEl?.classList.remove('is-swiping')
+  shellEl?.removeAttribute('data-swipe-action')
+}
+
+function commitSwipe(gesture, action) {
+  const { rowEl, shellEl, item } = gesture
+  const width = shellEl?.offsetWidth || 0
+  const direction = action === SWIPE_ACTION.ARCHIVE ? 1 : -1
+  const index = emailList.findIndex(row => row.emailId === item.emailId)
+
+  shellEl?.classList.add('is-removing')
+  rowEl.style.transition = SWIPE_SETTLE
+  rowEl.style.transform = `translate3d(${direction * width}px, 0, 0)`
+  rowEl.style.opacity = '0'
+
+  const request = action === SWIPE_ACTION.ARCHIVE
+    ? props.emailArchive([item.emailId])
+    : props.emailDelete([item.emailId])
+
+  request.then(data => {
+    // The row is only dropped once the server confirmed it.
+    deleteEmail([item.emailId])
+    showSwipeOutcome({
+      item,
+      index,
+      action,
+      // A delete with `sync_delete` on is physical, so there is nothing to
+      // undo; the server reports which one happened.
+      canUndo: action === SWIPE_ACTION.ARCHIVE || data?.soft === true,
+    })
+  }).catch(error => {
+    console.error(error)
+    // Refused: put the card back exactly where it was.
+    rowEl.style.transition = SWIPE_SPRING
+    rowEl.style.transform = 'translate3d(0, 0, 0)'
+    rowEl.style.opacity = '1'
+    shellEl?.classList.remove('is-removing')
+    shellEl?.classList.remove('is-swiping')
+    shellEl?.removeAttribute('data-swipe-action')
+    ElMessage({
+      message: t('swipeActionFailMsg'),
+      type: 'error',
+      plain: true,
+    })
+  })
+}
+
+function showSwipeOutcome({ item, index, action, canUndo }) {
+  const message = action === SWIPE_ACTION.ARCHIVE ? t('archiveSuccessMsg') : t('delSuccessMsg')
+
+  if (!canUndo) {
+    ElMessage({ message, type: 'success', plain: true })
+    return
+  }
+
+  showUndoSnackbar({
+    message,
+    undoLabel: t('undo'),
+    duration: SWIPE_UNDO_MS,
+    onUndo: () => undoSwipedEmail({ item, index, action }),
+  })
+}
+
+function undoSwipedEmail({ item, index, action }) {
+  const request = action === SWIPE_ACTION.ARCHIVE
+    ? props.emailUnarchive([item.emailId])
+    : props.emailRestore([item.emailId])
+
+  request.then(() => {
+    // Put it back where it was; `index` may be stale if the list changed in the
+    // meantime, so clamp instead of trusting it.
+    const position = Math.max(0, Math.min(index, emailList.length))
+    emailList.splice(position, 0, item)
+  }).catch(error => {
+    console.error(error)
+    ElMessage({
+      message: t('undoFailMsg'),
+      type: 'error',
+      plain: true,
+    })
+  })
+}
+
 const itemHeight = computed(() => {
     if (props.type === 'all-email') {
       return isMobile.value ? 132 : 65;
     } else  {
-      return isMobile.value ? 83 : 48;
+      // Phone inbox rows are 80px tall (see the .email-row.email mobile rules);
+      // keep the virtual list in lock-step so rows never overlap.
+      return isPhone.value && props.type === 'email'
+        ? 80
+        : (isMobile.value ? 83 : 48);
     }
 })
 
@@ -416,6 +986,28 @@ watch(scrollbarRef, () => {
 watch(itemHeight, () => {
   keyCount.value ++
 })
+
+/**
+ * Row preview text, hardened on the client too.
+ *
+ * The Worker already flattens markdown and unwraps a body that is itself a raw
+ * message when it builds `listText`, but a row stored before those rules still
+ * carries its `MIME-Version:` header block or markdown syntax. Normalising here
+ * means the Inbox never shows either, whatever the stored row looks like.
+ */
+function listPreview(item) {
+  const raw = String(item?.listText || '')
+  if (!raw) return ''
+
+  const nested = unwrapNestedMessage(raw)
+  if (nested) {
+    const body = nested.text || ''
+    return nested.bodyType === MAIL_BODY_TYPE.MARKDOWN ? stripMarkdown(body).trim() : body
+  }
+
+  // A markdown body that arrived as text/plain: flatten it for the row.
+  return looksLikeMarkdownDocument(raw) ? stripMarkdown(raw).trim() : raw
+}
 
 watch(followLoading, (isFollowLoading) => {
   if (isFollowLoading) {
@@ -558,29 +1150,44 @@ const accountShow = computed(() => {
   return uiStore.accountShow && settingStore.settings.manyEmail === 0
 })
 
+function syncStarState(email, value) {
+  const nextValue = value ? 1 : 0
+
+  email.isStar = nextValue
+
+  const detail = emailStore.detailMap[email.emailId]
+  if (detail) {
+    detail.isStar = nextValue
+  }
+
+  const current = emailStore.contentData.email
+  if (current?.emailId === email.emailId) {
+    current.isStar = nextValue
+  }
+}
+
 function starChange(email) {
-
   if (!email.isStar) {
+    if (!props.allowStar) return
 
-    if (!props.allowStar) return;
+    syncStarState(email, 1)
 
-    email.isStar = 1;
     props.starAdd(email.emailId).then(() => {
-      email.isStar = 1;
+      syncStarState(email, 1)
       props.starSuccess(email)
     }).catch(e => {
       console.error(e)
-      email.isStar = 0
+      syncStarState(email, 0)
     })
   } else {
+    syncStarState(email, 0)
 
-    email.isStar = 0;
     props.starCancel(email.emailId).then(() => {
-      email.isStar = 0;
+      syncStarState(email, 0)
       props.cancelSuccess?.(email)
     }).catch(e => {
       console.error(e)
-      email.isStar = 1;
+      syncStarState(email, 1)
     })
   }
 }
@@ -701,6 +1308,44 @@ function deleteEmail(emailIds) {
 
 function addItem(email) {
 
+  // The Inbox lists conversations, not messages: a new reply must re-order and
+  // refresh its conversation row instead of adding a second inbox item.
+  if (props.type === 'email' && email.threadId) {
+    const threadIndex = emailList.findIndex(item => item.threadId && item.threadId === email.threadId)
+
+    if (threadIndex > -1) {
+      const previous = emailList[threadIndex]
+
+      // Same representative message: nothing to update.
+      if (previous.emailId === email.emailId) {
+        return false
+      }
+
+      const merged = { ...previous, ...email }
+      // Preserve row-local UI state.
+      merged.checked = previous.checked
+      merged.expand = previous.expand
+
+      emailList.splice(threadIndex, 1)
+
+      if (noLoading.value) {
+        handleList([merged])
+      }
+
+      if (props.timeSort) {
+        emailList.push(merged)
+      } else {
+        emailList.unshift(merged)
+      }
+
+      if (email.emailId > (latestEmail.value?.emailId || 0)) {
+        latestEmail.value = email
+      }
+
+      return false
+    }
+  }
+
   const existIndex = emailList.findIndex(item => item.emailId === email.emailId)
 
   if (existIndex > -1) {
@@ -779,6 +1424,21 @@ function updateCheckStatus() {
 }
 
 function jumpDetails(email) {
+  // A horizontal drag ends with a click too; it must never open the message.
+  if (swipeBlockClick) {
+    swipeBlockClick = false
+    return
+  }
+
+  if (longPressTriggered) {
+    longPressTriggered = false
+    return
+  }
+
+  if (isPhone.value && mobileSelecting.value && props.type === 'email') {
+    email.checked = !email.checked
+    return
+  }
 
   if (dropdownShow.value) {
     dropdownRef.value.handleClose();
@@ -799,13 +1459,13 @@ function getEmailList(refresh = false) {
 
   if (reqLock) return;
 
-  let emailId = emailList.length > 0 ? emailList.at(-1).emailId : 0;
+  let emailId = nextPageCursor(emailList);
 
   reqLock = true
 
   if (!refresh) {
 
-    if (loading.value || noLoading.value) {
+    if (!canRequestPage({ loading: loading.value, noLoading: noLoading.value })) {
       reqLock = false
       return
     }
@@ -822,6 +1482,7 @@ function getEmailList(refresh = false) {
   } else {
     followLoading.value = !refresh;
   }
+  loadError.value = false;
   let start = Date.now();
 
   props.getEmailList(emailId, queryParam.size).then(async data => {
@@ -848,10 +1509,14 @@ function getEmailList(refresh = false) {
     emailList.push(...list);
     if (refresh) scrollbarRef.value?.setScrollTop(0);
 
-    noLoading.value = data.list.length < queryParam.size;
-    followLoading.value = data.list.length >= queryParam.size;
+    noLoading.value = isLastPage(data.list.length, queryParam.size);
+    followLoading.value = !noLoading.value;
 
     total.value = data.total;
+  }).catch(error => {
+    loadError.value = true;
+    noLoading.value = true;
+    console.error(error);
   }).finally(() => {
     loading.value = false
     reqLock = false
@@ -904,6 +1569,10 @@ function loadData() {
 .email-container {
   display: grid;
   grid-template-rows: auto 1fr;
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   padding: 0;
   font-size: 14px;
   color: var(--el-text-color-primary);
@@ -994,6 +1663,7 @@ function loadData() {
     }
   }
   &:hover { background: var(--nova-hover); }
+  &:active { background: var(--nova-selected); }
   .user-info {
     display: flex;
     flex-wrap: wrap;
@@ -1009,7 +1679,7 @@ function loadData() {
       overflow: hidden;
       white-space: nowrap;
       text-overflow: ellipsis;
-      transition: all 300ms;
+      transition: color var(--nova-motion-base) var(--nova-motion-ease), opacity var(--nova-motion-base) var(--nova-motion-ease);
       line-height: 12px;
       max-width: 300px;
       min-width: 0;
@@ -1102,6 +1772,9 @@ function loadData() {
         }
 
         > span:first-child {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
           overflow: hidden;
           white-space: nowrap;
           text-overflow: ellipsis;
@@ -1111,7 +1784,8 @@ function loadData() {
           width: 150px;
           height: 1rem;
           @media (max-width: 767px) {
-            width: 130px;
+            width: 120px;
+            height: .875rem;
           }
         }
       }
@@ -1134,6 +1808,7 @@ function loadData() {
         }
         @media (max-width: 767px) {
           width: 70%;
+          height: 14px;
         }
       }
 
@@ -1145,6 +1820,9 @@ function loadData() {
         }
         @media (max-width: 1366px) {
           width: 100%;
+        }
+        @media (max-width: 767px) {
+          height: 14px;
         }
       }
     }
@@ -1245,6 +1923,16 @@ function loadData() {
 .pc-star {
   display: flex;
   width: 40px;
+}
+
+.inbox-star-icon {
+  color: var(--regular-text-color);
+  opacity: .9;
+}
+
+.inbox-star-icon.is-active {
+  color: var(--el-color-primary);
+  opacity: 1;
 }
 
 @media (max-width: 1366px) {
@@ -1358,6 +2046,1005 @@ ul {
   list-style: none;
   padding: 0;
   margin: 0;
+}
+
+/* Compact desktop mail rows: keep the list dense and columns stable while
+   preserving the existing virtual-list item height (48px). */
+@media (min-width: 768px) {
+  :deep(.email-row:not(.all-email)) {
+    display: grid;
+    grid-template-columns: 24px 30px minmax(0, 1fr) 82px;
+    align-items: center;
+    gap: 8px;
+    height: 48px;
+    min-height: 48px;
+    padding: 4px 14px;
+  }
+
+  :deep(.email-row:not(.all-email) .checkbox) {
+    padding: 0;
+  }
+
+  :deep(.email-row:not(.all-email) .pc-star) {
+    width: 30px;
+    justify-content: center;
+  }
+
+  :deep(.email-row:not(.all-email) .title) {
+    display: grid;
+    grid-template-columns: minmax(130px, 30%) minmax(0, 1fr) !important;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  :deep(.email-row:not(.all-email) .email-sender) {
+    min-width: 0;
+  }
+
+  :deep(.email-row:not(.all-email) .email-text) {
+    min-width: 0;
+    width: 100%;
+    overflow: hidden;
+
+    display: grid;
+    grid-template-columns: minmax(0, 45%) minmax(0, 1fr);
+    align-items: center;
+  }
+
+  :deep(.email-row:not(.all-email) .email-subject) {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+
+    display: flex;
+    align-items: center;
+  }
+
+  :deep(.email-row:not(.all-email) .subject-text) {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  :deep(.email-row:not(.all-email) .email-content) {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    padding-left: 6px;
+  }
+
+  :deep(.email-row:not(.all-email) .email-right) {
+    display: block;
+    padding-left: 0;
+    text-align: right;
+  }
+
+  :deep(.email-row:not(.all-email) .email-time) {
+    padding-right: 0;
+  }
+
+  :deep(.email-row:not(.all-email) .user-info) {
+    display: none;
+  }
+}
+
+/* Mobile rows use one stable two-column layout. The checkbox owns the first
+   column; all message content stays together in the second column so the
+   avatar, sender, time, subject and preview cannot drift apart. */
+@media (max-width: 767px) {
+  :deep(.email-row:not(.all-email)) {
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr);
+    column-gap: 8px;
+    align-items: start;
+    height: 83px;
+    min-height: 83px;
+    padding: 8px 12px;
+    box-sizing: border-box;
+  }
+
+  :deep(.email-row:not(.all-email) > .checkbox) {
+    grid-column: 1;
+    grid-row: 1;
+    width: 18px;
+    height: 18px;
+    align-self: start;
+    justify-content: flex-start;
+    padding: 0;
+    margin-top: 2px;
+  }
+
+  /* The desktop star column is hidden on touch layouts; the inline star in
+     the sender header remains available when starring is enabled. */
+  :deep(.email-row:not(.all-email) > :nth-child(2)) {
+    display: none;
+  }
+
+  :deep(.email-row:not(.all-email) > .title) {
+    grid-column: 2;
+    grid-row: 1;
+    width: 100%;
+    min-width: 0;
+    display: block;
+    padding: 0;
+  }
+
+  :deep(.email-row:not(.all-email) .email-sender) {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    line-height: 28px;
+  }
+
+  :deep(.email-row:not(.all-email) .email-sender > div:first-child:empty) {
+    display: none;
+  }
+
+  :deep(.email-row:not(.all-email) .name) {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 6px;
+  }
+
+  :deep(.email-row:not(.all-email) .name > span:first-child) {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  :deep(.email-row:not(.all-email) .name .sender-avatar) {
+    width: 28px !important;
+    height: 28px !important;
+    flex: 0 0 28px !important;
+  }
+
+  :deep(.email-row:not(.all-email) .name > span:first-child > :last-child) {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  :deep(.email-row:not(.all-email) .phone-time) {
+    min-width: max-content;
+    padding: 0;
+    color: var(--secondary-text-color);
+    font-size: 12px;
+    line-height: 28px;
+    white-space: nowrap;
+  }
+
+  :deep(.email-row:not(.all-email) .email-text) {
+    display: block;
+    min-width: 0;
+    width: 100%;
+    margin-top: 2px;
+    overflow: hidden;
+  }
+
+  :deep(.email-row:not(.all-email) .email-subject),
+  :deep(.email-row:not(.all-email) .email-content) {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  :deep(.email-row:not(.all-email) .email-subject) {
+    line-height: 20px;
+  }
+
+  :deep(.email-row:not(.all-email) .email-content) {
+    margin-top: 1px;
+    padding-left: 0;
+    color: var(--regular-text-color);
+    font-size: 13px;
+    line-height: 20px;
+  }
+
+  :deep(.email-row:not(.all-email) > .email-right) {
+    display: none;
+  }
+}
+
+
+
+/* =========================================================
+   Mobile Inbox v2
+   Keep this block last so the proven desktop/stable styles
+   remain authoritative outside phone layouts.
+   ========================================================= */
+
+.mobile-inbox-tools,
+.mobile-unread-slot,
+.mobile-sender-avatar,
+.mobile-row-meta,
+.mobile-row-star,
+.mobile-filter-empty,
+/* Swipe actions are a phone-only affordance; the media query below lays them
+   out. Without this the desktop layout would show both action panels. */
+.swipe-actions {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .email-container {
+    grid-template-rows: auto minmax(0, 1fr);
+    background: var(--nova-surface);
+    color: var(--mobile-primary);
+  }
+
+  .email-container.mobile-selecting {
+    grid-template-rows: auto auto minmax(0, 1fr);
+  }
+
+  /* ---------- Inbox tools (search + filter rows) ---------- */
+
+  .mobile-inbox-tools {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    /* 4px of air below the filter divider so it no longer touches the first
+       mail row, without adding height to the Inbox header block. */
+    padding: 0 0 4px;
+    background: var(--nova-surface);
+  }
+
+  /* ---------- Search row ---------- */
+
+  .mobile-search-row {
+    /* Page gutter shared with the app bar and mail rows. */
+    padding: 2px 12px 8px;
+    box-sizing: border-box;
+
+    /* Search field on the left, sort + multi-select on the right; the field
+       keeps every pixel the two 32px tools do not need. */
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .mobile-search {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+    height: 44px;
+
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    padding: 0 12px;
+    box-sizing: border-box;
+
+    border: 1px solid var(--nova-search-border);
+    border-radius: 12px;
+
+    /* A step above the page surface in both themes: light keeps the iOS grey,
+       dark lifts off the near-black page instead of dissolving into it. */
+    background: var(--nova-search-bg);
+    color: var(--mobile-secondary);
+
+    transition: border-color var(--nova-motion-fast) var(--nova-motion-ease),
+                box-shadow var(--nova-motion-fast) var(--nova-motion-ease);
+  }
+
+  .mobile-search:focus-within {
+    border-color: color-mix(in srgb, var(--el-color-primary) 55%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--el-color-primary) 12%, transparent);
+  }
+
+  .mobile-search .app-icon {
+    flex: 0 0 auto;
+    width: 18px;
+    height: 18px;
+    opacity: .72;
+  }
+
+  .mobile-search input {
+    flex: 1 1 auto;
+    width: 0;
+    min-width: 0;
+    height: 100%;
+
+    border: 0;
+    outline: 0;
+    background: transparent;
+
+    color: var(--mobile-primary);
+    font-size: 15px;
+    text-overflow: ellipsis;
+  }
+
+  .mobile-search input::placeholder {
+    color: color-mix(in srgb, var(--mobile-secondary) 88%, transparent);
+    opacity: 1;
+  }
+
+  .mobile-search-clear {
+    flex: 0 0 auto;
+
+    width: 24px;
+    height: 24px;
+    padding: 0;
+
+    display: grid;
+    place-items: center;
+
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+
+    color: var(--mobile-secondary);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .mobile-search-clear:active {
+    background: var(--nova-hover);
+  }
+
+  /* ---------- Filters ---------- */
+
+  .mobile-filter-bar {
+    /* border-box: 40 = 2 (top) + 32 (tabs) + 5 (bottom) + 1 (divider). */
+    height: 40px;
+    min-width: 0;
+
+    /* Symmetric page gutter: the four chips fill the row edge to edge, so the
+       group is centred in the bar instead of leaning left. */
+    padding: 2px 12px 5px;
+
+    display: flex;
+    align-items: center;
+
+    border-bottom: 1px solid var(--nova-divider-soft, color-mix(in srgb, var(--nova-divider) 55%, transparent));
+  }
+
+  .mobile-filters {
+    flex: 1 1 auto;
+    min-width: 0;
+
+    /* One equal column per filter: `minmax(0, 1fr)` lets a long label shrink
+       instead of pushing its neighbours out of line, so the four cells stay
+       identical whether or not one of them is active. */
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    align-items: center;
+    gap: 0;
+  }
+
+  .mobile-filters button {
+    /* Every chip carries the same box whether or not it is active, so toggling
+       a filter cannot shift its neighbours. The content is centred inside the
+       cell, which keeps the labels optically on the row's centre line. */
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    height: 32px;
+    padding: 0 4px;
+    box-sizing: border-box;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+
+    border: 0;
+    border-radius: 999px;
+
+    color: var(--mobile-secondary);
+    background: transparent;
+
+    overflow: hidden;
+
+    font-size: clamp(10.5px, 3.15vw, 12.5px);
+    cursor: pointer;
+  }
+
+  .mobile-filters button.active {
+    color: var(--el-color-primary);
+    background: var(--nova-selected);
+
+    font-weight: 650;
+  }
+
+  .mobile-filter-label {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  /* Sort + multi-select behave as one right-aligned unit beside the search
+     field (see `.mobile-search-row`). */
+  .mobile-filter-actions {
+    flex: 0 0 auto;
+
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .mobile-tool-button {
+    flex: 0 0 32px;
+
+    width: 32px;
+    height: 32px;
+    padding: 0;
+
+    display: grid;
+    place-items: center;
+
+    border: 0;
+    background: transparent;
+
+    color: var(--mobile-primary);
+    cursor: pointer;
+  }
+
+  .mobile-tool-button .iconify {
+    width: 18px !important;
+    height: 18px !important;
+    opacity: .72 !important;
+  }
+
+  /* ---------- Hide desktop action toolbar ---------- */
+
+  .email-container > .header-actions {
+    display: none;
+  }
+
+  .email-container.mobile-selecting > .header-actions {
+    display: grid;
+
+    grid-template-columns: 32px 1fr auto;
+
+    min-height: 48px;
+    padding: 5px 16px;
+  }
+
+  .email-container.mobile-selecting > .header-actions .header-left {
+    gap: 12px;
+  }
+
+  .email-container.mobile-selecting
+    > .header-actions
+    .header-left
+    > :first-child,
+  .email-container.mobile-selecting
+    > .header-actions
+    .reload,
+  .email-container.mobile-selecting
+    > .header-actions
+    .header-right {
+    display: none;
+  }
+
+  /* ---------- Mail row ---------- */
+
+  :deep(.email-row.email) {
+    position: relative;
+
+    display: grid;
+    /* Unread gutter | avatar | message body | fixed metadata/action column.
+       Tracks are flush (no column gap): the avatar sits at the start of its
+       50px track, so its trailing 10px is the avatar -> text gap and the body
+       column gets every remaining pixel. Every track except the body is fixed,
+       so a read/unread flip or a long sender can never move anything.
+
+       The metadata track is `max-content` rather than a fixed 72px: it takes
+       exactly the width of that row's own timestamp, so Subject/Snippet run
+       right up to the first character of the time text and only then ellipsis.
+       The avatar and the body's left edge are untouched — the extra width is
+       taken from the metadata column alone, never from the left. */
+    grid-template-columns: 16px 50px minmax(0, 1fr) max-content;
+
+    column-gap: 0;
+
+    width: 100%;
+    height: 80px;
+    min-height: 80px;
+
+    padding: 10px 8px 10px 8px;
+
+    box-sizing: border-box;
+
+    align-items: start;
+
+    border: 0;
+    background: var(--nova-surface);
+  }
+
+  :deep(.email-row.email)::after {
+    content: '';
+
+    position: absolute;
+    /* Spans the whole row: the avatar, the body and the time/star column all
+       sit on the same divider, so the list reads as one continuous table. */
+    left: 0;
+    right: 0;
+    bottom: 0;
+
+    height: 1px;
+
+    background: var(--nova-divider-soft, color-mix(in srgb, var(--nova-divider) 55%, transparent));
+  }
+
+  :deep(.email-row.email:active) {
+    background: var(--nova-selected);
+  }
+
+  /* desktop checkbox + star are hidden normally */
+  :deep(.email-row.email > .checkbox),
+  :deep(.email-row.email > .pc-star),
+  :deep(.email-row.email > .email-right) {
+    display: none;
+  }
+
+  /* ---------- Selection mode ---------- */
+
+  .email-container.mobile-selecting
+    :deep(.email-row.email) {
+    /* The checkbox replaces the unread gutter in the first track. */
+    grid-template-columns: 20px 50px minmax(0, 1fr) max-content;
+  }
+
+  .email-container.mobile-selecting
+    :deep(.email-row.email > .checkbox) {
+    grid-column: 1;
+
+    display: flex;
+
+    width: 20px;
+    padding: 6px 0 0;
+    margin: 0;
+  }
+
+  .email-container.mobile-selecting
+    .mobile-unread-slot {
+    display: none;
+  }
+
+  /* ---------- Unread gutter ---------- */
+
+  /* A permanent 16px track left of the avatar. Read rows keep the empty slot so
+     toggling read/unread never changes the row's horizontal geometry. */
+  .mobile-unread-slot {
+    grid-column: 1;
+
+    /* Match the avatar's box so the dot lines up with the avatar's centre even
+       though the row aligns its items to the top. */
+    align-self: start;
+
+    width: 100%;
+    height: 40px;
+
+    display: grid;
+    place-items: center;
+  }
+
+  .mobile-unread-dot {
+    width: 8px;
+    height: 8px;
+
+    border-radius: 999px;
+
+    /* Centred in the gutter so it reads as "beside the avatar" without being
+       pushed against the avatar's edge now that the tracks are flush. */
+    justify-self: center;
+
+    background: var(--el-color-primary);
+  }
+
+  /* ---------- Sender avatar ---------- */
+
+  .mobile-sender-avatar {
+    grid-column: 2;
+
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    min-height: 40px;
+
+    /* Anchored to the start of its 50px track: the 10px left over is the gap
+       between the avatar and the message body. */
+    justify-self: start;
+
+    display: grid;
+    place-items: center;
+
+    padding: 0;
+    margin: 0;
+
+    border-radius: 50%;
+    overflow: hidden;
+
+    color: var(--el-color-primary);
+    background: var(--nova-selected);
+
+    font-size: 17px;
+    font-weight: 650;
+    line-height: 1;
+    text-align: center;
+  }
+
+  /* stable SenderAvatar inside the sender line stays available
+     for desktop, but the dedicated 40px avatar owns phone rows */
+  :deep(.email-row.email .name .sender-avatar) {
+    display: none;
+  }
+
+  /* ---------- Message body ---------- */
+
+  :deep(.email-row.email > .title) {
+    grid-column: 3;
+
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+
+    display: block;
+
+    padding: 0;
+
+    /* Not `hidden`: the preview line below is allowed to reach into the gutter
+       the timestamp leaves (see `.email-content`). Every line inside already
+       clips itself with its own ellipsis, so nothing else can escape. */
+    overflow: visible;
+  }
+
+  :deep(.email-row.email .title .email-sender) {
+    width: 100%;
+    min-width: 0;
+
+    display: flex;
+    align-items: baseline;
+
+    gap: 4px;
+
+    /* Sender is the strongest line: largest type, heaviest weight, primary ink. */
+    line-height: 20px;
+    margin-bottom: 1px;
+
+    /* Overflow lives in the row's own meta column now. */
+    padding-right: 0;
+
+    color: var(--mobile-primary);
+
+    font-size: 17px;
+    font-weight: 600;
+  }
+
+  :deep(.email-row.email.is-unread .title .email-sender) {
+    font-weight: 700;
+  }
+
+  /* hide old status placeholder / old unread dot */
+  :deep(.email-row.email .email-sender > div),
+  :deep(.email-row.email .unread) {
+    display: none;
+  }
+
+  :deep(.email-row.email .title .email-sender .name) {
+    flex: 1;
+    min-width: 0;
+
+    display: block;
+
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  :deep(.email-row.email .name > span:last-child) {
+    display: none;
+  }
+
+  /* The timestamp moved to the row's metadata column; the inline copy would
+     duplicate it. */
+  :deep(.email-row.email .phone-time) {
+    display: none;
+  }
+
+  :deep(.email-row.email .email-text) {
+    display: block;
+
+    width: 100%;
+    min-width: 0;
+
+    padding-right: 0;
+    margin-top: 1px;
+
+    line-height: 18px;
+
+    /* See `.title`: the snippet needs to escape this box, the subject does not
+       (it owns its own ellipsis). */
+    overflow: visible;
+  }
+
+  :deep(.email-row.email .email-subject) {
+    display: block;
+
+    width: 100%;
+    min-width: 0;
+
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+
+    /* Second step: still primary ink, one size down from the sender. */
+    color: var(--mobile-primary);
+
+    font-size: 15px;
+    line-height: 19px;
+    font-weight: 400;
+  }
+
+  :deep(.email-row.email.is-unread .email-subject) {
+    font-weight: 600;
+  }
+
+  :deep(.email-row.email .email-text .email-content) {
+    display: block;
+
+    /* The row's grid gives the body column everything up to the metadata
+       column, but that column carries `padding-left: 8px` so its timestamp does
+       not sit flush against the Subject. That 8px is dead space on the preview
+       line: the timestamp occupies the row's FIRST line and the star hangs off
+       the right edge well below it, so the third line has room the subject line
+       does not.
+
+       Borrowing exactly that padding puts the snippet's ellipsis on the first
+       character of the timestamp in the common case, and in the narrowest case
+       (`HH:mm` is ~35px, i.e. narrower than the 36px star) it stops on the
+       star's own left edge. Going further would run under the star, whose tap
+       target is transparent, so the text would show through beside the glyph. */
+    width: calc(100% + 8px);
+    max-width: none;
+
+    min-width: 0;
+
+    padding: 0;
+
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+
+    /* Third step: the preview drops to the weakest text tier so the eye lands
+       on Sender -> Subject first. The extra .email-text step wins the cascade
+       against the older `.email-row:not(.all-email) .email-content` rule. */
+    color: var(--mobile-tertiary);
+
+    font-size: 14px;
+    line-height: 18px;
+    font-weight: 400;
+  }
+
+  /* ---------- Unread blue dot ----------
+     The dot itself lives in the reserved `.mobile-unread-slot` track (see
+     above); no absolutely-positioned pseudo-element pins it to the edge. */
+
+  /* ---------- Metadata column (time above star) ---------- */
+
+  .mobile-row-meta {
+    grid-column: 4;
+
+    align-self: start;
+
+    /* Sized by its own content (see the row's grid-template-columns) so the
+       body can run right up to the timestamp. 8px of left padding is the only
+       gap between the ellipsised Subject/Snippet and the time's first digit.
+       The cap is a safety valve for an unexpected relative-time fallback: a
+       runaway label ellipsises instead of eating the message body. */
+    width: auto;
+    min-width: 0;
+    max-width: 96px;
+
+    display: flex;
+    flex-direction: column;
+    /* Time and star both hang off the right edge so the column reads as one
+       right-aligned metadata block. */
+    align-items: flex-end;
+    justify-content: flex-start;
+
+    gap: 2px;
+
+    padding-top: 1px;
+    padding-left: 8px;
+  }
+
+  .mobile-meta-time {
+    display: block;
+
+    max-width: 100%;
+
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    text-align: right;
+
+    /* Tabular digits keep the label from twitching as the value changes. */
+    font-variant-numeric: tabular-nums;
+
+    /* Metadata, not message: dimmer than the sender, brighter than before so a
+       date is still legible at this size. */
+    color: color-mix(in srgb, var(--mobile-secondary) 82%, transparent);
+
+    font-size: 14px;
+    line-height: 1.2;
+    font-weight: 400;
+  }
+
+  /* ---------- Mobile star ---------- */
+
+  .mobile-row-star {
+    /* A 36px tap target around an 18px glyph: still easy to hit, but light
+       enough that the star stays an auxiliary action next to the timestamp. */
+    width: 36px;
+    height: 36px;
+    flex: 0 0 auto;
+
+    display: grid;
+    place-items: center;
+
+    padding: 0;
+    margin: 0;
+
+    border: 0;
+    background: transparent;
+
+    cursor: pointer;
+  }
+
+  .mobile-row-star .iconify {
+    width: 18px !important;
+    height: 18px !important;
+  }
+
+  /* Starred rows use the theme accent on the phone list (the desktop list keeps
+     the global treatment). `!important` outranks the global dark icon veil. */
+  .mobile-row-star .inbox-star-icon.is-active {
+    color: var(--el-color-primary) !important;
+    opacity: 1 !important;
+  }
+
+  /* ---------- Filtered empty ---------- */
+
+  .scroll {
+    position: relative;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .mobile-filter-empty {
+    position: absolute;
+
+    z-index: 2;
+
+    left: 0;
+    right: 0;
+    top: 48%;
+
+    display: block;
+
+    text-align: center;
+
+    color: var(--mobile-tertiary);
+
+    font-size: 14px;
+
+    pointer-events: none;
+  }
+
+  /* End-of-list label: give it real air below the last message instead of
+     sitting flush against the final row. */
+  .noLoading {
+    padding: 20px 0 14px;
+    font-size: 13px;
+  }
+
+  /* ---------- Swipe actions ----------
+   *
+   * `.swipe-shell` is the virtual-list item. It clips the horizontal travel and
+   * owns the axis contract: `touch-action: pan-y` keeps vertical scrolling
+   * native while horizontal movement reaches the pointermove handler instead of
+   * being consumed by the browser's own panning.
+   *
+   * The action panels sit *under* the card. The card keeps its own background
+   * (`--nova-surface`, opaque) and is later in the DOM, so it hides the panels
+   * at rest and uncovers them as it moves. Reusing the existing row element is
+   * what leaves its radius, padding, divider and dark-mode colours untouched.
+   */
+  :deep(.swipe-shell) {
+    position: relative;
+
+    display: block;
+
+    overflow: hidden;
+
+    touch-action: pan-y;
+  }
+
+  :deep(.swipe-actions) {
+    position: absolute;
+    inset: 0;
+
+    display: flex;
+    align-items: stretch;
+    justify-content: space-between;
+
+    /* Below the card, and never a click target: the gesture owns this area. */
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  :deep(.swipe-action) {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+
+    width: 96px;
+
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  /* Archive (revealed by dragging right) and Delete (dragging left) are told
+     apart by a tint of the shared accent colours over the muted surface. A
+     saturated fill would fight the monochrome archive/trash SVGs, which are
+     dark glyphs that the theme inverts. */
+  :deep(.swipe-action-archive) {
+    color: var(--el-color-primary);
+    background: color-mix(in srgb, var(--el-color-primary) 12%, var(--nova-surface-muted));
+  }
+
+  :deep(.swipe-action-delete) {
+    color: var(--el-color-danger);
+    background: color-mix(in srgb, var(--el-color-danger) 14%, var(--nova-surface-muted));
+  }
+
+  /* The card paints over the panels. */
+  :deep(.swipe-shell > .email-row.email) {
+    position: relative;
+    z-index: 1;
+  }
+
+  :deep(.swipe-shell.is-swiping > .email-row.email) {
+    will-change: transform;
+  }
+
+  /* The tap highlight belongs to a tap, not to a drag. */
+  :deep(.swipe-shell.is-swiping > .email-row.email:active) {
+    background: var(--nova-surface);
+  }
+
+  /* Emphasise whichever action the current drag would commit to. */
+  :deep(.swipe-shell[data-swipe-action='archive'] .swipe-action-archive),
+  :deep(.swipe-shell[data-swipe-action='delete'] .swipe-action-delete) {
+    filter: brightness(1.05);
+  }
 }
 
 </style>

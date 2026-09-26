@@ -11,6 +11,9 @@ dist-ssr
 *.local
 dist
 
+# pnpm content-addressable store, when it is kept inside the checkout
+.pnpm-store/
+
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -26,3 +29,15 @@ mail-vue/dist
 .wrangler
 .venv
 git-tools.js
+
+# Local Cloudflare Worker secrets
+mail-worker/.dev.vars
+*.backup
+*.bak-*
+
+# Local-only scratch: headless-Chrome harnesses, screenshots, profiles
+.nova-test/
+.nova-verify/
+
+# Generated SQL from `npm run threads:rebuild`
+.thread-rebuild/

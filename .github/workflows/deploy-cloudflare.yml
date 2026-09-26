@@ -1,4 +1,4 @@
-name: 🚀 Deploy cloud-mail to Cloudflare Workers
+name: 🚀 Deploy Nova Mail to Cloudflare Workers
 
 on:
   push:
@@ -6,19 +6,60 @@ on:
     paths:
       - "mail-worker/**"
       - "mail-vue/**"
+      # The workspace root now owns the single lockfile, the shared scripts and
+      # this workflow itself. A dependency bump or a CI edit must redeploy, and
+      # must be exercised by CI — a workflow-only change used to match none of
+      # the patterns above, so it never ran and never failed either.
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - ".github/workflows/**"
   workflow_dispatch:
 
 jobs:
-  Deploy-cloud-mail:
+  # Gate for the release. `pnpm test` runs both workspace suites — the frontend
+  # (vitest + jsdom) and the Worker's unit + integration tests — and the deploy
+  # job `needs` this one, so a failing test blocks the deployment instead of
+  # shipping a regression.
+  Test:
+    name: 🧪 Test frontend and Worker
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🚚 检出代码仓库 / Checkout repository
+        uses: actions/checkout@v4
+
+      - name: ⚙ 设置 pnpm / Set up pnpm
+        uses: pnpm/action-setup@v4.1.0
+        # No `version:` here on purpose. The action reads `packageManager` from
+        # the root package.json, and declaring both makes it fail with
+        # "Multiple versions of pnpm specified".
+
+      - name: ⚙ 设置 Node.js / Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "pnpm"
+          cache-dependency-path: "./pnpm-lock.yaml"
+
+      - name: 📦 安装依赖 / Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: 🧪 运行测试 / Run test suite
+        run: pnpm test
+
+  Deploy-nova-mail:
     name: 🏗️ Build and Deploy
+    needs: Test
     runs-on: ubuntu-latest
 
     env:
-      NAME: ${{ secrets.NAME || vars.NAME || 'cloud-mail' }}
+      NAME: ${{ secrets.NAME || vars.NAME || 'nova-mail' }}
       CUSTOM_DOMAIN: ${{ secrets.CUSTOM_DOMAIN || vars.CUSTOM_DOMAIN }}
       DOMAIN: ${{ secrets.DOMAIN || vars.DOMAIN }}
       ADMIN: ${{ secrets.ADMIN || vars.ADMIN }}
       JWT_SECRET: ${{ secrets.JWT_SECRET || vars.JWT_SECRET }}
+      BOOTSTRAP_TOKEN: ${{ secrets.BOOTSTRAP_TOKEN }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN || vars.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || vars.CLOUDFLARE_ACCOUNT_ID }}
       D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID || vars.D1_DATABASE_ID }}
@@ -28,6 +69,9 @@ jobs:
       AI_MODEL: ${{ secrets.AI_MODEL || vars.AI_MODEL || '@cf/meta/llama-3.1-8b-instruct-fast' }}
       CLOUDFLARE_EMAIL: ${{ secrets.CF_EMAIL || vars.CF_EMAIL || false }}
       ANALYSIS_CACHE: ${{ secrets.ANALYSIS_CACHE || vars.ANALYSIS_CACHE || false }}
+      VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY || vars.VAPID_PUBLIC_KEY }}
+      VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY || vars.VAPID_PRIVATE_KEY }}
+      VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT || vars.VAPID_SUBJECT }}
 
 
     outputs:
@@ -40,19 +84,18 @@ jobs:
 
       - name: ⚙ 设置 pnpm / Set up pnpm
         uses: pnpm/action-setup@v4.1.0
-        with:
-          version: 11
+        # Version comes from `packageManager` in the root package.json; see the
+        # Test job above.
 
       - name: ⚙ 设置 Node.js / Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "24"
           cache: "pnpm"
-          cache-dependency-path: "./mail-worker/pnpm-lock.yaml"
+          cache-dependency-path: "./pnpm-lock.yaml"
 
       - name: 📦 安装依赖 / Install dependencies
         run: pnpm install --frozen-lockfile
-        working-directory: ./mail-worker
 
       - name: 📡 禁用 Wrangler 遥测 / Disable wrangler telemetry
         working-directory: ./mail-worker
@@ -61,52 +104,71 @@ jobs:
       - name: 🛠️ 设置环境 / Set up environment
         working-directory: ./mail-worker
         run: |
-          
+
           echo "🔐 Starting environment setup..."
-          
-          if [ -z "$JWT_SECRET" ] || grep -q '[?%#/\\]' <<< "$JWT_SECRET"; then
-            echo "❌ JWT_SECRET variable is empty or contains invalid characters (?, %, #, /, \\)."
+
+          # These values are substituted into wrangler-action.toml with `sed`
+          # below. A wrapped paste (a value holding a newline) turns those
+          # substitutions into `sed: unterminated 's' command`, which names
+          # neither the variable nor the real problem, so reject the shape up
+          # front. `[![:print:]]` catches newlines, carriage returns, tabs and
+          # other control characters; plain spaces are fine.
+          for entry in NAME CUSTOM_DOMAIN DOMAIN ADMIN JWT_SECRET R2_BUCKET_NAME PROJECT_LINK ANALYSIS_CACHE AI_MODEL; do
+            entry_value="${!entry}"
+            case "$entry_value" in
+              *[![:print:]]*)
+                echo "❌ $entry must be a single line (a wrapped paste breaks the deploy)."
+                exit 1
+                ;;
+            esac
+          done
+
+          # `|` delimits the sed substitutions and `&` re-inserts the matched
+          # text, so either one would corrupt the generated config instead of
+          # failing loudly.
+          if [ -z "$JWT_SECRET" ] || grep -q '[?%#/\\|&]' <<< "$JWT_SECRET"; then
+            echo "❌ JWT_SECRET variable is empty or contains invalid characters (?, %, #, /, \\, |, &)."
             exit 1
           fi
-          
+
           if ! jq -e 'type == "array"' <<< "$DOMAIN" ; then
             echo "❌ DOMAIN variable must be a JSON array (e.g., [\"example.com\"])."
             exit 1
           fi
-          
+
           if [ -z "$ADMIN" ]; then
             echo "❌ ADMIN variable cannot be empty."
             exit 1
           fi
-          
+
           if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
             echo "❌ CLOUDFLARE_ACCOUNT_ID variable cannot be empty."
             exit 1
           fi
-          
+
           if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
             echo "❌ CLOUDFLARE_API_TOKEN variable cannot be empty."
             exit 1
           fi
-          
+
           if [ -z "$CUSTOM_DOMAIN" ]; then
             echo "::warning:: CUSTOM_DOMAIN variable is not set."
           fi
-          
+
           CONFIG_FILE="wrangler-action.toml"
-          
+
           if [ -z "$R2_BUCKET_NAME" ]; then
             sed -i '/\[\[r2_buckets\]\]/,/^$/d' "$CONFIG_FILE"
           fi
-          
+
           if [ -z "$PROJECT_LINK" ]; then
             sed -i '/^project_link = /d' "$CONFIG_FILE"
           fi
-          
+
           if [ -z "$CUSTOM_DOMAIN" ]; then
             sed -i '/\[\[routes\]\]/,/^$/d' "$CONFIG_FILE"
           fi
-          
+
           if [ "$(printf '%s' "$CLOUDFLARE_EMAIL" | tr '[:upper:]' '[:lower:]')" = "true" ]; then
             cat >> "$CONFIG_FILE" <<'EOF'
 
@@ -127,33 +189,33 @@ jobs:
           sed -i "s|\${LINUXDO_CLIENT_ID}|${LINUXDO_CLIENT_ID}|g" "$CONFIG_FILE"
           sed -i "s|\${LINUXDO_CLIENT_SECRET}|${LINUXDO_CLIENT_SECRET}|g" "$CONFIG_FILE"
           sed -i "s|\${LINUXDO_CALLBACK_URL}|${LINUXDO_CALLBACK_URL}|g" "$CONFIG_FILE"
-          
+
           echo "✅ Environment setup completed."
 
       - name: ⚡ 设置KV数据库 / Set up KV database
         working-directory: ./mail-worker
         run: |
-          
+
           CONFIG_FILE="wrangler-action.toml"
-          
+
           if [ -n "$KV_NAMESPACE_ID" ]; then
             sed -i "s|\${KV_NAMESPACE_ID}|${KV_NAMESPACE_ID}|g" "$CONFIG_FILE"
             echo "✅ Using the database from environment variables."
             exit 0
           fi
-          
+
           echo "🔍 Checking if the database exists..."
-          
+
           set +e
             KV_LIST=$(pnpm wrangler kv namespace list 2>&1)
             STATUS=$?
           set -e
-          
+
           if [ $STATUS -ne 0 ]; then
             echo "$KV_LIST"
             exit 1
           fi
-                  
+
           if echo "$KV_LIST" | jq -e ".[] | select(.title == \"$NAME\")" >/dev/null; then
             echo "✅ Database $NAME already exists."
             KV_ID=$(echo "$KV_LIST" | jq -r ".[] | select(.title == \"$NAME\") | .id")
@@ -164,34 +226,34 @@ jobs:
             KV_LIST=$(pnpm wrangler kv namespace list)
             KV_ID=$(echo "$KV_LIST" | jq -r ".[] | select(.title == \"$NAME\") | .id")
           fi
-          
+
           sed -i "s|\${KV_NAMESPACE_ID}|$KV_ID|g" "$CONFIG_FILE"
           echo "✅ Setup completed."
 
       - name: 🐬 设置D1数据库 / Set up D1 database
         working-directory: ./mail-worker
         run: |
-          
+
           CONFIG_FILE="wrangler-action.toml"
-          
+
           if [ -n "$D1_DATABASE_ID" ]; then
             sed -i "s|\${D1_DATABASE_ID}|${D1_DATABASE_ID}|g" "$CONFIG_FILE"
             echo "✅ Using the database from environment variables."
             exit 0
           fi
-          
+
           echo "🔍 Checking if the database exists..."
-          
+
           set +e
             DB_LIST=$(pnpm wrangler d1 list --json 2>&1)
             STATUS=$?
           set -e
-          
+
           if [ $STATUS -ne 0 ]; then
             echo "$DB_LIST"
             exit 1
           fi
-          
+
           if echo "$DB_LIST" | jq -e ".[] | select(.name == \"$NAME\")" >/dev/null; then
             echo "✅ Database $NAME already exists."
             D1_ID=$(echo "$DB_LIST" | jq -r ".[] | select(.name == \"$NAME\") | .uuid")
@@ -202,57 +264,189 @@ jobs:
             DB_LIST=$(pnpm wrangler d1 list --json)
             D1_ID=$(echo "$DB_LIST" | jq -r ".[] | select(.name == \"$NAME\") | .uuid")
           fi
-          
+
           sed -i "s|\${D1_DATABASE_ID}|$D1_ID|g" "$CONFIG_FILE"
           echo "✅ Setup completed."
+
+      # The Worker serves the SPA from `./dist` ([assets] in wrangler-*.toml) and
+      # `dist` is gitignored, so the frontend MUST be built before deploying —
+      # otherwise the Worker keeps serving a stale build (e.g. an old reader
+      # bundle), which is exactly how "my fix doesn't show up" happens.
+      - name: 🎨 构建前端 / Build frontend
+        working-directory: ./mail-vue
+        run: |
+          echo "🎨 Building Nova Mail frontend..."
+          # Dependencies were installed once at the workspace root; the build
+          # writes into ../mail-worker/dist (see mail-vue/.env.release).
+          pnpm run build
+          echo "✅ Frontend built into mail-worker/dist"
+
+      # The old /api/init/<jwt_secret> route was removed. Existing databases
+      # cannot use one-time bootstrap for upgrades, so apply the one new column
+      # required by the security branch before the new Worker is deployed.
+      - name: 🔎 检查现有数据库 / Check existing schema
+        working-directory: ./mail-worker
+        run: |
+          DB_ID=$(sed -n 's/^database_id = "\([^"]*\)"/\1/p' wrangler-action.toml)
+          SCHEMA=$(pnpm wrangler d1 execute "$DB_ID" --remote --yes --json \
+            --command "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'email'; SELECT name FROM pragma_table_info('email');")
+          if ! printf '%s' "$SCHEMA" | grep -q '"email"'; then
+            echo "New database; one-time bootstrap will create the schema."
+            exit 0
+          fi
+          for column in body_type thread_id archived bimi_selector; do
+            if ! printf '%s' "$SCHEMA" | grep -q "\"$column\""; then
+              echo "::error::Missing $column; apply the existing-installation migrations before deploying."
+              exit 1
+            fi
+          done
+          if ! printf '%s' "$SCHEMA" | grep -q '"auth_results"'; then
+            pnpm wrangler d1 execute "$DB_ID" --remote --yes \
+              --command "ALTER TABLE email ADD COLUMN auth_results TEXT NOT NULL DEFAULT '';"
+          fi
 
       - name: 🚀 开始部署 / Start deployment
         id: deploy
         working-directory: ./mail-worker
         run: |
           echo "🚀 Starting deployment..."
+          # The deploy summary prints every `[vars]` entry. `domain` and
+          # `jwt_secret` are both credentials in this repository's configuration,
+          # and the logs of a public repository are public, so mask them.
           pnpm wrangler deploy -c wrangler-action.toml 2>&1 \
             | tee deploy.log \
             | grep -v "https://.*\.workers\.dev" \
-            | sed -E 's/env\.domain .*/env.domain (***)/' \
+            | sed -E -e 's/env\.domain .*/env.domain (***)/' -e 's/env\.jwt_secret .*/env.jwt_secret (***)/' \
             || true
-          
+
           DEPLOY_EXIT_CODE=${PIPESTATUS[0]}
           if [ $DEPLOY_EXIT_CODE -ne 0 ]; then
             exit 1
           fi
-          
+
           WORKER_URL=$(grep -o "https://.*\.workers\.dev" deploy.log || echo "")
-          
+
           if [ -n "$WORKER_URL" ]; then
             echo "::add-mask::$WORKER_URL"
           fi
-          
+
           echo "worker_url=$WORKER_URL" >> $GITHUB_OUTPUT
           echo "✅ Setup completed."
 
+      # Web Push only works when the Worker holds a VAPID key pair; without it
+      # `GET /api/push/config` reports `enabled: false` and the settings page
+      # disables the 邮件通知 switch ("服务端未配置"). They are uploaded as Worker
+      # secrets rather than `[vars]`, so they never reach the deploy summary.
+      # Rotating the pair invalidates every existing subscription.
+      # This step must never fail the run. The Worker is already deployed at this
+      # point, and Cloudflare can refuse a secret edit outright
+      # ("the latest version of your Worker isn't currently deployed") whenever the
+      # account holds an undeployed version. A red X here used to skip the database
+      # initialization below, which is far worse than a stale key pair.
+      - name: 🔔 配置推送密钥 / Configure Web Push keys
+        working-directory: ./mail-worker
+        run: |
+          if [ -z "$VAPID_PUBLIC_KEY" ] || [ -z "$VAPID_PRIVATE_KEY" ]; then
+            echo "::warning::VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY are not set; Web Push stays unavailable."
+            exit 0
+          fi
+
+          upload() {
+            local name="$1" value="$2"
+            if printf '%s' "$value" | pnpm wrangler secret put "$name" -c wrangler-action.toml; then
+              echo "✅ uploaded $name"
+            else
+              # Known causes: a name already used by a plain Worker variable, or an
+              # undeployed version on the account. Either way the value that is
+              # already on the Worker is kept, so this is a warning, not a failure.
+              echo "::warning::could not upload $name — keeping whatever the Worker already has (see the error above)."
+            fi
+          }
+
+          upload vapid_public_key "$VAPID_PUBLIC_KEY"
+          upload vapid_private_key "$VAPID_PRIVATE_KEY"
+          upload vapid_subject "${VAPID_SUBJECT:-mailto:admin@example.com}"
+
+          echo "--- Worker secret names ---"
+          pnpm wrangler secret list -c wrangler-action.toml || true
+
+          if pnpm wrangler secret list -c wrangler-action.toml 2>/dev/null | grep -q vapid_public_key; then
+            echo "✅ VAPID keys are on the Worker."
+          else
+            echo "::warning::vapid_public_key is not on the Worker; Web Push will report itself unavailable."
+          fi
+
       - name: ♻️ 初始化数据库 / Initialize database
         run: |
-          echo "🛠️ Starting database initialization..."
+          echo "🛠️ Checking database bootstrap status..."
           sleep 15
-          
+
           WORKER_URL="${CUSTOM_DOMAIN:+https://$CUSTOM_DOMAIN}"
           WORKER_URL="${WORKER_URL:-${{ steps.deploy.outputs.worker_url }}}"
-          
+
           if [ -z "$WORKER_URL" ]; then
             echo "❌ Preview URL not available. Please set CUSTOM_DOMAIN."
             exit 1
           fi
-          
-          HTTP_CODE=$(curl -sL -w "%{http_code}" -o response.txt "$WORKER_URL/api/init/${JWT_SECRET}")
+
+          if [ -z "$BOOTSTRAP_TOKEN" ]; then
+            echo "::warning::BOOTSTRAP_TOKEN is unset; first-time database initialization must be completed separately."
+            exit 0
+          fi
+
+          HTTP_CODE=$(curl --silent --show-error --max-redirs 0 -X POST \
+            -H "X-Bootstrap-Token: $BOOTSTRAP_TOKEN" \
+            -w "%{http_code}" -o response.txt "$WORKER_URL/api/bootstrap")
           RESPONSE_BODY=$(cat response.txt)
 
-          if [ "$RESPONSE_BODY" = "success" ]; then
-            echo "✅ Setup completed."
+          if [ "$HTTP_CODE" = "200" ] && [ "$RESPONSE_BODY" = "success" ]; then
+            echo "✅ New database initialized."
+          elif [ "$HTTP_CODE" = "409" ]; then
+            echo "✅ Database was already initialized; bootstrap was not repeated."
           else
-            echo "❌ Failed. HTTP: $HTTP_CODE, Response: $RESPONSE_BODY"
+            echo "❌ Bootstrap failed. HTTP: $HTTP_CODE"
             exit 1
           fi
+
+      # Bootstrap runs only on new installations. Existing databases need
+      # migrations applied out of band before deploying code that requires them.
+      # Read the schema back so a missing migration cannot look like success.
+      - name: 🔎 验证数据库 / Verify database schema
+        working-directory: ./mail-worker
+        run: |
+          echo "🔎 Checking email.body_type..."
+
+          # `--json` sends errors to stdout as well, so a plain
+          # `SCHEMA=$(...)` under `bash -e` would exit on failure and swallow the
+          # reason — capture both streams and report them instead.
+          set +e
+          SCHEMA=$(pnpm wrangler d1 execute "$D1_DATABASE_ID" --remote --yes --json \
+            --command "SELECT name FROM pragma_table_info('email');" 2>&1)
+          STATUS=$?
+          set -e
+
+          echo "exit status: $STATUS"
+          echo "$SCHEMA"
+
+          if [ "$STATUS" -ne 0 ]; then
+            # Reading a remote D1 database goes through the account-level D1 API,
+            # which a token scoped to Workers + KV alone cannot use (Cloudflare
+            # filters the database list, so wrangler reports "Couldn't find DB").
+            # The deploy and the initialization call both succeeded at this
+            # point, so warn instead of failing the whole run.
+            echo "::warning::Could not read the schema; give CLOUDFLARE_API_TOKEN the D1 → Edit permission to verify it automatically."
+            exit 0
+          fi
+
+          if ! printf '%s' "$SCHEMA" | grep -q 'body_type'; then
+            echo "❌ email.body_type is missing: the v3.8 migration did not apply."
+            exit 1
+          fi
+
+          pnpm wrangler d1 execute "$D1_DATABASE_ID" --remote --yes --json \
+            --command "SELECT body_type, COUNT(*) AS total FROM email GROUP BY body_type;"
+
+          echo "✅ email.body_type is present."
 
       - name: 🗑️ 删除运行记录 / Delete workflow runs
         uses: GitRML/delete-workflow-runs@main

@@ -1,21 +1,23 @@
 <template>
   <div class="mail-list-page">
-    <label class="mobile-mail-search">
-      <img src="@/icons/svg/search.svg" alt="" />
-      <input type="search" :placeholder="$t('searchMail')" />
-    </label>
   <emailScroll ref="scroll"
                :cancel-success="cancelStar"
                :star-success="addStar"
                :getEmailList="getEmailList"
                :emailDelete="emailDelete"
+               :email-archive="emailArchive"
+               :email-unarchive="emailUnarchive"
+               :email-restore="emailRestore"
                :star-add="starAdd"
                :star-cancel="starCancel"
                :time-sort="params.timeSort"
                :email-read="emailRead"
                :show-unread="true"
+               :show-account-icon="false"
+               :searching="Boolean(keyword)"
                actionLeft="4px"
                @jump="jumpContent"
+              @mobile-sort="changeTimeSort"
   >
     <template #first>
       <Icon class="icon" @click="changeTimeSort" icon="material-symbols-light:timer-arrow-down-outline"
@@ -33,13 +35,15 @@ import {useAccountStore} from "@/store/account.js";
 import {useEmailStore} from "@/store/email.js";
 import {useSettingStore} from "@/store/setting.js";
 import emailScroll from "@/components/email-scroll/index.vue"
-import {emailList, emailDelete, emailLatest, emailRead} from "@/request/email.js";
+import {emailList, emailDelete, emailLatest, emailRead, emailArchive, emailUnarchive, emailRestore} from "@/request/email.js";
 import {starAdd, starCancel} from "@/request/star.js";
-import {defineOptions, h, onMounted, reactive, ref, watch} from "vue";
+import {defineOptions, onMounted, reactive, ref, watch} from "vue";
 import {sleep} from "@/utils/time-utils.js";
 import router from "@/router/index.js";
 import {Icon} from "@iconify/vue";
 import { useRoute } from 'vue-router'
+import {useMailSearch} from "@/composables/use-mail-search.js";
+import {alertNewMail} from "@/utils/new-mail-alert.js";
 
 defineOptions({
   name: 'email'
@@ -50,13 +54,19 @@ const emailStore = useEmailStore();
 const accountStore = useAccountStore();
 const settingStore = useSettingStore();
 const scroll = ref({})
+const {keyword, clear, handleKeydown} = useMailSearch();
 const params = reactive({
   timeSort: 0,
 })
 
 onMounted(() => {
   emailStore.emailScroll = scroll;
+  emailStore.searchKeyword = String(route.query.q || '').trim();
   latest()
+})
+
+watch(() => route.query.q, () => {
+  if (route.name === 'email') scroll.value?.refreshList()
 })
 
 
@@ -70,7 +80,17 @@ function changeTimeSort() {
 }
 
 function jumpContent(email) {
-  emailStore.contentData.email = emailStore.toContentEmail(email)
+  const contentEmail = emailStore.toContentEmail(email)
+
+  // detailMap may have been populated before a recent star toggle.
+  // The currently visible list row is authoritative here.
+  contentEmail.isStar = email.isStar ? 1 : 0
+
+  if (emailStore.detailMap[email.emailId]) {
+    emailStore.detailMap[email.emailId].isStar = contentEmail.isStar
+  }
+
+  emailStore.contentData.email = contentEmail
   emailStore.contentData.delType = 'logic'
   emailStore.contentData.showUnread = true
   emailStore.contentData.showStar = true
@@ -92,7 +112,7 @@ async function latest() {
 
     const latestId = scroll.value.latestEmail?.emailId
 
-    if (!scroll.value.firstLoad && autoRefresh > 1) {
+    if (!scroll.value.firstLoad && autoRefresh > 1 && !keyword.value) {
       try {
         const accountId = accountStore.currentAccountId
         const allReceive = scroll.value.latestEmail?.allReceive
@@ -107,6 +127,12 @@ async function latest() {
         //确保请求回来后，账号没有切换，时间排序没有改变，全部邮件类型没变
         if (accountId === accountStore.currentAccountId && params.timeSort === curTimeSort && allReceive === accountStore.currentAccount.allReceive) {
           if (list.length > 0) {
+            // Only genuinely new messages ring (the first load is guarded by
+            // `firstLoad` above, opening a mail and manual refreshes never get
+            // here). The shared cursor also suppresses mail the global watcher
+            // already announced before this route was entered.
+            alertNewMail(list.filter(email => !existIds.has(email.emailId)).map(email => email.emailId))
+
             emailStore.applyFullList(list)
 
             for (let email of list) {
@@ -149,7 +175,7 @@ function getEmailList(emailId, size) {
   const accountId =  accountStore.currentAccountId;
   const allReceive = accountStore.currentAccount.allReceive;
   return emailStore.fetchList(full =>
-    emailList(accountId, allReceive, emailId, params.timeSort, size, 0, full)
+    emailList(accountId, allReceive, emailId, params.timeSort, size, 0, full, keyword.value)
   ).then(data => {
     data.latestEmail.reqAccountId = accountId;
     data.latestEmail.allReceive = allReceive;
@@ -160,15 +186,7 @@ function getEmailList(emailId, size) {
 </script>
 <style scoped>
 .mail-list-page { height: 100%; min-height: 0; }
-.mobile-mail-search { display: none; }
 
-@media (max-width: 767px) {
-  .mail-list-page { display: grid; grid-template-rows: auto 1fr; }
-  .mobile-mail-search { height: 38px; margin: 0 12px 8px; padding: 0 11px; display: flex; align-items: center; gap: 8px; border: 1px solid var(--light-border); border-radius: 10px; color: var(--regular-text-color); background: var(--extra-light-fill); }
-  .mobile-mail-search img { width: 15px; height: 15px; opacity: .68; }
-  .mobile-mail-search input { min-width: 0; flex: 1; color: inherit; }
-  .mobile-mail-search input::placeholder { color: inherit; }
-}
 .icon {
   cursor: pointer;
 }

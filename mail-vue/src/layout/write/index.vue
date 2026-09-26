@@ -47,7 +47,12 @@
         <tinyEditor :def-value="defValue" ref="editor" @change="change" @focus="focusChange" />
         <div class="button-item">
           <div class="att-add" @click="chooseFile">
-            <AppIcon name="attachment" :size="22"/>
+            <Icon
+                class="compose-attachment-icon"
+                icon="solar:paperclip-linear"
+                width="22"
+                height="22"
+            />
           </div>
           <div class="att-clear" @click="clearContent">
             <Icon icon="icon-park-outline:clear-format" width="24" height="24 "/>
@@ -104,7 +109,7 @@ import {useEmailStore} from "@/store/email.js";
 import {fileToBase64, formatBytes} from "@/utils/file-utils.js";
 import {getIconByName} from "@/utils/icon-utils.js";
 import sendPercent from "@/components/send-percent/index.vue"
-import {toOssDomain} from "@/utils/convert.js";
+import {resolvePrivateMailImages} from '@/utils/private-attachments.js'
 import {formatDetailDate} from "@/utils/day.js";
 import {useSettingStore} from "@/store/setting.js";
 import {userDraftStore} from "@/store/draft.js";
@@ -115,6 +120,7 @@ import {useI18n} from "vue-i18n";
 import router from "@/router/index.js";
 import {ElMessageBox} from "element-plus";
 import {accountList} from "@/request/account.js";
+import {validateCompose} from "@/utils/compose-validate.js";
 
 defineExpose({
   open,
@@ -291,49 +297,24 @@ function chooseFile() {
 
 async function sendEmail() {
 
-  if (form.receiveEmail.length === 0) {
-    ElMessage({
-      message: t('emptyRecipientMsg'),
-      type: 'error',
-      plain: true,
-    })
-    return
-  }
-
-  if (!form.subject) {
-    ElMessage({
-      message: t('emptySubjectMsg'),
-      type: 'error',
-      plain: true,
-    })
-    return
-  }
-
   if (!form.content) {
-    form.content = editor.value.getContent();
+    // The editor is only mounted while the composer is open; reading it
+    // defensively keeps a stray call from throwing before validation runs.
+    form.content = editor.value?.getContent ? editor.value.getContent() : form.content;
   }
 
-  if (!form.content) {
-    ElMessage({
-      message: t('emptyContentMsg'),
-      type: 'error',
-      plain: true,
-    })
-    return
-  }
+  const problem = validateCompose({
+    recipientCount: form.receiveEmail.length,
+    subject: form.subject,
+    content: form.content,
+    attachmentCount: form.attachments.length,
+    manyType: form.manyType,
+    sending,
+  })
 
-  if (form.manyType === 'divide' && form.attachments.length > 0) {
+  if (problem) {
     ElMessage({
-      message: t('noSeparateSendMsg'),
-      type: 'error',
-      plain: true,
-    })
-    return
-  }
-
-  if (sending) {
-    ElMessage({
-      message: t('sendingErrorMsg'),
+      message: t(problem),
       type: 'error',
       plain: true,
     })
@@ -352,6 +333,10 @@ async function sendEmail() {
 
   show.value = false
 
+  // Captured before resetForm(): the sent reply/forward is inserted into the
+  // open conversation as soon as the API confirms.
+  const sentType = form.sendType
+
   emailSend(form, (e) => {
     percent.value = Math.round((e.loaded * 98) / e.total)
   }).then(emailList => {
@@ -359,6 +344,12 @@ async function sendEmail() {
     emailList.forEach(item => {
       emailStore.sendScroll?.addItem(item)
     })
+
+    // Show the new message in the conversation thread straight away instead of
+    // waiting for the list to be refetched.
+    if ((sentType === 'reply' || sentType === 'forward') && email) {
+      emailStore.appendThreadMessage(email)
+    }
 
     ElNotification({
       title: t('sendSuccessMsg'),
@@ -444,9 +435,15 @@ function openForward(email) {
 
   defValue.value = ''
 
-  setTimeout(() => {
+  setTimeout(async () => {
+    const quotedHtml = email.content
+      ? await resolvePrivateMailImages(email.content, settingStore.settings.r2Domain)
+      : ''
+    // `.nova-quoted` lets the editor re-skin the quoted mail for dark mode.
     defValue.value = `
-      ${formatImage(email.content) || `<pre style="font-family: inherit;word-break: break-word;white-space: pre-wrap;margin: 0">${email.text}</pre>`}
+      <div class="nova-quoted">
+      ${quotedHtml || `<pre style="font-family: inherit;word-break: break-word;white-space: pre-wrap;margin: 0">${email.text}</pre>`}
+      </div>
     `
     open()
 
@@ -496,16 +493,19 @@ async function openReply(email) {
 
   const senderAccount = await replyAccount(email)
 
-  setTimeout(() => {
+  setTimeout(async () => {
+    const quotedHtml = email.content
+      ? await resolvePrivateMailImages(email.content, settingStore.settings.r2Domain)
+      : ''
     defValue.value = `
     <div></div>
     <div>
     <br>
         ${formatDetailDate(email.createTime)} ${email.name} &lt${email.sendEmail}&gt ${t('wrote')}:
     </div>
-    <blockquote class="mceNonEditable" style="margin: 0 0 0 0.8ex;border-left: 1px solid rgb(204,204,204);padding-left: 1ex;">
-      <articl>
-          ${formatImage(email.content) || `<pre style="font-family: inherit;word-break: break-word;white-space: pre-wrap;margin: 0">${email.text}</pre>`}
+    <blockquote class="mceNonEditable nova-quoted" style="margin: 0 0 0 0.8ex;border-left: 1px solid rgb(204,204,204);padding-left: 1ex;">
+      <article>
+          ${quotedHtml || `<pre style="font-family: inherit;word-break: break-word;white-space: pre-wrap;margin: 0">${email.text}</pre>`}
       </article>
     </blockquote>`
     open(senderAccount)
@@ -518,12 +518,6 @@ async function openReply(email) {
     })
   })
 
-}
-
-function formatImage(content) {
-  content = content || '';
-  const domain = settingStore.settings.r2Domain;
-  return content.replace(/{{domain}}/g, toOssDomain(domain) + '/');
 }
 
 function open(preferredAccount) {
@@ -725,6 +719,26 @@ function close() {
 
         .att-add {
           cursor: pointer;
+          color: var(--regular-text-color);
+        }
+
+        .compose-attachment-icon {
+          color: currentColor;
+          transition:
+            color var(--nova-motion-base) var(--nova-motion-ease),
+            opacity var(--nova-motion-base) var(--nova-motion-ease);
+        }
+
+        .att-add:hover {
+          color: var(--el-color-primary);
+        }
+
+        html.dark & .att-add {
+          color: #D1D1D6;
+        }
+
+        html.dark & .att-add:hover {
+          color: var(--el-color-primary);
         }
 
         .att-clear {

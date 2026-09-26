@@ -18,6 +18,22 @@ export function disconnectGithubAccount() {
 
 export function oauthComplete(grant) { return http.post('/oauth/complete', { grant }) }
 
+export function googleOauthComplete(grant) {
+    return http.post('/oauth/google/complete', { grant })
+}
+
+export function googleConnectedAccount() {
+    return http.get('/oauth/google/account')
+}
+
+export function connectGoogleAccount() {
+    return http.post('/oauth/google/connect')
+}
+
+export function disconnectGoogleAccount() {
+    return http.delete('/oauth/google/account')
+}
+
 export function oauthBindUser(form) {
     return http.put('/oauth/bindUser', form)
 }

@@ -26,6 +26,8 @@ const en = {
 	noSendProvider: 'Email sending service is not configured',
 	sendEmailNotCurUser: 'Sender email does not belong to current user',
 	notExistEmailReply: 'Mail does not exist and cannot be replied to',
+	pushSubscriptionInvalid: 'Invalid push subscription',
+	pushTestBody: 'This is a test notification — receiving it means notifications work',
 	imageAttLimit: 'The maximum number of image attachments is 10',
 	attLimit: 'The maximum number of attachments is 10.',
 	pwdLengthLimit: 'Password length exceeds the limit',

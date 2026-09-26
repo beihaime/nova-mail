@@ -1,0 +1,19 @@
+{
+  "name": "nova-mail",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Nova Mail — Vue 3 SPA and Cloudflare Worker mailbox.",
+  "packageManager": "pnpm@12.4.2",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter ./mail-vue --filter ./mail-worker run dev",
+    "build": "pnpm --filter ./mail-vue run build",
+    "test": "pnpm -r --no-bail run test",
+    "test:frontend": "pnpm --filter ./mail-vue run test",
+    "test:worker": "pnpm --filter ./mail-worker run test",
+    "test:worker:unit": "pnpm --filter ./mail-worker run test:unit",
+    "test:worker:integration": "pnpm --filter ./mail-worker run test:integration"
+  }
+}

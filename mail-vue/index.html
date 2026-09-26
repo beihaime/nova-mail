@@ -2,52 +2,222 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <meta name="theme-color" content="#F6F8FC" id="theme-color-meta">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
+    <meta
+            id="theme-color-meta"
+            name="theme-color"
+            content="#FFFFFF"
+    />
+    <meta name="color-scheme" content="light dark">
   <meta name="description" content="Nova Mail — your mail, your rules.">
   <meta name="application-name" content="Nova Mail">
   <meta name="apple-mobile-web-app-title" content="Nova Mail">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
+    <!-- iOS standalone status bar: only `default` (light) / `black` / `black-translucent`
+         are supported, and iOS reads it at launch. `theme-color` stays the runtime
+         source of truth; this is kept in sync with the saved theme so the next
+         launch matches, and defaults to `default` before the script runs. -->
+    <meta
+            id="apple-status-bar-meta"
+            name="apple-mobile-web-app-status-bar-style"
+            content="default"
+    />
   <title>Nova Mail</title>
   <link rel="icon" href="/src/icons/svg/brand-mark.svg" type="image/svg+xml">
   <link rel="icon" href="/icons/nova-mail-192.png" sizes="192x192" type="image/png">
   <link rel="apple-touch-icon" href="/icons/nova-mail-192.png">
   <!-- Explicit rendering prevents the API script from racing Vue's lifecycle. -->
   <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
-  <script>
-    const uiStoreStr =  localStorage.getItem('ui')
-    let isDark = false
-    if (uiStoreStr) {
-      const uiStore =  JSON.parse(uiStoreStr)
-      isDark = uiStore.dark
-      const root = document.documentElement
-      root.setAttribute('class', isDark ? 'dark' : '');
-    }
-    const metaTag = document.getElementById('theme-color-meta');
-    const isMobile =  !window.matchMedia("(pointer: fine) and (hover: hover)").matches;
-    metaTag.setAttribute('content', isDark ? (isMobile ? '#141414' : '#000000') : '#F6F8FC');
-  </script>
+    <script>
+        (() => {
+
+            let isDark = false
+            let mode = 'system'
+
+
+            try {
+
+                const uiStoreStr =
+                    localStorage.getItem('ui')
+
+                const uiStore =
+                    uiStoreStr
+                        ? JSON.parse(uiStoreStr)
+                        : {}
+
+
+                mode =
+                    ['light','dark','system']
+                        .includes(uiStore.themeMode)
+
+                        ? uiStore.themeMode
+
+                        : (
+                            uiStore.dark
+                                ? 'dark'
+                                : 'system'
+                        )
+
+
+                const systemDark =
+                    window.matchMedia(
+                        '(prefers-color-scheme: dark)'
+                    ).matches
+
+
+                isDark =
+                    mode === 'dark' ||
+                    (
+                        mode === 'system'
+                        &&
+                        systemDark
+                    )
+
+
+            } catch {
+
+
+                mode='system'
+
+
+                isDark =
+                    window.matchMedia(
+                        '(prefers-color-scheme: dark)'
+                    ).matches
+
+            }
+
+
+
+            const root =
+                document.documentElement
+
+
+            root.classList.toggle(
+                'dark',
+                isDark
+            )
+
+
+            root.style.colorScheme =
+                isDark
+                    ? 'dark'
+                    : 'light'
+
+
+
+            window.__NOVA_INITIAL_THEME__ = {
+
+                dark:isDark,
+
+                mode
+
+            }
+
+
+
+            const metaTag =
+                document.getElementById(
+                    'theme-color-meta'
+                )
+                ||
+                document.querySelector(
+                    'meta[name="theme-color"]'
+                )
+
+
+            // First paint only. `style.css` owns the real value: it derives
+            // `--nova-mobile-header-bg` from `--nova-surface`, and `applyTheme()`
+            // re-reads it on every theme change. The literals below merely mirror
+            // that token for the instant before the stylesheet is available, so
+            // the very first frame already matches the phone header.
+            let mobileHeaderBg =
+                isDark
+                    ? '#17191d'
+                    : '#FFFFFF'
+
+
+            try {
+
+                const token =
+                    getComputedStyle(root)
+                        .getPropertyValue(
+                            '--nova-mobile-header-bg'
+                        )
+                        .trim()
+
+
+                if (token && !token.includes('var(')) {
+
+                    mobileHeaderBg = token
+
+                }
+
+            } catch {
+
+                // Stylesheet not ready — keep the fallback above.
+
+            }
+
+
+            metaTag?.setAttribute(
+                'content',
+                mobileHeaderBg
+            )
+
+
+            const statusBarMeta =
+                document.getElementById(
+                    'apple-status-bar-meta'
+                )
+
+
+            // iOS only supports `default` / `black` / `black-translucent`, and
+            // reads this once at launch. `black-translucent` lets the header
+            // colour fill the status-bar strip instead of a pure-black band.
+            statusBarMeta?.setAttribute(
+                'content',
+                isDark
+                    ? 'black-translucent'
+                    : 'default'
+            )
+
+
+        })()
+    </script>
 </head>
 <style>
-  html {
-    background: #FFFFFF;
-  }
-  .dark {
-    background: #141414;
-  }
-  #loading-first {
-    position: fixed;
-    left: 0;
-    top: 0;
-    height: 100%;
-    width: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 500;
-    background: var(--el-bg-color);
-  }
+    /* Pre-stylesheet chrome. `--nova-mobile-header-bg` is defined in style.css;
+       until it loads these fallbacks keep the first paint aligned with the phone
+       header (dark grey #17191d, never pure black). */
+    html {
+        background: var(--nova-mobile-header-bg, #FFFFFF);
+    }
 
+    html.dark {
+        background: var(--nova-mobile-header-bg, #17191d);
+    }
+
+    body {
+        background:inherit;
+    }
+    #loading-first {
+        position: fixed;
+        left: 0;
+        top: 0;
+        height: 100%;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 500;
+        background: var(--nova-mobile-header-bg, #ffffff);
+    }
+
+    html.dark #loading-first {
+        background: var(--nova-mobile-header-bg, #17191d);
+    }
   .loading-hide {
     pointer-events: none;
     opacity: 0;
