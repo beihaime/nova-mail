@@ -2139,6 +2139,8 @@ const handleDelete = () => {
   line-height: 1.55;
 }
 
+.email-text :deep(.nova-code-prose) { white-space: pre-wrap; }
+
 .email-text :deep(.hljs-keyword),
 .email-text :deep(.hljs-selector-tag),
 .email-text :deep(.hljs-built_in) { color: #7c3aed; }

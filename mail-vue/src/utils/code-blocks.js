@@ -173,6 +173,78 @@ export function enhanceCodeBlocks(html) {
   return root.innerHTML
 }
 
+function isPlainHtmlTextBlock(node) {
+  return Array.from(node.childNodes || []).every((child) => (
+    child.nodeType === 3 || (child.nodeType === 1 && child.tagName === 'BR')
+  ))
+}
+
+function textFromHtmlBlock(node) {
+  return Array.from(node.childNodes || []).map((child) => {
+    if (child.nodeType === 3) return child.nodeValue || ''
+    return child.nodeType === 1 && child.tagName === 'BR' ? '\n' : ''
+  }).join('')
+}
+
+function detectedBlocksFragment(doc, blocks) {
+  const fragment = doc.createDocumentFragment()
+  blocks.forEach((block) => {
+    if (block.type === 'code') {
+      const holder = doc.createElement('div')
+      holder.innerHTML = renderCodeBlock(block.code, block.language)
+      fragment.append(holder.firstChild)
+      return
+    }
+    const prose = doc.createElement('div')
+    prose.className = 'nova-code-prose'
+    prose.textContent = block.text
+    fragment.append(prose)
+  })
+  return fragment
+}
+
+/**
+ * HTML-only mail clients commonly serialize a pasted code snippet as adjacent
+ * `<div>`s and `<br>`s rather than `<pre>`. Group those text-only siblings and
+ * run the same conservative detector, while leaving formatted mail and quoted
+ * reply containers untouched.
+ */
+export function enhanceHtmlTextCodeBlocks(html) {
+  if (typeof DOMParser === 'undefined') return String(html || '')
+  const doc = new DOMParser().parseFromString(`<div data-nova-code-root="1">${String(html || '')}</div>`, 'text/html')
+  const root = doc.body.querySelector('[data-nova-code-root]')
+  if (!root) return String(html || '')
+
+  const skipped = 'blockquote, .nova-quoted, .quote-block, .quote-content, details'
+  const visit = (container) => {
+    if (container.matches?.(skipped)) return
+
+    const children = Array.from(container.children)
+    for (let index = 0; index < children.length;) {
+      const first = children[index]
+      if (!isPlainHtmlTextBlock(first)) {
+        visit(first)
+        index++
+        continue
+      }
+
+      const group = []
+      while (index < children.length && isPlainHtmlTextBlock(children[index])) {
+        group.push(children[index])
+        index++
+      }
+      const blocks = detectCodeBlocks(group.map(textFromHtmlBlock).join('\n'))
+      if (!blocks.some(block => block.type === 'code')) continue
+
+      group[0].replaceWith(detectedBlocksFragment(doc, blocks))
+      group.slice(1).forEach(node => node.remove())
+    }
+  }
+
+  visit(root)
+  return root.innerHTML
+}
+
 /** Add detected code only to the new plain-text body; quoted reply markup stays untouched. */
 export function enhancePlainTextCodeBlocks(html) {
   if (typeof DOMParser === 'undefined') return String(html || '')
@@ -183,15 +255,7 @@ export function enhancePlainTextCodeBlocks(html) {
   root.querySelectorAll('.quote-plain').forEach((node) => {
     const blocks = detectCodeBlocks(node.textContent || '')
     if (!blocks.some(block => block.type === 'code')) return
-    const fragment = doc.createDocumentFragment()
-    blocks.forEach((block) => {
-      const holder = doc.createElement('div')
-      holder.innerHTML = block.type === 'code'
-        ? renderCodeBlock(block.code, block.language)
-        : `<div class="quote-plain">${escapeHtml(block.text)}</div>`
-      while (holder.firstChild) fragment.append(holder.firstChild)
-    })
-    node.replaceWith(fragment)
+    node.replaceWith(detectedBlocksFragment(doc, blocks))
   })
   return root.innerHTML
 }

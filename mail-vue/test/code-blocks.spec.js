@@ -67,6 +67,16 @@ describe('explicit code blocks', () => {
     expect(html).not.toContain('onclick')
   })
 
+  it('detects code pasted as div/br HTML, as produced by common mail clients', () => {
+    const html = prepareMailBody({
+      html: '<div><div>package com.example;</div><div>import java.util.List;</div><div>public class Rules {<br>&nbsp;&nbsp;private boolean valid(int move) {<br>&nbsp;&nbsp;&nbsp;&nbsp;if (move == 0) {<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return false;<br>&nbsp;&nbsp;&nbsp;&nbsp;}<br>&nbsp;&nbsp;&nbsp;&nbsp;return true;<br>&nbsp;&nbsp;}</div></div>',
+    }).html
+
+    expect(html).toContain('nova-code-block')
+    expect(html).toContain('language-java')
+    expect(html).toContain('hljs-keyword')
+  })
+
   it('falls back to plaintext when language confidence is low', () => {
     expect(detectLanguage('just some opaque tokens\nwith no useful syntax')).toBe('')
     expect(renderCodeBlock('opaque syntax').replace(/<[^>]+>/g, '')).toContain('opaque syntax')

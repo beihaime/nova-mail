@@ -186,6 +186,7 @@ function buildFrameStyle(theme) {
       background: ${codeBackground}; white-space: pre; word-break: normal; overflow-wrap: normal;
     }
     .nova-code-block code { display: block; min-width: max-content; font-size: 13px; line-height: 1.55; }
+    .nova-code-prose { white-space: pre-wrap; }
     .hljs-keyword, .hljs-selector-tag, .hljs-built_in { color: ${dark ? '#c4b5fd' : '#7c3aed'}; }
     .hljs-string, .hljs-attr, .hljs-template-variable { color: ${dark ? '#6ee7b7' : '#087f5b'}; }
     .hljs-number, .hljs-literal { color: ${dark ? '#fbbf24' : '#b45309'}; }
