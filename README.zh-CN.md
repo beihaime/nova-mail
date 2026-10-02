@@ -67,6 +67,7 @@ Nova Mail 是一个现代化 Web 邮件客户端，基于开源项目 [maillab/c
 - 一个 Nova Mail 账户绑定多个邮箱地址，并支持地址切换和独立的地址管理页面
 - 支持写信、回复、转发、标记已读/未读、星标、删除、归档、附件和邮件打印
 - 使用 sanitizer 安全渲染富 HTML 邮件，支持 Markdown 渲染，同时支持纯文本邮件
+- 自动识别 HTML、Markdown 与纯文本邮件中的代码块并进行语法高亮；支持常见语言、语言标签、行号和原始代码复制
 - 支持 GitHub OAuth 登录和账户绑定
 - 支持 Google OAuth/OIDC 登录和账户绑定
 - 对受保护的账户操作使用 Cloudflare Turnstile 验证
@@ -92,6 +93,16 @@ Nova Mail 按每封邮件存储的 body type 选择渲染方式，所以正文�
 - `text/markdown` 不是 Postal MIME 认识的类型，会先落到附件里；Nova 会把它取回正文并从附件列表移除，所以不会出现莫名其妙的 `body.md` 附件。
 - 以 `text/plain`（或没有 `Content-Type`）到达的 markdown，只有在出现强信号时才会被识别为 markdown——ATX 标题、代码围栏、真实的 markdown 链接——然后按 markdown 渲染。`2 * 3 = 6`、`- sent from my phone` 仍按纯文本处理。
 - 远程图片默认拦截，读者点「显示图片」后才加载；链接会净化并硬化。HTML 邮件请使用内联样式和表格布局——`<script>`、事件属性、外链样式表和 `javascript:` 链接都会被清洗掉。
+
+### 代码块与语法高亮
+
+详情页会直接把 Markdown 围栏代码，以及 HTML 邮件中的 `<pre>` / `<code>`
+渲染为代码块。对于纯文本邮件和使用 `<div>` / `<br>` 表示粘贴代码的 HTML
+邮件，也会保守地识别连续的代码特征行；仅包含括号或冒号的一句话不会被误判为代码。
+
+当可可靠识别语言时，Python、Java、JavaScript、TypeScript、C/C++、C#、Go、Rust、
+Shell、JSON、HTML、CSS 和 SQL 会获得语法高亮。代码块优先使用 JetBrains Mono，
+显示语言标签、紧凑行号和横向滚动，并提供复制按钮；复制的是原始源码而不是高亮后的 HTML。无法可靠判断语言时会安全地按纯文本显示。
 
 ### HTML 邮件
 

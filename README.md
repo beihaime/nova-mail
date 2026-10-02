@@ -62,6 +62,7 @@ Nova Mail is a modern web mail client based on the open-source [cloud-mail](http
 - Multiple email addresses per Nova Mail account with address switching and a dedicated address-management page
 - Compose, reply, forward, mark read/unread, star, delete, archive, attachments, and email printing
 - Sanitized rich HTML email rendering, Markdown rendering, and plain-text email support
+- Automatic code-block detection and syntax highlighting for HTML, Markdown, and plain-text mail; supports common languages, language labels, line numbers, and copying the original code
 - GitHub OAuth login and account linking
 - Google OAuth/OIDC login and account linking
 - Cloudflare Turnstile verification for protected account operations
@@ -100,6 +101,20 @@ Rules:
   sanitized and hardened. Inline CSS and table layout are the reliable way to
   style an HTML mail — `<script>`, event handlers, external stylesheets and
   `javascript:` URLs are stripped.
+
+### Code blocks and syntax highlighting
+
+The reader renders explicit Markdown fenced blocks and HTML `<pre>` / `<code>`
+content as code. It also conservatively detects consecutive code-like lines in
+plain-text mail and in HTML mail that represents pasted code as `<div>` / `<br>`
+elements. A single sentence containing parentheses or a colon is not enough to
+be treated as code.
+
+Python, Java, JavaScript, TypeScript, C/C++, C#, Go, Rust, Shell, JSON, HTML,
+CSS, and SQL are highlighted when the language can be identified. Each code
+block uses JetBrains Mono where available, provides a language label, compact
+line numbers, horizontal scrolling, and a Copy button that copies the original
+source rather than highlighted markup. Unknown languages remain safe plaintext.
 
 ### HTML mail
 
