@@ -5,10 +5,10 @@
         <AppIcon class="brand-mark" name="brand-app" :size="44" />
         <div>{{settingStore.settings.title}}</div>
       </div>
-      <button v-perm="'email:send'" class="compose" @click="openCompose">
+      <button v-perm="'email:send'" class="compose nova-primary-button" @click="openCompose">
          <span>{{ $t('compose') }}</span>
       </button>
-      <el-menu :collapse="false">
+      <el-menu class="nova-sidebar-nav" :collapse="false">
         <el-menu-item @click="router.push({name: 'email'})" index="email"
                       :class="route.meta.name === 'email' ? 'choose-item' : ''">
           <AppIcon name="inbox" :size="19" />
@@ -198,30 +198,6 @@ const openCompose = () => uiStore.writerRef?.open()
   width: calc(100% - 28px);
   height: 42px;
 
-  border: none;
-  border-radius: 10px;
-
-  color: #fff;
-  background: var(--el-color-primary);
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  cursor: pointer;
-  font-weight: 650;
-
-  transition:
-    filter .16s ease,
-    transform .16s ease;
-}
-
-.compose:hover {
-  filter: brightness(.94);
-}
-
-.compose:active {
-  transform: scale(.98);
 }
 
 
@@ -280,24 +256,29 @@ const openCompose = () => uiStore.writerRef?.open()
   font-size: 12px;
 }
 
-.el-menu-item {
+:deep(.nova-sidebar-nav .el-menu-item) {
   margin: 1px 10px !important;
   border-radius: 9px;
   height: 38px;
   padding: 9px 12px !important;
+  color: var(--el-text-color-regular);
+  transition: background-color var(--nova-motion-fast) var(--nova-motion-ease), color var(--nova-motion-fast) var(--nova-motion-ease), box-shadow var(--nova-motion-fast) var(--nova-motion-ease);
 }
 
-.choose-item {
+:deep(.nova-sidebar-nav .choose-item) {
+  color: var(--el-text-color-primary);
   font-weight: 650;
-  background: var(--aside-menu-active-background) !important;
-  backdrop-filter: blur(4px);
+  background: var(--nova-selected) !important;
 }
 
 @media (hover: hover) {
-  .el-menu-item:hover {
-    background: var(--base-fill) !important;
+  :deep(.nova-sidebar-nav .el-menu-item:hover) {
+    background: var(--nova-button-hover) !important;
   }
 }
+
+:deep(.nova-sidebar-nav .el-menu-item:active) { background: var(--nova-button-active) !important; }
+:deep(.nova-sidebar-nav .el-menu-item:focus-visible) { outline: none; box-shadow: var(--nova-button-focus-ring); }
 
 .menu-name {
   user-select: none;

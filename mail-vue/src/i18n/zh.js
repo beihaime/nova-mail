@@ -339,6 +339,8 @@ const zh = {
     botVerifyMsg: '请完成人机验证',
     oauthLogin: 'OAuth2',
     noticeTitle: '网站公告',
+    lightMode: '切换到浅色模式',
+    darkMode: '切换到深色模式',
     noticePopup: '登录弹窗',
     notification: '通知',
     notificationSound: '新邮件通知声音',

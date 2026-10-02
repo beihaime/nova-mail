@@ -198,6 +198,15 @@ button, input, select, textarea {
     --nova-motion-base: 180ms;
     --nova-motion-slow: 240ms;
     --nova-motion-ease: cubic-bezier(.2, .8, .2, 1);
+    /* Shared desktop control language. Components consume these rather than
+       introducing their own near-identical button measurements. */
+    --nova-button-radius: 9px;
+    --nova-button-primary-radius: 10px;
+    --nova-icon-button-size: 34px;
+    --nova-button-hover: var(--nova-hover);
+    --nova-button-active: color-mix(in srgb, var(--el-color-primary) 12%, var(--nova-hover));
+    --nova-button-focus-ring: 0 0 0 2px color-mix(in srgb, var(--el-color-primary) 52%, transparent);
+    --nova-button-disabled-opacity: .48;
 }
 
 .dark {
@@ -252,6 +261,7 @@ button, input, select, textarea {
     /* The UI SVGs are raster-backed assets, so they cannot inherit currentColor. */
     --nova-ui-icon-filter: brightness(0) invert(78%);
     --nova-ui-icon-filter-hover: brightness(0) invert(92%);
+    --nova-button-active: color-mix(in srgb, var(--el-color-primary) 18%, var(--nova-hover));
 }
 
 /* Keep the product responsive without making routine mail actions feel animated. */
@@ -294,6 +304,107 @@ button:not(:disabled),
 .el-input__wrapper, .el-textarea__inner { border-radius: 10px; box-shadow: 0 0 0 1px var(--light-border) inset !important; }
 .el-dialog { border-radius: 16px; overflow: hidden; }
 .el-popper { border-radius: 12px !important; }
+
+/* Button primitives. They intentionally own geometry and state treatment,
+   while each surface keeps ownership of its placement and content. */
+.nova-primary-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+    padding: 0 16px;
+    border: 1px solid transparent;
+    border-radius: var(--nova-button-primary-radius);
+    color: #fff;
+    background: var(--el-color-primary);
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--el-color-primary) 28%, transparent);
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.nova-primary-button:hover:not(:disabled) {
+    background: var(--el-color-primary-dark-2);
+    box-shadow: 0 3px 8px color-mix(in srgb, var(--el-color-primary) 22%, transparent);
+}
+
+.nova-primary-button:active:not(:disabled) { transform: scale(.98); }
+
+.nova-icon-button {
+    appearance: none;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 var(--nova-icon-button-size);
+    width: var(--nova-icon-button-size);
+    height: var(--nova-icon-button-size);
+    min-width: var(--nova-icon-button-size);
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: var(--nova-button-radius);
+    color: var(--el-text-color-regular);
+    background: transparent;
+    box-shadow: none;
+    cursor: pointer;
+}
+
+.nova-icon-button:hover:not(:disabled) {
+    color: var(--el-color-primary);
+    background: var(--nova-button-hover);
+}
+
+.nova-icon-button:active:not(:disabled) {
+    background: var(--nova-button-active);
+    transform: scale(.96);
+}
+
+.nova-primary-button:focus-visible,
+.nova-icon-button:focus-visible,
+.nova-secondary-button:focus-visible {
+    outline: none;
+    box-shadow: var(--nova-button-focus-ring);
+}
+
+.nova-primary-button:disabled,
+.nova-icon-button:disabled,
+.nova-secondary-button:disabled {
+    cursor: not-allowed;
+    opacity: var(--nova-button-disabled-opacity);
+}
+
+.nova-secondary-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 34px;
+    padding: 0 14px;
+    border: 1px solid var(--light-border);
+    border-radius: var(--nova-button-radius);
+    color: var(--el-text-color-primary);
+    background: transparent;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.nova-secondary-button:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--el-color-primary) 45%, var(--light-border));
+    background: var(--nova-button-hover);
+}
+
+.nova-secondary-button:active:not(:disabled) {
+    background: var(--nova-button-active);
+    transform: scale(.98);
+}
+
+html.dark .nova-icon-button .iconify:not(.nova-star-icon) {
+    color: var(--el-text-color-regular) !important;
+    opacity: 1 !important;
+}
+
+html.dark .nova-icon-button:hover .iconify:not(.nova-star-icon) {
+    color: var(--el-color-primary) !important;
+}
 
 .el-input {
     --el-input-text-color: var(--el-text-color-primary) !important;

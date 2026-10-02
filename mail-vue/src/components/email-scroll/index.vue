@@ -150,7 +150,7 @@
                            @click.stop></el-checkbox>
               <el-tooltip v-if="showStar" effect="dark" :content="item.isStar ? t('unstar') : t('star')" :show-after="2000">
                 <button
-                    class="pc-star"
+                    class="nova-icon-button pc-star"
                     type="button"
                     :aria-label="item.isStar ? t('unstar') : t('star')"
                     @click.stop="starChange(item)"
@@ -1938,20 +1938,8 @@ function loadData() {
 }
 
 .pc-star {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  cursor: pointer;
-}
-
-.pc-star:hover {
-  background: var(--nova-hover);
+  width: var(--nova-icon-button-size);
+  height: var(--nova-icon-button-size);
 }
 
 @media (max-width: 1366px) {
@@ -2072,7 +2060,7 @@ ul {
 @media (min-width: 768px) {
   :deep(.email-row:not(.all-email)) {
     display: grid;
-    grid-template-columns: 24px 30px minmax(0, 1fr) 82px;
+    grid-template-columns: 24px var(--nova-icon-button-size) minmax(0, 1fr) 82px;
     align-items: center;
     gap: 8px;
     height: 48px;
@@ -2085,7 +2073,7 @@ ul {
   }
 
   :deep(.email-row:not(.all-email) .pc-star) {
-    width: 30px;
+    width: var(--nova-icon-button-size);
     justify-content: center;
   }
 

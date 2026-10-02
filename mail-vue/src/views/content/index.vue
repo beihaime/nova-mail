@@ -1,18 +1,18 @@
 <template>
   <div class="box mail-reader">
     <div class="header-actions">
-      <el-tooltip effect="dark" :content="$t('back')" :show-after="2000"><button class="toolbar-action" type="button" :aria-label="$t('back')" @click="handleBack"><Icon icon="solar:arrow-left-linear" width="20" height="20" /></button></el-tooltip>
-      <el-tooltip v-perm="'email:delete'" effect="dark" :content="$t('delete')" :show-after="2000"><button class="toolbar-action" type="button" :aria-label="$t('delete')" @click="handleDelete"><Icon icon="solar:trash-bin-trash-linear" width="20" height="20" /></button></el-tooltip>
+      <el-tooltip effect="dark" :content="$t('back')" :show-after="2000"><button class="nova-icon-button toolbar-action" type="button" :aria-label="$t('back')" @click="handleBack"><Icon icon="solar:arrow-left-linear" width="20" height="20" /></button></el-tooltip>
+      <el-tooltip v-perm="'email:delete'" effect="dark" :content="$t('delete')" :show-after="2000"><button class="nova-icon-button toolbar-action" type="button" :aria-label="$t('delete')" @click="handleDelete"><Icon icon="solar:trash-bin-trash-linear" width="20" height="20" /></button></el-tooltip>
       <el-tooltip v-if="emailStore.contentData.showStar" effect="dark" :content="email.isStar ? $t('unstar') : $t('star')" :show-after="2000">
-        <button class="toolbar-action toolbar-star" type="button" :aria-label="email.isStar ? $t('unstar') : $t('star')" @click="changeStar(email)">
+        <button class="nova-icon-button toolbar-action toolbar-star" type="button" :aria-label="email.isStar ? $t('unstar') : $t('star')" @click="changeStar(email)">
           <Icon v-if="email.isStar" class="nova-star-icon is-active" icon="solar:star-bold" width="18" height="18" />
           <Icon v-else class="nova-star-icon" icon="solar:star-linear" width="18" height="18" />
         </button>
       </el-tooltip>
-      <el-tooltip v-if="emailStore.contentData.showReply" v-perm="'email:send'" effect="dark" :content="$t('reply')" :show-after="2000"><button class="toolbar-action" type="button" :aria-label="$t('reply')" @click="openReply"><Icon icon="solar:reply-linear" width="20" height="20" /></button></el-tooltip>
-      <el-tooltip v-if="emailStore.contentData.showReply" v-perm="'email:send'" effect="dark" :content="$t('replyAll')" :show-after="2000"><button class="toolbar-action" type="button" :aria-label="$t('replyAll')" @click="openReplyAll"><Icon icon="mdi:reply-all-outline" width="20" height="20" /></button></el-tooltip>
-      <el-tooltip v-if="emailStore.contentData.showReply" v-perm="'email:send'" effect="dark" :content="$t('forward')" :show-after="2000"><button class="toolbar-action" type="button" :aria-label="$t('forward')" @click="openForward"><Icon icon="solar:forward-2-linear" width="20" height="20" /></button></el-tooltip>
-      <el-tooltip effect="dark" :content="$t('print')" :show-after="2000"><button class="toolbar-action" type="button" :aria-label="$t('print')" @click="printEmail"><Icon icon="solar:printer-linear" width="20" height="20" /></button></el-tooltip>
+      <el-tooltip v-if="emailStore.contentData.showReply" v-perm="'email:send'" effect="dark" :content="$t('reply')" :show-after="2000"><button class="nova-icon-button toolbar-action" type="button" :aria-label="$t('reply')" @click="openReply"><Icon icon="solar:reply-linear" width="20" height="20" /></button></el-tooltip>
+      <el-tooltip v-if="emailStore.contentData.showReply" v-perm="'email:send'" effect="dark" :content="$t('replyAll')" :show-after="2000"><button class="nova-icon-button toolbar-action" type="button" :aria-label="$t('replyAll')" @click="openReplyAll"><Icon icon="mdi:reply-all-outline" width="20" height="20" /></button></el-tooltip>
+      <el-tooltip v-if="emailStore.contentData.showReply" v-perm="'email:send'" effect="dark" :content="$t('forward')" :show-after="2000"><button class="nova-icon-button toolbar-action" type="button" :aria-label="$t('forward')" @click="openForward"><Icon icon="solar:forward-2-linear" width="20" height="20" /></button></el-tooltip>
+      <el-tooltip effect="dark" :content="$t('print')" :show-after="2000"><button class="nova-icon-button toolbar-action" type="button" :aria-label="$t('print')" @click="printEmail"><Icon icon="solar:printer-linear" width="20" height="20" /></button></el-tooltip>
     </div>
     <div></div>
     <el-scrollbar ref="scrollRef" class="scrollbar">
@@ -93,7 +93,7 @@
                   :show-after="2000"
               >
                 <button
-                    class="message-star"
+                  class="nova-icon-button message-star"
                     type="button"
                     :aria-label="message.isStar ? $t('unstar') : $t('star')"
                     @click.stop="changeStar(message)"
@@ -130,7 +130,7 @@
                 <div v-if="showRemoteImagesBar(message)" class="remote-images-bar">
                   <AppIcon name="eye-off" :size="16" />
                   <span>{{ $t('imagesBlocked', { count: blockedImageCount(message) }) }}</span>
-                  <button type="button" @click.stop="allowRemoteImages(message)">{{ $t('showImages') }}</button>
+                  <button class="nova-secondary-button" type="button" @click.stop="allowRemoteImages(message)">{{ $t('showImages') }}</button>
                 </div>
 
                 <!-- HTML path: sanitized, then rendered inside its own sandboxed
@@ -158,7 +158,7 @@
               <!-- Never leave the body silently blank: show why + retry. -->
               <div v-if="messageBodyKind(message) === 'none'" class="message-empty">
                 <span>{{ $t('bodyLoadFailMsg') }}</span>
-                <button type="button" @click.stop="fetchPrimaryBody">{{ $t('retry') }}</button>
+                <button class="nova-secondary-button" type="button" @click.stop="fetchPrimaryBody">{{ $t('retry') }}</button>
               </div>
 
               <div class="att" v-if="message.attachments?.length > 0">
@@ -192,8 +192,8 @@
         </div>
         <Teleport to="body" :disabled="!isMobileReader">
           <div v-if="emailStore.contentData.showReply" class="reader-bottom-actions">
-            <button v-perm="'email:send'" type="button" @click="openReply"><Icon icon="solar:reply-linear" width="18" height="18" />{{ $t('reply') }}</button>
-            <button v-perm="'email:send'" type="button" @click="openForward"><Icon icon="solar:forward-linear" width="18" height="18" />{{ $t('forward') }}</button>
+            <button v-perm="'email:send'" class="nova-secondary-button" type="button" @click="openReply"><Icon icon="solar:reply-linear" width="18" height="18" />{{ $t('reply') }}</button>
+            <button v-perm="'email:send'" class="nova-secondary-button" type="button" @click="openForward"><Icon icon="solar:forward-linear" width="18" height="18" />{{ $t('forward') }}</button>
           </div>
         </Teleport>
       </div>
@@ -1498,53 +1498,11 @@ const handleDelete = () => {
   gap: 10px;
   border-bottom: 1px solid var(--nova-divider);
   .toolbar-action {
-    appearance: none;
-    border: 0;
-    box-sizing: border-box;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex: 0 0 32px;
-    cursor: pointer;
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    padding: 0;
-    color: var(--el-text-color-regular);
-    background: transparent;
-    outline: none;
-    box-shadow: none;
-    transition: color .15s ease, background-color .15s ease, transform .15s ease;
-
     :deep(.iconify) {
       width: 20px;
       height: 20px;
     }
 
-    &:hover {
-      color: var(--el-color-primary);
-      background: var(--nova-hover);
-    }
-
-    &:focus {
-      outline: none;
-    }
-
-    &:focus-visible {
-      outline: none;
-      box-shadow: 0 0 0 2px color-mix(in srgb, var(--el-color-primary) 55%, transparent);
-    }
-
-    &:active { transform: scale(.94); }
-  }
-
-  :global(html.dark) .toolbar-action :deep(.iconify:not(.nova-star-icon)) {
-    color: var(--el-text-color-regular) !important;
-    opacity: 1 !important;
-  }
-
-  :global(html.dark) .toolbar-action:hover :deep(.iconify:not(.nova-star-icon)) {
-    color: var(--el-color-primary) !important;
   }
 
 }
@@ -1935,25 +1893,7 @@ const handleDelete = () => {
 }
 
 .message-star {
-  flex: 0 0 auto;
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
   margin-left: 2px;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  cursor: pointer;
-  opacity: .7;
-  transition:
-    opacity var(--nova-motion-fast) var(--nova-motion-ease),
-    background-color var(--nova-motion-fast) var(--nova-motion-ease);
-}
-
-.message-star:hover {
-  opacity: 1;
-  background: var(--nova-hover);
 }
 
 
@@ -2074,8 +2014,7 @@ const handleDelete = () => {
 .htm-scrollbar { max-width: 1100px; overflow-x: auto; }
 .email-text { max-width: 100%; overflow-wrap: anywhere; font-family: var(--nova-font-reading); font-size: 15px; font-weight: 400; line-height: 1.62; color: var(--nova-text-primary); }
 .reader-bottom-actions { display: flex; gap: 10px; max-width: 1100px; padding: 28px 0 18px; }
-.reader-bottom-actions button { min-height: 34px; display: inline-flex; align-items: center; gap: 7px; padding: 0 14px; color: var(--el-text-color-primary); border: 1px solid var(--light-border); border-radius: 9px; background: transparent; cursor: pointer; font-size: 13px; font-weight: 600; }
-.reader-bottom-actions button:hover { background: var(--base-fill); border-color: var(--el-color-primary); }
+.reader-bottom-actions button { gap: 7px; }
 
 .shadow-html::after  {
   content: "";
@@ -2110,12 +2049,6 @@ const handleDelete = () => {
   padding: 0 12px;
   margin-left: auto;
   color: var(--el-color-primary);
-  border: 1px solid var(--light-border);
-  border-radius: 8px;
-  background: transparent;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 600;
 }
 
 .remote-images-bar button:hover {

@@ -11,27 +11,32 @@
 
     </label>
     <div class="toolbar">
-      <div v-if="uiStore.dark" class="sun-icon icon-item" @click="openDark($event)">
-        <AppIcon name="theme-toggle" :size="20" />
-      </div>
-      <div v-else class="dark-icon icon-item" @click="openDark($event)">
-        <AppIcon name="theme-toggle" :size="20" />
-      </div>
-      <div
-          class="notice icon-item"
-          role="button"
-          :aria-label="$t('noticeTitle')"
-          :title="$t('noticeTitle')"
-          @click="openNotice"
-      >
-        <AppIcon name="notifications" :size="20" />
-        <!-- Data-driven unread dot: nothing renders at 0/null/undefined. -->
-        <span
-            v-if="Number(uiStore.unreadNotifications) > 0"
-            class="notice-dot"
-            aria-hidden="true"
-        ></span>
-      </div>
+      <el-tooltip v-if="uiStore.dark" effect="dark" :content="$t('lightMode')" :show-after="2000">
+        <button class="sun-icon icon-item nova-icon-button" type="button" :aria-label="$t('lightMode')" @click="openDark($event)">
+          <AppIcon name="theme-toggle" :size="20" />
+        </button>
+      </el-tooltip>
+      <el-tooltip v-else effect="dark" :content="$t('darkMode')" :show-after="2000">
+        <button class="dark-icon icon-item nova-icon-button" type="button" :aria-label="$t('darkMode')" @click="openDark($event)">
+          <AppIcon name="theme-toggle" :size="20" />
+        </button>
+      </el-tooltip>
+      <el-tooltip effect="dark" :content="$t('noticeTitle')" :show-after="2000">
+        <button
+            class="notice icon-item nova-icon-button"
+            type="button"
+            :aria-label="$t('noticeTitle')"
+            @click="openNotice"
+        >
+          <AppIcon name="notifications" :size="20" />
+          <!-- Data-driven unread dot: nothing renders at 0/null/undefined. -->
+          <span
+              v-if="Number(uiStore.unreadNotifications) > 0"
+              class="notice-dot"
+              aria-hidden="true"
+          ></span>
+        </button>
+      </el-tooltip>
       <el-dropdown ref="userinfoRef" @visible-change="e => userInfoShow = e" :teleported="false" popper-class="detail-dropdown">
         <div class="avatar" @click.stop="openAccountSwitcher" >
           <img v-if="currentAvatar" class="avatar-image" :src="currentAvatar" alt="" @error="handleAvatarError" />
@@ -576,17 +581,7 @@ function formatName(email) {
 
   .icon-item {
     align-self: center;
-    width: 34px;
-    height: 34px;
-    border-radius: 9px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-  }
-
-  .icon-item:hover {
-    background: var(--base-fill);
+    margin: 0;
   }
 
   :global(.dark .toolbar .icon-item .app-icon) {
@@ -697,7 +692,7 @@ function formatName(email) {
   .toolbar .avatar { margin-left: 0; }
   .toolbar .avatar .avatar-text { width: 42px; height: 42px; }
   .toolbar .avatar .avatar-image { width: 42px; height: 42px; flex: 0 0 42px; }
-  .toolbar .icon-item { width: 44px; height: 44px; }
+  .toolbar .icon-item { flex-basis: 44px; width: 44px; height: 44px; }
   .toolbar .avatar .account-summary { display: none; }
   .breadcrumb-item { font-size: 15px; }
 }

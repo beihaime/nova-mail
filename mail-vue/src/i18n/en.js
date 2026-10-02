@@ -339,6 +339,8 @@ const en = {
     botVerifyMsg: 'Please verify that you are human',
     oauthLogin: 'OAuth2',
     noticeTitle: 'Notice',
+    lightMode: 'Switch to light mode',
+    darkMode: 'Switch to dark mode',
     noticePopup: 'Sign-In Popup',
     notification: 'Notifications',
     notificationSound: 'New mail sound',
