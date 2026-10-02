@@ -72,7 +72,6 @@
       <div class="header-left" :style="'padding-left:' + actionLeft">
 
         <slot name="first"></slot>
-        <AppIcon class="icon reload" name="refresh" :size="18" @click="refresh"/>
         <AppIcon v-perm="'email:delete'" class="icon delete" name="nova-sidebar-trash" :size="18" inline
               v-if="getSelectedMailsIds().length > 0"
               @click="handleDelete"/>
@@ -473,7 +472,6 @@ const props = defineProps({
 
 const emit = defineEmits([
   'jump',
-  'refresh-before',
   'delete-draft',
   'right-search',
   'mobile-sort'
@@ -1564,14 +1562,6 @@ function handleList(list) {
   })
 }
 
-function refresh() {
-  emit('refresh-before')
-  if (props.skeleton) {
-    scrollbarRef.value.setScrollTop(0)
-  }
-  refreshList()
-}
-
 function refreshList() {
   checkAll.value = false;
   isIndeterminate.value = false;
@@ -1586,6 +1576,9 @@ function loadData() {
 <style lang="scss" scoped>
 
 .email-container {
+  --mail-list-selection-column: 24px;
+  --mail-list-column-gap: 8px;
+  --mail-list-horizontal-padding: 14px;
   display: grid;
   grid-template-rows: auto 1fr;
   grid-template-columns: minmax(0, 1fr);
@@ -1995,13 +1988,13 @@ function loadData() {
   .header-right {
     display: grid;
     grid-template-columns: auto auto;
-    align-items: start;
+    align-items: center;
     height: 100%;
     color: var(--el-text-color-primary);;
 
     .email-count {
       white-space: nowrap;
-      margin-top: 6px;
+      margin-top: 0;
     }
   }
 
@@ -2065,14 +2058,26 @@ ul {
 /* Compact desktop mail rows: keep the list dense and columns stable while
    preserving the existing virtual-list item height (48px). */
 @media (min-width: 768px) {
+  .header-actions {
+    grid-template-columns: var(--mail-list-selection-column) minmax(0, 1fr) auto;
+    column-gap: var(--mail-list-column-gap);
+    padding-right: var(--mail-list-horizontal-padding);
+    padding-left: var(--mail-list-horizontal-padding);
+  }
+
+  .header-actions > :deep(.el-checkbox) {
+    width: var(--mail-list-selection-column);
+    margin: 0;
+  }
+
   :deep(.email-row:not(.all-email)) {
     display: grid;
-    grid-template-columns: 24px var(--nova-icon-button-size) minmax(0, 1fr) 82px;
+    grid-template-columns: var(--mail-list-selection-column) var(--nova-icon-button-size) minmax(0, 1fr) 82px;
     align-items: center;
-    gap: 8px;
+    gap: var(--mail-list-column-gap);
     height: 48px;
     min-height: 48px;
-    padding: 4px 14px;
+    padding: 4px var(--mail-list-horizontal-padding);
   }
 
   :deep(.email-row:not(.all-email) .checkbox) {
@@ -2544,9 +2549,6 @@ ul {
     > .header-actions
     .header-left
     > :first-child,
-  .email-container.mobile-selecting
-    > .header-actions
-    .reload,
   .email-container.mobile-selecting
     > .header-actions
     .header-right {
