@@ -25,44 +25,110 @@ export const DEFAULT_PALETTES = {
 const PRESETS = {
   light: {
     'nova-default': DEFAULT_PALETTES.light,
-    'soft-light': {
-      accent: '#5B7CFA', background: '#F7F6F3', foreground: '#292724', surface: '#FFFEFB', border: '#E7E3DB',
+    terracotta: {
+      accent: '#DA7756', background: '#F5F3EE', foreground: '#1D1B16', surface: '#FFFCF8', border: '#D8D3CA',
     },
-    'warm-paper': {
-      accent: '#A85D36', background: '#F6F1E8', foreground: '#302923', surface: '#FFFDF8', border: '#E7DCCB',
+    forest: {
+      accent: '#4F8A65', background: '#F3F6F1', foreground: '#182219', surface: '#FBFDF9', border: '#D2DCD0',
     },
-    'quiet-stone': {
-      accent: '#64748B', background: '#F5F5F4', foreground: '#292524', surface: '#FFFFFF', border: '#E7E5E4',
+    lavender: {
+      accent: '#C86478', background: '#FAF4F5', foreground: '#2B1C20', surface: '#FFFDFD', border: '#E5D2D6',
     },
-    'blue-mist': {
-      accent: '#3B82C4', background: '#F2F7FA', foreground: '#1F2A37', surface: '#FEFEFF', border: '#D7E3EA',
+    rose: {
+      accent: '#C86478', background: '#FAF4F5', foreground: '#2B1C20', surface: '#FFFDFD', border: '#E5D2D6',
     },
-    'pine-light': {
-      accent: '#2F7D68', background: '#F2F6F3', foreground: '#1E302B', surface: '#FCFEFC', border: '#D9E6DE',
+    matcha: {
+      accent: '#789262', background: '#F5F6EE', foreground: '#20251A', surface: '#FCFDF7', border: '#D8DDC9',
+    },
+    graphite: {
+      accent: '#666B73', background: '#F4F4F3', foreground: '#1C1D1F', surface: '#FCFCFB', border: '#D7D7D4',
+    },
+    sakura: {
+      accent: '#D77A96', background: '#FCF5F7', foreground: '#2A1D22', surface: '#FFFCFD', border: '#E8D5DB',
+    },
+    arctic: {
+      accent: '#4C91A8', background: '#F2F7F8', foreground: '#172326', surface: '#FAFEFF', border: '#CFDEE1',
+    },
+    mocha: {
+      accent: '#9A7058', background: '#F7F2ED', foreground: '#291F1A', surface: '#FFFDF9', border: '#DFD2C8',
+    },
+    amber: {
+      accent: '#D99024', background: '#FFF8E8', foreground: '#2B2114', surface: '#FFFCF4', border: '#E6D7B8',
+    },
+    aurora: {
+      accent: '#269C91', background: '#F1F8F7', foreground: '#152523', surface: '#FBFEFD', border: '#CFE1DE',
+    },
+    cobalt: {
+      accent: '#3568D4', background: '#F3F6FC', foreground: '#182033', surface: '#FCFDFF', border: '#D2DAEA',
+    },
+    orchid: {
+      accent: '#9964B4', background: '#F8F4FA', foreground: '#281D2D', surface: '#FFFDFE', border: '#E1D3E6',
+    },
+    crimson: {
+      accent: '#B64F5C', background: '#FAF4F4', foreground: '#2B191C', surface: '#FFFDFD', border: '#E4D1D3',
+    },
+    pine: {
+      accent: '#39745D', background: '#F2F6F3', foreground: '#18231E', surface: '#FBFDFB', border: '#CFDBD4',
+    },
+    lunar: {
+      accent: '#697386', background: '#F5F6F8', foreground: '#1C2027', surface: '#FFFFFF', border: '#D8DCE2',
+    },
+    cyber: {
+      accent: '#1689A7', background: '#F0F8FA', foreground: '#14252A', surface: '#FAFEFF', border: '#C9E0E5',
     },
   },
   dark: {
     'nova-default': DEFAULT_PALETTES.dark,
-    midnight: {
-      accent: '#6EA8FE', background: '#111827', foreground: '#E5EDF9', surface: '#172033', border: '#334155',
-    },
-    'oled-night': {
-      accent: '#60A5FA', background: '#000000', foreground: '#EEF2F7', surface: '#101114', border: '#2D3035',
-    },
-    graphite: {
-      accent: '#A6B4C8', background: '#202124', foreground: '#ECEDEF', surface: '#292A2E', border: '#44464C',
-    },
-    'blue-mist': {
-      accent: '#78A9FF', background: '#14202B', foreground: '#E6EFFA', surface: '#1C2A38', border: '#35485B',
+    terracotta: {
+      accent: '#DA7756', background: '#171512', foreground: '#F5F1EA', surface: '#211E1A', border: '#3A3530',
     },
     forest: {
-      accent: '#69B99D', background: '#14211D', foreground: '#E5F1EB', surface: '#1B2C26', border: '#385248',
+      accent: '#70A984', background: '#131813', foreground: '#EDF3EC', surface: '#1C241D', border: '#354137',
     },
-    'solar-dusk': {
-      accent: '#D6A85E', background: '#1B2027', foreground: '#E8E2D6', surface: '#252B34', border: '#414B58',
+    lavender: {
+      accent: '#DF7C90', background: '#1A1416', foreground: '#FAEFF1', surface: '#251C1F', border: '#48353B',
     },
-    'northern-sky': {
-      accent: '#88C0D0', background: '#202A38', foreground: '#E5ECF5', surface: '#2A3647', border: '#4A5B70',
+    rose: {
+      accent: '#DF7C90', background: '#1A1416', foreground: '#FAEFF1', surface: '#251C1F', border: '#48353B',
+    },
+    matcha: {
+      accent: '#9AAF7B', background: '#161811', foreground: '#F1F3E9', surface: '#20241A', border: '#3A4030',
+    },
+    graphite: {
+      accent: '#A8ADB5', background: '#141516', foreground: '#F1F1F0', surface: '#1E2022', border: '#393C40',
+    },
+    sakura: {
+      accent: '#E896AD', background: '#1B1417', foreground: '#FAF0F3', surface: '#271D21', border: '#49373D',
+    },
+    arctic: {
+      accent: '#6FB1C5', background: '#111719', foreground: '#EDF6F7', surface: '#192326', border: '#314247',
+    },
+    mocha: {
+      accent: '#BC8C70', background: '#181411', foreground: '#F5EEE8', surface: '#231D19', border: '#40362F',
+    },
+    amber: {
+      accent: '#F0B44D', background: '#17130B', foreground: '#F8EFD8', surface: '#211B10', border: '#423722',
+    },
+    aurora: {
+      accent: '#4BC2B5', background: '#0F1716', foreground: '#EAF6F4', surface: '#172220', border: '#30423F',
+    },
+    cobalt: {
+      accent: '#6891EF', background: '#10141D', foreground: '#EDF1FA', surface: '#181E2A', border: '#313B50',
+    },
+    orchid: {
+      accent: '#B985D2', background: '#18131B', foreground: '#F6EEF8', surface: '#231B27', border: '#403346',
+    },
+    crimson: {
+      accent: '#D66B77', background: '#1A1214', foreground: '#F9EFF0', surface: '#25191C', border: '#493238',
+    },
+    pine: {
+      accent: '#62A486', background: '#101713', foreground: '#ECF4EF', surface: '#18231D', border: '#304238',
+    },
+    lunar: {
+      accent: '#9CA7BA', background: '#111318', foreground: '#F0F2F5', surface: '#1A1D23', border: '#343943',
+    },
+    cyber: {
+      accent: '#2EC4E6', background: '#0C1417', foreground: '#E8F7FA', surface: '#132025', border: '#29414A',
     },
   },
 }
@@ -101,6 +167,18 @@ export function findMatchingPreset(mode, palette) {
   ) || 'custom'
 }
 
+function persistedPresetForPalette(mode, palette, persistedPreset) {
+  const preset = String(persistedPreset || '')
+  const normal = normalizePalette(palette, DEFAULT_PALETTES[mode])
+  if (
+    availablePresets(mode).includes(preset)
+    && PALETTE_KEYS.every((key) => paletteForPreset(mode, preset)[key] === normal[key])
+  ) {
+    return preset
+  }
+  return findMatchingPreset(mode, normal)
+}
+
 /** Resolve System mode without ever changing either stored palette. */
 export function resolvePaletteMode(mode, systemDark = false) {
   return mode === 'dark' || (mode === 'system' && systemDark) ? 'dark' : 'light'
@@ -120,8 +198,8 @@ export function migrateAppearanceConfig(config = {}) {
     appearanceVersion: APPEARANCE_SCHEMA_VERSION,
     lightPalette,
     darkPalette,
-    lightThemePreset: findMatchingPreset('light', lightPalette),
-    darkThemePreset: findMatchingPreset('dark', darkPalette),
+    lightThemePreset: persistedPresetForPalette('light', lightPalette, source.lightThemePreset),
+    darkThemePreset: persistedPresetForPalette('dark', darkPalette, source.darkThemePreset),
   }
 }
 

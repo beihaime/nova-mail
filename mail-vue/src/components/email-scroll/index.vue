@@ -1629,8 +1629,13 @@ function loadData() {
     display: flex;
     justify-content: center;
     align-items: center;
-    padding: 15px 0 0 0;
+    min-height: 34px;
+    padding: 8px 0 0;
     color: var(--secondary-text-color);
+    font-size: 11px;
+    line-height: 1.2;
+    opacity: .58;
+    pointer-events: none;
   }
 
   .follow-loading {
@@ -2957,8 +2962,10 @@ ul {
   /* End-of-list label: give it real air below the last message instead of
      sitting flush against the final row. */
   .noLoading {
-    padding: 20px 0 14px;
-    font-size: 13px;
+    min-height: 34px;
+    padding: 12px 0 8px;
+    font-size: 11px;
+    opacity: .56;
   }
 
   /* ---------- Swipe actions ----------

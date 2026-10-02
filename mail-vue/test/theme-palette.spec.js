@@ -88,20 +88,32 @@ describe('theme palettes', () => {
     expect(paletteForPreset('dark', 'nova-default')).toEqual(DEFAULT_PALETTES.dark)
   })
 
-  it('provides the expanded preset collection without weakening palette validation', () => {
-    expect(availablePresets('light')).toEqual(expect.arrayContaining([
-      'nova-default', 'soft-light', 'warm-paper', 'quiet-stone', 'blue-mist', 'pine-light',
-    ]))
-    expect(availablePresets('dark')).toEqual(expect.arrayContaining([
-      'nova-default', 'midnight', 'oled-night', 'graphite', 'blue-mist', 'forest', 'solar-dusk', 'northern-sky',
-    ]))
-    expect(paletteForPreset('dark', 'forest')).toEqual(expect.objectContaining({ accent: '#69B99D' }))
+  it('provides only the supported preset collection without weakening palette validation', () => {
+    const expectedPresets = [
+      'nova-default', 'terracotta', 'forest', 'lavender', 'rose', 'matcha', 'graphite', 'sakura', 'arctic', 'mocha',
+      'amber', 'aurora', 'cobalt', 'orchid', 'crimson', 'pine', 'lunar', 'cyber',
+    ]
+    expect(availablePresets('light')).toEqual(expectedPresets)
+    expect(availablePresets('dark')).toEqual(expectedPresets)
+    expect(paletteForPreset('dark', 'forest')).toEqual(expect.objectContaining({ accent: '#70A984' }))
+
+    for (const mode of ['light', 'dark']) {
+      const paletteKey = `${mode}Palette`
+      const presetKey = `${mode}ThemePreset`
+      expect(migrateAppearanceConfig({
+        [paletteKey]: paletteForPreset(mode, 'rose'),
+        [presetKey]: 'rose',
+      })[presetKey]).toBe('rose')
+    }
 
     for (const mode of ['light', 'dark']) {
       for (const preset of availablePresets(mode)) {
         const palette = paletteForPreset(mode, preset)
         expect(normalizePalette(palette, DEFAULT_PALETTES[mode])).toEqual(palette)
-        expect(findMatchingPreset(mode, palette)).toBe(preset)
+        // Lavender and Rose intentionally share the supplied palette. The
+        // stored explicit preset preserves the selected name; matching a raw
+        // palette resolves to the first equivalent preset.
+        expect(paletteForPreset(mode, findMatchingPreset(mode, palette))).toEqual(palette)
 
         const values = {}
         applyPaletteTokens({ style: { setProperty: (key, value) => { values[key] = value } } }, palette, mode)

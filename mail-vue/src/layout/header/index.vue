@@ -21,22 +21,6 @@
           <AppIcon name="theme-toggle" :size="20" />
         </button>
       </el-tooltip>
-      <el-tooltip effect="dark" :content="$t('noticeTitle')" :show-after="2000">
-        <button
-            class="notice icon-item nova-icon-button nova-toolbar-button"
-            type="button"
-            :aria-label="$t('noticeTitle')"
-            @click="openNotice"
-        >
-          <AppIcon name="notifications" :size="20" />
-          <!-- Data-driven unread dot: nothing renders at 0/null/undefined. -->
-          <span
-              v-if="Number(uiStore.unreadNotifications) > 0"
-              class="notice-dot"
-              aria-hidden="true"
-          ></span>
-        </button>
-      </el-tooltip>
       <el-dropdown ref="userinfoRef" @visible-change="e => userInfoShow = e" :teleported="false" popper-class="detail-dropdown">
         <div class="avatar" @click.stop="openAccountSwitcher" >
           <img v-if="currentAvatar" class="avatar-image" :src="currentAvatar" alt="" @error="handleAvatarError" />
@@ -107,7 +91,7 @@ import {logout} from "@/request/login.js";
 import {useUiStore} from "@/store/ui.js";
 import {useUserStore} from "@/store/user.js";
 import {useRoute} from "vue-router";
-import {computed, onMounted, ref, watch} from "vue";
+import {computed, onMounted, ref} from "vue";
 import {useSettingStore} from "@/store/setting.js";
 import {hasPerm} from "@/perm/perm.js"
 import {useI18n} from "vue-i18n";
@@ -251,7 +235,6 @@ onMounted(() => {
   })
   userStore.refreshGithubAccount()
   userStore.refreshGoogleAccount()
-  uiStore.refreshNotifications()
 })
 
 function handleAvatarError() {
@@ -263,23 +246,6 @@ function changeLang(lang) {
   setExtend(lang === 'en' ? 'en' : 'zh-cn')
   settingStore.lang = lang
 }
-
-function openNotice() {
-  // Opening the announcement clears the unread dot for this visitor.
-  uiStore.markNotificationsRead()
-  uiStore.showNotice()
-}
-
-// The dot reflects the configured announcement, so keep it in sync whenever the
-// notice settings arrive or change.
-watch(
-  () => [
-    settingStore.settings.notice,
-    settingStore.settings.noticeTitle,
-    settingStore.settings.noticeContent
-  ],
-  () => uiStore.refreshNotifications()
-)
 
 function openDark(e) {
   applyThemeTransition(uiStore.dark ? 'light' : 'dark', e)
@@ -377,10 +343,6 @@ function formatName(email) {
   .toolbar .dark-icon .app-icon {
     width: 32px;
     height: 32px;
-  }
-
-  .toolbar .notice {
-    display: none;
   }
 
   .toolbar .setting-icon {
@@ -487,7 +449,7 @@ function formatName(email) {
     border-radius: 50%; color: var(--el-color-primary); background: var(--nova-selected);
     border: 1px solid color-mix(in srgb, var(--el-color-primary) 18%, var(--nova-divider)); font-weight: 700;
   }
-  .account-dropdown-avatar-image { display: block; object-fit: cover; border: 0; }
+  .account-dropdown-avatar-image { display: block; object-fit: cover; border: 0; background: var(--nova-surface); }
   .address-section-label { display: block; align-self: flex-start; width: 100%; color: var(--regular-text-color); font-size: 11px; font-weight: 650; letter-spacing: .08em; text-align: left; text-transform: uppercase; }
   .address-section { display: flex; flex: 1 1 auto; min-height: 0; flex-direction: column; padding-top: 11px; }
   /* Hairline under the section label: the top edge of the scrolling region. */
@@ -526,17 +488,19 @@ function formatName(email) {
   height: 100%;
   gap: 12px;
   padding: 0 14px;
-  grid-template-columns: minmax(92px, auto) minmax(220px, 1fr) auto;
+  grid-template-columns: minmax(92px, auto) minmax(280px, 1fr) auto;
 }
 
 .header.not-send {
-  grid-template-columns: minmax(92px, auto) minmax(220px, 1fr) auto;
+  grid-template-columns: minmax(92px, auto) minmax(280px, 1fr) auto;
 }
 
 .search-shell {
   height: 38px;
   align-self: center;
   display: flex;
+  width: 100%;
+  min-width: 0;
   align-items: center;
   gap: 10px;
   padding: 0 11px;
@@ -594,24 +558,6 @@ function formatName(email) {
     opacity: 1 !important;
   }
 
-  .notice {
-    position: relative;
-    margin-right: 4px;
-  }
-
-  /* Only rendered when the store reports an unread notification. */
-  .notice-dot {
-    position: absolute;
-    top: 6px;
-    right: 6px;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--el-color-danger);
-    box-shadow: 0 0 0 2px var(--nova-surface);
-    pointer-events: none;
-  }
-
   .avatar {
     display: flex;
     align-items: center;
@@ -635,6 +581,7 @@ function formatName(email) {
       flex: 0 0 33px;
       border-radius: 50%;
       object-fit: cover;
+      background: var(--nova-surface);
     }
 
     .setting-icon {
@@ -687,7 +634,6 @@ function formatName(email) {
      vertically centred on the 42px avatar and seated 16px away from it. */
   .toolbar .sun-icon,
   .toolbar .dark-icon { width: 44px; height: 44px; }
-  .toolbar .notice { display: none; }
   .toolbar .setting-icon { display: none; }
   .toolbar .avatar { margin-left: 0; }
   .toolbar .avatar .avatar-text { width: 42px; height: 42px; }

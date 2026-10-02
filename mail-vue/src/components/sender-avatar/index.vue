@@ -166,6 +166,7 @@ watch(
   width: 100%;
   height: 100%;
   object-fit: cover;
+  background: var(--nova-surface);
   opacity: 0;
   transition: opacity var(--nova-motion-base) var(--nova-motion-ease);
 }
@@ -190,9 +191,8 @@ watch(
   box-shadow: 0 0 0 2px var(--nova-surface, #fff);
 }
 
-/* Remote brand logos are usually drawn for light backgrounds; in dark mode a
-   faint light plate keeps dark marks legible without resizing the circle. */
+/* Transparent remote avatars should reveal the current surface in either mode. */
 :global(html.dark) .sender-avatar-image {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--nova-surface);
 }
 </style>

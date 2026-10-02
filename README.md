@@ -61,7 +61,7 @@ Nova Mail is a modern web mail client based on the open-source [cloud-mail](http
 ## Features
 
 - Responsive desktop and mobile mail interface
-- Light and dark themes with Nova Mail branding and PWA support
+- Light and dark themes with Nova Mail branding, preset palettes, custom palette import/export, and PWA support
 - Inbox, sent mail, drafts, starred mail, archive, spam, trash, folders, and search
 - Multiple email addresses per Nova Mail account with address switching and a dedicated address-management page
 - Compose, reply, forward, mark read/unread, star, delete, archive, attachments, and email printing
@@ -74,6 +74,18 @@ Nova Mail is a modern web mail client based on the open-source [cloud-mail](http
 - Cloudflare Email Workers receiving, Resend sending/status webhooks, and R2 attachment storage
 - Optional Telegram forwarding, webhook forwarding, verification-code extraction with Workers AI, and analytics
 - English and Simplified Chinese localization
+
+### Theme palettes
+
+Nova Mail applies a complete five-color palette to both light and dark modes:
+accent, background, foreground, surface, and border. Select a preset from
+**Settings → Appearance**, then optionally fine-tune or import/export a custom
+palette without changing the mail layout.
+
+Built-in presets: **Nova Default**, **Terracotta**, **Forest**, **Lavender**,
+**Rose**, **Matcha**, **Graphite**, **Sakura**, **Arctic**, **Mocha**,
+**Amber**, **Aurora**, **Cobalt**, **Orchid**, **Crimson**, **Pine**, **Lunar**,
+and **Cyber**. Each preset includes coordinated light and dark values.
 
 ## Sending HTML and Markdown mail
 
