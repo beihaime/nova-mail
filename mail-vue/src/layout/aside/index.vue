@@ -277,17 +277,17 @@ const openCompose = () => uiStore.writerRef?.open()
 }
 
 :deep(.nova-sidebar-nav .choose-item) {
-  color: #fff;
+  color: var(--el-color-primary);
   font-weight: 650;
-  background: var(--el-color-primary) !important;
+  background: var(--nova-selected) !important;
 }
 
 :deep(.nova-sidebar-nav .el-menu-item.choose-item:hover) {
-  background: var(--el-color-primary) !important;
+  background: var(--nova-selected) !important;
 }
 
 :deep(.nova-sidebar-nav .choose-item .app-icon) {
-  filter: brightness(0) invert(1) !important;
+  filter: none !important;
   opacity: 1 !important;
 }
 
