@@ -11,39 +11,39 @@
       <el-menu class="nova-sidebar-nav" :collapse="false">
         <el-menu-item class="nova-navigation-button" @click="router.push({name: 'email'})" index="email"
                       :class="route.meta.name === 'email' ? 'choose-item' : ''">
-          <span class="nav-icon"><AppIcon name="inbox" :size="18" /></span>
+          <span class="nav-icon"><AppIcon name="nova-sidebar-inbox" :size="18" inline /></span>
           <span class="menu-name">{{$t('inbox')}}</span>
         </el-menu-item>
         <el-menu-item class="nova-navigation-button" @click="router.push({name: 'send'})" index="send" v-perm="'email:send'"
                       :class="route.meta.name === 'send' ? 'choose-item' : ''">
-          <span class="nav-icon"><AppIcon name="sent-nav" :size="18" /></span>
+          <span class="nav-icon"><AppIcon name="nova-sidebar-sent" :size="18" inline /></span>
           <span class="menu-name">{{$t('sent')}}</span>
         </el-menu-item>
         <el-menu-item class="nova-navigation-button" @click="router.push({name: 'draft'})" index="draft" v-perm="'email:send'"
                       :class="route.meta.name === 'draft' ? 'choose-item' : ''">
-          <span class="nav-icon"><AppIcon name="drafts-nav" :size="18" /></span>
+          <span class="nav-icon"><AppIcon name="nova-sidebar-drafts" :size="18" inline /></span>
           <span class="menu-name">{{$t('drafts')}}</span>
         </el-menu-item>
         <el-menu-item class="nova-navigation-button" @click="router.push({name: 'star'})" index="star"
                       :class="route.meta.name === 'star' ? 'choose-item' : ''">
-          <span class="nav-icon"><AppIcon name="starred-nav" :size="18" /></span>
+          <span class="nav-icon"><AppIcon name="nova-sidebar-starred" :size="18" inline /></span>
           <span class="menu-name">{{$t('starred')}}</span>
         </el-menu-item>
         <!-- Only users who may archive (the swipe action reuses `email:delete`)
              can ever have anything in here. -->
         <el-menu-item class="nova-navigation-button" @click="router.push({name: 'archive'})" index="archive" v-perm="'email:delete'"
                       :class="route.meta.name === 'archive' ? 'choose-item' : ''">
-          <span class="nav-icon"><AppIcon name="archive-nav" :size="18" /></span>
+          <span class="nav-icon"><AppIcon name="nova-sidebar-archive" :size="18" inline /></span>
           <span class="menu-name">{{$t('archive')}}</span>
         </el-menu-item>
         <el-menu-item class="nova-navigation-button" @click="router.push({name: 'trash'})" index="trash" v-perm="'email:delete'"
                       :class="route.meta.name === 'trash' ? 'choose-item' : ''">
-          <span class="nav-icon"><AppIcon name="trash-nav" :size="18" /></span>
+          <span class="nav-icon"><AppIcon name="nova-sidebar-trash" :size="18" inline /></span>
           <span class="menu-name">{{$t('trash')}}</span>
         </el-menu-item>
         <el-menu-item class="nova-navigation-button" @click="router.push({name: 'setting'})" index="setting"
                       :class="route.meta.name === 'setting' ? 'choose-item' : ''">
-          <span class="nav-icon"><AppIcon name="settings-top" :size="18" /></span>
+          <span class="nav-icon"><AppIcon name="nova-sidebar-settings" :size="18" inline /></span>
           <span class="menu-name">{{$t('settings')}}</span>
         </el-menu-item>
         <div class="manage-title" v-perm="['all-email:query','user:query','role:query','setting:query','analysis:query','reg-key:query']">
@@ -51,32 +51,32 @@
         </div>
         <el-menu-item class="nova-navigation-button" @click="router.push({name: 'analysis'})" index="analysis" v-perm="'analysis:query'"
                       :class="route.meta.name === 'analysis' ? 'choose-item' : ''">
-          <span class="nav-icon"><AppIcon name="history" :size="18" /></span>
+          <span class="nav-icon"><AppIcon name="nova-sidebar-analytics" :size="18" inline /></span>
           <span class="menu-name">{{$t('analytics')}}</span>
         </el-menu-item>
         <el-menu-item class="nova-navigation-button" @click="router.push({name: 'user'})" index="setting" v-perm="'user:query'"
                       :class="route.meta.name === 'user' ? 'choose-item' : ''">
-          <span class="nav-icon"><AppIcon name="users" :size="18" /></span>
+          <span class="nav-icon"><AppIcon name="nova-sidebar-users" :size="18" inline /></span>
           <span class="menu-name">{{$t('allUsers')}}</span>
         </el-menu-item>
         <el-menu-item class="nova-navigation-button" @click="router.push({name: 'all-email'})" index="all-email" v-perm="'all-email:query'"
                       :class="route.meta.name === 'all-email' ? 'choose-item' : ''">
-          <span class="nav-icon"><AppIcon name="mail-unread" :size="18" /></span>
+          <span class="nav-icon"><AppIcon name="nova-sidebar-mail" :size="18" inline /></span>
           <span class="menu-name">{{$t('allMail')}}</span>
         </el-menu-item>
         <el-menu-item class="nova-navigation-button" @click="router.push({name: 'role'})" index="setting" v-perm="'role:query'"
                       :class="route.meta.name === 'role' ? 'choose-item' : ''">
-          <span class="nav-icon"><AppIcon name="lock" :size="18" /></span>
+          <span class="nav-icon"><AppIcon name="nova-sidebar-role" :size="18" inline /></span>
           <span class="menu-name">{{$t('permissions')}}</span>
         </el-menu-item>
         <el-menu-item class="nova-navigation-button" @click="router.push({name: 'reg-key'})" index="reg-key" v-perm="'reg-key:query'"
                       :class="route.meta.name === 'reg-key' ? 'choose-item' : ''">
-          <span class="nav-icon"><AppIcon name="label-nav" :size="18" /></span>
+          <span class="nav-icon"><AppIcon name="nova-sidebar-invite" :size="18" inline /></span>
           <span class="menu-name">{{$t('inviteCode')}}</span>
         </el-menu-item>
         <el-menu-item class="nova-navigation-button" @click="router.push({name: 'sys-setting'})" index="sys-setting" v-perm="'setting:query'"
                       :class="route.meta.name === 'sys-setting' ? 'choose-item' : ''">
-          <span class="nav-icon"><AppIcon name="settings-top" :size="18" /></span>
+          <span class="nav-icon"><AppIcon name="nova-sidebar-system-settings" :size="18" inline /></span>
           <span class="menu-name">{{$t('SystemSettings')}}</span>
         </el-menu-item>
       </el-menu>
@@ -286,16 +286,6 @@ const openCompose = () => uiStore.writerRef?.open()
   background: var(--nova-selected) !important;
 }
 
-:deep(.nova-sidebar-nav .choose-item .app-icon) {
-  filter: none !important;
-  opacity: 1 !important;
-}
-
-:deep(.nova-sidebar-nav .el-menu-item:not(.choose-item) .app-icon) {
-  filter: grayscale(1) brightness(0);
-  opacity: .72;
-}
-
 @media (hover: hover) {
   :deep(.nova-sidebar-nav .el-menu-item:hover) {
     background: var(--nova-button-hover) !important;
@@ -340,16 +330,6 @@ const openCompose = () => uiStore.writerRef?.open()
 :deep(.el-menu-item img) { width: 19px; height: 19px; opacity: .78; }
 :deep(.choose-item img) { opacity: 1; }
 
-/* Most navigation assets are embedded monochrome PNGs inside their SVG files.
- * Keep the active brand/blue icon untouched, while lifting inactive icons only
- * in dark mode so they remain readable without changing the light theme. */
-:global(.dark .nova-sidebar-nav .el-menu-item:not(.choose-item) .app-icon) {
-  filter: grayscale(1) brightness(0) invert(1);
-  opacity: .78;
-}
-:global(.dark .nova-sidebar-nav .el-menu-item:not(.choose-item):hover .app-icon) {
-  filter: grayscale(1) brightness(0) invert(1);
-}
 :global(.dark .send-usage > .app-icon) {
   filter: none !important;
   opacity: .9;

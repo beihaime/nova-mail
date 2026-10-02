@@ -1,5 +1,16 @@
 <template>
+  <span
+      v-if="inline"
+      class="app-icon"
+      :class="{ 'is-decorative': decorative, 'is-inline': true }"
+      :data-icon-name="resolvedName"
+      :role="decorative ? 'presentation' : 'img'"
+      :aria-label="decorative ? undefined : label || resolvedName"
+      :style="{ '--app-icon-size': `${size}px` }"
+      v-html="rawSource"
+  ></span>
   <img
+      v-else
       class="app-icon"
       :class="{ 'is-decorative': decorative, 'preserve-color': preserveColor }"
       :data-icon-name="resolvedName"
@@ -20,12 +31,15 @@ const props = defineProps({
   size: {type: [Number, String], default: 20},
   label: {type: String, default: ''},
   decorative: {type: Boolean, default: true},
+  /** Render trusted local SVG markup so its currentColor follows the parent. */
+  inline: {type: Boolean, default: false},
   /** Force keep original colors (skip dark-mode invert). Auto-detected for known colored icons. */
   preserve: {type: Boolean, default: false},
 })
 
 const uiStore = useUiStore()
 const assets = import.meta.glob('../../icons/svg/*.svg', {eager: true, query: '?url', import: 'default'})
+const rawAssets = import.meta.glob('../../icons/svg/nova-sidebar-*.svg', {eager: true, query: '?raw', import: 'default'})
 
 /** Icons that already carry brand/status colors — must not be inverted in dark mode. */
 const PRESERVE_COLOR_ICONS = new Set([
@@ -75,6 +89,9 @@ const resolvedName = computed(() => {
 const preserveColor = computed(() => props.preserve || PRESERVE_COLOR_ICONS.has(resolvedName.value))
 
 const source = computed(() => assets[`../../icons/svg/${resolvedName.value}.svg`] || assets['../../icons/svg/status-gray.svg'])
+// Source is restricted to the local icon directory above; no user-provided SVG
+// is ever rendered through v-html.
+const rawSource = computed(() => rawAssets[`../../icons/svg/${resolvedName.value}.svg`] || '')
 </script>
 
 <style scoped>
@@ -86,12 +103,18 @@ const source = computed(() => assets[`../../icons/svg/${resolvedName.value}.svg`
   object-fit: contain;
 }
 
+:global(.app-icon.is-inline svg) {
+  display: block;
+  width: var(--app-icon-size);
+  height: var(--app-icon-size);
+}
+
 /* Monochrome PNG icons are drawn dark; invert them for dark theme. */
-:global(html.dark .app-icon:not(.preserve-color)) {
+:global(html.dark .app-icon:not(.preserve-color):not(.is-inline)) {
   filter: var(--nova-ui-icon-filter);
 }
 
-:global(html.dark .app-icon:not(.preserve-color):hover) {
+:global(html.dark .app-icon:not(.preserve-color):not(.is-inline):hover) {
   filter: var(--nova-ui-icon-filter-hover);
 }
 
