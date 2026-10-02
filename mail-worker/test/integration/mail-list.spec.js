@@ -159,6 +159,31 @@ describe('mail deletion', () => {
 		expect(stored.is_del).toBe(1);
 	});
 
+	it('deletes every message in the selected conversation', async () => {
+		await updateSetting({ sync_delete: settingConst.syncDelete.CLOSE });
+		const threadId = `delete-thread-${owner.userId}`;
+		const first = await seedEmail(owner, { subject: 'delete the whole thread', threadId });
+		const newest = await seedEmail(owner, { subject: 'Re: delete the whole thread', threadId });
+
+		const response = await api(`/api/email/delete?emailIds=${newest.email_id}`, {
+			method: 'DELETE',
+			token: owner.token,
+		});
+		expect((await response.json()).code).toBe(200);
+
+		const rows = await env.db
+			.prepare('SELECT email_id, is_del FROM email WHERE email_id IN (?, ?) ORDER BY email_id')
+			.bind(first.email_id, newest.email_id)
+			.all();
+		expect(rows.results).toEqual([
+			{ email_id: first.email_id, is_del: 1 },
+			{ email_id: newest.email_id, is_del: 1 },
+		]);
+
+		const inbox = await listFor(owner, { size: 50 });
+		expect(inbox.list.map((item) => item.threadId)).not.toContain(threadId);
+	});
+
 	it('removes the row entirely when sync-delete is on', async () => {
 		await updateSetting({ sync_delete: settingConst.syncDelete.OPEN });
 		try {
@@ -171,6 +196,25 @@ describe('mail deletion', () => {
 				.bind(row.email_id)
 				.first();
 			expect(stored).toBeNull();
+		} finally {
+			await updateSetting({ sync_delete: settingConst.syncDelete.CLOSE });
+		}
+	});
+
+	it('physically deletes every message in a conversation when sync-delete is on', async () => {
+		await updateSetting({ sync_delete: settingConst.syncDelete.OPEN });
+		try {
+			const threadId = `hard-delete-thread-${owner.userId}`;
+			const first = await seedEmail(owner, { subject: 'hard delete thread', threadId });
+			const newest = await seedEmail(owner, { subject: 'Re: hard delete thread', threadId });
+
+			await api(`/api/email/delete?emailIds=${newest.email_id}`, { method: 'DELETE', token: owner.token });
+
+			const rows = await env.db
+				.prepare('SELECT email_id FROM email WHERE email_id IN (?, ?)')
+				.bind(first.email_id, newest.email_id)
+				.all();
+			expect(rows.results).toEqual([]);
 		} finally {
 			await updateSetting({ sync_delete: settingConst.syncDelete.CLOSE });
 		}

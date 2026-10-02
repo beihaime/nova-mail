@@ -52,6 +52,49 @@ function toEmailIdList(emailIds) {
 		.filter(value => Number.isInteger(value) && value > 0);
 }
 
+/**
+ * Expand selected messages into complete conversations owned by one user.
+ *
+ * The Inbox renders one (newest) message per thread, so deleting only that
+ * representative leaves its older siblings alive. A later message with the
+ * same subject can then attach to those siblings and make an apparently
+ * deleted conversation reappear. Empty legacy thread ids deliberately resolve
+ * to their own message only: treating every empty value as one conversation
+ * would delete unrelated old mail.
+ */
+async function ownedThreadMessageIds(c, userId, emailIds) {
+	const selectedIds = toEmailIdList(emailIds);
+	if (!selectedIds.length) return [];
+
+	const anchors = await orm(c)
+		.select({ emailId: email.emailId, threadId: email.threadId })
+		.from(email)
+		.where(and(
+			eq(email.userId, userId),
+			inArray(email.emailId, selectedIds),
+		))
+		.all();
+
+	if (!anchors.length) return [];
+
+	const conversationFilters = anchors.map(anchor => (
+		anchor.threadId
+			? eq(email.threadId, anchor.threadId)
+			: eq(email.emailId, anchor.emailId)
+	));
+
+	const rows = await orm(c)
+		.select({ emailId: email.emailId })
+		.from(email)
+		.where(and(
+			eq(email.userId, userId),
+			or(...conversationFilters),
+		))
+		.all();
+
+	return rows.map(row => row.emailId);
+}
+
 function emailKeywordFilters(keyword) {
 	if (!keyword) return [];
 
@@ -436,17 +479,12 @@ const emailService = {
 	},
 
 	async delete(c, params, userId) {
-		const { emailIds } = params;
-		const emailIdList = emailIds.split(',').map(Number);
+		const emailIdList = await ownedThreadMessageIds(c, userId, params?.emailIds);
 		const { syncDelete } = await settingService.query(c);
 
 		if (syncDelete === settingConst.syncDelete.OPEN) {
-			const owned = await orm(c).select({ emailId: email.emailId }).from(email)
-				.where(and(eq(email.userId, userId), inArray(email.emailId, emailIdList)))
-				.all();
-			const ownedIds = owned.map(row => row.emailId);
-			if (ownedIds.length) {
-				await this.physicsDelete(c, { emailIds: ownedIds.join(',') });
+			if (emailIdList.length) {
+				await this.physicsDelete(c, { emailIds: emailIdList.join(',') });
 			}
 			// Reported to the client so the swipe action only offers "Undo" when
 			// the row still exists. With `sync_delete` on, the delete is final by
@@ -497,7 +535,7 @@ const emailService = {
 	 * `soft: true`.
 	 */
 	async restore(c, params, userId) {
-		const emailIdList = toEmailIdList(params?.emailIds);
+		const emailIdList = await ownedThreadMessageIds(c, userId, params?.emailIds);
 		if (!emailIdList.length) return;
 
 		await orm(c).update(email).set({ isDel: isDel.NORMAL }).where(

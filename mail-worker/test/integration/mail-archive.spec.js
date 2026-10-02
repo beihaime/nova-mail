@@ -149,6 +149,25 @@ describe('delete and restore (undo)', () => {
 		expect((await listFor(principal)).list.map((item) => item.subject)).toContain('undo-me');
 	});
 
+	it('restores the complete conversation after a thread delete', async () => {
+		await updateSetting({ sync_delete: settingConst.syncDelete.CLOSE });
+		const principal = await sessionFor(await createAccount());
+		const threadId = `undo-thread-${principal.userId}`;
+		const first = await seedEmail(principal, { subject: 'undo the thread', threadId });
+		const newest = await seedEmail(principal, { subject: 'Re: undo the thread', threadId });
+
+		await api(`/api/email/delete?emailIds=${newest.email_id}`, { method: 'DELETE', token: principal.token });
+		expect((await storedRow(first.email_id)).is_del).toBe(1);
+		expect((await storedRow(newest.email_id)).is_del).toBe(1);
+
+		// The client only has the visible representative id, but Undo restores
+		// every sibling that the delete action changed.
+		await put(principal.token, '/api/email/restore', [newest.email_id]);
+		expect((await storedRow(first.email_id)).is_del).toBe(0);
+		expect((await storedRow(newest.email_id)).is_del).toBe(0);
+		expect((await listFor(principal)).total).toBe(1);
+	});
+
 	it('reports that a permanent delete cannot be undone', async () => {
 		await updateSetting({ sync_delete: settingConst.syncDelete.OPEN });
 		try {
