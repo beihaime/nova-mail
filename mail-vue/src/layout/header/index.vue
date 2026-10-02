@@ -21,7 +21,7 @@
           <AppIcon name="theme-toggle" :size="20" />
         </button>
       </el-tooltip>
-      <el-dropdown ref="userinfoRef" @visible-change="e => userInfoShow = e" :teleported="false" popper-class="detail-dropdown">
+      <el-dropdown v-if="!isMobileViewport" ref="userinfoRef" @visible-change="e => userInfoShow = e" :teleported="false" popper-class="detail-dropdown">
         <div class="avatar" @click.stop="openAccountSwitcher" >
           <img v-if="currentAvatar" class="avatar-image" :src="currentAvatar" alt="" @error="handleAvatarError" />
           <div v-else class="avatar-text">
@@ -74,13 +74,73 @@
             </div>
             <div class="account-dropdown-actions">
               <button v-if="hasPerm('account:query')" class="nova-ghost-button" @click="openManageAddresses"><AppIcon name="user" :size="17" />{{ $t('manageAddresses') }}</button>
-              <button class="nova-ghost-button" @click="router.push({ name: 'setting' })"><AppIcon name="settings-top" :size="17" />{{ $t('settings') }}</button>
+              <button class="nova-ghost-button" @click="openSettings"><AppIcon name="settings-top" :size="17" />{{ $t('settings') }}</button>
               <button class="sign-out nova-ghost-button nova-danger-button" :disabled="logoutLoading" @click="clickLogout">{{ $t('logOut') }}</button>
             </div>
           </div>
         </template>
       </el-dropdown>
+      <button
+          v-else
+          class="avatar mobile-profile-trigger"
+          type="button"
+          :aria-label="$t('accountLabel')"
+          :aria-expanded="mobileProfileOpen"
+          @click="openAccountSwitcher"
+      >
+        <img v-if="currentAvatar" class="avatar-image" :src="currentAvatar" alt="" @error="handleAvatarError" />
+        <div v-else class="avatar-text"><div>{{ formatName(currentAccount.email || userStore.user.email) }}</div></div>
+      </button>
     </div>
+    <Teleport to="body">
+      <div v-if="mobileProfileOpen" class="mobile-profile-sheet-backdrop" @click.self="closeProfilePopup">
+        <section
+            ref="mobileProfileSheetRef"
+            class="mobile-profile-sheet"
+            role="dialog"
+            aria-modal="true"
+            :aria-label="$t('accountLabel')"
+            tabindex="-1"
+            @keydown.esc="closeProfilePopup"
+        >
+          <div class="mobile-profile-sheet-handle" aria-hidden="true"></div>
+          <div class="mobile-profile-sheet-head">
+            <img v-if="currentAvatar" class="mobile-profile-avatar mobile-profile-avatar-image" :src="currentAvatar" alt="" @error="handleAvatarError" />
+            <div v-else class="mobile-profile-avatar">{{ formatName(primaryAddress) }}</div>
+            <div class="mobile-profile-identity">
+              <strong>{{ accountDisplayName }}</strong>
+              <span>{{ $t('accountLabel') }}</span>
+            </div>
+          </div>
+          <div class="mobile-profile-addresses">
+            <div class="mobile-profile-section-label">{{ $t('mailAddresses') }}</div>
+            <div v-if="accounts.length" class="mobile-profile-address-list">
+              <button
+                  v-for="address in accounts"
+                  :key="address.accountId"
+                  class="mobile-profile-address"
+                  :class="{ selected: address.accountId === currentAccount.accountId }"
+                  @click="selectAccount(address)"
+              >
+                <span class="mobile-profile-address-email">{{ address.email }}</span>
+                <span v-if="address.accountId === currentAccount.accountId" class="address-state-check" aria-hidden="true">
+                  <svg class="address-state-icon" viewBox="0 0 16 16" width="16" height="16" focusable="false" aria-hidden="true">
+                    <path d="M3.4 8.5 6.6 11.6 12.7 5.2" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </span>
+                <small v-if="address.email === primaryAddress" class="primary-badge">{{ $t('primary') }}</small>
+              </button>
+            </div>
+            <div v-else class="mobile-profile-address-loading">{{ $t('loading') }}</div>
+          </div>
+          <footer class="mobile-profile-sheet-actions">
+            <button v-if="hasPerm('account:query')" class="nova-ghost-button" @click="openManageAddresses"><AppIcon name="user" :size="17" />{{ $t('manageAddresses') }}</button>
+            <button class="nova-ghost-button" @click="openSettings"><AppIcon name="settings-top" :size="17" />{{ $t('settings') }}</button>
+            <button class="sign-out nova-ghost-button nova-danger-button" :disabled="logoutLoading" @click="clickLogout">{{ $t('logOut') }}</button>
+          </footer>
+        </section>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -91,7 +151,7 @@ import {logout} from "@/request/login.js";
 import {useUiStore} from "@/store/ui.js";
 import {useUserStore} from "@/store/user.js";
 import {useRoute} from "vue-router";
-import {computed, onMounted, ref} from "vue";
+import {computed, nextTick, onBeforeUnmount, onMounted, ref, watch} from "vue";
 import {useSettingStore} from "@/store/setting.js";
 import {hasPerm} from "@/perm/perm.js"
 import {useI18n} from "vue-i18n";
@@ -114,6 +174,9 @@ const logoutLoading = ref(false)
 const userInfoShow = ref(false)
 const userinfoRef = ref({})
 const accounts = ref([])
+const isMobileViewport = ref(window.innerWidth < 768)
+const mobileProfileOpen = ref(false)
+const mobileProfileSheetRef = ref(null)
 
 const currentAccount = computed(() => accountStore.currentAccount || {})
 const primaryAddress = computed(() => userStore.user.email || currentAccount.value.email || '')
@@ -190,32 +253,40 @@ function userInfoHide() {
 }
 
 function openAccountSwitcher() {
-  if (window.innerWidth < 768) {
-    // The mobile account list used to open alongside this dropdown. Keep the
-    // profile interaction single-owned by the account popover; the full
-    // address-management page remains available through Manage addresses.
+  if (isMobileViewport.value) {
     uiStore.accountShow = false
-    userInfoHide()
+    mobileProfileOpen.value = !mobileProfileOpen.value
+    if (mobileProfileOpen.value) nextTick(() => mobileProfileSheetRef.value?.focus())
     return
   }
   userInfoHide()
 }
 
+function closeProfilePopup() {
+  mobileProfileOpen.value = false
+  if (userInfoShow.value) userinfoRef.value?.handleClose?.()
+}
+
 function selectAccount(account) {
   if (account.accountId === currentAccount.value.accountId) {
-    userinfoRef.value.handleClose()
+    closeProfilePopup()
     return
   }
   accountStore.currentAccountId = account.accountId
   accountStore.currentAccount = account
   emailStore.emailScroll?.refreshList()
   emailStore.sendScroll?.refreshList()
-  userinfoRef.value.handleClose()
+  closeProfilePopup()
 }
 
 function openManageAddresses() {
-  userinfoRef.value.handleClose()
+  closeProfilePopup()
   router.push({ name: 'addresses' })
+}
+
+function openSettings() {
+  closeProfilePopup()
+  router.push({ name: 'setting' })
 }
 
 async function loadAccounts() {
@@ -235,7 +306,21 @@ onMounted(() => {
   })
   userStore.refreshGithubAccount()
   userStore.refreshGoogleAccount()
+  window.addEventListener('resize', syncViewport)
+  window.addEventListener('popstate', closeProfilePopup)
 })
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', syncViewport)
+  window.removeEventListener('popstate', closeProfilePopup)
+})
+
+function syncViewport() {
+  isMobileViewport.value = window.innerWidth < 768
+  if (!isMobileViewport.value) mobileProfileOpen.value = false
+}
+
+watch(() => route.fullPath, closeProfilePopup)
 
 function handleAvatarError() {
   if (userStore.githubAvatar) userStore.githubAvatar = ''
@@ -256,6 +341,7 @@ function changeAside() {
 }
 
 function clickLogout() {
+  closeProfilePopup()
   logoutLoading.value = true
   logout().then(() => {
     localStorage.removeItem("token")
@@ -273,6 +359,154 @@ function formatName(email) {
 <style>
 .detail-dropdown {
   color: var(--el-text-color-primary) !important;
+}
+
+/* Mobile owns its profile surface instead of asking the desktop dropdown
+   popper to imitate a sheet. The backdrop is the outside-click target; only
+   the address region scrolls, leaving identity and actions stable. */
+.mobile-profile-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2200;
+  display: flex;
+  align-items: flex-end;
+  padding: 0 12px calc(12px + env(safe-area-inset-bottom, 0px));
+  background: color-mix(in srgb, var(--nova-overlay) 72%, transparent);
+  animation: nova-fade-in var(--nova-motion-fast) var(--nova-motion-ease) both;
+}
+
+.mobile-profile-sheet {
+  width: 100%;
+  max-height: min(75dvh, 720px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--el-text-color-primary);
+  background: var(--nova-surface);
+  border: 1px solid var(--nova-divider);
+  border-radius: 18px;
+  box-shadow: 0 18px 48px color-mix(in srgb, #000 34%, transparent);
+  animation: nova-sheet-in var(--nova-motion-base) var(--nova-motion-ease) both;
+}
+
+.mobile-profile-sheet-handle {
+  width: 34px;
+  height: 4px;
+  flex: 0 0 auto;
+  align-self: center;
+  margin: 9px 0 5px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--el-text-color-primary) 22%, transparent);
+}
+
+.mobile-profile-sheet-head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  flex: 0 0 auto;
+  padding: 6px 16px 12px;
+}
+
+.mobile-profile-avatar {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--el-color-primary) 18%, var(--nova-divider));
+  border-radius: 50%;
+  color: var(--el-color-primary);
+  background: var(--nova-selected);
+  font-weight: 700;
+}
+
+.mobile-profile-avatar-image {
+  display: block;
+  object-fit: cover;
+  border: 0;
+  background: var(--nova-surface);
+}
+
+.mobile-profile-identity { min-width: 0; text-align: left; }
+.mobile-profile-identity strong,
+.mobile-profile-identity span { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.mobile-profile-identity strong { font-size: 15px; font-weight: 650; }
+.mobile-profile-identity span { margin-top: 2px; color: var(--regular-text-color); font-size: 12px; }
+
+.mobile-profile-addresses {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  border-top: 1px solid var(--nova-divider-soft, var(--nova-divider));
+}
+
+.mobile-profile-section-label {
+  flex: 0 0 auto;
+  padding: 10px 16px 6px;
+  color: var(--regular-text-color);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: .08em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.mobile-profile-address-list {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 8px 8px;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mobile-profile-address {
+  width: 100%;
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 9px;
+  color: var(--el-text-color-primary);
+  background: transparent;
+  text-align: left;
+}
+
+.mobile-profile-address.selected { color: var(--el-color-primary); background: var(--nova-selected); font-weight: 600; }
+.mobile-profile-address-email { min-width: 0; flex: 1 1 auto; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.mobile-profile-address-loading { padding: 18px 16px; color: var(--regular-text-color); text-align: center; }
+
+.mobile-profile-sheet-actions {
+  display: grid;
+  flex: 0 0 auto;
+  gap: 2px;
+  padding: 7px 8px 8px;
+  border-top: 1px solid var(--nova-divider);
+}
+
+.mobile-profile-sheet-actions button {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 8px;
+  border-radius: 8px;
+  color: var(--el-text-color-primary);
+  text-align: left;
+}
+
+.mobile-profile-sheet-actions .sign-out { color: var(--nova-danger); }
+
+@keyframes nova-sheet-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes nova-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 

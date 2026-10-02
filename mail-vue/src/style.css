@@ -44,7 +44,7 @@
     --nova-text-secondary: var(--nm-text-secondary);
     --nova-text-muted: var(--nm-text-muted);
     --nova-star-idle: var(--nova-text-muted);
-    --nova-star-active: #d4a72c;
+    --nova-star-active: var(--nova-accent);
     --el-text-color-primary: var(--nova-text-primary);
     --el-text-color-regular: var(--nova-text-secondary);
     --el-text-color-secondary: var(--nova-text-muted);
@@ -262,7 +262,7 @@ button, input, select, textarea {
     --nova-text-secondary: var(--nm-text-secondary);
     --nova-text-muted: var(--nm-text-muted);
     --nova-star-idle: var(--nova-text-secondary);
-    --nova-star-active: #facc15;
+    --nova-star-active: var(--nova-accent);
     --el-text-color-primary: var(--nova-text-primary);
     --el-text-color-regular: var(--nova-text-secondary);
     --el-text-color-secondary: var(--nova-text-muted);
@@ -501,6 +501,18 @@ button:not(:disabled),
 }
 
 .nova-toolbar-button.nova-danger-button:hover:not(:disabled) { color: #fff; background: var(--nova-danger); }
+
+/* The mail reader delete action needs a denser danger surface in dark mode.
+   It is intentionally more solid than the ordinary icon hover so it remains
+   unmistakable against every dark theme surface. */
+html.dark .nova-toolbar-button.nova-danger-button:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--nova-danger) 88%, var(--nm-surface));
+    background: color-mix(in srgb, var(--nova-danger) 88%, var(--nm-surface));
+}
+
+html.dark .nova-toolbar-button.nova-danger-button:hover:not(:disabled) .iconify {
+    color: currentColor !important;
+}
 
 .nova-mobile-icon-button {
     border: 1px solid transparent;

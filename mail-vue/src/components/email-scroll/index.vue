@@ -73,12 +73,9 @@
 
         <slot name="first"></slot>
         <AppIcon class="icon reload" name="refresh" :size="18" @click="refresh"/>
-        <AppIcon v-perm="'email:delete'" class="icon delete" name="delete-outline" :size="18"
+        <AppIcon v-perm="'email:delete'" class="icon delete" name="nova-sidebar-trash" :size="18" inline
               v-if="getSelectedMailsIds().length > 0"
               @click="handleDelete"/>
-        <AppIcon v-perm="'email:delete'" class="icon delete" name="mail-unread" :size="20"
-              v-if="getSelectedMailsIds().length > 0 && showUnread"
-              @click="handleRead"/>
       </div>
 
       <div class="header-right">
@@ -367,7 +364,7 @@
           <el-dropdown-item @click="rightDelete(rightClickEmail.emailId)">
             <template #default>
               <div class="right-dropdown-item">
-                <Icon icon="uiw:delete" width="16" height="20" style="margin-left: 1px;margin-right: 3px" />
+                <AppIcon name="nova-sidebar-trash" :size="18" inline />
                 <span>{{t('delete')}}</span>
               </div>
             </template>
@@ -1223,12 +1220,6 @@ function changeAccountShow() {
   uiStore.accountShow = !uiStore.accountShow;
 }
 
-const handleRead = () => {
-  const emailIds = getSelectedMailsIds();
-  props.emailRead(emailIds);
-  localRead(emailIds);
-}
-
 function emailRead(emailId) {
   props.emailRead([emailId])
   localRead([emailId]);
@@ -1985,9 +1976,9 @@ function loadData() {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
-  min-height: 48px;
+  height: 48px;
   gap: 12px;
-  padding: 7px 14px;
+  padding: 0 14px;
   box-shadow: inset 0 -1px 0 var(--nova-divider);
 
   .header-left {
@@ -1996,7 +1987,7 @@ function loadData() {
     align-items: center;
     position: relative;
     column-gap: 14px;
-    row-gap: 8px;
+    row-gap: 0;
     padding-left: 2px;
     color: var(--el-text-color-primary);;
   }

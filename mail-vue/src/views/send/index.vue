@@ -10,14 +10,7 @@
                @jump="jumpContent"
                :time-sort="params.timeSort"
                :type="'send'"
-  >
-    <template #first>
-      <Icon class="icon" @click="changeTimeSort" icon="material-symbols-light:timer-arrow-down-outline"
-            v-if="params.timeSort === 0" width="28" height="28"/>
-      <Icon class="icon" @click="changeTimeSort" icon="material-symbols-light:timer-arrow-up-outline" v-else
-            width="28" height="28"/>
-    </template>
-  </emailScroll>
+  />
 </template>
 
 <script setup>
@@ -28,7 +21,6 @@ import {emailList, emailDelete} from "@/request/email.js";
 import {starAdd, starCancel} from "@/request/star.js";
 import {defineOptions, onMounted, reactive, ref, watch} from "vue";
 import router from "@/router/index.js";
-import {Icon} from "@iconify/vue";
 
 defineOptions({
   name: 'send'
@@ -83,9 +75,3 @@ function getEmailList(emailId, size) {
 }
 
 </script>
-
-<style scoped>
-.icon {
-  cursor: pointer;
-}
-</style>

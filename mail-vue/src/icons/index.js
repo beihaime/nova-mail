@@ -170,7 +170,7 @@ addCollection({
             "body": "<path fill=\"currentColor\" d=\"m12 12.708l-5.246 5.246q-.14.14-.344.15t-.364-.15t-.16-.354t.16-.354L11.292 12L6.046 6.754q-.14-.14-.15-.344t.15-.364t.354-.16t.354.16L12 11.292l5.246-5.246q.14-.14.345-.15q.203-.01.363.15t.16.354t-.16.354L12.708 12l5.246 5.246q.14.14.15.345q.01.203-.15.363t-.354.16t-.354-.16z\"/>"
         },
         "timer-arrow-down-outline": {
-            "body": "<path fill=\"currentColor\" d=\"M8.734 19q-2.667 0-4.527-1.867T2.347 12.6t1.861-4.537t4.523-1.87q1.185 0 2.248.402q1.063.403 1.898 1.128l.954-.954l.688.689l-.934.953q.725.835 1.137 1.902t.413 2.283q0 2.669-1.867 4.536T8.734 19m10.65 0l-2.692-2.692l.708-.708l1.485 1.485V5h1v12.079l1.479-1.479l.713.708zM6.809 4.77v-1h3.884v1zM8.73 18q2.26 0 3.832-1.572t1.573-3.833t-1.573-3.832q-1.572-1.57-3.832-1.57T4.908 8.764q-1.562 1.572-1.562 3.832t1.562 3.832T8.729 18m-.498-5.096h1V9.096h-1zm.5-.308\"/>"
+            "body": "<circle cx=\"8.3\" cy=\"13.2\" r=\"4.8\" fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"1.75\"/><path d=\"M6.6 4.7h3.4M8.3 4.7v2.1M8.3 13.2V11\" fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"1.75\"/><path d=\"M17.2 8.2V17m-2.6-2.6 2.6 2.6 2.6-2.6\" fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"1.75\"/>"
         },
         "arrow-back-ios-new": {
             "body": "<path fill=\"currentColor\" d=\"M16 21.308L6.692 12L16 2.692l1.064 1.064L8.819 12l8.244 8.244z\"/>"
