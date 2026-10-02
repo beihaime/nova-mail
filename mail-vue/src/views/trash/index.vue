@@ -18,11 +18,6 @@
             <Icon icon="solar:restart-linear" width="20" height="20" />
           </button>
         </el-tooltip>
-        <el-tooltip effect="dark" :content="t('emptyTrash')" :show-after="2000">
-          <button class="nova-icon-button" type="button" :disabled="!hasMail" :aria-label="t('emptyTrash')" @click="emptyTrash">
-            <Icon icon="solar:trash-bin-minimalistic-linear" width="20" height="20" />
-          </button>
-        </el-tooltip>
       </template>
     </emailScroll>
   </div>
@@ -35,7 +30,7 @@ import { useI18n } from 'vue-i18n'
 import { useAccountStore } from '@/store/account.js'
 import { useEmailStore } from '@/store/email.js'
 import emailScroll from '@/components/email-scroll/index.vue'
-import { emailDeleteForever, emailEmptyTrash, emailList, emailRead, emailRestore } from '@/request/email.js'
+import { emailDeleteForever, emailList, emailRead, emailRestore } from '@/request/email.js'
 import router from '@/router/index.js'
 
 defineOptions({ name: 'trash' })
@@ -45,7 +40,6 @@ const scroll = ref(null)
 const emailStore = useEmailStore()
 const accountStore = useAccountStore()
 const selectedIds = computed(() => scroll.value?.getSelectedMailsIds?.() || [])
-const hasMail = computed(() => Boolean(scroll.value?.emailList?.length))
 
 onMounted(() => { emailStore.trashScroll = scroll })
 
@@ -73,15 +67,6 @@ async function restoreSelected() {
   ElMessage({ message: t('restoreSuccessMsg'), type: 'success', plain: true })
 }
 
-function emptyTrash() {
-  ElMessageBox.confirm(t('emptyTrashConfirm'), {
-    confirmButtonText: t('confirm'), cancelButtonText: t('cancel'), type: 'warning'
-  }).then(async () => {
-    await emailEmptyTrash(accountStore.currentAccountId)
-    scroll.value.refreshList()
-    ElMessage({ message: t('delSuccessMsg'), type: 'success', plain: true })
-  })
-}
 </script>
 
 <style scoped>
