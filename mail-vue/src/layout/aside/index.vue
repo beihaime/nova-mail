@@ -36,6 +36,11 @@
           <AppIcon name="archive-nav" :size="19" />
           <span class="menu-name">{{$t('archive')}}</span>
         </el-menu-item>
+        <el-menu-item @click="router.push({name: 'trash'})" index="trash" v-perm="'email:delete'"
+                      :class="route.meta.name === 'trash' ? 'choose-item' : ''">
+          <AppIcon name="trash-nav" :size="19" />
+          <span class="menu-name">{{$t('trash')}}</span>
+        </el-menu-item>
         <el-menu-item @click="router.push({name: 'setting'})" index="setting"
                       :class="route.meta.name === 'setting' ? 'choose-item' : ''">
           <AppIcon name="settings-top" :size="19" />

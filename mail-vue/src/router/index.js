@@ -23,6 +23,12 @@ const routes = [
                 }
             },
             {
+                path: '/trash',
+                name: 'trash',
+                component: () => import('@/views/trash/index.vue'),
+                meta: { title: 'trash', name: 'trash', menu: true }
+            },
+            {
                 path: '/mail',
                 name: 'content',
                 component: () => import('@/views/content/index.vue'),

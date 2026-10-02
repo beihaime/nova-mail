@@ -22,10 +22,18 @@ app.get('/email/thread', async (c) => {
 });
 
 app.delete('/email/delete', async (c) => {
-	// `data.soft` tells the caller whether the row can still be restored; the
-	// mobile swipe action uses it to decide between "Undo" and a plain notice.
-	const data = await emailService.delete(c, c.req.query(), userContext.getUserId(c));
+	const data = await emailService.moveToTrash(c, c.req.query(), userContext.getUserId(c));
 	return c.json(result.ok(data));
+});
+
+app.delete('/email/trash/delete', async (c) => {
+	await emailService.deleteForever(c, c.req.query(), userContext.getUserId(c));
+	return c.json(result.ok());
+});
+
+app.delete('/email/trash/empty', async (c) => {
+	await emailService.emptyTrash(c, c.req.query(), userContext.getUserId(c));
+	return c.json(result.ok());
 });
 
 // Mobile swipe actions. Archive hides a message from the Inbox without deleting
@@ -41,7 +49,7 @@ app.put('/email/unarchive', async (c) => {
 })
 
 app.put('/email/restore', async (c) => {
-	await emailService.restore(c, await c.req.json(), userContext.getUserId(c));
+	await emailService.restoreFromTrash(c, await c.req.json(), userContext.getUserId(c));
 	return c.json(result.ok());
 })
 

@@ -4,6 +4,7 @@ import { settingConst } from '../../src/const/entity-const';
 import {
 	api,
 	createAccount,
+	createAdmin,
 	createPermissionlessRole,
 	seedEmail,
 	sessionFor,
@@ -39,7 +40,7 @@ function put(token, path, emailIds) {
 
 async function storedRow(emailId) {
 	return env.db
-		.prepare('SELECT archived, is_del FROM email WHERE email_id = ?')
+		.prepare('SELECT archived, is_del, trashed, trash_archived FROM email WHERE email_id = ?')
 		.bind(emailId)
 		.first();
 }
@@ -102,7 +103,7 @@ describe('archiving', () => {
 		expect((await listFor(owner)).list.map((item) => item.subject)).toContain('not-yours-to-archive');
 	});
 
-	it('never archives a deleted message', async () => {
+	it('never archives a trashed message', async () => {
 		const principal = await sessionFor(await createAccount());
 		await updateSetting({ sync_delete: settingConst.syncDelete.CLOSE });
 		const row = await seedEmail(principal, { subject: 'deleted-first' });
@@ -111,7 +112,7 @@ describe('archiving', () => {
 		await put(principal.token, '/api/email/archive', [row.email_id]);
 
 		const stored = await storedRow(row.email_id);
-		expect(stored.is_del).toBe(1);
+		expect(stored.trashed).toBe(1);
 		expect(stored.archived).toBe(0);
 	});
 
@@ -125,8 +126,21 @@ describe('archiving', () => {
 	});
 });
 
-describe('delete and restore (undo)', () => {
-	it('soft-deletes and restores when sync-delete is off, so undo is possible', async () => {
+describe('Trash and restore', () => {
+	it('moves an All Mail deletion to the recipient owner\'s Trash instead of physically deleting it', async () => {
+		const admin = await sessionFor(await createAdmin());
+		const owner = await sessionFor(await createAccount());
+		const row = await seedEmail(owner, { subject: 'all-mail-soft-delete' });
+
+		const response = await api(`/api/allEmail/delete?emailIds=${row.email_id}`, { method: 'DELETE', token: admin.token });
+		expect((await response.json()).code).toBe(200);
+		expect((await storedRow(row.email_id)).trashed).toBe(1);
+
+		const ownerTrash = await api(`/api/email/list?accountId=${owner.accountId}&type=all&size=50&trashed=1`, { token: owner.token });
+		expect((await ownerTrash.json()).data.list.map(item => item.subject)).toContain('all-mail-soft-delete');
+	});
+
+	it('moves to Trash and restores regardless of the legacy sync-delete setting', async () => {
 		await updateSetting({ sync_delete: settingConst.syncDelete.CLOSE });
 		const principal = await sessionFor(await createAccount());
 		const row = await seedEmail(principal, { subject: 'undo-me' });
@@ -140,12 +154,12 @@ describe('delete and restore (undo)', () => {
 		// The client uses this flag to decide whether to offer Undo at all.
 		expect(deletedBody.data).toEqual({ soft: true });
 
-		expect((await storedRow(row.email_id)).is_del).toBe(1);
+		expect((await storedRow(row.email_id)).trashed).toBe(1);
 		expect((await listFor(principal)).total).toBe(0);
 
 		await put(principal.token, '/api/email/restore', [row.email_id]);
 
-		expect((await storedRow(row.email_id)).is_del).toBe(0);
+		expect((await storedRow(row.email_id)).trashed).toBe(0);
 		expect((await listFor(principal)).list.map((item) => item.subject)).toContain('undo-me');
 	});
 
@@ -157,18 +171,18 @@ describe('delete and restore (undo)', () => {
 		const newest = await seedEmail(principal, { subject: 'Re: undo the thread', threadId });
 
 		await api(`/api/email/delete?emailIds=${newest.email_id}`, { method: 'DELETE', token: principal.token });
-		expect((await storedRow(first.email_id)).is_del).toBe(1);
-		expect((await storedRow(newest.email_id)).is_del).toBe(1);
+		expect((await storedRow(first.email_id)).trashed).toBe(1);
+		expect((await storedRow(newest.email_id)).trashed).toBe(1);
 
 		// The client only has the visible representative id, but Undo restores
 		// every sibling that the delete action changed.
 		await put(principal.token, '/api/email/restore', [newest.email_id]);
-		expect((await storedRow(first.email_id)).is_del).toBe(0);
-		expect((await storedRow(newest.email_id)).is_del).toBe(0);
+		expect((await storedRow(first.email_id)).trashed).toBe(0);
+		expect((await storedRow(newest.email_id)).trashed).toBe(0);
 		expect((await listFor(principal)).total).toBe(1);
 	});
 
-	it('reports that a permanent delete cannot be undone', async () => {
+	it('keeps normal delete soft even when the legacy sync-delete setting is on', async () => {
 		await updateSetting({ sync_delete: settingConst.syncDelete.OPEN });
 		try {
 			const principal = await sessionFor(await createAccount());
@@ -181,8 +195,8 @@ describe('delete and restore (undo)', () => {
 			const body = await deleted.json();
 
 			expect(body.code).toBe(200);
-			expect(body.data).toEqual({ soft: false });
-			expect(await storedRow(row.email_id)).toBeNull();
+			expect(body.data).toEqual({ soft: true });
+			expect((await storedRow(row.email_id)).trashed).toBe(1);
 		} finally {
 			await updateSetting({ sync_delete: settingConst.syncDelete.CLOSE });
 		}
@@ -197,7 +211,121 @@ describe('delete and restore (undo)', () => {
 		await api(`/api/email/delete?emailIds=${row.email_id}`, { method: 'DELETE', token: owner.token });
 		await put(stranger.token, '/api/email/restore', [row.email_id]);
 
-		expect((await storedRow(row.email_id)).is_del).toBe(1);
+		expect((await storedRow(row.email_id)).trashed).toBe(1);
+	});
+
+	it('permanently deletes only the owner\'s trashed message', async () => {
+		const owner = await sessionFor(await createAccount());
+		const stranger = await sessionFor(await createAccount());
+		const row = await seedEmail(owner, { subject: 'forever' });
+		await api(`/api/email/delete?emailIds=${row.email_id}`, { method: 'DELETE', token: owner.token });
+
+		await api(`/api/email/trash/delete?emailIds=${row.email_id}`, { method: 'DELETE', token: stranger.token });
+		expect((await storedRow(row.email_id)).trashed).toBe(1);
+
+		const response = await api(`/api/email/trash/delete?emailIds=${row.email_id}`, { method: 'DELETE', token: owner.token });
+		expect((await response.json()).code).toBe(200);
+		expect(await storedRow(row.email_id)).toBeNull();
+	});
+
+	it('keeps attachment metadata and objects on soft delete, then removes both on Delete forever', async () => {
+		const principal = await sessionFor(await createAccount());
+		const row = await seedEmail(principal, { subject: 'attachment-trash-lifecycle' });
+		const key = `attachments/trash-lifecycle-${row.email_id}.txt`;
+		await env.r2.put(key, 'keep me until permanent delete');
+		await env.db.prepare(
+			'INSERT INTO attachments (user_id, account_id, email_id, key, filename, mime_type, size, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+		).bind(principal.userId, principal.accountId, row.email_id, key, 'lifecycle.txt', 'text/plain', 30, 0).run();
+
+		await api(`/api/email/delete?emailIds=${row.email_id}`, { method: 'DELETE', token: principal.token });
+		expect(await env.db.prepare('SELECT att_id FROM attachments WHERE email_id = ?').bind(row.email_id).first()).toBeTruthy();
+		expect(await env.r2.get(key)).toBeTruthy();
+
+		await api(`/api/email/trash/delete?emailIds=${row.email_id}`, { method: 'DELETE', token: principal.token });
+		expect(await env.db.prepare('SELECT att_id FROM attachments WHERE email_id = ?').bind(row.email_id).first()).toBeNull();
+		expect(await env.r2.get(key)).toBeNull();
+	});
+
+	it('trashing a sent copy never changes an independently owned recipient copy', async () => {
+		const sender = await sessionFor(await createAccount());
+		const recipient = await sessionFor(await createAccount());
+		const threadId = `independent-copies-${sender.userId}-${recipient.userId}`;
+		const sent = await seedEmail(sender, { subject: 'sent-copy', type: 1, threadId });
+		const received = await seedEmail(recipient, { subject: 'sent-copy', type: 0, threadId });
+
+		await api(`/api/email/delete?emailIds=${sent.email_id}`, { method: 'DELETE', token: sender.token });
+		expect((await storedRow(sent.email_id)).trashed).toBe(1);
+		expect((await storedRow(received.email_id)).trashed).toBe(0);
+		expect((await listFor(recipient)).list.map(item => item.subject)).toContain('sent-copy');
+
+		await put(sender.token, '/api/email/restore', [sent.email_id]);
+		expect((await storedRow(sent.email_id)).trashed).toBe(0);
+		expect((await listFor(sender, 1)).list.map(item => item.subject)).toContain('sent-copy');
+	});
+
+	it('does not move a different account of the same user when a thread is trashed', async () => {
+		const principal = await sessionFor(await createAccount());
+		const secondary = await env.db.prepare(
+			'INSERT INTO account (email, name, user_id, is_del, all_receive) VALUES (?, ?, ?, 0, 0) RETURNING account_id, email',
+		).bind(`second.${principal.userId}@example.com`, 'second', principal.userId).first();
+		const threadId = `same-user-separate-account-${principal.userId}`;
+		const selected = await seedEmail(principal, { subject: 'primary-copy', threadId });
+		const sibling = await seedEmail({ ...principal, accountId: secondary.account_id, email: secondary.email }, { subject: 'secondary-copy', threadId });
+
+		await api(`/api/email/delete?emailIds=${selected.email_id}`, { method: 'DELETE', token: principal.token });
+		expect((await storedRow(selected.email_id)).trashed).toBe(1);
+		expect((await storedRow(sibling.email_id)).trashed).toBe(0);
+	});
+
+	it('lists only Trash and restores an archived message to Archive', async () => {
+		const principal = await sessionFor(await createAccount());
+		const archived = await seedEmail(principal, { subject: 'archive-before-trash' });
+		const visible = await seedEmail(principal, { subject: 'keep-visible' });
+		await put(principal.token, '/api/email/archive', [archived.email_id]);
+		await api(`/api/email/delete?emailIds=${archived.email_id}`, { method: 'DELETE', token: principal.token });
+
+		const response = await api(`/api/email/list?accountId=${principal.accountId}&type=0&size=50&trashed=1`, { token: principal.token });
+		const trash = (await response.json()).data;
+		expect(trash.list.map(item => item.subject)).toContain('archive-before-trash');
+		expect(trash.list.map(item => item.subject)).not.toContain('keep-visible');
+
+		await put(principal.token, '/api/email/restore', [archived.email_id]);
+		expect((await storedRow(archived.email_id)).archived).toBe(1);
+	});
+
+	it('keeps trashed matches out of normal keyword search', async () => {
+		const principal = await sessionFor(await createAccount());
+		const row = await seedEmail(principal, { subject: 'unique trash search token' });
+		await api(`/api/email/delete?emailIds=${row.email_id}`, { method: 'DELETE', token: principal.token });
+
+		const normal = await api(`/api/email/list?accountId=${principal.accountId}&type=0&size=50&keyword=unique%20trash%20search%20token`, { token: principal.token });
+		expect((await normal.json()).data.total).toBe(0);
+		const trash = await api(`/api/email/list?accountId=${principal.accountId}&type=all&size=50&keyword=unique%20trash%20search%20token&trashed=1`, { token: principal.token });
+		expect((await trash.json()).data.list.map(item => item.subject)).toContain('unique trash search token');
+	});
+
+	it('keeps starred Trash mail out of Starred without removing its star', async () => {
+		const principal = await sessionFor(await createAccount());
+		const row = await seedEmail(principal, { subject: 'starred-trash' });
+		await api('/api/star/add', { method: 'POST', token: principal.token, body: { emailId: row.email_id } });
+		await api(`/api/email/delete?emailIds=${row.email_id}`, { method: 'DELETE', token: principal.token });
+
+		const starred = await api('/api/star/list?size=50', { token: principal.token });
+		expect((await starred.json()).data.list.map(item => item.subject)).not.toContain('starred-trash');
+		expect(await env.db.prepare('SELECT star_id FROM star WHERE email_id = ?').bind(row.email_id).first()).toBeTruthy();
+	});
+
+	it('empties only the current owner/account Trash', async () => {
+		const owner = await sessionFor(await createAccount());
+		const other = await sessionFor(await createAccount());
+		const owned = await seedEmail(owner, { subject: 'owned-trash' });
+		const theirs = await seedEmail(other, { subject: 'other-trash' });
+		await api(`/api/email/delete?emailIds=${owned.email_id}`, { method: 'DELETE', token: owner.token });
+		await api(`/api/email/delete?emailIds=${theirs.email_id}`, { method: 'DELETE', token: other.token });
+
+		await api(`/api/email/trash/empty?accountId=${owner.accountId}`, { method: 'DELETE', token: owner.token });
+		expect(await storedRow(owned.email_id)).toBeNull();
+		expect((await storedRow(theirs.email_id)).trashed).toBe(1);
 	});
 });
 

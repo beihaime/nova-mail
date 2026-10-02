@@ -33,16 +33,32 @@ const dbInit = {
 		await this.v3_8DB(c);
 		await this.v3_9DB(c);
 		await this.v3_10DB(c);
+		await this.v3_11DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
+	},
+
+	/** v3.11 — user-facing mailbox Trash state. Safe for existing D1 databases. */
+	async v3_11DB(c) {
+		for (const statement of [
+			`ALTER TABLE email ADD COLUMN trashed INTEGER NOT NULL DEFAULT 0;`,
+			`ALTER TABLE email ADD COLUMN trashed_at TEXT NOT NULL DEFAULT '';`,
+			`ALTER TABLE email ADD COLUMN trash_archived INTEGER NOT NULL DEFAULT 0;`,
+		]) {
+			try { await c.env.db.prepare(statement).run(); }
+			catch (e) { console.warn(`跳过回收站字段添加：${e.message}`); }
+		}
+		try {
+			await c.env.db.prepare(`CREATE INDEX IF NOT EXISTS idx_email_user_trashed ON email(user_id, trashed, account_id);`).run();
+		} catch (e) { console.warn(`跳过回收站索引创建：${e.message}`); }
 	},
 
 	/**
 	 * v3.10 — archive flag for the mobile swipe actions.
 	 *
 	 * `archived = 1` takes a message out of the Inbox without deleting it, so the
-	 * undo snackbar can bring it back. Deleted mail keeps `is_del = 1` and is
-	 * unaffected; the two flags are independent.
+	 * undo snackbar can bring it back. Trash is introduced independently by
+	 * v3.11; the legacy `is_del` flag remains reserved for system flows.
 	 */
 	async v3_10DB(c) {
 		try {

@@ -42,6 +42,12 @@ export const email = sqliteTable('email', {
 	// destroying it, so the undo snackbar can put it back. Archiving never sets
 	// `is_del`, and restoring a deleted message never clears `archived` — the
 	// two states are independent.
-	archived: integer('archived').default(0).notNull()
+	archived: integer('archived').default(0).notNull(),
+	// Trash is a mailbox state, deliberately separate from the legacy `is_del`
+	// flag used by administrative/system deletion flows. `trash_archived` lets a
+	// restore return the message to Archive rather than blindly to Inbox.
+	trashed: integer('trashed').default(0).notNull(),
+	trashedAt: text('trashed_at').default('').notNull(),
+	trashArchived: integer('trash_archived').default(0).notNull()
 });
 export default email

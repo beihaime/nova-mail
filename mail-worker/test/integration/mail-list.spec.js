@@ -153,10 +153,10 @@ describe('mail deletion', () => {
 		expect(data.list.map((item) => item.subject)).toContain('keep-me');
 
 		const stored = await env.db
-			.prepare('SELECT is_del FROM email WHERE email_id = ?')
+			.prepare('SELECT trashed FROM email WHERE email_id = ?')
 			.bind(row.email_id)
 			.first();
-		expect(stored.is_del).toBe(1);
+		expect(stored.trashed).toBe(1);
 	});
 
 	it('deletes every message in the selected conversation', async () => {
@@ -172,19 +172,19 @@ describe('mail deletion', () => {
 		expect((await response.json()).code).toBe(200);
 
 		const rows = await env.db
-			.prepare('SELECT email_id, is_del FROM email WHERE email_id IN (?, ?) ORDER BY email_id')
+			.prepare('SELECT email_id, trashed FROM email WHERE email_id IN (?, ?) ORDER BY email_id')
 			.bind(first.email_id, newest.email_id)
 			.all();
 		expect(rows.results).toEqual([
-			{ email_id: first.email_id, is_del: 1 },
-			{ email_id: newest.email_id, is_del: 1 },
+			{ email_id: first.email_id, trashed: 1 },
+			{ email_id: newest.email_id, trashed: 1 },
 		]);
 
 		const inbox = await listFor(owner, { size: 50 });
 		expect(inbox.list.map((item) => item.threadId)).not.toContain(threadId);
 	});
 
-	it('removes the row entirely when sync-delete is on', async () => {
+	it('keeps the row in Trash when sync-delete is on', async () => {
 		await updateSetting({ sync_delete: settingConst.syncDelete.OPEN });
 		try {
 			const row = await seedEmail(owner, { subject: 'hard-delete' });
@@ -192,16 +192,16 @@ describe('mail deletion', () => {
 			await api(`/api/email/delete?emailIds=${row.email_id}`, { method: 'DELETE', token: owner.token });
 
 			const stored = await env.db
-				.prepare('SELECT email_id FROM email WHERE email_id = ?')
+				.prepare('SELECT trashed FROM email WHERE email_id = ?')
 				.bind(row.email_id)
 				.first();
-			expect(stored).toBeNull();
+			expect(stored.trashed).toBe(1);
 		} finally {
 			await updateSetting({ sync_delete: settingConst.syncDelete.CLOSE });
 		}
 	});
 
-	it('physically deletes every message in a conversation when sync-delete is on', async () => {
+	it('moves every message in a conversation to Trash when sync-delete is on', async () => {
 		await updateSetting({ sync_delete: settingConst.syncDelete.OPEN });
 		try {
 			const threadId = `hard-delete-thread-${owner.userId}`;
@@ -211,10 +211,10 @@ describe('mail deletion', () => {
 			await api(`/api/email/delete?emailIds=${newest.email_id}`, { method: 'DELETE', token: owner.token });
 
 			const rows = await env.db
-				.prepare('SELECT email_id FROM email WHERE email_id IN (?, ?)')
+				.prepare('SELECT trashed FROM email WHERE email_id IN (?, ?) ORDER BY email_id')
 				.bind(first.email_id, newest.email_id)
 				.all();
-			expect(rows.results).toEqual([]);
+			expect(rows.results).toEqual([{ trashed: 1 }, { trashed: 1 }]);
 		} finally {
 			await updateSetting({ sync_delete: settingConst.syncDelete.CLOSE });
 		}

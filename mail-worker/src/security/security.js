@@ -44,6 +44,8 @@ const requirePerms = [
 	'/email/archive',
 	'/email/unarchive',
 	'/email/restore',
+	'/email/trash/delete',
+	'/email/trash/empty',
 	'/account/list',
 	'/account/delete',
 	'/account/add',
@@ -84,7 +86,7 @@ const requirePerms = [
 // Maps a stored permission key to the API routes it unlocks. The name now
 // matches `perm.perm_key` and `permKeyToPaths` below; it previously did not.
 const permKey = {
-	'email:delete': ['/email/delete', '/email/archive', '/email/unarchive', '/email/restore'],
+	'email:delete': ['/email/delete', '/email/archive', '/email/unarchive', '/email/restore', '/email/trash/delete', '/email/trash/empty'],
 	'email:send': ['/email/send'],
 	'account:add': ['/account/add'],
 	'account:query': ['/account/list'],

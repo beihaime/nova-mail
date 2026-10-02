@@ -6,7 +6,7 @@
       <ContentPane class="desktop-reading-pane" />
     </div>
     <router-view v-else class="main-view" v-slot="{ Component,route }">
-      <keep-alive :include="['email','all-email','send','sys-setting','star','user','role','analysis','reg-key','draft']">
+      <keep-alive :include="['email','all-email','send','sys-setting','star','user','role','analysis','reg-key','draft','trash']">
         <component :is="Component" :key="route.name"/>
       </keep-alive>
     </router-view>

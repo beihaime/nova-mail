@@ -6,8 +6,8 @@ import http from '@/axios/index.js';
  * `archived` selects the view: 0 is the Inbox (and every other folder), 1 is the
  * Archive. The server filters on the flag, so the two never mix.
  */
-export function emailList(accountId, allReceive, emailId, timeSort, size, type, full, keyword = '', archived = 0) {
-    return http.get('/email/list', {params: {accountId, allReceive, emailId, timeSort, size, type, full, keyword, archived}})
+export function emailList(accountId, allReceive, emailId, timeSort, size, type, full, keyword = '', archived = 0, trashed = 0) {
+    return http.get('/email/list', {params: {accountId, allReceive, emailId, timeSort, size, type, full, keyword, archived, trashed}})
 }
 
 export function emailDelete(emailIds) {
@@ -29,6 +29,14 @@ export function emailUnarchive(emailIds) {
 
 export function emailRestore(emailIds) {
     return http.put('/email/restore', {emailIds})
+}
+
+export function emailDeleteForever(emailIds) {
+    return http.delete('/email/trash/delete?emailIds=' + emailIds)
+}
+
+export function emailEmptyTrash(accountId) {
+    return http.delete('/email/trash/empty', { params: { accountId } })
 }
 
 export function emailLatest(emailId, accountId, allReceive) {

@@ -19,6 +19,7 @@ export const useEmailStore = defineStore('email', {
         // The Archive view's list ref, so marking mail read reaches whichever
         // folder is open (see `markListRead`).
         archiveScroll: null,
+        trashScroll: null,
         detailMap: {},
         searchKeyword: '',
         // Client-side query behind the phone Inbox search field. It lives in the
@@ -83,7 +84,7 @@ export const useEmailStore = defineStore('email', {
             }
         },
         markListRead(emailId) {
-            const scrolls = [this.emailScroll, this.starScroll, this.sendScroll, this.archiveScroll]
+            const scrolls = [this.emailScroll, this.starScroll, this.sendScroll, this.archiveScroll, this.trashScroll]
             for (const scroll of scrolls) {
                 const list = scroll?.emailList
                 if (!list?.length) continue

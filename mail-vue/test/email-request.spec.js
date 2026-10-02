@@ -16,7 +16,7 @@ vi.mock('@/axios/index.js', () => ({
   default: { get: mocks.get, put: mocks.put, delete: mocks.delete },
 }))
 
-const { emailList, emailDelete, emailArchive, emailUnarchive, emailRestore } = await import(
+const { emailList, emailDelete, emailArchive, emailUnarchive, emailRestore, emailDeleteForever, emailEmptyTrash } = await import(
   '../src/request/email.js'
 )
 
@@ -54,6 +54,12 @@ describe('emailList', () => {
     expect(params.timeSort).toBe(1)
     expect(params.allReceive).toBe(1)
   })
+
+  it('can request the owner Trash across received and sent copies', () => {
+    emailList(7, 0, 0, 0, 50, 'all', 1, '', 0, 1)
+
+    expect(mocks.get.mock.calls[0][1].params).toMatchObject({ type: 'all', trashed: 1, archived: 0 })
+  })
 })
 
 describe('delete and the swipe action routes', () => {
@@ -81,5 +87,13 @@ describe('delete and the swipe action routes', () => {
     emailRestore([11, 12])
 
     expect(mocks.put).toHaveBeenCalledWith('/email/restore', { emailIds: [11, 12] })
+  })
+
+  it('uses the dedicated permanent-delete and account-scoped empty routes', () => {
+    emailDeleteForever([11, 12])
+    emailEmptyTrash(7)
+
+    expect(mocks.delete).toHaveBeenNthCalledWith(1, '/email/trash/delete?emailIds=11,12')
+    expect(mocks.delete).toHaveBeenNthCalledWith(2, '/email/trash/empty', { params: { accountId: 7 } })
   })
 })

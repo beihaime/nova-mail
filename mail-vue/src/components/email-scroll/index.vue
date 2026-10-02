@@ -415,6 +415,14 @@ const props = defineProps({
   emailArchive: Function,
   emailUnarchive: Function,
   emailRestore: Function,
+  deleteConfirmText: {
+    type: String,
+    default: ''
+  },
+  deleteSuccessText: {
+    type: String,
+    default: ''
+  },
   starAdd: Function,
   starCancel: Function,
   cancelSuccess: Function,
@@ -550,7 +558,8 @@ defineExpose({
   firstLoad,
   latestEmail,
   noLoading,
-  total
+  total,
+  getSelectedMailsIds
 })
 
 onActivated(() => {
@@ -1235,31 +1244,18 @@ function localRead(emailIds) {
 }
 
 function rightDelete(emailId) {
-
-  if (props.type === 'all-email') {
-    ElMessageBox.confirm(t('delOneEmailConfirm'), {
-      confirmButtonText: t('confirm'),
-      cancelButtonText: t('cancel'),
-      type: 'warning'
-    }).then(() => {
-      props.emailDelete([emailId]).then(() => {
-        ElMessage({
-          message: t('delSuccessMsg'),
-          type: 'success',
-          plain: true
-        })
-        emailStore.deleteIds = [emailId];
-      })
-    })
-    return;
-  }
+  // Normal-folder row deletion is a reversible move to Trash. Remove first;
+  // the following refresh restores authoritative state if the request fails.
+  emailStore.deleteIds = [emailId];
   props.emailDelete([emailId]).then(() => {
     ElMessage({
       message: t('delSuccessMsg'),
       type: 'success',
       plain: true
     })
-    emailStore.deleteIds = [emailId];
+  }).catch(error => {
+    refreshList()
+    console.error(error)
   })
 }
 
@@ -1286,12 +1282,7 @@ async function copyCode(code) {
 }
 
 function handleDelete() {
-  ElMessageBox.confirm(t('delEmailsConfirm'), {
-    confirmButtonText: t('confirm'),
-    cancelButtonText: t('cancel'),
-    type: 'warning'
-  }).then(() => {
-
+  const removeSelected = () => {
     if (props.type === 'draft') {
       const draftIds = getSelectedDraftsIds();
       emit('delete-draft', draftIds);
@@ -1299,15 +1290,34 @@ function handleDelete() {
     }
 
     const emailIds = getSelectedMailsIds();
+    const optimistic = !props.deleteConfirmText
+    if (optimistic) emailStore.deleteIds = emailIds
     props.emailDelete(emailIds).then(() => {
       ElMessage({
-        message: t('delSuccessMsg'),
+        message: props.deleteSuccessText || t('delSuccessMsg'),
         type: 'success',
         plain: true
       })
-      emailStore.deleteIds = emailIds;
+      if (!optimistic) emailStore.deleteIds = emailIds;
+    }).catch(error => {
+      if (optimistic) refreshList()
+      console.error(error)
     })
-  })
+  }
+
+  // Moving a mail to Trash is reversible and should be immediate.  The Trash
+  // view supplies `deleteConfirmText`, making its destructive action the only
+  // mail-list delete that asks for confirmation.
+  if (!props.deleteConfirmText && props.type !== 'draft') {
+    removeSelected()
+    return
+  }
+
+  ElMessageBox.confirm(props.deleteConfirmText || t('delEmailsConfirm'), {
+    confirmButtonText: t('confirm'),
+    cancelButtonText: t('cancel'),
+    type: 'warning'
+  }).then(removeSelected)
 }
 
 function deleteEmail(emailIds) {

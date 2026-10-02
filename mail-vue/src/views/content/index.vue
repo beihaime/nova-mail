@@ -2,7 +2,8 @@
   <div class="box mail-reader">
     <div class="header-actions">
       <el-tooltip effect="dark" :content="$t('back')" :show-after="2000"><button class="nova-icon-button toolbar-action" type="button" :aria-label="$t('back')" @click="handleBack"><Icon icon="solar:arrow-left-linear" width="20" height="20" /></button></el-tooltip>
-      <el-tooltip v-perm="'email:delete'" effect="dark" :content="$t('delete')" :show-after="2000"><button class="nova-icon-button toolbar-action" type="button" :aria-label="$t('delete')" @click="handleDelete"><Icon icon="solar:trash-bin-trash-linear" width="20" height="20" /></button></el-tooltip>
+      <el-tooltip v-if="emailStore.contentData.delType === 'trash'" v-perm="'email:delete'" effect="dark" :content="$t('restoreFromTrash')" :show-after="2000"><button class="nova-icon-button toolbar-action" type="button" :aria-label="$t('restoreFromTrash')" @click="restoreTrash"><Icon icon="solar:restart-linear" width="20" height="20" /></button></el-tooltip>
+      <el-tooltip v-perm="'email:delete'" effect="dark" :content="emailStore.contentData.delType === 'trash' ? $t('deleteForever') : $t('delete')" :show-after="2000"><button class="nova-icon-button toolbar-action" type="button" :aria-label="emailStore.contentData.delType === 'trash' ? $t('deleteForever') : $t('delete')" @click="handleDelete"><Icon icon="solar:trash-bin-trash-linear" width="20" height="20" /></button></el-tooltip>
       <el-tooltip v-if="emailStore.contentData.showStar" effect="dark" :content="email.isStar ? $t('unstar') : $t('star')" :show-after="2000">
         <button class="nova-icon-button toolbar-action toolbar-star" type="button" :aria-label="email.isStar ? $t('unstar') : $t('star')" @click="changeStar(email)">
           <Icon v-if="email.isStar" class="nova-star-icon is-active" icon="solar:star-bold" width="18" height="18" />
@@ -233,7 +234,7 @@ import MailHtmlFrame from '@/components/mail-html-frame/index.vue'
 import {computed, reactive, ref, watch, nextTick, onMounted, onUnmounted} from "vue";
 import {useRoute, useRouter} from 'vue-router'
 import {ElMessage, ElMessageBox} from 'element-plus'
-import {emailDelete, emailLatest, emailList, emailRead, emailThread} from "@/request/email.js";
+import {emailDelete, emailDeleteForever, emailLatest, emailList, emailRead, emailRestore, emailThread} from "@/request/email.js";
 import {Icon} from "@iconify/vue";
 import {useEmailStore} from "@/store/email.js";
 import {useAccountStore} from "@/store/account.js";
@@ -770,7 +771,8 @@ async function fetchPrimaryBody() {
 
     // timeSort=0 returns rows with a smaller emailId than the cursor, so
     // `emailId + 1` includes the target row itself.
-    const data = await emailList(accountId, allReceive, emailId + 1, 0, 1, type, 1)
+    const inTrash = emailStore.contentData.delType === 'trash'
+    const data = await emailList(accountId, allReceive, emailId + 1, 0, 1, type, 1, '', 0, inTrash ? 1 : 0)
     const list = Array.isArray(data) ? data : data?.list
     const row = (list || []).find(item => Number(item.emailId) === emailId)
 
@@ -1452,32 +1454,57 @@ const handleBack = () => {
 }
 
 const handleDelete = () => {
-  ElMessageBox.confirm(t('delEmailConfirm'), {
+  const isTrash = emailStore.contentData.delType === 'trash'
+  const removeCurrent = () => {
+    if (isTrash) {
+      emailDeleteForever(email.value.emailId).then(() => {
+        ElMessage({ message: t('delSuccessMsg'), type: 'success', plain: true })
+        emailStore.trashScroll?.deleteEmail([email.value.emailId])
+        router.back()
+      })
+    } else if (emailStore.contentData.delType === 'logic') {
+      const emailId = email.value.emailId
+      emailStore.deleteIds = [emailId]
+      router.back()
+      emailDelete(emailId).then(() => {
+        ElMessage({ message: t('delSuccessMsg'), type: 'success', plain: true })
+      }).catch(error => {
+        console.error(error)
+        emailStore.emailScroll?.refreshList()
+        emailStore.sendScroll?.refreshList()
+        emailStore.starScroll?.refreshList()
+        emailStore.archiveScroll?.refreshList()
+      })
+    } else  {
+      const emailId = email.value.emailId
+      emailStore.deleteIds = [emailId]
+      router.back()
+      allEmailDelete(emailId).then(() => {
+        ElMessage({ message: t('delSuccessMsg'), type: 'success', plain: true })
+      }).catch(error => {
+        console.error(error)
+      })
+    }
+  }
+
+  // Normal deletion is a reversible move to Trash.  Only its permanent
+  // counterpart in Trash carries an irreversible-action confirmation.
+  if (!isTrash) {
+    removeCurrent()
+    return
+  }
+
+  ElMessageBox.confirm(t('deleteForeverConfirm'), {
     confirmButtonText: t('confirm'),
     cancelButtonText: t('cancel'),
     type: 'warning'
-  }).then(() => {
-    if (emailStore.contentData.delType === 'logic') {
-      emailDelete(email.value.emailId).then(() => {
-        ElMessage({
-          message: t('delSuccessMsg'),
-          type: 'success',
-          plain: true,
-        })
-        emailStore.deleteIds = [email.value.emailId]
-      })
-    } else  {
+  }).then(removeCurrent)
+}
 
-      allEmailDelete(email.value.emailId).then(() => {
-        ElMessage({
-          message: t('delSuccessMsg'),
-          type: 'success',
-          plain: true,
-        })
-        emailStore.deleteIds = [email.value.emailId]
-      })
-    }
-
+function restoreTrash() {
+  emailRestore([email.value.emailId]).then(() => {
+    ElMessage({ message: t('restoreSuccessMsg'), type: 'success', plain: true })
+    emailStore.trashScroll?.deleteEmail([email.value.emailId])
     router.back()
   })
 }

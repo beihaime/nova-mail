@@ -53,7 +53,7 @@ function toEmailIdList(emailIds) {
 }
 
 /**
- * Expand selected messages into complete conversations owned by one user.
+ * Expand selected messages into complete conversations owned by one mailbox.
  *
  * The Inbox renders one (newest) message per thread, so deleting only that
  * representative leaves its older siblings alive. A later message with the
@@ -67,7 +67,7 @@ async function ownedThreadMessageIds(c, userId, emailIds) {
 	if (!selectedIds.length) return [];
 
 	const anchors = await orm(c)
-		.select({ emailId: email.emailId, threadId: email.threadId })
+		.select({ emailId: email.emailId, threadId: email.threadId, accountId: email.accountId })
 		.from(email)
 		.where(and(
 			eq(email.userId, userId),
@@ -77,7 +77,8 @@ async function ownedThreadMessageIds(c, userId, emailIds) {
 
 	if (!anchors.length) return [];
 
-	const conversationFilters = anchors.map(anchor => (
+	const conversationFilters = anchors.map(anchor => and(
+		eq(email.accountId, anchor.accountId),
 		anchor.threadId
 			? eq(email.threadId, anchor.threadId)
 			: eq(email.emailId, anchor.emailId)
@@ -119,10 +120,14 @@ const emailService = {
 
 	async list(c, params, userId) {
 
-		let { emailId, type, accountId, size, timeSort, allReceive, full, keyword, archived } = params;
+		let { emailId, type, accountId, size, timeSort, allReceive, full, keyword, archived, trashed } = params;
 
 		size = Number(size);
-		type = Number(type);
+		// Trash contains both received and sent copies.  Normal folders still send
+		// their concrete numeric type; the owner-only Trash view is the one caller
+		// allowed to request all types.
+		const allTypes = String(type || '').toLowerCase() === 'all';
+		type = allTypes ? null : Number(type);
 		emailId = Number(emailId) || 0;
 		timeSort = Number(timeSort);
 		accountId = Number(accountId);
@@ -131,9 +136,12 @@ const emailService = {
 		keyword = normalizeSearchKeyword(keyword);
 		// The Archive view asks for `archived=1`; every other list keeps the
 		// default and never sees archived mail.
-		archived = Number(archived) === 1 ? 1 : 0;
+		trashed = Number(trashed) === 1 ? 1 : 0;
+		// Archive is the previous folder state once a row is in Trash, not a
+		// second Trash sub-folder.  Show both archived and inbox rows there.
+		archived = trashed ? null : (Number(archived) === 1 ? 1 : 0);
 
-		if (isNaN(type)) {
+		if (!allTypes && isNaN(type)) {
 			type = 0;
 		}
 
@@ -160,15 +168,15 @@ const emailService = {
 			allReceive = accountRow.allReceive;
 		}
 
-		const filters = this.emailListFilters({ userId, accountId, type, allReceive, emailId, timeSort, keyword, archived });
-		const countFilters = this.emailListFilters({ userId, accountId, type, allReceive, withCursor: false, keyword, archived });
+		const filters = this.emailListFilters({ userId, accountId, type, allReceive, emailId, timeSort, keyword, archived, trashed });
+		const countFilters = this.emailListFilters({ userId, accountId, type, allReceive, withCursor: false, keyword, archived, trashed });
 		const columns = full ? emailListColumns : emailBriefColumns;
 
 		// The Inbox (received mail) is a conversation list: rows are collapsed to
 		// the newest message of each thread so a reply updates and re-orders its
 		// conversation instead of appearing as a second Inbox item. Sent and the
 		// other folders stay message-per-row.
-		const groupByThread = type === emailConst.type.RECEIVE;
+		const groupByThread = type === emailConst.type.RECEIVE || trashed === 1;
 
 		// Conversation key. Legacy rows without a thread id stay separate
 		// (`e:<email_id>`) instead of collapsing into one bucket.
@@ -282,16 +290,18 @@ const emailService = {
 		const latestEmailQuery = orm(c).select({
 			emailId: email.emailId,
 			accountId: email.accountId,
+			trashed: email.trashed,
 			userId: email.userId,
 		}).from(email).where(
 			and(
 				eq(email.userId, userId),
-				eq(email.type, type),
+				type === null ? undefined : eq(email.type, type),
 				eq(email.isDel, isDel.NORMAL),
 				// Match the view being listed: the Inbox's poll cursor must skip
 				// archived mail, and the Archive view must not be seeded with an
 				// Inbox id it would then page against.
-				eq(email.archived, archived),
+				archived === null ? undefined : eq(email.archived, archived),
+				eq(email.trashed, trashed),
 				allReceive ? undefined : eq(email.accountId, accountId),
 				...emailKeywordFilters(keyword)
 			))
@@ -351,6 +361,7 @@ const emailService = {
 					subject: email.subject,
 					userId: email.userId,
 					accountId: email.accountId,
+					trashed: email.trashed,
 				})
 				.from(email)
 				.where(and(eq(email.emailId, emailId), eq(email.userId, userId)))
@@ -359,6 +370,7 @@ const emailService = {
 			if (!anchor) {
 				throw new BizError(t('notExistEmailReply'));
 			}
+			params.trashed = anchor.trashed;
 
 			if (anchor.threadId) {
 				threadId = anchor.threadId;
@@ -383,6 +395,7 @@ const emailService = {
 				eq(email.userId, userId),
 				eq(legacyThreadKey, threadId),
 				eq(email.isDel, isDel.NORMAL),
+				eq(email.trashed, Number(params.trashed) === 1 ? 1 : 0),
 				eq(account.isDel, isDel.NORMAL),
 			))
 			.orderBy(asc(email.emailId))
@@ -411,14 +424,15 @@ const emailService = {
 		return list;
 	},
 
-	emailListFilters({ userId, accountId, type, allReceive, emailId, timeSort, keyword, archived = 0, withCursor = true }) {
+	emailListFilters({ userId, accountId, type, allReceive, emailId, timeSort, keyword, archived = 0, trashed = 0, withCursor = true }) {
 		const conditions = [
 			eq(email.userId, userId),
-			eq(email.type, type),
+			type === null ? undefined : eq(email.type, type),
 			eq(email.isDel, isDel.NORMAL),
 			// One flag, two views: the Inbox asks for `archived = 0` and the
 			// Archive view for `archived = 1`, so neither can leak into the other.
-			eq(email.archived, archived),
+			archived === null ? undefined : eq(email.archived, archived),
+			eq(email.trashed, trashed),
 			eq(account.isDel, isDel.NORMAL),
 		];
 		if (!allReceive) {
@@ -432,7 +446,9 @@ const emailService = {
 	},
 
 	allEmailListFilters({ emailId, name, subject, accountEmail, userEmail, type, timeSort, withCursor = true }) {
-		const conditions = [];
+		// Administrative All Mail follows normal client semantics: Trash is only
+		// visible through the owner-scoped Trash mailbox, never this global view.
+		const conditions = [eq(email.trashed, 0)];
 
 		if (type === 'send') {
 			conditions.push(eq(email.type, emailConst.type.SEND));
@@ -478,28 +494,46 @@ const emailService = {
 		return conditions;
 	},
 
-	async delete(c, params, userId) {
+	async moveToTrash(c, params, userId) {
 		const emailIdList = await ownedThreadMessageIds(c, userId, params?.emailIds);
-		const { syncDelete } = await settingService.query(c);
+		if (!emailIdList.length) return { soft: true };
 
-		if (syncDelete === settingConst.syncDelete.OPEN) {
-			if (emailIdList.length) {
-				await this.physicsDelete(c, { emailIds: emailIdList.join(',') });
-			}
-			// Reported to the client so the swipe action only offers "Undo" when
-			// the row still exists. With `sync_delete` on, the delete is final by
-			// the user's own configuration and nothing can bring it back.
-			return { soft: false };
-		}
-
-		await orm(c).update(email).set({ isDel: isDel.DELETE }).where(
+		// Preserve the actual folder state before hiding the message. Attachments,
+		// stars and all delivery metadata intentionally remain untouched.
+		await orm(c).update(email).set({
+			trashed: 1,
+			trashedAt: new Date().toISOString(),
+			trashArchived: sql`${email.archived}`,
+		}).where(
 			and(
 				eq(email.userId, userId),
+				eq(email.trashed, 0),
 				inArray(email.emailId, emailIdList)))
 			.run();
 
 		return { soft: true };
 	},
+
+	/**
+	 * Administrative All Mail uses the same non-destructive mailbox action.
+	 * Its route is protected by `all-email:delete`; unlike the user route it may
+	 * act on a row owned by another mailbox, so only the selected records (not
+	 * a cross-user thread expansion) are moved.  The owner can restore it from
+	 * their own Trash afterwards.
+	 */
+	async moveToTrashAdmin(c, params) {
+		const emailIdList = toEmailIdList(params?.emailIds);
+		if (!emailIdList.length) return { soft: true };
+		await orm(c).update(email).set({
+			trashed: 1,
+			trashedAt: new Date().toISOString(),
+			trashArchived: sql`${email.archived}`,
+		}).where(and(eq(email.trashed, 0), inArray(email.emailId, emailIdList))).run();
+		return { soft: true };
+	},
+
+	// Compatibility alias for internal callers retained during the Trash rollout.
+	async delete(c, params, userId) { return this.moveToTrash(c, params, userId); },
 
 	/**
 	 * Take messages out of the Inbox without deleting them (mobile swipe right).
@@ -523,6 +557,7 @@ const emailService = {
 			and(
 				eq(email.userId, userId),
 				eq(email.isDel, isDel.NORMAL),
+				eq(email.trashed, 0),
 				inArray(email.emailId, emailIdList)))
 			.run();
 	},
@@ -534,15 +569,49 @@ const emailService = {
 	 * nothing and is a no-op — the client only offers Undo when `delete` reported
 	 * `soft: true`.
 	 */
-	async restore(c, params, userId) {
+	async restoreFromTrash(c, params, userId) {
 		const emailIdList = await ownedThreadMessageIds(c, userId, params?.emailIds);
 		if (!emailIdList.length) return;
 
-		await orm(c).update(email).set({ isDel: isDel.NORMAL }).where(
+		await orm(c).update(email).set({
+			trashed: 0,
+			trashedAt: '',
+			archived: sql`${email.trashArchived}`,
+			trashArchived: 0,
+		}).where(
 			and(
 				eq(email.userId, userId),
+				eq(email.trashed, 1),
 				inArray(email.emailId, emailIdList)))
 			.run();
+	},
+
+	async restore(c, params, userId) { return this.restoreFromTrash(c, params, userId); },
+
+	async deleteForever(c, params, userId) {
+		const emailIdList = await ownedThreadMessageIds(c, userId, params?.emailIds);
+		if (!emailIdList.length) return;
+		const rows = await orm(c).select({ emailId: email.emailId }).from(email).where(and(
+			eq(email.userId, userId), eq(email.trashed, 1), inArray(email.emailId, emailIdList)
+		)).all();
+		if (!rows.length) return;
+		await this.physicsDelete(c, { emailIds: rows.map(row => row.emailId).join(',') });
+	},
+
+	async emptyTrash(c, params, userId) {
+		const accountId = Number(params?.accountId);
+		// Emptying Trash is intentionally scoped to the active, owned account.
+		// Never treat a missing or malformed account id as "all accounts".
+		if (!Number.isInteger(accountId) || accountId <= 0) {
+			throw new BizError(t('emptyAccountId'));
+		}
+		const conditions = [
+			eq(email.userId, userId),
+			eq(email.accountId, accountId),
+			eq(email.trashed, 1)
+		];
+		const rows = await orm(c).select({ emailId: email.emailId }).from(email).where(and(...conditions)).all();
+		if (rows.length) await this.physicsDelete(c, { emailIds: rows.map(row => row.emailId).join(',') });
 	},
 
 	/**
@@ -1261,7 +1330,8 @@ const emailService = {
 		return orm(c).select().from(email).where(
 			and(eq(email.emailId, emailId),
 				userId === undefined ? undefined : eq(email.userId, userId),
-				eq(email.isDel, isDel.NORMAL)))
+				eq(email.isDel, isDel.NORMAL),
+				eq(email.trashed, 0)))
 			.get();
 	},
 
@@ -1287,6 +1357,7 @@ const emailService = {
 					// Archiving the newest message must not make the poll hand it
 					// back to the list it was just removed from.
 					eq(email.archived, 0),
+					eq(email.trashed, 0),
 					eq(account.isDel, isDel.NORMAL),
 					allReceive ? undefined : eq(email.accountId, accountId),
 					eq(email.type, emailConst.type.RECEIVE)
@@ -1399,7 +1470,11 @@ const emailService = {
 			accountId: email.accountId,
 			userId: email.userId,
 		}).from(email)
-			.where(eq(email.type, emailConst.type.RECEIVE))
+			.where(and(
+				eq(email.type, emailConst.type.RECEIVE),
+				eq(email.isDel, isDel.NORMAL),
+				eq(email.trashed, 0),
+			))
 			.orderBy(desc(email.emailId)).limit(1).get();
 
 		let [list, totalRow, latestEmail] = await Promise.all([listQuery, totalQuery, latestEmailQuery]);
@@ -1432,7 +1507,9 @@ const emailService = {
 			.where(
 				and(
 					gt(email.emailId, emailId),
-					eq(email.type, emailConst.type.RECEIVE)
+					eq(email.type, emailConst.type.RECEIVE),
+					eq(email.isDel, isDel.NORMAL),
+					eq(email.trashed, 0)
 				))
 			.orderBy(desc(email.emailId))
 			.limit(20);
