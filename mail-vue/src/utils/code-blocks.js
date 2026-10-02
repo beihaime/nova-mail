@@ -157,12 +157,12 @@ export function renderCodeBlock(code, language = '') {
   ))
   const html = highlightedLines.map((line, index) => (
     `<span class="nova-code-line" data-line="${index + 1}">${line}</span>`
-  )).join('\n')
+  )).join('')
   const languageClass = normalized ? ` language-${normalized}` : ''
   const lineCount = source ? source.split('\n').length : 0
   const lineLabel = `${lineCount} ${lineCount === 1 ? 'line' : 'lines'}`
   const languageLabel = LANGUAGE_LABELS[normalized] || 'Plain text'
-  return `<div class="nova-code-block"><div class="nova-code-toolbar"><span class="nova-code-language"><span class="nova-code-language-icon" aria-hidden="true">&lt;/&gt;</span>${languageLabel}</span><span class="nova-code-lines">${lineLabel}</span><button class="nova-code-copy" type="button" data-nova-copy-code="1" aria-label="Copy code">Copy</button></div><pre><code class="hljs${languageClass}">${html}</code></pre></div>`
+  return `<div class="nova-code-block" data-nova-code-source="${escapeHtml(source)}"><div class="nova-code-toolbar"><span class="nova-code-language"><span class="nova-code-language-icon" aria-hidden="true">&lt;/&gt;</span>${languageLabel}</span><span class="nova-code-lines">${lineLabel}</span><button class="nova-code-copy" type="button" data-nova-copy-code="1" aria-label="Copy code">Copy</button></div><pre><code class="hljs${languageClass}">${html}</code></pre></div>`
 }
 
 function languageFromCodeElement(code) {

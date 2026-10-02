@@ -120,7 +120,7 @@ async function handleFrameClick(event) {
   const button = event.target?.closest?.('[data-nova-copy-code]')
   if (!button) return
 
-  const code = button.closest('.nova-code-block')?.querySelector('code')?.textContent || ''
+  const code = button.closest('.nova-code-block')?.getAttribute('data-nova-code-source') || ''
   if (!code) return
 
   try {

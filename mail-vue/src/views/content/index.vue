@@ -425,7 +425,7 @@ async function copyCodeBlock(event) {
   const button = event.target?.closest?.('[data-nova-copy-code]')
   if (!button) return
 
-  const code = button.closest('.nova-code-block')?.querySelector('code')?.textContent || ''
+  const code = button.closest('.nova-code-block')?.getAttribute('data-nova-code-source') || ''
   if (!code) return
 
   try {
@@ -2139,7 +2139,7 @@ const handleDelete = () => {
   position: relative;
   max-width: 100%;
   margin: 10px 0;
-  padding: 40px 14px 12px;
+  padding: 34px 14px 10px;
   overflow-x: auto;
   box-sizing: border-box;
   border: 1px solid var(--light-border);
@@ -2160,7 +2160,7 @@ const handleDelete = () => {
   min-width: max-content;
   font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 13px;
-  line-height: 1.55;
+  line-height: 1.3;
 }
 
 .email-text :deep(.nova-code-prose) { white-space: pre-wrap; }
@@ -2168,6 +2168,7 @@ const handleDelete = () => {
 .email-text :deep(.nova-code-toolbar) {
   position: absolute;
   top: 8px;
+  left: 12px;
   right: 10px;
   display: flex;
   align-items: center;
@@ -2194,6 +2195,7 @@ const handleDelete = () => {
   align-items: center;
   gap: 4px;
   color: var(--el-color-primary);
+  margin-right: auto;
 }
 
 .email-text :deep(.nova-code-language-icon) { font-weight: 700; }
@@ -2201,7 +2203,7 @@ const handleDelete = () => {
 .email-text :deep(.nova-code-line) {
   position: relative;
   display: block;
-  min-height: 1.55em;
+  min-height: 1.3em;
   padding-left: 3.5em;
 }
 
