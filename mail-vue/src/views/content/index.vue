@@ -1,25 +1,18 @@
 <template>
   <div class="box mail-reader">
     <div class="header-actions">
-      <AppIcon class="icon" name="back" :size="20" title="Back" aria-label="Back" @click="handleBack"/>
-      <AppIcon v-perm="'email:delete'" class="icon" name="delete-outline" :size="18" title="Delete" aria-label="Delete email" @click="handleDelete"/>
-      <span class="star" v-if="emailStore.contentData.showStar">
-        <Icon
-          v-if="email.isStar"
-          class="icon star-active-icon"
-          icon="solar:star-bold"
-          width="20"
-          height="20"
-          title="Unstar"
-          aria-label="Unstar email"
-          @click="changeStar(email)"
-        />
-        <AppIcon class="icon" @click="changeStar(email)" v-else name="star-outline" :size="19" title="Star" aria-label="Star email"/>
-      </span>
-      <AppIcon class="icon" v-if="emailStore.contentData.showReply" v-perm="'email:send'"  @click="openReply" name="reply" :size="21" title="Reply" aria-label="Reply" />
-      <Icon class="icon" v-if="emailStore.contentData.showReply" v-perm="'email:send'" @click="openReplyAll" icon="mdi:reply-all-outline" width="21" height="21" :title="$t('replyAll')" :aria-label="$t('replyAll')" />
-      <AppIcon class="icon" v-if="emailStore.contentData.showReply" v-perm="'email:send'"  @click="openForward" name="forward" :size="20" title="Forward" aria-label="Forward" />
-      <AppIcon class="icon" name="print" :size="19" title="Print" aria-label="Print email" @click="printEmail" />
+      <el-tooltip content="Back" :show-after="2000"><button class="toolbar-action" type="button" aria-label="Back" @click="handleBack"><Icon icon="solar:arrow-left-linear" width="20" height="20" /></button></el-tooltip>
+      <el-tooltip v-perm="'email:delete'" content="Delete" :show-after="2000"><button class="toolbar-action" type="button" aria-label="Delete email" @click="handleDelete"><Icon icon="solar:trash-bin-trash-linear" width="20" height="20" /></button></el-tooltip>
+      <el-tooltip v-if="emailStore.contentData.showStar" :content="email.isStar ? 'Unstar' : 'Star'" :show-after="2000">
+        <button class="toolbar-action toolbar-star" type="button" :aria-label="email.isStar ? 'Unstar' : 'Star'" @click="changeStar(email)">
+          <Icon v-if="email.isStar" class="star-active-icon" icon="solar:star-bold" width="20" height="20" />
+          <Icon v-else icon="solar:star-linear" width="20" height="20" />
+        </button>
+      </el-tooltip>
+      <el-tooltip v-if="emailStore.contentData.showReply" v-perm="'email:send'" content="Reply" :show-after="2000"><button class="toolbar-action" type="button" aria-label="Reply" @click="openReply"><Icon icon="solar:reply-linear" width="20" height="20" /></button></el-tooltip>
+      <el-tooltip v-if="emailStore.contentData.showReply" v-perm="'email:send'" :content="$t('replyAll')" :show-after="2000"><button class="toolbar-action" type="button" :aria-label="$t('replyAll')" @click="openReplyAll"><Icon icon="mdi:reply-all-outline" width="20" height="20" /></button></el-tooltip>
+      <el-tooltip v-if="emailStore.contentData.showReply" v-perm="'email:send'" content="Forward" :show-after="2000"><button class="toolbar-action" type="button" aria-label="Forward" @click="openForward"><Icon icon="solar:forward-2-linear" width="20" height="20" /></button></el-tooltip>
+      <el-tooltip content="Print" :show-after="2000"><button class="toolbar-action" type="button" aria-label="Print email" @click="printEmail"><Icon icon="solar:printer-linear" width="20" height="20" /></button></el-tooltip>
     </div>
     <div></div>
     <el-scrollbar ref="scrollRef" class="scrollbar">
@@ -100,8 +93,8 @@
                   :aria-label="message.isStar ? 'Unstar' : 'Star'"
                   @click.stop="changeStar(message)"
               >
-                <Icon v-if="message.isStar" class="star-active-icon" icon="solar:star-bold" width="19" height="19" />
-                <AppIcon v-else name="star-outline" :size="18" />
+                <Icon v-if="message.isStar" class="star-active-icon" icon="solar:star-bold" width="20" height="20" />
+                <Icon v-else icon="solar:star-linear" width="20" height="20" />
               </button>
             </header>
 
@@ -1498,24 +1491,54 @@ const handleDelete = () => {
   align-items: center;
   gap: 10px;
   border-bottom: 1px solid var(--nova-divider);
-  font-size: 18px;
-  .star {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 21px;
-  }
-  .icon {
+  .toolbar-action {
+    appearance: none;
+    border: 0;
+    display: grid;
+    place-items: center;
     cursor: pointer;
-    width: 34px;
-    height: 34px;
+    width: 36px;
+    height: 36px;
     border-radius: 8px;
-    padding: 7px;
-    transition: background-color .15s ease, transform .15s ease;
-    &:hover { background: var(--base-fill); }
+    padding: 0;
+    color: var(--el-text-color-regular);
+    background: transparent;
+    transition: color .15s ease, background-color .15s ease, transform .15s ease;
+
+    :deep(.iconify) {
+      width: 20px;
+      height: 20px;
+    }
+
+    &:hover {
+      color: var(--el-color-primary);
+      background: var(--nova-hover);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--el-color-primary);
+      outline-offset: 2px;
+    }
+
     &:active { transform: scale(.94); }
   }
 
+  .toolbar-star .star-active-icon {
+    color: #eab308;
+  }
+
+  :global(html.dark) .toolbar-action :deep(.iconify) {
+    color: var(--el-text-color-regular) !important;
+    opacity: 1 !important;
+  }
+
+  :global(html.dark) .toolbar-action:hover :deep(.iconify) {
+    color: var(--el-color-primary) !important;
+  }
+
+  :global(html.dark) .toolbar-star .star-active-icon {
+    color: #facc15 !important;
+  }
 }
 
 
@@ -1902,11 +1925,11 @@ const handleDelete = () => {
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
   margin-left: 2px;
   border: 0;
-  border-radius: 50%;
+  border-radius: 8px;
   background: transparent;
   cursor: pointer;
   opacity: .7;
@@ -1917,11 +1940,16 @@ const handleDelete = () => {
 
 .message-star:hover {
   opacity: 1;
-  background: var(--base-fill);
+  background: var(--nova-hover);
 }
 
 .message-star .star-active-icon {
-  color: var(--el-color-primary);
+  color: #eab308;
+}
+
+.message-star .iconify {
+  width: 20px;
+  height: 20px;
 }
 
 .message-preview {

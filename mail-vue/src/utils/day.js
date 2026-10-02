@@ -110,17 +110,25 @@ export function formatCompactDate(time) {
  * column scans as one aligned set of timestamps. Anything older keeps the same
  * calendar label the list already showed.
  *
- * Deliberately language-independent: the list shows a clock, not prose.
+ * Today is a clock; older messages use the current interface language so a
+ * Chinese Inbox keeps the day component (for example "10月2日").
  */
 export function formatListClock(time) {
-    const d = dayjs.utc(time).tz(timeZone);
+    const isEnglish = settingStore.lang === 'en';
+    const d = dayjs.utc(time).tz(timeZone).locale(isEnglish ? 'en' : 'zh-cn');
     const now = dayjs();
 
     if (now.isSame(d, 'day')) return d.format('HH:mm');
 
+    if (isEnglish) {
+        return now.year() === d.year()
+            ? d.format('MMM D')
+            : d.format('YYYY/MM/DD');
+    }
+
     return now.year() === d.year()
-        ? d.format('MMM D')
-        : d.format('YYYY/MM/DD');
+        ? d.format('M月D日')
+        : d.format('YYYY年M月D日');
 }
 
 export function tzDayjs(time) {

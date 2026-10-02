@@ -235,24 +235,11 @@
               <div class="email-right" :style="showUserInfo ? 'align-self: start;':''">
                 <span class="email-time" :style="(item.unread === EmailUnreadEnum.UNREAD && showUnread) ? 'font-weight: bold' : ''">{{ item.formatCreateTime }}</span>
               </div>
-              <!-- Fixed right-hand metadata/action column (time above star).
-                   Both share one centred flex column so the star never drifts
-                   with the timestamp's width. -->
+              <!-- Fixed right-hand metadata column.  The Inbox's phone layout
+                   deliberately keeps starring out of this dense list so the
+                   subject and preview retain the extra room below the time. -->
               <div v-if="type === 'email'" class="mobile-row-meta">
                 <span class="mobile-meta-time">{{ listClock(item) }}</span>
-                <button
-                    v-if="showStar"
-                    class="mobile-row-star"
-                    :aria-label="t('star')"
-                    @click.stop="starChange(item)"
-                >
-                  <Icon
-                      :class="['inbox-star-icon', { 'is-active': item.isStar }]"
-                      :icon="item.isStar ? 'solar:star-bold' : 'solar:star-linear'"
-                      width="19"
-                      height="19"
-                  />
-                </button>
               </div>
             </div>
             </div>
@@ -2563,18 +2550,16 @@ ul {
     position: relative;
 
     display: grid;
-    /* Unread gutter | avatar | message body | fixed metadata/action column.
+    /* Unread gutter | avatar | message body. The timestamp is positioned over
+       the sender line, so it does not reserve a column below that line.
        Tracks are flush (no column gap): the avatar sits at the start of its
        50px track, so its trailing 10px is the avatar -> text gap and the body
        column gets every remaining pixel. Every track except the body is fixed,
        so a read/unread flip or a long sender can never move anything.
 
-       The metadata track is `max-content` rather than a fixed 72px: it takes
-       exactly the width of that row's own timestamp, so Subject/Snippet run
-       right up to the first character of the time text and only then ellipsis.
-       The avatar and the body's left edge are untouched — the extra width is
-       taken from the metadata column alone, never from the left. */
-    grid-template-columns: 16px 50px minmax(0, 1fr) max-content;
+       The avatar and the body's left edge remain fixed while the subject and
+       preview consume all remaining row width. */
+    grid-template-columns: 16px 50px minmax(0, 1fr);
 
     column-gap: 0;
 
@@ -2623,7 +2608,7 @@ ul {
   .email-container.mobile-selecting
     :deep(.email-row.email) {
     /* The checkbox replaces the unread gutter in the first track. */
-    grid-template-columns: 20px 50px minmax(0, 1fr) max-content;
+    grid-template-columns: 20px 50px minmax(0, 1fr);
   }
 
   .email-container.mobile-selecting
@@ -2744,7 +2729,9 @@ ul {
     margin-bottom: 1px;
 
     /* Overflow lives in the row's own meta column now. */
-    padding-right: 0;
+    /* Time sits over the first line only, leaving the preview below free to
+       use the full body width after the mobile list star was removed. */
+    padding-right: 68px;
 
     color: var(--mobile-primary);
 
@@ -2815,6 +2802,7 @@ ul {
     font-size: 15px;
     line-height: 19px;
     font-weight: 400;
+    padding-right: 68px;
   }
 
   :deep(.email-row.email.is-unread .email-subject) {
@@ -2824,20 +2812,11 @@ ul {
   :deep(.email-row.email .email-text .email-content) {
     display: block;
 
-    /* The row's grid gives the body column everything up to the metadata
-       column, but that column carries `padding-left: 8px` so its timestamp does
-       not sit flush against the Subject. That 8px is dead space on the preview
-       line: the timestamp occupies the row's FIRST line and the star hangs off
-       the right edge well below it, so the third line has room the subject line
-       does not.
-
-       Borrowing exactly that padding puts the snippet's ellipsis on the first
-       character of the timestamp in the common case, and in the narrowest case
-       (`HH:mm` is ~35px, i.e. narrower than the 36px star) it stops on the
-       star's own left edge. Going further would run under the star, whose tap
-       target is transparent, so the text would show through beside the glyph. */
-    width: calc(100% + 8px);
-    max-width: none;
+    /* The timestamp is absolutely positioned over the sender line, not a grid
+       column, so the preview can use the whole row width without painting under
+       an interactive star. */
+    width: 100%;
+    max-width: 100%;
 
     min-width: 0;
 
@@ -2861,21 +2840,17 @@ ul {
      The dot itself lives in the reserved `.mobile-unread-slot` track (see
      above); no absolutely-positioned pseudo-element pins it to the edge. */
 
-  /* ---------- Metadata column (time above star) ---------- */
+  /* ---------- Timestamp ---------- */
 
   .mobile-row-meta {
-    grid-column: 4;
+    position: absolute;
+    top: 11px;
+    right: 8px;
 
-    align-self: start;
-
-    /* Sized by its own content (see the row's grid-template-columns) so the
-       body can run right up to the timestamp. 8px of left padding is the only
-       gap between the ellipsised Subject/Snippet and the time's first digit.
-       The cap is a safety valve for an unexpected relative-time fallback: a
-       runaway label ellipsises instead of eating the message body. */
+    /* The date belongs to the sender line only. It no longer reserves a full
+       height column now that the mobile Inbox has no inline star action. */
     width: auto;
-    min-width: 0;
-    max-width: 96px;
+    max-width: 64px;
 
     display: flex;
     flex-direction: column;
@@ -2884,10 +2859,7 @@ ul {
     align-items: flex-end;
     justify-content: flex-start;
 
-    gap: 2px;
-
-    padding-top: 1px;
-    padding-left: 8px;
+    padding: 0;
   }
 
   .mobile-meta-time {
