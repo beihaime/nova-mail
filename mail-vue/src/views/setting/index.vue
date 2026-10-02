@@ -75,24 +75,59 @@
     </div>
 
     <div class="appearance">
-      <div class="title">{{ appearanceTitle }}</div>
+      <div class="title">{{ $t('visualStyle') }}</div>
 
-      <div class="theme-options">
-        <button
-          v-for="option in themeOptions"
-          :key="option.value"
-          type="button"
-          class="theme-option"
-          :class="{ active: uiStore.themeMode === option.value }"
-          @click="selectTheme(option.value, $event)"
-        >
-          <span
-            class="theme-preview"
-            :class="`theme-preview-${option.value}`"
-            aria-hidden="true"
-          ></span>
-          <span>{{ option.label }}</span>
-        </button>
+      <div class="appearance-editor">
+        <div class="appearance-row appearance-mode-row">
+          <div class="appearance-label">
+            <span>{{ $t('mode') }}</span>
+            <small>{{ $t('appearanceModeDesc') }}</small>
+          </div>
+          <div class="theme-options" role="radiogroup" :aria-label="$t('mode')">
+            <button
+              v-for="option in themeOptions"
+              :key="option.value"
+              type="button"
+              class="theme-option"
+              :class="{ active: uiStore.themeMode === option.value }"
+              :aria-checked="uiStore.themeMode === option.value"
+              role="radio"
+              @click="selectTheme(option.value, $event)"
+            >
+              <span class="theme-miniature" :class="`theme-miniature-${option.value}`" aria-hidden="true"><i></i><b></b><em></em></span>
+              <span>{{ option.label }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="appearance-row">
+          <div class="appearance-label">
+            <span>{{ $t('theme') }}</span>
+            <small>{{ activePaletteLabel }}</small>
+          </div>
+          <div class="appearance-actions">
+            <el-select class="theme-preset-select" :model-value="activePreset" @change="setPreset">
+              <el-option v-for="preset in themePresetOptions" :key="preset.value" :label="preset.label" :value="preset.value" />
+            </el-select>
+            <button type="button" class="nova-icon-button appearance-action" :aria-label="$t('importTheme')" :title="$t('importTheme')" @click="themeImportInput?.click()"><Icon icon="solar:import-linear" width="18" height="18" /></button>
+            <button type="button" class="nova-icon-button appearance-action" :aria-label="$t('exportTheme')" :title="$t('exportTheme')" @click="exportTheme"><Icon icon="solar:export-linear" width="18" height="18" /></button>
+            <input ref="themeImportInput" class="theme-import-input" type="file" accept="application/json,.json" @change="importTheme" />
+          </div>
+        </div>
+
+        <div v-for="token in colorTokens" :key="token.key" class="appearance-row appearance-color-row">
+          <div class="appearance-label"><span>{{ token.label }}</span></div>
+          <div class="color-control">
+            <input :ref="(element) => { colorInputs[token.key] = element }" class="color-native-input" type="color" :value="activePalette[token.key]" :aria-label="token.label" @input="setPaletteColor(token.key, $event.target.value)" />
+            <button type="button" class="color-swatch" :style="{ backgroundColor: activePalette[token.key] }" :aria-label="`${token.label}: ${activePalette[token.key]}`" @click="colorInputs[token.key]?.click()"></button>
+            <input class="color-hex-input" :value="activePalette[token.key]" spellcheck="false" maxlength="7" @change="setPaletteColor(token.key, $event.target.value)" @keyup.enter="$event.target.blur()" />
+          </div>
+        </div>
+
+        <div class="appearance-row appearance-reset-row">
+          <span>{{ $t('resetThemeDesc', { theme: activePaletteLabel }) }}</span>
+          <el-button @click="resetPalette">{{ $t('resetTheme') }}</el-button>
+        </div>
       </div>
     </div>
 
@@ -189,6 +224,7 @@ import {useUiStore} from "@/store/ui.js";
 import {connectGithubAccount, disconnectGithubAccount, githubConnectedAccount, connectGoogleAccount, disconnectGoogleAccount, googleConnectedAccount} from '@/request/ouath.js';
 import {Icon} from '@iconify/vue';
 import {applyThemeTransition} from "@/utils/theme-transition.js";
+import {availablePresets, PALETTE_KEYS, parseThemeImport, normalizeHex} from '@/utils/theme-palette.js';
 import {
   NOTIFICATION_SOUNDS,
   notificationSoundStatus,
@@ -220,6 +256,8 @@ const githubLoading = ref(false)
 const githubAccount = reactive({ connected: false, login: '', avatarUrl: '' })
 const googleLoading = ref(false)
 const googleAccount = reactive({ connected: false, email: '', avatarUrl: '' })
+const themeImportInput = ref(null)
+const colorInputs = reactive({})
 
 const themeOptions = computed(() => {
   const zh = settingStore.lang === 'zh'
@@ -235,9 +273,64 @@ function selectTheme(mode, event) {
   applyThemeTransition(mode, event)
 }
 
-const appearanceTitle = computed(() =>
-  settingStore.lang === 'zh' ? '外观' : 'Appearance'
+const activePaletteMode = computed(() => uiStore.dark ? 'dark' : 'light')
+const activePalette = computed(() => uiStore[`${activePaletteMode.value}Palette`])
+const activePreset = computed(() => uiStore[`${activePaletteMode.value}ThemePreset`])
+const activePaletteLabel = computed(() =>
+  activePaletteMode.value === 'dark' ? t('darkTheme') : t('lightTheme')
 )
+const themePresetOptions = computed(() => {
+  const labels = {
+    'nova-default': t('themePresetDefault'),
+    'soft-light': t('themePresetSoftLight'),
+    midnight: t('themePresetMidnight'),
+    custom: t('themePresetCustom'),
+  }
+  return [...availablePresets(activePaletteMode.value), 'custom'].map((value) => ({ value, label: labels[value] }))
+})
+const colorTokens = computed(() => PALETTE_KEYS.map((key) => ({ key, label: t(`themeColor${key[0].toUpperCase()}${key.slice(1)}`) })))
+
+function setPreset(preset) {
+  if (preset === 'custom') return
+  uiStore.setThemePreset(activePaletteMode.value, preset)
+}
+
+function setPaletteColor(key, value) {
+  const color = normalizeHex(value)
+  if (!color) {
+    ElMessage({ message: t('invalidThemeColor'), type: 'warning', plain: true })
+    return
+  }
+  uiStore.setThemePalette(activePaletteMode.value, { ...activePalette.value, [key]: color })
+}
+
+function resetPalette() {
+  uiStore.resetThemePalette(activePaletteMode.value)
+}
+
+function exportTheme() {
+  const payload = JSON.stringify({ light: uiStore.lightPalette, dark: uiStore.darkPalette }, null, 2)
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(new Blob([payload], { type: 'application/json' }))
+  link.download = 'nova-mail-theme.json'
+  link.click()
+  URL.revokeObjectURL(link.href)
+}
+
+async function importTheme(event) {
+  const file = event.target.files?.[0]
+  event.target.value = ''
+  if (!file) return
+
+  const theme = parseThemeImport(await file.text())
+  if (!theme) {
+    ElMessage({ message: t('invalidThemeImport'), type: 'error', plain: true })
+    return
+  }
+  uiStore.setThemePalette('light', theme.light)
+  uiStore.setThemePalette('dark', theme.dark)
+  ElMessage({ message: t('themeImported'), type: 'success', plain: true })
+}
 
 /* ---------- Notification sound ---------- */
 
@@ -878,33 +971,61 @@ function submitPwd() {
     margin-bottom: 34px;
   }
 
+  .appearance-editor {
+    margin-top: 14px;
+    overflow: hidden;
+    border: 1px solid var(--nova-divider);
+    border-radius: 12px;
+    background: var(--nova-surface);
+  }
+
+  .appearance-row {
+    min-height: 58px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 22px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--nova-divider-soft);
+  }
+
+  .appearance-row:last-child { border-bottom: 0; }
+  .appearance-mode-row { align-items: flex-start; }
+
+  .appearance-label {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    color: var(--el-text-color-primary);
+    font-weight: 500;
+  }
+
+  .appearance-label small {
+    color: var(--el-text-color-secondary);
+    font-size: 12px;
+    font-weight: 400;
+  }
+
   .theme-options {
     display: flex;
-    flex-wrap: wrap;
+    flex: 0 1 auto;
     gap: 10px;
-    margin-top: 14px;
   }
 
   .theme-option {
-    min-width: 112px;
-    min-height: 42px;
-    display: inline-flex;
-    align-items: center;
-    gap: 9px;
-    padding: 7px 12px;
+    width: 96px;
+    display: grid;
+    gap: 7px;
+    padding: 8px;
     border: 1px solid var(--nova-divider);
-    border-radius: 10px;
+    border-radius: 9px;
     color: var(--el-text-color-primary);
     background: var(--nova-surface-muted);
     cursor: pointer;
-  }
-
-  /* The label may truncate, but the three options always stay on one row. */
-  .theme-option > span:last-child {
-    min-width: 0;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
+    font-size: 12px;
+    font-weight: 500;
+    text-align: left;
   }
 
   .theme-option:hover {
@@ -918,56 +1039,116 @@ function submitPwd() {
   .theme-option.active {
     color: var(--el-color-primary);
     border-color: var(--el-color-primary);
-    background: var(--nova-selected);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--el-color-primary) 38%, transparent);
   }
 
-  .theme-preview {
-    width: 22px;
-    height: 22px;
-    flex: 0 0 22px;
-    border: 1px solid var(--nova-divider);
-    border-radius: 50%;
-  }
-
-  .theme-preview-light {
+  .theme-miniature {
+    position: relative;
+    height: 38px;
+    overflow: hidden;
+    display: block;
+    border: 1px solid color-mix(in srgb, var(--nova-divider) 80%, transparent);
+    border-radius: 5px;
     background: #fff;
   }
 
-  .theme-preview-dark {
-    background: #17191d;
+  .theme-miniature::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 17px;
+    background: #eef1f5;
   }
 
-  .theme-preview-system {
-    background: linear-gradient(
-      90deg,
-      #fff 0 50%,
-      #17191d 50% 100%
-    );
+  .theme-miniature i,
+  .theme-miniature b,
+  .theme-miniature em {
+    position: absolute;
+    left: 23px;
+    right: 6px;
+    height: 4px;
+    display: block;
+    border-radius: 2px;
+    background: #d5dbe5;
   }
+
+  .theme-miniature i { top: 8px; background: #0a84ff; }
+  .theme-miniature b { top: 17px; }
+  .theme-miniature em { top: 26px; right: 17px; }
+  .theme-miniature-dark { background: #17191d; border-color: #343944; }
+  .theme-miniature-dark::before { background: #20242b; }
+  .theme-miniature-dark b, .theme-miniature-dark em { background: #59616d; }
+  .theme-miniature-system { background: linear-gradient(90deg, #fff 0 50%, #17191d 50% 100%); }
+  .theme-miniature-system::before { background: linear-gradient(90deg, #eef1f5 0 50%, #20242b 50% 100%); }
+  .theme-miniature-system b, .theme-miniature-system em { background: linear-gradient(90deg, #d5dbe5 0 50%, #59616d 50% 100%); }
+
+  .appearance-actions, .color-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .theme-preset-select { width: 138px; }
+  .appearance-action { --nova-icon-button-size: 32px; }
+  .theme-import-input, .color-native-input { display: none; }
+
+  .color-swatch {
+    width: 28px;
+    height: 28px;
+    flex: 0 0 28px;
+    border: 1px solid color-mix(in srgb, var(--nova-divider) 84%, transparent);
+    border-radius: 7px;
+    cursor: pointer;
+  }
+
+  .color-hex-input {
+    width: 84px;
+    padding: 5px 0;
+    color: var(--el-text-color-primary);
+    background: transparent;
+    font-family: var(--nova-font-code);
+    font-size: 13px;
+    text-align: right;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .color-hex-input:focus-visible, .color-swatch:focus-visible, .theme-option:focus-visible {
+    outline: none;
+    box-shadow: var(--nova-button-focus-ring);
+  }
+
+  .appearance-reset-row {
+    min-height: 54px;
+    color: var(--el-text-color-secondary);
+    font-size: 12px;
+  }
+
+  .appearance-reset-row > span { min-width: 0; }
+  .appearance-reset-row :deep(.el-button) { flex: 0 0 auto; }
 
   @media (max-width: 767px) {
+    .appearance-row { gap: 12px; padding: 12px; }
+    .appearance-mode-row { display: block; }
+    .appearance-mode-row .appearance-label { margin-bottom: 10px; }
     .theme-options {
+      width: 100%;
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 8px;
+      gap: 7px;
     }
 
-    /* Three options must stay on one row even at 320px: at that width the
-       widest label ("System" / "跟随系统") only fits with a smaller preview,
-       tighter padding and slightly smaller type. */
-    .theme-option {
-      min-width: 0;
-      justify-content: center;
-      padding-inline: 5px;
-      gap: 6px;
-      font-size: 13px;
-    }
-
-    .theme-preview {
-      width: 18px;
-      height: 18px;
-      flex: 0 0 18px;
-    }
+    .theme-option { width: auto; min-width: 0; padding: 6px; }
+    .theme-miniature { height: 32px; }
+    .theme-miniature i { top: 7px; }
+    .theme-miniature b { top: 15px; }
+    .theme-miniature em { top: 23px; }
+    .theme-preset-select { width: min(124px, 42vw); }
+    .appearance-actions { gap: 4px; }
+    .appearance-action { --nova-icon-button-size: 30px; }
+    .color-hex-input { width: 76px; }
+    .appearance-reset-row { align-items: flex-start; }
   }
 
 </style>

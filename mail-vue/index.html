@@ -34,6 +34,7 @@
 
             let isDark = false
             let mode = 'system'
+            let savedPalettes = null
 
 
             try {
@@ -45,6 +46,8 @@
                     uiStoreStr
                         ? JSON.parse(uiStoreStr)
                         : {}
+
+                savedPalettes = uiStore
 
 
                 mode =
@@ -92,6 +95,30 @@
 
             const root =
                 document.documentElement
+
+
+            // Paint the persisted palette before Vue mounts. The store applies
+            // the full derived token set immediately afterwards; these core
+            // values prevent a default-colour flash on a customised theme.
+            const defaults = isDark
+                ? { accent: '#0A84FF', background: '#1C1D20', foreground: '#E5E7EB', surface: '#17191D', border: '#383A3F' }
+                : { accent: '#0A84FF', background: '#F5F6F8', foreground: '#1F2937', surface: '#FFFFFF', border: '#E5E7EB' }
+            const candidate = savedPalettes?.[isDark ? 'darkPalette' : 'lightPalette'] || {}
+            const hex = /^#[0-9a-f]{6}$/i
+            const palette = Object.fromEntries(Object.entries(defaults).map(([key, fallback]) => [key, hex.test(candidate[key]) ? candidate[key].toUpperCase() : fallback]))
+            const initialTokens = {
+                '--nova-accent': palette.accent,
+                '--nova-background': palette.background,
+                '--nova-foreground': palette.foreground,
+                '--nova-surface': palette.surface,
+                '--nova-border': palette.border,
+                '--nova-text-primary': palette.foreground,
+                '--el-color-primary': palette.accent,
+                '--settings-page-background': palette.background,
+                '--light-border': palette.border,
+                '--el-bg-color': palette.surface,
+            }
+            Object.entries(initialTokens).forEach(([name, value]) => root.style.setProperty(name, value))
 
 
             root.classList.toggle(

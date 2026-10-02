@@ -1,5 +1,13 @@
 import { defineStore } from 'pinia'
 import { useSettingStore } from './setting.js'
+import {
+    DEFAULT_PALETTES,
+    applyPaletteTokens,
+    clonePalette,
+    findMatchingPreset,
+    normalizePalette,
+    paletteForPreset,
+} from '@/utils/theme-palette.js'
 
 /**
  * Notifications are the site announcement (`setting.notice*`), so "unread" is
@@ -103,6 +111,13 @@ export const useUiStore = defineStore('ui', {
         themeMode:
             window.__NOVA_INITIAL_THEME__?.mode ??
             'system',
+
+        // Light and dark are intentionally independent. System mode simply
+        // resolves one of these two palettes from the operating system.
+        lightPalette: clonePalette(DEFAULT_PALETTES.light),
+        darkPalette: clonePalette(DEFAULT_PALETTES.dark),
+        lightThemePreset: 'nova-default',
+        darkThemePreset: 'nova-default',
 
 
         asideCount: {
@@ -231,8 +246,18 @@ export const useUiStore = defineStore('ui', {
             this.dark=effectiveDark
 
 
+            const paletteMode = effectiveDark ? 'dark' : 'light'
+            const paletteKey = `${paletteMode}Palette`
+            const presetKey = `${paletteMode}ThemePreset`
+            this[paletteKey] = normalizePalette(this[paletteKey], DEFAULT_PALETTES[paletteMode])
+            this[presetKey] = findMatchingPreset(paletteMode, this[paletteKey])
+
+
 
             const root=document.documentElement
+
+
+            applyPaletteTokens(root, this[paletteKey], paletteMode)
 
 
             root.classList.toggle(
@@ -298,6 +323,36 @@ export const useUiStore = defineStore('ui', {
 
             this.applyTheme()
 
+        },
+
+
+        setThemePalette(mode, palette){
+
+            if (!['light', 'dark'].includes(mode)) return
+
+            this[`${mode}Palette`] = normalizePalette(palette, DEFAULT_PALETTES[mode])
+            this[`${mode}ThemePreset`] = findMatchingPreset(mode, this[`${mode}Palette`])
+            this.applyTheme()
+
+        },
+
+
+        setThemePreset(mode, preset){
+
+            if (!['light', 'dark'].includes(mode)) return
+
+            this[`${mode}Palette`] = paletteForPreset(mode, preset)
+            this[`${mode}ThemePreset`] = preset
+            this.applyTheme()
+
+        },
+
+
+        resetThemePalette(mode){
+
+            if (!['light', 'dark'].includes(mode)) return
+            this.setThemePreset(mode, 'nova-default')
+
         }
 
     },
@@ -307,7 +362,11 @@ export const useUiStore = defineStore('ui', {
         pick:[
             'accountShow',
             'dark',
-            'themeMode'
+            'themeMode',
+            'lightPalette',
+            'darkPalette',
+            'lightThemePreset',
+            'darkThemePreset'
         ]
     }
 

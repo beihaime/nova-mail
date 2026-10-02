@@ -17,7 +17,14 @@
     --nova-font-code: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     --nova-font-family: var(--nova-font-ui);
     --el-font-family: var(--nova-font-ui);
-    --nova-text-primary: #1f2937;
+    /* Base palette tokens. The UI store updates these as one palette, then the
+       rest of the application continues consuming its established aliases. */
+    --nova-accent: #0a84ff;
+    --nova-background: #f5f6f8;
+    --nova-foreground: #1f2937;
+    --nova-surface: #ffffff;
+    --nova-border: #e5e7eb;
+    --nova-text-primary: var(--nova-foreground);
     --nova-text-secondary: #5f6673;
     --nova-text-muted: #7b8491;
     --nova-star-idle: var(--nova-text-muted);
@@ -135,7 +142,7 @@ button, input, select, textarea {
 }
 
 :root {
-    --el-color-primary: #0a84ff;
+    --el-color-primary: var(--nova-accent);
     --el-color-primary-dark-2: #0067d6;
     --el-color-primary-light-3: #5aaeff;
     --el-color-primary-light-5: #8bc5ff;
@@ -143,9 +150,9 @@ button, input, select, textarea {
     --el-color-primary-light-9: #edf7ff;
 
     --extra-light-fill: #f7f8fa;
-    --settings-page-background: #f5f6f8;
+    --settings-page-background: var(--nova-background);
     --light-ill: #f2f4f7;
-    --light-border: #e5e7eb;
+    --light-border: var(--nova-border);
     --header-actions-border: inset 0 -1px 0 0 var(--el-border-color-lighter);
     --aside-backgound: #f7f8fa;
     --aside-menu-active-background: #e2efff;
@@ -171,7 +178,6 @@ button, input, select, textarea {
     --vt-y: 50%;
     --vt-duration: 520ms;
     --vt-easing: ease-out;
-    --nova-surface: #ffffff;
     --nova-surface-muted: #f7f8fa;
     /* Single source of truth for the phone chrome. The mobile app bar, the
        status-bar / `safe-area-inset-top` strip behind it and the PWA
@@ -210,7 +216,12 @@ button, input, select, textarea {
 }
 
 .dark {
-    --nova-text-primary: #e5e7eb;
+    --nova-accent: #0a84ff;
+    --nova-background: #1c1d20;
+    --nova-foreground: #e5e7eb;
+    --nova-surface: #17191d;
+    --nova-border: #383a3f;
+    --nova-text-primary: var(--nova-foreground);
     --nova-text-secondary: #a7adb7;
     --nova-text-muted: #7e8590;
     --nova-star-idle: var(--nova-text-secondary);
@@ -219,9 +230,9 @@ button, input, select, textarea {
     --el-text-color-regular: var(--nova-text-secondary);
     --el-text-color-secondary: var(--nova-text-muted);
     --extra-light-fill: #1c1d20;
-    --settings-page-background: var(--extra-light-fill);
+    --settings-page-background: var(--nova-background);
     --light-ill: #27292d;
-    --light-border: #383a3f;
+    --light-border: var(--nova-border);
     --aside-backgound: #1b1c1f;
     --aside-menu-active-background: rgba(10, 132, 255, .22);
     --header-actions-border: inset 0 -1px 0 0 var(--el-border-color-lighter);
@@ -242,8 +253,7 @@ button, input, select, textarea {
     --base-border-color: #4C4D4F;
     --secondary-text-color: var(--nova-text-muted);
     --message-block-color: rgba(30, 30, 30, 0.2);
-    --el-border-color: #414243 !important;
-    --nova-surface: #17191d;
+    --el-border-color: var(--nova-border) !important;
     --nova-surface-muted: #1d2025;
     --nova-divider: #2c3037;
     /* Dark search field must stay a hair above the page: a 5.5% white veil plus
