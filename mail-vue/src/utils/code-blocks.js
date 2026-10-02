@@ -183,7 +183,10 @@ export function renderCodeBlock(code, language = '') {
       : escapeHtml(line)
   ))
   const html = highlightedLines.map((line, index) => (
-    `<span class="nova-code-line" data-line="${index + 1}">${line}</span>`
+    // A real, fixed-size gutter is more stable than an absolutely positioned
+    // pseudo-element on narrow screens: four-digit line numbers never squeeze
+    // the code's first character or alter its horizontal scroll width.
+    `<span class="nova-code-line"><span class="nova-code-line-number" data-line="${index + 1}" aria-hidden="true">${index + 1}</span><span class="nova-code-line-content">${line}</span></span>`
   )).join('')
   const languageClass = normalized ? ` language-${normalized}` : ''
   const lineCount = source ? source.split('\n').length : 0

@@ -2163,7 +2163,9 @@ function restoreTrash() {
 
 .email-text :deep(.nova-code-content) {
   min-width: max-content;
-  padding: 0 14px 10px;
+  /* Keep source away from the sticky toolbar divider, including the first and
+     last baselines in a short mobile block. */
+  padding: 14px;
 }
 
 .email-text :deep(.nova-code-prose) { white-space: pre-wrap; }
@@ -2221,22 +2223,24 @@ function restoreTrash() {
 .email-text :deep(.nova-code-lines) { flex: 0 0 auto; white-space: nowrap; }
 
 .email-text :deep(.nova-code-line) {
-  position: relative;
-  display: block;
+  display: grid;
+  grid-template-columns: 44px max-content;
+  align-items: baseline;
   min-height: 1.3em;
-  padding-left: 3.5em;
+  line-height: 1.3;
 }
 
-.email-text :deep(.nova-code-line::before) {
-  position: absolute;
-  left: 0;
-  width: 2.5em;
+.email-text :deep(.nova-code-line-number) {
+  box-sizing: border-box;
+  width: 44px;
+  padding-right: 14px;
   color: var(--regular-text-color);
-  content: attr(data-line);
   text-align: right;
   user-select: none;
   opacity: .62;
 }
+
+.email-text :deep(.nova-code-line-content) { min-height: 1.3em; }
 
 .email-text :deep(.hljs-keyword),
 .email-text :deep(.hljs-selector-tag),
@@ -2283,7 +2287,7 @@ function restoreTrash() {
   }
 
   .email-text :deep(.nova-code-toolbar) { padding: 8px 10px 7px; }
-  .email-text :deep(.nova-code-content) { padding: 0 10px 10px; }
+  .email-text :deep(.nova-code-content) { padding: 14px 10px; }
   .email-text :deep(.nova-code-lines) { display: none; }
 }
 

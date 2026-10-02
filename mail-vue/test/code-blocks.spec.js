@@ -120,6 +120,8 @@ describe('explicit code blocks', () => {
     expect(html).toContain('JavaScript')
     expect(html).toContain('data-line="1"')
     expect(html).toContain('data-line="2"')
+    expect(html).toContain('class="nova-code-line-number"')
+    expect(html).toContain('class="nova-code-line-content"')
     expect(html).toContain('data-nova-code-source="const a = 1;\nconsole.log(a);"')
   })
 
