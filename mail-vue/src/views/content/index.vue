@@ -1557,10 +1557,11 @@ const handleDelete = () => {
   }
 
   .email-title {
-    font-size: clamp(22px, 2vw, 28px);
-    line-height: 1.28;
-    font-weight: 700;
-    letter-spacing: -.02em;
+    font-family: var(--nova-font-ui);
+    font-size: clamp(24px, 2.2vw, 28px);
+    line-height: 1.3;
+    font-weight: 500;
+    letter-spacing: -.015em;
     max-width: 1100px;
     margin-bottom: 24px;
   }
@@ -1756,6 +1757,7 @@ const handleDelete = () => {
 }
 
 .sender-line .sender-name {
+  font-family: var(--nova-font-ui);
   flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
@@ -1763,10 +1765,11 @@ const handleDelete = () => {
   text-overflow: ellipsis;
   color: var(--el-text-color-primary);
   font-size: 15px;
-  font-weight: 680;
+  font-weight: 600;
 }
 
 .sender-line .sender-email {
+  font-family: var(--nova-font-ui);
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
@@ -1783,15 +1786,16 @@ const handleDelete = () => {
   min-width: 0;
   max-width: 100%;
   color: var(--secondary-text-color);
-  font-size: inherit;
+  font-family: var(--nova-font-ui);
+  font-size: 13px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.recipient-toggle { display: inline-flex; align-items: center; gap: 5px; margin-top: 4px; padding: 0; color: var(--regular-text-color); font-size: 12px; cursor: pointer; text-align: left; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recipient-toggle { display: inline-flex; align-items: center; gap: 5px; margin-top: 4px; padding: 0; color: var(--regular-text-color); font-family: var(--nova-font-ui); font-size: 12px; cursor: pointer; text-align: left; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .recipient-toggle:hover { color: var(--el-color-primary); }
-.message-date { flex: 0 0 auto; margin-left: auto; padding-top: 2px; color: var(--regular-text-color); font-size: 12px; white-space: nowrap; }
+.message-date { flex: 0 0 auto; margin-left: auto; padding-top: 2px; color: var(--regular-text-color); font-family: var(--nova-font-ui); font-size: 12px; white-space: nowrap; }
 
 /* Expanded header metadata: fixed label column, adaptive value column.
    `overflow-wrap: anywhere` lets a long address break inside itself instead of
@@ -1807,6 +1811,7 @@ const handleDelete = () => {
   border: 1px solid var(--nova-divider);
   border-radius: 8px;
   color: var(--regular-text-color);
+  font-family: var(--nova-font-ui);
   font-size: 12px;
   box-sizing: border-box;
 }
@@ -2067,7 +2072,7 @@ const handleDelete = () => {
 }
 
 .htm-scrollbar { max-width: 1100px; overflow-x: auto; }
-.email-text { max-width: 100%; overflow-wrap: anywhere; line-height: 1.65; }
+.email-text { max-width: 100%; overflow-wrap: anywhere; font-family: var(--nova-font-reading); font-size: 15px; font-weight: 400; line-height: 1.62; color: var(--nova-text-primary); }
 .reader-bottom-actions { display: flex; gap: 10px; max-width: 1100px; padding: 28px 0 18px; }
 .reader-bottom-actions button { min-height: 34px; display: inline-flex; align-items: center; gap: 7px; padding: 0 14px; color: var(--el-text-color-primary); border: 1px solid var(--light-border); border-radius: 9px; background: transparent; cursor: pointer; font-size: 13px; font-weight: 600; }
 .reader-bottom-actions button:hover { background: var(--base-fill); border-color: var(--el-color-primary); }
@@ -2132,7 +2137,7 @@ const handleDelete = () => {
 }
 
 .email-text {
-  font-family: inherit;
+  font-family: var(--nova-font-reading);
   white-space: pre-wrap;
   word-break: break-word;
   margin: 0;
@@ -2142,7 +2147,7 @@ const handleDelete = () => {
    instead of turning into blank lines the way the plain-text path needs. */
 .email-text.email-markdown {
   white-space: normal;
-  line-height: 1.65;
+  line-height: 1.62;
 }
 
 .email-text.email-markdown :deep(table) {
@@ -2190,7 +2195,7 @@ const handleDelete = () => {
 .email-text :deep(.nova-code-block code) {
   display: block;
   min-width: max-content;
-  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--nova-font-code);
   font-size: 13px;
   line-height: 1.3;
 }
@@ -2208,7 +2213,7 @@ const handleDelete = () => {
   gap: 8px;
   margin-bottom: 8px;
   color: var(--regular-text-color);
-  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--nova-font-code);
   font-size: 11px;
 }
 
@@ -2283,7 +2288,7 @@ const handleDelete = () => {
 :global(html.dark) .email-text :deep(.hljs-function) { color: #93c5fd; }
 
 .email-text.email-markdown :deep(code) {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--nova-font-code);
   font-size: 13px;
 }
 

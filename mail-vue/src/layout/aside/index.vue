@@ -233,7 +233,7 @@ const openCompose = () => uiStore.writerRef?.open()
   position: relative;
 
   font-size: 19px;
-  font-weight: 700;
+  font-weight: 600;
 
   align-items: center;
   justify-content: center;
@@ -244,6 +244,8 @@ const openCompose = () => uiStore.writerRef?.open()
   padding: 0 10px;
 
   > div {
+    font-family: var(--nova-font-reading);
+    letter-spacing: -.01em;
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;

@@ -8,10 +8,21 @@
 }
 
 :root {
-    /* The app's reading/UI face. Keep broad CJK and generic-serif fallbacks for
-       devices that do not have Source Han Serif installed locally. */
-    --nova-font-family: "Source Han Serif SC VF", "Source Han Serif SC", "Noto Serif CJK SC", serif;
-    --el-font-family: var(--nova-font-family);
+    /* UI stays neutral and highly scannable. No web font is fetched: each
+       entry is a locally available system face or an optional local install. */
+    --nova-font-ui: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+    /* A deliberately restrained reading face. It is used only for the brand
+       and mail prose; controls, metadata and application chrome remain sans. */
+    --nova-font-reading: "Source Han Serif SC VF", "Source Han Serif SC", "Noto Serif CJK SC", Georgia, serif;
+    --nova-font-code: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --nova-font-family: var(--nova-font-ui);
+    --el-font-family: var(--nova-font-ui);
+    --nova-text-primary: #1f2937;
+    --nova-text-secondary: #5f6673;
+    --nova-text-muted: #7b8491;
+    --el-text-color-primary: var(--nova-text-primary);
+    --el-text-color-regular: var(--nova-text-secondary);
+    --el-text-color-secondary: var(--nova-text-muted);
 }
 
 html, body {
@@ -39,13 +50,13 @@ html, body {
 }
 
 .el-table thead th {
-    font-weight: bold !important;
+    font-weight: 600 !important;
 }
 
 body {
-    font-family: var(--nova-font-family);
-    line-height: 1.5;
-    color: var(--el-text-color-primary);
+    font-family: var(--nova-font-ui);
+    line-height: 1.55;
+    color: var(--nova-text-primary);
     font-size: 14px;
 }
 
@@ -139,11 +150,10 @@ button, input, select, textarea {
     --loadding-background: rgba(255, 255, 255, 0.8);
     --dark-border: #d1d5db;
     --base-fill: #eef1f5;
-    --regular-text-color: #5e6673;
+    --regular-text-color: var(--nova-text-secondary);
     --light-border-color: #e4e7ec;
     --aside-right-border: 1px 0 0 rgba(17, 24, 39, .08);
     --choose-account-background: var(--el-color-primary-light-8);
-    --el-text-color-regular: var(--el-text-color-primary);
     --email-scroll-content-color: rgba(25, 41, 59, 0.4);
     --email-hover-background: #f2f7ff;
     --email-right-click-background: #FDF6EC;
@@ -152,7 +162,7 @@ button, input, select, textarea {
     --login-switch-color: #006be6;
     --scrollbar-track-color: #A8ABB2;
     --base-border-color: #DCDFE6;
-    --secondary-text-color: #909399;
+    --secondary-text-color: var(--nova-text-muted);
     --message-block-color: rgba(0, 0, 0, 0);
     --loading-hide-transition: all 200ms;
     --vt-x: 50%;
@@ -189,6 +199,12 @@ button, input, select, textarea {
 }
 
 .dark {
+    --nova-text-primary: #e5e7eb;
+    --nova-text-secondary: #a7adb7;
+    --nova-text-muted: #7e8590;
+    --el-text-color-primary: var(--nova-text-primary);
+    --el-text-color-regular: var(--nova-text-secondary);
+    --el-text-color-secondary: var(--nova-text-muted);
     --extra-light-fill: #1c1d20;
     --settings-page-background: var(--extra-light-fill);
     --light-ill: #27292d;
@@ -199,7 +215,7 @@ button, input, select, textarea {
     --loadding-background: rgba(0, 0, 0, 0.3);
     --dark-border: #636466;
     --base-fill: #2b2d31;
-    --regular-text-color: #b7bbc3;
+    --regular-text-color: var(--nova-text-secondary);
     --light-border-color: #37393e;
     --aside-right-border: 1px 0 0 #313338;
     --choose-account-background: #39393A;
@@ -211,7 +227,7 @@ button, input, select, textarea {
     --login-switch-color: rgb(102, 177, 255);
     --scrollbar-track-color: #8D9095;
     --base-border-color: #4C4D4F;
-    --secondary-text-color: #A3A6AD;
+    --secondary-text-color: var(--nova-text-muted);
     --message-block-color: rgba(30, 30, 30, 0.2);
     --el-border-color: #414243 !important;
     --nova-surface: #17191d;
@@ -269,7 +285,7 @@ button:not(:disabled),
 }
 
 /* Shared Nova Mail surface language.  Component styles keep the existing behavior. */
-.el-button { border-radius: 10px; font-weight: 600; }
+.el-button { border-radius: 10px; font-weight: 500; }
 .el-button--primary { box-shadow: 0 1px 2px rgba(10, 132, 255, .2); }
 .el-input__wrapper, .el-textarea__inner { border-radius: 10px; box-shadow: 0 0 0 1px var(--light-border) inset !important; }
 .el-dialog { border-radius: 16px; overflow: hidden; }
