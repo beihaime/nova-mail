@@ -105,8 +105,8 @@ const rawSource = computed(() => rawAssets[`../../icons/svg/${resolvedName.value
 
 :global(.app-icon.is-inline svg) {
   display: block;
-  width: var(--app-icon-size);
-  height: var(--app-icon-size);
+  width: 100%;
+  height: 100%;
 }
 
 /* Monochrome PNG icons are drawn dark; invert them for dark theme. */
