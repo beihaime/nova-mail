@@ -25,10 +25,12 @@
   </el-container>
   <nav v-if="route.name !== 'content'" class="mobile-nav" aria-label="Mail navigation">
     <button class="nova-navigation-button" :class="{active: route.name === 'email'}" @click="router.push({name: 'email'})">
-      <AppIcon name="nova-sidebar-inbox" :size="24" inline /><span>{{ $t('inbox') }}</span>
+      <span class="mobile-nav-icon"><AppIcon name="nova-sidebar-inbox" :size="24" inline /></span>
+      <span class="mobile-nav-label">{{ $t('inbox') }}</span>
     </button>
     <button class="nova-navigation-button" @click="uiStore.asideShow = true">
-      <AppIcon name="folder-nav" :size="24" /><span>{{ $t('folders') }}</span>
+      <span class="mobile-nav-icon"><AppIcon name="nova-sidebar-folder" :size="24" inline /></span>
+      <span class="mobile-nav-label">{{ $t('folders') }}</span>
     </button>
     <button
         v-perm="'email:send'"
@@ -36,10 +38,12 @@
         :class="{active: route.name === 'draft'}"
         @click="router.push({name: 'draft'})"
     >
-      <AppIcon name="drafts-nav" :size="24" /><span>{{ $t('drafts') }}</span>
+      <span class="mobile-nav-icon"><AppIcon name="nova-sidebar-drafts" :size="24" inline /></span>
+      <span class="mobile-nav-label">{{ $t('drafts') }}</span>
     </button>
     <button class="nova-navigation-button" :class="{active: route.name === 'setting'}" @click="router.push({name: 'setting'})">
-      <AppIcon name="settings-top" :size="24" /><span>{{ $t('settings') }}</span>
+      <span class="mobile-nav-icon"><AppIcon name="nova-sidebar-settings" :size="24" inline /></span>
+      <span class="mobile-nav-label">{{ $t('settings') }}</span>
     </button>
   </nav>
   <button
@@ -295,36 +299,54 @@ onBeforeUnmount(() => {
 
   .mobile-nav button {
     min-width: 0;
-    min-height: 0;
+    height: 44px;
+    min-height: 44px;
+    padding: 3px 0 2px;
 
     display: grid;
-    place-items: center;
-    gap: 1px;
+    grid-template-rows: 24px 13px;
+    align-content: center;
+    justify-items: center;
+    row-gap: 1px;
 
     color: var(--regular-text-color);
     font-size: 12px;
-    line-height: 1.1;
+    line-height: 13px;
   }
 
-  .mobile-nav button span {
+  .mobile-nav-icon {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 24px;
+    line-height: 0;
+  }
+
+  .mobile-nav button :deep(.mobile-nav-icon .app-icon) {
+    width: 24px;
+    height: 24px;
+    opacity: .68;
+  }
+
+  .mobile-nav-label {
+    display: block;
+    max-height: 13px;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 13px;
     max-width: 100%;
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
   }
 
-  .mobile-nav button :deep(.app-icon) {
-    width: 22px;
-    height: 22px;
-    opacity: .68;
-  }
-
   .mobile-nav button.active {
     color: var(--el-color-primary);
-    font-weight: 600;
   }
 
-  .mobile-nav button.active :deep(.app-icon) {
+  .mobile-nav button.active :deep(.mobile-nav-icon .app-icon) {
     opacity: .95;
   }
 
