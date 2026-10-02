@@ -37,6 +37,35 @@ print(f"spent: {(end - start) * 1000:.3f} ms")`)
     expect(firstCode('#!/usr/bin/env bash\nexport NAME=Nova\necho "$NAME"\nif [ -n "$NAME" ]; then\n  echo ok\nfi')?.language).toBe('bash')
   })
 
+  it('does not mistake C includes for HTML and labels C separately from C++', () => {
+    const cSource = '#include <stdio.h>\nint main(void) {\n  printf("Hello\\n");\n  return 0;\n}'
+    expect(firstCode(cSource)?.language).toBe('c')
+    expect(renderCodeBlock(cSource)).toContain('>C</span>')
+    expect(detectLanguage('#include <vector>\nint main() { std::vector<int> values; }')).toBe('cpp')
+  })
+
+  it('keeps a raw HTML document together as one HTML code block', () => {
+    const source = `<!doctype html>
+<html lang="zh-CN">
+<head>
+  <style>
+    body { color: #18181b; }
+  </style>
+</head>
+<body><main>Hello</main></body>
+</html>`
+
+    const blocks = detectCodeBlocks(source)
+    expect(blocks).toEqual([{ type: 'code', code: source, language: 'xml' }])
+
+    const html = enhancePlainTextCodeBlocks(quotedTextToHtml(source, 'Quoted'))
+    expect(html.match(/nova-code-block/g)).toHaveLength(1)
+    expect(html).toContain('language-xml')
+    expect(html).toContain('data-nova-code-source="<!doctype html>')
+    expect(html).toContain('hljs-meta')
+    expect(html).toContain('body { color: #18181b; }')
+  })
+
   it('does not mistake ordinary English, Chinese, or one parenthesised sentence for code', () => {
     expect(firstCode('Hello team,\n\nCould you review the plan tomorrow?\n\nThanks!')).toBeUndefined()
     expect(firstCode('你好，\n\n明天我们讨论一下发布计划。\n\n谢谢！')).toBeUndefined()

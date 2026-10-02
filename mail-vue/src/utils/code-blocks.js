@@ -1,5 +1,6 @@
 import hljs from 'highlight.js/lib/core'
 import bash from 'highlight.js/lib/languages/bash'
+import c from 'highlight.js/lib/languages/c'
 import cpp from 'highlight.js/lib/languages/cpp'
 import csharp from 'highlight.js/lib/languages/csharp'
 import css from 'highlight.js/lib/languages/css'
@@ -15,7 +16,7 @@ import xml from 'highlight.js/lib/languages/xml'
 
 // Register only the languages the mail reader supports. Importing highlight.js
 // core rather than its all-languages entry keeps the reader bundle contained.
-const LANGUAGES = { bash, cpp, csharp, css, go, java, javascript, json, python, rust, sql, typescript, xml }
+const LANGUAGES = { bash, c, cpp, csharp, css, go, java, javascript, json, python, rust, sql, typescript, xml }
 Object.entries(LANGUAGES).forEach(([name, language]) => hljs.registerLanguage(name, language))
 
 const LANGUAGE_ALIASES = {
@@ -23,13 +24,13 @@ const LANGUAGE_ALIASES = {
   ts: 'typescript', tsx: 'typescript',
   py: 'python', sh: 'bash', shell: 'bash', zsh: 'bash',
   html: 'xml', xhtml: 'xml', svg: 'xml',
-  c: 'cpp', 'c++': 'cpp', cc: 'cpp', hpp: 'cpp',
+  'c++': 'cpp', cc: 'cpp', hpp: 'cpp',
   cs: 'csharp', 'c#': 'csharp',
   rs: 'rust', golang: 'go',
 }
 
 const LANGUAGE_LABELS = {
-  bash: 'Shell', cpp: 'C++', csharp: 'C#', css: 'CSS', go: 'Go', java: 'Java',
+  bash: 'Shell', c: 'C', cpp: 'C++', csharp: 'C#', css: 'CSS', go: 'Go', java: 'Java',
   javascript: 'JavaScript', json: 'JSON', python: 'Python', rust: 'Rust', sql: 'SQL',
   typescript: 'TypeScript', xml: 'HTML',
 }
@@ -70,12 +71,35 @@ function codeLineScore(line) {
 }
 
 /**
+ * A complete HTML document sent as text is source code, not rich mail markup.
+ *
+ * This check intentionally lives before the line-by-line heuristic. Otherwise
+ * a document's tags score as prose while the CSS inside `<style>` scores as
+ * code, producing the confusing split shown in the reader. Require a document
+ * start or several structural tags so an ordinary sentence mentioning `<div>`
+ * does not become a code block.
+ */
+function looksLikeHtmlSource(text) {
+  const source = String(text || '')
+  if (!source.trim()) return false
+  if (/^\s*(?:<!doctype\s+html\b|<html\b)/i.test(source)) return true
+
+  const tags = source.match(/<\/?(?:html|head|body|style|script|div|p|span|table|tbody|thead|tr|td|th|h[1-6]|ul|ol|li|br|img|a|strong|em|b|i|u)\b[^>]*>/gi)
+  return Boolean(tags && tags.length >= 3)
+}
+
+/**
  * Split a plain-text message into prose and high-confidence code runs.
  * A run needs three code-like lines (or two very strong ones), so ordinary
  * English/Chinese sentences and a single parenthesised sentence stay prose.
  */
 export function detectCodeBlocks(text) {
-  const lines = String(text || '').replace(/\r\n?/g, '\n').split('\n')
+  const source = String(text || '').replace(/\r\n?/g, '\n')
+  if (looksLikeHtmlSource(source)) {
+    return [{ type: 'code', code: source, language: 'xml' }]
+  }
+
+  const lines = source.split('\n')
   const blocks = []
   let index = 0
 
@@ -132,13 +156,16 @@ export function detectLanguage(code) {
   const source = String(code || '')
   if (!source.trim()) return ''
   try { JSON.parse(source); return 'json' } catch { /* not JSON */ }
-  if (/^\s*<!doctype\s+html|<\/?[a-z][^>]*>/im.test(source)) return 'xml'
+  // `<stdio.h>` and other angle-bracket includes are not HTML tags. Reuse the
+  // document/structural-tag check instead of accepting every `<word>` token.
+  if (looksLikeHtmlSource(source)) return 'xml'
   if (/^\s*(?:SELECT|INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM|CREATE\s+TABLE)\b/im.test(source)) return 'sql'
-  if (/^\s*#include\s*[<"]|\bstd::|\bint\s+main\s*\(/m.test(source)) return 'cpp'
-  if (/^\s*(?:package\s+main|func\s+\w+\s*\(|fmt\.)/m.test(source)) return 'go'
-  if (/^\s*(?:fn\s+\w+|let\s+mut\b|println!\s*\()/m.test(source)) return 'rust'
   if (/^\s*(?:using\s+\w|namespace\s+\w|Console\.)/m.test(source)) return 'csharp'
   if (/^\s*(?:package\s+[\w.]+|public\s+(?:static\s+)?class|System\.out\.)/m.test(source)) return 'java'
+  if (/\bstd::|\b(?:namespace|template|class)\s+\w+|#include\s*[<"](?:iostream|vector|string|memory|map|set)[>"]/m.test(source)) return 'cpp'
+  if (/^\s*#include\s*[<"]|\b(?:printf|scanf|malloc|calloc|realloc|free)\s*\(/m.test(source)) return 'c'
+  if (/^\s*(?:package\s+main|func\s+\w+\s*\(|fmt\.)/m.test(source)) return 'go'
+  if (/^\s*(?:fn\s+\w+|let\s+mut\b|println!\s*\()/m.test(source)) return 'rust'
   if (/^\s*(?:#!.*\b(?:ba)?sh|echo\b|export\s+\w+=|(?:if|for|while)\s+\[|fi$|done$)/m.test(source)) return 'bash'
   if (/^\s*(?:def\s+\w+\s*\(|from\s+[\w.]+\s+import\s+|import\s+[\w.]+|print\s*\(|class\s+\w+.*:)/m.test(source)) return 'python'
   if (/^\s*(?:interface\s+\w+|type\s+\w+\s*=|enum\s+\w+|(?:const|let)\s+\w+\s*:\s*\w+)/m.test(source)) return 'typescript'

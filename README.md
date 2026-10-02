@@ -50,6 +50,10 @@ Nova Mail is a modern web mail client based on the open-source [cloud-mail](http
 
 ![Nova Mail Login](doc/demo/loginDemo.png)
 
+### Login — dark theme
+
+![Nova Mail Login in dark theme](doc/demo/logindark.png)
+
 ### Mail interface
 
 ![Nova Mail Mail View](doc/demo/webview.png)
@@ -103,6 +107,9 @@ Rules:
   `javascript:` URLs are stripped.
 
 ### Code blocks and syntax highlighting
+
+For the complete recognition rules, supported languages, examples, security
+model, and verification notes, see [Code blocks and syntax highlighting](doc/CODE_HIGHLIGHTING.md).
 
 The reader renders explicit Markdown fenced blocks and HTML `<pre>` / `<code>`
 content as code. It also conservatively detects consecutive code-like lines in

@@ -55,6 +55,10 @@ Nova Mail 是一个现代化 Web 邮件客户端，基于开源项目 [maillab/c
 
 ![Nova Mail 登录页面](doc/demo/loginDemo.png)
 
+### 暗色主题登录页面
+
+![Nova Mail 暗色主题登录页面](doc/demo/logindark.png)
+
 ### 邮件界面
 
 ![Nova Mail 邮件界面](doc/demo/webview.png)
@@ -95,6 +99,8 @@ Nova Mail 按每封邮件存储的 body type 选择渲染方式，所以正文�
 - 远程图片默认拦截，读者点「显示图片」后才加载；链接会净化并硬化。HTML 邮件请使用内联样式和表格布局——`<script>`、事件属性、外链样式表和 `javascript:` 链接都会被清洗掉。
 
 ### 代码块与语法高亮
+
+完整的识别规则、支持语言、示例、安全模型与验证说明请参阅[代码块与语法高亮说明](doc/CODE_HIGHLIGHTING.zh-CN.md)。
 
 详情页会直接把 Markdown 围栏代码，以及 HTML 邮件中的 `<pre>` / `<code>`
 渲染为代码块。对于纯文本邮件和使用 `<div>` / `<br>` 表示粘贴代码的 HTML
