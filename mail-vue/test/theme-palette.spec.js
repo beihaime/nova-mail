@@ -90,7 +90,7 @@ describe('theme palettes', () => {
 
   it('provides only the supported preset collection without weakening palette validation', () => {
     const expectedPresets = [
-      'nova-default', 'terracotta', 'forest', 'lavender', 'rose', 'matcha', 'graphite', 'sakura', 'arctic', 'mocha',
+      'nova-default', 'terracotta', 'forest', 'lavender', 'matcha', 'graphite', 'sakura', 'arctic', 'mocha',
       'amber', 'aurora', 'cobalt', 'orchid', 'crimson', 'pine', 'lunar', 'cyber',
     ]
     expect(availablePresets('light')).toEqual(expectedPresets)
@@ -101,18 +101,15 @@ describe('theme palettes', () => {
       const paletteKey = `${mode}Palette`
       const presetKey = `${mode}ThemePreset`
       expect(migrateAppearanceConfig({
-        [paletteKey]: paletteForPreset(mode, 'rose'),
+        [paletteKey]: paletteForPreset(mode, 'lavender'),
         [presetKey]: 'rose',
-      })[presetKey]).toBe('rose')
+      })[presetKey]).toBe('lavender')
     }
 
     for (const mode of ['light', 'dark']) {
       for (const preset of availablePresets(mode)) {
         const palette = paletteForPreset(mode, preset)
         expect(normalizePalette(palette, DEFAULT_PALETTES[mode])).toEqual(palette)
-        // Lavender and Rose intentionally share the supplied palette. The
-        // stored explicit preset preserves the selected name; matching a raw
-        // palette resolves to the first equivalent preset.
         expect(paletteForPreset(mode, findMatchingPreset(mode, palette))).toEqual(palette)
 
         const values = {}

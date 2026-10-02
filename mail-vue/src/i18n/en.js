@@ -219,7 +219,6 @@ const en = {
     themePresetGraphite: 'Graphite',
     themePresetForest: 'Forest',
     themePresetLavender: 'Lavender',
-    themePresetRose: 'Rose',
     themePresetMatcha: 'Matcha',
     themePresetSakura: 'Sakura',
     themePresetArctic: 'Arctic',

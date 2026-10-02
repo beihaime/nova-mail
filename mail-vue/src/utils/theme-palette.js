@@ -34,9 +34,6 @@ const PRESETS = {
     lavender: {
       accent: '#C86478', background: '#FAF4F5', foreground: '#2B1C20', surface: '#FFFDFD', border: '#E5D2D6',
     },
-    rose: {
-      accent: '#C86478', background: '#FAF4F5', foreground: '#2B1C20', surface: '#FFFDFD', border: '#E5D2D6',
-    },
     matcha: {
       accent: '#789262', background: '#F5F6EE', foreground: '#20251A', surface: '#FCFDF7', border: '#D8DDC9',
     },
@@ -86,9 +83,6 @@ const PRESETS = {
       accent: '#70A984', background: '#131813', foreground: '#EDF3EC', surface: '#1C241D', border: '#354137',
     },
     lavender: {
-      accent: '#DF7C90', background: '#1A1416', foreground: '#FAEFF1', surface: '#251C1F', border: '#48353B',
-    },
-    rose: {
       accent: '#DF7C90', background: '#1A1416', foreground: '#FAEFF1', surface: '#251C1F', border: '#48353B',
     },
     matcha: {

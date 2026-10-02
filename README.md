@@ -83,7 +83,7 @@ accent, background, foreground, surface, and border. Select a preset from
 palette without changing the mail layout.
 
 Built-in presets: **Nova Default**, **Terracotta**, **Forest**, **Lavender**,
-**Rose**, **Matcha**, **Graphite**, **Sakura**, **Arctic**, **Mocha**,
+**Matcha**, **Graphite**, **Sakura**, **Arctic**, **Mocha**,
 **Amber**, **Aurora**, **Cobalt**, **Orchid**, **Crimson**, **Pine**, **Lunar**,
 and **Cyber**. Each preset includes coordinated light and dark values.
 

@@ -286,7 +286,6 @@ const themePresetOptions = computed(() => {
     graphite: t('themePresetGraphite'),
     forest: t('themePresetForest'),
     lavender: t('themePresetLavender'),
-    rose: t('themePresetRose'),
     matcha: t('themePresetMatcha'),
     sakura: t('themePresetSakura'),
     arctic: t('themePresetArctic'),

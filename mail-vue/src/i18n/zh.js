@@ -219,7 +219,6 @@ const zh = {
     themePresetGraphite: '石墨',
     themePresetForest: '森林',
     themePresetLavender: '薰衣草',
-    themePresetRose: '玫瑰',
     themePresetMatcha: '抹茶',
     themePresetSakura: '樱花',
     themePresetArctic: '极地',
