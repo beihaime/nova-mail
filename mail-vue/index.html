@@ -106,7 +106,23 @@
             const candidate = savedPalettes?.[isDark ? 'darkPalette' : 'lightPalette'] || {}
             const hex = /^#[0-9a-f]{6}$/i
             const palette = Object.fromEntries(Object.entries(defaults).map(([key, fallback]) => [key, hex.test(candidate[key]) ? candidate[key].toUpperCase() : fallback]))
+            const blend = (base, overlay, ratio) => {
+                const channels = (value) => [1, 3, 5].map((start) => Number.parseInt(value.slice(start, start + 2), 16))
+                const encode = (value) => Math.round(value).toString(16).padStart(2, '0')
+                const [r1, g1, b1] = channels(base)
+                const [r2, g2, b2] = channels(overlay)
+                return `#${encode(r1 + (r2 - r1) * ratio)}${encode(g1 + (g2 - g1) * ratio)}${encode(b1 + (b2 - b1) * ratio)}`
+            }
+            const surface = blend(palette.background, palette.surface, isDark ? .40 : .20)
+            const selected = blend(palette.background, palette.accent, isDark ? .22 : .10)
             const initialTokens = {
+                '--nm-bg': palette.background,
+                '--nm-surface': surface,
+                '--nm-surface-elevated': palette.surface,
+                '--nm-accent': palette.accent,
+                '--nm-accent-subtle': selected,
+                '--nm-selected': selected,
+                '--nm-hover': blend(surface, palette.accent, isDark ? .08 : .045),
                 '--nova-accent': palette.accent,
                 '--nova-background': palette.background,
                 '--nova-foreground': palette.foreground,
@@ -117,6 +133,9 @@
                 '--settings-page-background': palette.background,
                 '--light-border': palette.border,
                 '--el-bg-color': palette.surface,
+                '--aside-backgound': surface,
+                '--aside-menu-active-background': selected,
+                '--nova-selected': selected,
             }
             Object.entries(initialTokens).forEach(([name, value]) => root.style.setProperty(name, value))
 

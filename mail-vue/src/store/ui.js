@@ -1,12 +1,15 @@
 import { defineStore } from 'pinia'
 import { useSettingStore } from './setting.js'
 import {
+    APPEARANCE_SCHEMA_VERSION,
     DEFAULT_PALETTES,
     applyPaletteTokens,
     clonePalette,
     findMatchingPreset,
+    migrateAppearanceConfig,
     normalizePalette,
     paletteForPreset,
+    resolvePaletteMode,
 } from '@/utils/theme-palette.js'
 
 /**
@@ -112,6 +115,10 @@ export const useUiStore = defineStore('ui', {
             window.__NOVA_INITIAL_THEME__?.mode ??
             'system',
 
+        // Versioned independently from the rest of persisted UI state. This
+        // lets the palette layer repair legacy/partial values deterministically.
+        appearanceVersion: APPEARANCE_SCHEMA_VERSION,
+
         // Light and dark are intentionally independent. System mode simply
         // resolves one of these two palettes from the operating system.
         lightPalette: clonePalette(DEFAULT_PALETTES.light),
@@ -210,6 +217,13 @@ export const useUiStore = defineStore('ui', {
 
         applyTheme(){
 
+            const appearance = migrateAppearanceConfig(this)
+            this.appearanceVersion = appearance.appearanceVersion
+            this.lightPalette = appearance.lightPalette
+            this.darkPalette = appearance.darkPalette
+            this.lightThemePreset = appearance.lightThemePreset
+            this.darkThemePreset = appearance.darkThemePreset
+
             let mode=this.themeMode
 
 
@@ -226,27 +240,17 @@ export const useUiStore = defineStore('ui', {
 
 
 
-            let effectiveDark=false
-
-
-            if(mode==='dark'){
-                effectiveDark=true
-            }
-            else if(mode==='system'){
-
-                effectiveDark =
-                    window.matchMedia(
-                        '(prefers-color-scheme: dark)'
-                    ).matches
-
-            }
+            const paletteMode = resolvePaletteMode(
+                mode,
+                window.matchMedia('(prefers-color-scheme: dark)').matches
+            )
+            const effectiveDark = paletteMode === 'dark'
 
 
 
             this.dark=effectiveDark
 
 
-            const paletteMode = effectiveDark ? 'dark' : 'light'
             const paletteKey = `${paletteMode}Palette`
             const presetKey = `${paletteMode}ThemePreset`
             this[paletteKey] = normalizePalette(this[paletteKey], DEFAULT_PALETTES[paletteMode])
@@ -363,6 +367,7 @@ export const useUiStore = defineStore('ui', {
             'accountShow',
             'dark',
             'themeMode',
+            'appearanceVersion',
             'lightPalette',
             'darkPalette',
             'lightThemePreset',

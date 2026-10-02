@@ -24,9 +24,25 @@
     --nova-foreground: #1f2937;
     --nova-surface: #ffffff;
     --nova-border: #e5e7eb;
-    --nova-text-primary: var(--nova-foreground);
-    --nova-text-secondary: #5f6673;
-    --nova-text-muted: #7b8491;
+    /* Semantic hierarchy. The five `--nova-*` palette inputs are the only
+       user-editable colours; these variables are the stable UI contract. */
+    --nm-bg: var(--nova-background);
+    --nm-surface: #f7f8fa;
+    --nm-surface-elevated: var(--nova-surface);
+    --nm-text-primary: var(--nova-foreground);
+    --nm-text-secondary: #5f6673;
+    --nm-text-muted: #7b8491;
+    --nm-border: var(--nova-border);
+    --nm-border-strong: #cbd1d9;
+    --nm-accent: var(--nova-accent);
+    --nm-accent-hover: #086fd9;
+    --nm-accent-active: #075eb8;
+    --nm-accent-subtle: #e2efff;
+    --nm-hover: #f3f7fc;
+    --nm-selected: var(--nm-accent-subtle);
+    --nova-text-primary: var(--nm-text-primary);
+    --nova-text-secondary: var(--nm-text-secondary);
+    --nova-text-muted: var(--nm-text-muted);
     --nova-star-idle: var(--nova-text-muted);
     --nova-star-active: #d4a72c;
     --el-text-color-primary: var(--nova-text-primary);
@@ -149,13 +165,13 @@ button, input, select, textarea {
     --el-color-primary-light-7: #b9ddff;
     --el-color-primary-light-9: #edf7ff;
 
-    --extra-light-fill: #f7f8fa;
-    --settings-page-background: var(--nova-background);
+    --extra-light-fill: var(--nm-surface);
+    --settings-page-background: var(--nm-bg);
     --light-ill: #f2f4f7;
     --light-border: var(--nova-border);
     --header-actions-border: inset 0 -1px 0 0 var(--el-border-color-lighter);
-    --aside-backgound: #f7f8fa;
-    --aside-menu-active-background: #e2efff;
+    --aside-backgound: var(--nm-surface);
+    --aside-menu-active-background: var(--nm-selected);
     --loadding-background: rgba(255, 255, 255, 0.8);
     --dark-border: #d1d5db;
     --base-fill: #eef1f5;
@@ -178,7 +194,7 @@ button, input, select, textarea {
     --vt-y: 50%;
     --vt-duration: 520ms;
     --vt-easing: ease-out;
-    --nova-surface-muted: #f7f8fa;
+    --nova-surface-muted: var(--nm-surface);
     /* Single source of truth for the phone chrome. The mobile app bar, the
        status-bar / `safe-area-inset-top` strip behind it and the PWA
        `theme-color` meta all resolve to this one token, so they can never
@@ -194,8 +210,8 @@ button, input, select, textarea {
     --nova-divider-soft: color-mix(in srgb, var(--nova-divider) 60%, transparent);
     /* Quoted-reply hierarchy line (Gmail style). */
     --nova-quote-line: #c7cdd4;
-    --nova-hover: #f3f7fc;
-    --nova-selected: #eaf3ff;
+    --nova-hover: var(--nm-hover);
+    --nova-selected: var(--nm-selected);
     --nova-shadow: 0 10px 32px rgba(23, 35, 52, .08);
     --nova-overlay: rgba(0,0,0,.45);
     --nova-ui-icon-filter: none;
@@ -210,8 +226,8 @@ button, input, select, textarea {
     --nova-button-primary-radius: 10px;
     --nova-icon-button-size: 34px;
     --nova-button-hover: var(--nova-hover);
-    --nova-button-active: color-mix(in srgb, var(--el-color-primary) 12%, var(--nova-hover));
-    --nova-button-focus-ring: 0 0 0 2px color-mix(in srgb, var(--el-color-primary) 52%, transparent);
+    --nova-button-active: var(--nm-accent-subtle);
+    --nova-button-focus-ring: 0 0 0 2px color-mix(in srgb, var(--nm-accent) 42%, transparent);
     --nova-button-disabled-opacity: .48;
 }
 
@@ -221,20 +237,34 @@ button, input, select, textarea {
     --nova-foreground: #e5e7eb;
     --nova-surface: #17191d;
     --nova-border: #383a3f;
-    --nova-text-primary: var(--nova-foreground);
-    --nova-text-secondary: #a7adb7;
-    --nova-text-muted: #7e8590;
+    --nm-bg: var(--nova-background);
+    --nm-surface: #1b1c1f;
+    --nm-surface-elevated: var(--nova-surface);
+    --nm-text-primary: var(--nova-foreground);
+    --nm-text-secondary: #a7adb7;
+    --nm-text-muted: #7e8590;
+    --nm-border: var(--nova-border);
+    --nm-border-strong: #5a5c61;
+    --nm-accent: var(--nova-accent);
+    --nm-accent-hover: #238fff;
+    --nm-accent-active: #3b9aff;
+    --nm-accent-subtle: #183a60;
+    --nm-hover: #202833;
+    --nm-selected: var(--nm-accent-subtle);
+    --nova-text-primary: var(--nm-text-primary);
+    --nova-text-secondary: var(--nm-text-secondary);
+    --nova-text-muted: var(--nm-text-muted);
     --nova-star-idle: var(--nova-text-secondary);
     --nova-star-active: #facc15;
     --el-text-color-primary: var(--nova-text-primary);
     --el-text-color-regular: var(--nova-text-secondary);
     --el-text-color-secondary: var(--nova-text-muted);
-    --extra-light-fill: #1c1d20;
-    --settings-page-background: var(--nova-background);
+    --extra-light-fill: var(--nm-surface);
+    --settings-page-background: var(--nm-bg);
     --light-ill: #27292d;
     --light-border: var(--nova-border);
-    --aside-backgound: #1b1c1f;
-    --aside-menu-active-background: rgba(10, 132, 255, .22);
+    --aside-backgound: var(--nm-surface);
+    --aside-menu-active-background: var(--nm-selected);
     --header-actions-border: inset 0 -1px 0 0 var(--el-border-color-lighter);
     --loadding-background: rgba(0, 0, 0, 0.3);
     --dark-border: #636466;
@@ -254,7 +284,7 @@ button, input, select, textarea {
     --secondary-text-color: var(--nova-text-muted);
     --message-block-color: rgba(30, 30, 30, 0.2);
     --el-border-color: var(--nova-border) !important;
-    --nova-surface-muted: #1d2025;
+    --nova-surface-muted: var(--nm-surface);
     --nova-divider: #2c3037;
     /* Dark search field must stay a hair above the page: a 5.5% white veil plus
        a barely-there outline, never a bright block. */
@@ -264,14 +294,14 @@ button, input, select, textarea {
     --nova-divider-soft: color-mix(in srgb, var(--nova-divider) 45%, transparent);
     /* Quoted-reply hierarchy line (Gmail style). */
     --nova-quote-line: #4b5563;
-    --nova-hover: #202833;
-    --nova-selected: #17385f;
+    --nova-hover: var(--nm-hover);
+    --nova-selected: var(--nm-selected);
     --nova-shadow: 0 10px 32px rgba(0, 0, 0, .22);
     --nova-overlay: rgba(0,0,0,.25);
     /* The UI SVGs are raster-backed assets, so they cannot inherit currentColor. */
     --nova-ui-icon-filter: brightness(0) invert(78%);
     --nova-ui-icon-filter-hover: brightness(0) invert(92%);
-    --nova-button-active: color-mix(in srgb, var(--el-color-primary) 18%, var(--nova-hover));
+    --nova-button-active: var(--nm-accent-subtle);
 }
 
 /* Keep the product responsive without making routine mail actions feel animated. */
