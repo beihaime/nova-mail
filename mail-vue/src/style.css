@@ -7,6 +7,13 @@
     scrollbar-color: var(--dark-border) transparent;
 }
 
+:root {
+    /* The app's reading/UI face. Keep broad CJK and generic-serif fallbacks for
+       devices that do not have Source Han Serif installed locally. */
+    --nova-font-family: "Source Han Serif SC VF", "Source Han Serif SC", "Noto Serif CJK SC", serif;
+    --el-font-family: var(--nova-font-family);
+}
+
 html, body {
     width: 100%;
     height: 100%;
@@ -36,7 +43,7 @@ html, body {
 }
 
 body {
-    font-family: Inter, "Helvetica Neue", Helvetica, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", Arial, sans-serif;
+    font-family: var(--nova-font-family);
     line-height: 1.5;
     color: var(--el-text-color-primary);
     font-size: 14px;

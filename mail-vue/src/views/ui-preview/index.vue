@@ -71,7 +71,7 @@ function selectMail(mail) { selected.value = mail; mobileReader.value = true; mo
 </script>
 
 <style scoped>
-.preview { min-height: 100vh; padding: 28px; color: #172033; background: radial-gradient(circle at 18% 10%, #e9f3ff, transparent 35%), #d9e4ef; font-family: Inter, "PingFang SC", sans-serif; }
+.preview { min-height: 100vh; padding: 28px; color: #172033; background: radial-gradient(circle at 18% 10%, #e9f3ff, transparent 35%), #d9e4ef; font-family: var(--nova-font-family); }
 .preview.dark { color: #eef3ff; background: radial-gradient(circle at 18% 10%, #283d61, transparent 35%), #101822; }
 .window { min-height: calc(100vh - 56px); max-width: 1500px; margin: auto; display: grid; grid-template-columns: 282px minmax(0, 1fr); overflow: hidden; border: 1px solid rgba(130,145,165,.28); border-radius: 18px; background: #fff; box-shadow: 0 22px 58px rgba(24,49,79,.2); }
 .dark .window { background: #111923; border-color: #2a3543; }
