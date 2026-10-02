@@ -188,7 +188,6 @@ button, input, select, textarea {
     --scrollbar-track-color: #A8ABB2;
     --base-border-color: #DCDFE6;
     --secondary-text-color: var(--nova-text-muted);
-    --message-block-color: rgba(0, 0, 0, 0);
     --loading-hide-transition: all 200ms;
     --vt-x: 50%;
     --vt-y: 50%;
@@ -289,7 +288,6 @@ button, input, select, textarea {
     --scrollbar-track-color: #8D9095;
     --base-border-color: #4C4D4F;
     --secondary-text-color: var(--nova-text-muted);
-    --message-block-color: rgba(30, 30, 30, 0.2);
     --el-border-color: var(--nova-border) !important;
     --nova-surface-muted: var(--nm-surface);
     --nova-divider: #2c3037;

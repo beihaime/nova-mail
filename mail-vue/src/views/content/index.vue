@@ -1862,11 +1862,11 @@ function restoreTrash() {
   border-color: var(--nova-divider);
 }
 
-/* An open message is the reader surface itself. Collapsed thread rows retain
-   the quieter muted surface, while the body and its transparent HTML frame sit
-   on the same `--nova-surface` colour as the rest of the expanded reader. */
+/* Expanding a message changes its content visibility, not its surface colour.
+   The body owns the page-background token below, so an active message can
+   never introduce a second dark/light rectangle behind its content. */
 .thread-message.is-expanded {
-  background: var(--nova-surface);
+  background: var(--nova-surface-muted);
 }
 
 .thread-message {
@@ -1960,6 +1960,7 @@ function restoreTrash() {
  * so a skipped animation can only skip the fade, not the content. */
 .message-body {
   padding: 0 16px 18px;
+  background: var(--nova-background);
   animation: nova-message-open var(--nova-motion-base) var(--nova-motion-ease) forwards;
 }
 
@@ -1979,7 +1980,6 @@ function restoreTrash() {
     opacity: 0;
     transform: translateY(-8px);
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--el-color-primary) 45%, transparent);
-    background: color-mix(in srgb, var(--el-color-primary) 10%, var(--el-bg-color));
   }
   18% {
     opacity: 1;
@@ -1987,11 +1987,9 @@ function restoreTrash() {
   }
   70% {
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--el-color-primary) 22%, transparent);
-    background: color-mix(in srgb, var(--el-color-primary) 5%, var(--el-bg-color));
   }
   100% {
     box-shadow: none;
-    background: var(--el-bg-color);
   }
 }
 
@@ -2045,21 +2043,17 @@ function restoreTrash() {
   margin-bottom: 0;
 }
 
+.message-body .htm-scrollbar,
+.message-body .email-text,
+.message-body :deep(.mail-frame),
+.message-body :deep(.mail-frame__iframe) {
+  background: var(--nova-background);
+}
+
 .htm-scrollbar { max-width: 1100px; overflow-x: auto; }
 .email-text { max-width: 100%; overflow-wrap: anywhere; font-family: var(--nova-font-reading); font-size: 15px; font-weight: 400; line-height: 1.62; color: var(--nova-text-primary); }
 .reader-bottom-actions { display: flex; gap: 10px; max-width: 1100px; padding: 28px 0 18px; }
 .reader-bottom-actions button { gap: 7px; }
-
-.shadow-html::after  {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: var(--message-block-color); /* 半透明黑色蒙层 */
-  pointer-events: none; /* 不影响点击 */
-}
 
 /* Remote content is held back until the reader asks for it, so a tracking pixel
    never fires just because a message was opened. */

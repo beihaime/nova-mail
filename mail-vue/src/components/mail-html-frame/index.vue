@@ -378,15 +378,16 @@ defineExpose({
 .mail-frame {
   width: 100%;
   display: block;
+  background: var(--nova-background);
 }
 
 .mail-frame__iframe {
   width: 100%;
   display: block;
   border: 0;
-  /* The frame is an opaque pane: give it no background of its own so the mail's
-     own colours (and the app's theme behind it) show through. */
-  background: transparent;
+  /* The untrusted document itself stays transparent, while its host always
+     inherits the reader's page background across every theme. */
+  background: var(--nova-background);
   color-scheme: normal;
 }
 
