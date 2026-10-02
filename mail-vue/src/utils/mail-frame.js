@@ -190,6 +190,10 @@ function buildFrameStyle(theme) {
     .nova-code-toolbar { position: absolute; top: 8px; right: 10px; display: flex; align-items: center; gap: 8px; color: ${quoteText}; font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; }
     .nova-code-copy { padding: 3px 7px; border: 1px solid ${codeBorder}; border-radius: 5px; color: inherit; background: transparent; font: inherit; cursor: pointer; }
     .nova-code-copy:hover { border-color: ${link}; color: ${link}; }
+    .nova-code-language { display: inline-flex; align-items: center; gap: 4px; color: ${link}; }
+    .nova-code-language-icon { font-weight: 700; }
+    .nova-code-line { position: relative; display: block; min-height: 1.55em; padding-left: 3.5em; }
+    .nova-code-line::before { position: absolute; left: 0; width: 2.5em; color: ${quoteText}; content: attr(data-line); text-align: right; user-select: none; opacity: .62; }
     .nova-code-prose { white-space: pre-wrap; }
     .hljs-keyword, .hljs-selector-tag, .hljs-built_in { color: ${dark ? '#c4b5fd' : '#7c3aed'}; }
     .hljs-string, .hljs-attr, .hljs-template-variable { color: ${dark ? '#6ee7b7' : '#087f5b'}; }

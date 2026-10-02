@@ -86,5 +86,8 @@ describe('explicit code blocks', () => {
     const html = renderCodeBlock('const a = 1;\nconsole.log(a);', 'javascript')
     expect(html).toContain('data-nova-copy-code="1"')
     expect(html).toContain('2 lines')
+    expect(html).toContain('JavaScript')
+    expect(html).toContain('data-line="1"')
+    expect(html).toContain('data-line="2"')
   })
 })

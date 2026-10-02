@@ -28,6 +28,12 @@ const LANGUAGE_ALIASES = {
   rs: 'rust', golang: 'go',
 }
 
+const LANGUAGE_LABELS = {
+  bash: 'Shell', cpp: 'C++', csharp: 'C#', css: 'CSS', go: 'Go', java: 'Java',
+  javascript: 'JavaScript', json: 'JSON', python: 'Python', rust: 'Rust', sql: 'SQL',
+  typescript: 'TypeScript', xml: 'HTML',
+}
+
 function escapeHtml(value) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -144,13 +150,19 @@ export function detectLanguage(code) {
 export function renderCodeBlock(code, language = '') {
   const source = String(code || '')
   const normalized = normalizeCodeLanguage(language) || detectLanguage(source)
-  const html = normalized
-    ? hljs.highlight(source, { language: normalized, ignoreIllegals: true }).value
-    : escapeHtml(source)
+  const highlightedLines = source.split('\n').map(line => (
+    normalized
+      ? hljs.highlight(line, { language: normalized, ignoreIllegals: true }).value
+      : escapeHtml(line)
+  ))
+  const html = highlightedLines.map((line, index) => (
+    `<span class="nova-code-line" data-line="${index + 1}">${line}</span>`
+  )).join('\n')
   const languageClass = normalized ? ` language-${normalized}` : ''
   const lineCount = source ? source.split('\n').length : 0
   const lineLabel = `${lineCount} ${lineCount === 1 ? 'line' : 'lines'}`
-  return `<div class="nova-code-block"><div class="nova-code-toolbar"><span class="nova-code-lines">${lineLabel}</span><button class="nova-code-copy" type="button" data-nova-copy-code="1" aria-label="Copy code">Copy</button></div><pre><code class="hljs${languageClass}">${html}</code></pre></div>`
+  const languageLabel = LANGUAGE_LABELS[normalized] || 'Plain text'
+  return `<div class="nova-code-block"><div class="nova-code-toolbar"><span class="nova-code-language"><span class="nova-code-language-icon" aria-hidden="true">&lt;/&gt;</span>${languageLabel}</span><span class="nova-code-lines">${lineLabel}</span><button class="nova-code-copy" type="button" data-nova-copy-code="1" aria-label="Copy code">Copy</button></div><pre><code class="hljs${languageClass}">${html}</code></pre></div>`
 }
 
 function languageFromCodeElement(code) {

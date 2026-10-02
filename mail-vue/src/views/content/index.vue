@@ -2189,6 +2189,33 @@ const handleDelete = () => {
 
 .email-text :deep(.nova-code-copy:hover) { border-color: var(--el-color-primary); color: var(--el-color-primary); }
 
+.email-text :deep(.nova-code-language) {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--el-color-primary);
+}
+
+.email-text :deep(.nova-code-language-icon) { font-weight: 700; }
+
+.email-text :deep(.nova-code-line) {
+  position: relative;
+  display: block;
+  min-height: 1.55em;
+  padding-left: 3.5em;
+}
+
+.email-text :deep(.nova-code-line::before) {
+  position: absolute;
+  left: 0;
+  width: 2.5em;
+  color: var(--regular-text-color);
+  content: attr(data-line);
+  text-align: right;
+  user-select: none;
+  opacity: .62;
+}
+
 .email-text :deep(.hljs-keyword),
 .email-text :deep(.hljs-selector-tag),
 .email-text :deep(.hljs-built_in) { color: #7c3aed; }
