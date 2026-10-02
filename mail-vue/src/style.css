@@ -20,6 +20,8 @@
     --nova-text-primary: #1f2937;
     --nova-text-secondary: #5f6673;
     --nova-text-muted: #7b8491;
+    --nova-star-idle: var(--nova-text-muted);
+    --nova-star-active: #d4a72c;
     --el-text-color-primary: var(--nova-text-primary);
     --el-text-color-regular: var(--nova-text-secondary);
     --el-text-color-secondary: var(--nova-text-muted);
@@ -202,6 +204,8 @@ button, input, select, textarea {
     --nova-text-primary: #e5e7eb;
     --nova-text-secondary: #a7adb7;
     --nova-text-muted: #7e8590;
+    --nova-star-idle: var(--nova-text-secondary);
+    --nova-star-active: #facc15;
     --el-text-color-primary: var(--nova-text-primary);
     --el-text-color-regular: var(--nova-text-secondary);
     --el-text-color-secondary: var(--nova-text-muted);
@@ -440,13 +444,28 @@ html.dark .iconify {
 }
 
 
-/* Keep active colored icons */
+/* Shared star system. The global dark Iconify fallback is intentionally
+ * overridden here so every star control has the same idle and active state. */
+.nova-star-icon {
+    width: 18px !important;
+    height: 18px !important;
+    flex: 0 0 18px;
+    color: var(--nova-star-idle);
+    opacity: 1;
+}
 
-html.dark .star-active-icon,
-html.dark .inbox-star-icon.is-active {
+.nova-star-icon.is-active {
+    color: var(--nova-star-active);
+}
+
+html.dark .nova-star-icon {
     filter: none !important;
-    color: #ffcc00 !important;
+    color: var(--nova-star-idle) !important;
     opacity: 1 !important;
+}
+
+html.dark .nova-star-icon.is-active {
+    color: var(--nova-star-active) !important;
 }
 
 

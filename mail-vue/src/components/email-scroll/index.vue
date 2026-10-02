@@ -148,14 +148,21 @@
                            v-model="item.checked"
                            :disabled="!item.checked && isSelectMax"
                            @click.stop></el-checkbox>
-              <div @click.stop="starChange(item)" class="pc-star" v-if="showStar">
-                <Icon
-                    :class="['inbox-star-icon', { 'is-active': item.isStar }]"
-                    :icon="item.isStar ? 'solar:star-bold' : 'solar:star-linear'"
-                    width="19"
-                    height="19"
-                />
-              </div>
+              <el-tooltip v-if="showStar" effect="dark" :content="item.isStar ? t('unstar') : t('star')" :show-after="2000">
+                <button
+                    class="pc-star"
+                    type="button"
+                    :aria-label="item.isStar ? t('unstar') : t('star')"
+                    @click.stop="starChange(item)"
+                >
+                  <Icon
+                      :class="['nova-star-icon', 'inbox-star-icon', { 'is-active': item.isStar }]"
+                      :icon="item.isStar ? 'solar:star-bold' : 'solar:star-linear'"
+                      width="18"
+                      height="18"
+                  />
+                </button>
+              </el-tooltip>
               <div v-if="!showStar"></div>
               <!-- Reserved unread gutter. The slot always owns its track, so a
                    read/unread flip cannot shift the avatar or the message text;
@@ -322,8 +329,13 @@
           <el-dropdown-item v-if="['email','send', 'star'].includes(props.type)" @click="starChange(rightClickEmail)">
             <template #default>
               <div class="right-dropdown-item">
-                <Icon icon="solar:star-line-duotone" width="19" height="19"/>
-                <span>{{t('star')}}</span>
+                <Icon
+                    :class="['nova-star-icon', { 'is-active': rightClickEmail.isStar }]"
+                    :icon="rightClickEmail.isStar ? 'solar:star-bold' : 'solar:star-linear'"
+                    width="18"
+                    height="18"
+                />
+                <span>{{ rightClickEmail.isStar ? t('unstar') : t('star') }}</span>
               </div>
             </template>
           </el-dropdown-item>
@@ -1926,18 +1938,20 @@ function loadData() {
 }
 
 .pc-star {
-  display: flex;
-  width: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
 }
 
-.inbox-star-icon {
-  color: var(--regular-text-color);
-  opacity: .9;
-}
-
-.inbox-star-icon.is-active {
-  color: var(--el-color-primary);
-  opacity: 1;
+.pc-star:hover {
+  background: var(--nova-hover);
 }
 
 @media (max-width: 1366px) {
@@ -2912,11 +2926,6 @@ ul {
 
   /* Starred rows use the theme accent on the phone list (the desktop list keeps
      the global treatment). `!important` outranks the global dark icon veil. */
-  .mobile-row-star .inbox-star-icon.is-active {
-    color: var(--el-color-primary) !important;
-    opacity: 1 !important;
-  }
-
   /* ---------- Filtered empty ---------- */
 
   .scroll {

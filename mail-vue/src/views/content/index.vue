@@ -1,18 +1,18 @@
 <template>
   <div class="box mail-reader">
     <div class="header-actions">
-      <el-tooltip content="Back" :show-after="2000"><button class="toolbar-action" type="button" aria-label="Back" @click="handleBack"><Icon icon="solar:arrow-left-linear" width="20" height="20" /></button></el-tooltip>
-      <el-tooltip v-perm="'email:delete'" content="Delete" :show-after="2000"><button class="toolbar-action" type="button" aria-label="Delete email" @click="handleDelete"><Icon icon="solar:trash-bin-trash-linear" width="20" height="20" /></button></el-tooltip>
-      <el-tooltip v-if="emailStore.contentData.showStar" :content="email.isStar ? 'Unstar' : 'Star'" :show-after="2000">
-        <button class="toolbar-action toolbar-star" type="button" :aria-label="email.isStar ? 'Unstar' : 'Star'" @click="changeStar(email)">
-          <Icon v-if="email.isStar" class="star-active-icon" icon="solar:star-bold" width="20" height="20" />
-          <Icon v-else icon="solar:star-linear" width="20" height="20" />
+      <el-tooltip effect="dark" :content="$t('back')" :show-after="2000"><button class="toolbar-action" type="button" :aria-label="$t('back')" @click="handleBack"><Icon icon="solar:arrow-left-linear" width="20" height="20" /></button></el-tooltip>
+      <el-tooltip v-perm="'email:delete'" effect="dark" :content="$t('delete')" :show-after="2000"><button class="toolbar-action" type="button" :aria-label="$t('delete')" @click="handleDelete"><Icon icon="solar:trash-bin-trash-linear" width="20" height="20" /></button></el-tooltip>
+      <el-tooltip v-if="emailStore.contentData.showStar" effect="dark" :content="email.isStar ? $t('unstar') : $t('star')" :show-after="2000">
+        <button class="toolbar-action toolbar-star" type="button" :aria-label="email.isStar ? $t('unstar') : $t('star')" @click="changeStar(email)">
+          <Icon v-if="email.isStar" class="nova-star-icon is-active" icon="solar:star-bold" width="18" height="18" />
+          <Icon v-else class="nova-star-icon" icon="solar:star-linear" width="18" height="18" />
         </button>
       </el-tooltip>
-      <el-tooltip v-if="emailStore.contentData.showReply" v-perm="'email:send'" content="Reply" :show-after="2000"><button class="toolbar-action" type="button" aria-label="Reply" @click="openReply"><Icon icon="solar:reply-linear" width="20" height="20" /></button></el-tooltip>
-      <el-tooltip v-if="emailStore.contentData.showReply" v-perm="'email:send'" :content="$t('replyAll')" :show-after="2000"><button class="toolbar-action" type="button" :aria-label="$t('replyAll')" @click="openReplyAll"><Icon icon="mdi:reply-all-outline" width="20" height="20" /></button></el-tooltip>
-      <el-tooltip v-if="emailStore.contentData.showReply" v-perm="'email:send'" content="Forward" :show-after="2000"><button class="toolbar-action" type="button" aria-label="Forward" @click="openForward"><Icon icon="solar:forward-2-linear" width="20" height="20" /></button></el-tooltip>
-      <el-tooltip content="Print" :show-after="2000"><button class="toolbar-action" type="button" aria-label="Print email" @click="printEmail"><Icon icon="solar:printer-linear" width="20" height="20" /></button></el-tooltip>
+      <el-tooltip v-if="emailStore.contentData.showReply" v-perm="'email:send'" effect="dark" :content="$t('reply')" :show-after="2000"><button class="toolbar-action" type="button" :aria-label="$t('reply')" @click="openReply"><Icon icon="solar:reply-linear" width="20" height="20" /></button></el-tooltip>
+      <el-tooltip v-if="emailStore.contentData.showReply" v-perm="'email:send'" effect="dark" :content="$t('replyAll')" :show-after="2000"><button class="toolbar-action" type="button" :aria-label="$t('replyAll')" @click="openReplyAll"><Icon icon="mdi:reply-all-outline" width="20" height="20" /></button></el-tooltip>
+      <el-tooltip v-if="emailStore.contentData.showReply" v-perm="'email:send'" effect="dark" :content="$t('forward')" :show-after="2000"><button class="toolbar-action" type="button" :aria-label="$t('forward')" @click="openForward"><Icon icon="solar:forward-2-linear" width="20" height="20" /></button></el-tooltip>
+      <el-tooltip effect="dark" :content="$t('print')" :show-after="2000"><button class="toolbar-action" type="button" :aria-label="$t('print')" @click="printEmail"><Icon icon="solar:printer-linear" width="20" height="20" /></button></el-tooltip>
     </div>
     <div></div>
     <el-scrollbar ref="scrollRef" class="scrollbar">
@@ -86,16 +86,22 @@
                 </template>
               </div>
               <time class="message-date">{{ messageTimeFor(message) }}</time>
-              <button
+              <el-tooltip
                   v-if="message.emailId && !message.isMine"
-                  class="message-star"
-                  type="button"
-                  :aria-label="message.isStar ? 'Unstar' : 'Star'"
-                  @click.stop="changeStar(message)"
+                  effect="dark"
+                  :content="message.isStar ? $t('unstar') : $t('star')"
+                  :show-after="2000"
               >
-                <Icon v-if="message.isStar" class="star-active-icon" icon="solar:star-bold" width="20" height="20" />
-                <Icon v-else icon="solar:star-linear" width="20" height="20" />
-              </button>
+                <button
+                    class="message-star"
+                    type="button"
+                    :aria-label="message.isStar ? $t('unstar') : $t('star')"
+                    @click.stop="changeStar(message)"
+                >
+                  <Icon v-if="message.isStar" class="nova-star-icon is-active" icon="solar:star-bold" width="18" height="18" />
+                  <Icon v-else class="nova-star-icon" icon="solar:star-linear" width="18" height="18" />
+                </button>
+              </el-tooltip>
             </header>
 
             <!-- Collapsed body: the quote-stripped first paragraph only.
@@ -1494,15 +1500,20 @@ const handleDelete = () => {
   .toolbar-action {
     appearance: none;
     border: 0;
-    display: grid;
-    place-items: center;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 32px;
     cursor: pointer;
-    width: 36px;
-    height: 36px;
-    border-radius: 8px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
     padding: 0;
     color: var(--el-text-color-regular);
     background: transparent;
+    outline: none;
+    box-shadow: none;
     transition: color .15s ease, background-color .15s ease, transform .15s ease;
 
     :deep(.iconify) {
@@ -1515,30 +1526,27 @@ const handleDelete = () => {
       background: var(--nova-hover);
     }
 
+    &:focus {
+      outline: none;
+    }
+
     &:focus-visible {
-      outline: 2px solid var(--el-color-primary);
-      outline-offset: 2px;
+      outline: none;
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--el-color-primary) 55%, transparent);
     }
 
     &:active { transform: scale(.94); }
   }
 
-  .toolbar-star .star-active-icon {
-    color: #eab308;
-  }
-
-  :global(html.dark) .toolbar-action :deep(.iconify) {
+  :global(html.dark) .toolbar-action :deep(.iconify:not(.nova-star-icon)) {
     color: var(--el-text-color-regular) !important;
     opacity: 1 !important;
   }
 
-  :global(html.dark) .toolbar-action:hover :deep(.iconify) {
+  :global(html.dark) .toolbar-action:hover :deep(.iconify:not(.nova-star-icon)) {
     color: var(--el-color-primary) !important;
   }
 
-  :global(html.dark) .toolbar-star .star-active-icon {
-    color: #facc15 !important;
-  }
 }
 
 
@@ -1930,11 +1938,11 @@ const handleDelete = () => {
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   margin-left: 2px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 50%;
   background: transparent;
   cursor: pointer;
   opacity: .7;
@@ -1948,14 +1956,6 @@ const handleDelete = () => {
   background: var(--nova-hover);
 }
 
-.message-star .star-active-icon {
-  color: #eab308;
-}
-
-.message-star .iconify {
-  width: 20px;
-  height: 20px;
-}
 
 .message-preview {
   display: block;
@@ -2644,11 +2644,6 @@ const handleDelete = () => {
 }
 
 
-
-/* Nova reader active star */
-.header-actions .star-active-icon {
-  color: var(--el-color-primary) !important;
-}
 
 /* PDF attachment preview: the object URL carries the blob's application/pdf
    type, so the browser's built-in viewer fills the frame. */
