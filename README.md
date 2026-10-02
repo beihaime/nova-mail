@@ -429,12 +429,14 @@ The pipeline calls this only when `BOOTSTRAP_TOKEN` is configured; initialized d
 - Each migration statement is wrapped in `try/catch`, so **`success` does not prove a migration applied** — a failed `ALTER TABLE` is only logged. That is why the pipeline reads the schema back and fails when a column is missing. The same check can be run by hand in the D1 console: `SELECT name FROM pragma_table_info('email');`
 - The token is single-use. Never recreate or reset a production D1 database to make bootstrap available again.
 
-Individual migrations are also kept runnable on their own under `mail-worker/migrations/`:
+Individual migrations are also kept runnable on their own under `mail-worker/migrations/`. For example, an existing database upgrading to the Trash mailbox must apply v3.11 before it runs a Trash-aware Worker:
 
 ```bash
 cd mail-worker
-pnpm wrangler d1 execute <database-id> --remote --file migrations/v3_8_body_type.sql
+pnpm wrangler d1 execute <database-id> --remote --file migrations/v3_11_trash.sql
 ```
+
+The deployment workflow performs this v3.11 upgrade automatically, before deploying the Worker, when its Cloudflare token has D1 · Edit permission. For a manual deployment, run it once yourself. Do not re-run the file after the columns exist: SQLite has no `ADD COLUMN IF NOT EXISTS`. Verify the result with `SELECT name FROM pragma_table_info('email');`; it must include `trashed`, `trashed_at`, and `trash_archived`.
 
 #### Troubleshooting
 

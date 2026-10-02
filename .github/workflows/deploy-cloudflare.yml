@@ -282,8 +282,8 @@ jobs:
           echo "✅ Frontend built into mail-worker/dist"
 
       # The old /api/init/<jwt_secret> route was removed. Existing databases
-      # cannot use one-time bootstrap for upgrades, so apply the one new column
-      # required by the security branch before the new Worker is deployed.
+      # cannot use one-time bootstrap for upgrades, so make compatible schema
+      # upgrades before the new Worker is deployed.
       - name: 🔎 检查现有数据库 / Check existing schema
         working-directory: ./mail-worker
         run: |
@@ -304,6 +304,25 @@ jobs:
             pnpm wrangler d1 execute "$DB_ID" --remote --yes \
               --command "ALTER TABLE email ADD COLUMN auth_results TEXT NOT NULL DEFAULT '';"
           fi
+
+          # v3.11: every normal mail-list query now filters `trashed`, so
+          # apply the independent fields before releasing the Trash-aware
+          # Worker. Check each one separately: SQLite lacks ADD COLUMN IF NOT
+          # EXISTS and a partially applied manual migration must still recover.
+          if ! printf '%s' "$SCHEMA" | grep -q '"trashed"'; then
+            pnpm wrangler d1 execute "$DB_ID" --remote --yes \
+              --command "ALTER TABLE email ADD COLUMN trashed INTEGER NOT NULL DEFAULT 0;"
+          fi
+          if ! printf '%s' "$SCHEMA" | grep -q '"trashed_at"'; then
+            pnpm wrangler d1 execute "$DB_ID" --remote --yes \
+              --command "ALTER TABLE email ADD COLUMN trashed_at TEXT NOT NULL DEFAULT '';"
+          fi
+          if ! printf '%s' "$SCHEMA" | grep -q '"trash_archived"'; then
+            pnpm wrangler d1 execute "$DB_ID" --remote --yes \
+              --command "ALTER TABLE email ADD COLUMN trash_archived INTEGER NOT NULL DEFAULT 0;"
+          fi
+          pnpm wrangler d1 execute "$DB_ID" --remote --yes \
+            --command "CREATE INDEX IF NOT EXISTS idx_email_user_trashed ON email(user_id, trashed, account_id);"
 
       - name: 🚀 开始部署 / Start deployment
         id: deploy
@@ -414,7 +433,7 @@ jobs:
       - name: 🔎 验证数据库 / Verify database schema
         working-directory: ./mail-worker
         run: |
-          echo "🔎 Checking email.body_type..."
+          echo "🔎 Checking required email schema..."
 
           # `--json` sends errors to stdout as well, so a plain
           # `SCHEMA=$(...)` under `bash -e` would exit on failure and swallow the
@@ -438,15 +457,17 @@ jobs:
             exit 0
           fi
 
-          if ! printf '%s' "$SCHEMA" | grep -q 'body_type'; then
-            echo "❌ email.body_type is missing: the v3.8 migration did not apply."
-            exit 1
-          fi
+          for column in body_type trashed trashed_at trash_archived; do
+            if ! printf '%s' "$SCHEMA" | grep -q "\"$column\""; then
+              echo "❌ email.$column is missing: its migration did not apply."
+              exit 1
+            fi
+          done
 
           pnpm wrangler d1 execute "$D1_DATABASE_ID" --remote --yes --json \
             --command "SELECT body_type, COUNT(*) AS total FROM email GROUP BY body_type;"
 
-          echo "✅ email.body_type is present."
+          echo "✅ Required email columns are present."
 
       - name: 🗑️ 删除运行记录 / Delete workflow runs
         uses: GitRML/delete-workflow-runs@main

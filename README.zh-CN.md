@@ -367,12 +367,14 @@ curl --fail-with-body -X POST https://<your-domain>/api/bootstrap \
 - 每个迁移语句都包在 `try/catch` 里，所以 **返回 `success` 并不代表迁移生效** —— `ALTER TABLE` 失败只会记一条日志。因此流水线会回读 schema，发现缺列就判定失败。同样的检查也可以在 D1 控制台手工执行：`SELECT name FROM pragma_table_info('email');`
 - 令牌仅能使用一次。绝不要为了重新开放初始化而重建或重置生产 D1 数据库。
 
-个别迁移也单独保留在 `mail-worker/migrations/` 下：
+个别迁移也单独保留在 `mail-worker/migrations/` 下。例如已有数据库升级到 Trash 邮箱前，必须先应用 v3.11：
 
 ```bash
 cd mail-worker
-pnpm wrangler d1 execute <database-id> --remote --file migrations/v3_8_body_type.sql
+pnpm wrangler d1 execute <database-id> --remote --file migrations/v3_11_trash.sql
 ```
+
+只要 Cloudflare token 具备 D1 · 编辑权限，部署工作流会在 Worker 发布前自动执行此 v3.11 升级。手工部署时请自行执行一次。SQLite 不支持 `ADD COLUMN IF NOT EXISTS`，字段已经存在后不要重复执行整个文件。可用 `SELECT name FROM pragma_table_info('email');` 验证，结果必须包含 `trashed`、`trashed_at` 和 `trash_archived`。
 
 Webhook 目标必须使用 HTTPS。应用会拒绝明显不安全的本机、内网、链路本地及保留 IP，并禁止 HTTP 重定向；但 Workers 的普通 `fetch` 不暴露 DNS 解析结果，无法防止所有 DNS 重绑定。若运行环境能访问私有网络，请额外配置管理员维护的域名白名单或受控出口代理。
 

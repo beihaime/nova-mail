@@ -33,6 +33,10 @@ describe('integration harness', () => {
 		expect(columns).toContain('parent_message_id');
 		// v3.10, behind the mobile swipe actions.
 		expect(columns).toContain('archived');
+		// v3.11, behind the Trash mailbox and every normal list filter.
+		expect(columns).toContain('trashed');
+		expect(columns).toContain('trashed_at');
+		expect(columns).toContain('trash_archived');
 	});
 
 	it('binds a usable JWT secret and the test mail domain', async () => {
