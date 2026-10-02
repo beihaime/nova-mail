@@ -403,6 +403,7 @@ import {
   resolveSwipeAxis,
   resolveSwipeRelease,
   swipeActionForOffset,
+  swipeCommitDistance,
 } from '@/utils/swipe-actions.js'
 import { showUndoSnackbar } from '@/utils/undo-snackbar.js'
 
@@ -685,10 +686,9 @@ function stopLongPress() {
 
 /* ------------------------------------------------------------ swipe actions
  *
- * Mobile-only gesture behind the Inbox rows: dragging the card right reveals
- * Archive, dragging it left reveals Delete. The card is the top layer and
- * follows the finger; `.swipe-actions` sits underneath and is uncovered by the
- * movement, so the action area never has to be positioned from JS.
+ * Mobile-only swipe-to-commit gesture behind Inbox rows. The action layer is
+ * feedback only: it never receives pointer input and a row cannot rest in a
+ * revealed-action state.
  *
  * The axis/commit maths lives in `utils/swipe-actions.js` and is unit tested.
  * Everything here is deliberately imperative (direct style writes, no reactive
@@ -698,7 +698,7 @@ function stopLongPress() {
 
 /** Slight overshoot so the card settles back like a spring, not a slide. */
 const SWIPE_SPRING = 'transform 280ms cubic-bezier(0.22, 1.18, 0.32, 1)'
-const SWIPE_SETTLE = 'transform 180ms ease-out, opacity 180ms ease-out'
+const SWIPE_SETTLE = 'transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 220ms cubic-bezier(0.2, 0.8, 0.2, 1)'
 
 let swipeGesture = null
 
@@ -728,6 +728,8 @@ function clearSwipeVisuals(gesture, { keepAction = false } = {}) {
   }
   shellEl?.classList.remove('is-swiping', 'is-removing')
   if (!keepAction) shellEl?.removeAttribute('data-swipe-action')
+  if (!keepAction) shellEl?.removeAttribute('data-swipe-ready')
+  if (!keepAction) shellEl?.style.removeProperty('--swipe-progress')
 }
 
 /** Snap a row that is mid-gesture back to rest before starting a new one. */
@@ -803,10 +805,14 @@ function onRowPointerMove(event) {
 
   const width = gesture.shellEl?.offsetWidth || 0
   const offset = clampSwipeOffset(gesture.dx, width)
+  const threshold = swipeCommitDistance(width)
 
   gesture.rowEl.style.transform = `translate3d(${offset}px, 0, 0)`
   gesture.shellEl?.classList.add('is-swiping')
   gesture.shellEl?.setAttribute('data-swipe-action', swipeActionForOffset(offset) || '')
+  if (Math.abs(offset) >= threshold) gesture.shellEl?.setAttribute('data-swipe-ready', 'true')
+  else gesture.shellEl?.removeAttribute('data-swipe-ready')
+  gesture.shellEl?.style.setProperty('--swipe-progress', String(Math.min(1, Math.abs(offset) / threshold)))
 }
 
 function onRowPointerUp(event) {
@@ -881,6 +887,8 @@ function springBackSwipe(gesture) {
 
   shellEl?.classList.remove('is-swiping')
   shellEl?.removeAttribute('data-swipe-action')
+  shellEl?.removeAttribute('data-swipe-ready')
+  shellEl?.style.removeProperty('--swipe-progress')
 }
 
 function commitSwipe(gesture, action) {
@@ -894,36 +902,47 @@ function commitSwipe(gesture, action) {
   rowEl.style.transform = `translate3d(${direction * width}px, 0, 0)`
   rowEl.style.opacity = '0'
 
-  const request = action === SWIPE_ACTION.ARCHIVE
-    ? props.emailArchive([item.emailId])
-    : props.emailDelete([item.emailId])
-
-  request.then(data => {
-    // The row is only dropped once the server confirmed it.
+  // Complete the visible exit first. This removes the item without waiting for
+  // HTTP, then starts the request; a failed request restores its old position.
+  let exitFinished = false
+  const finishExit = event => {
+    if (exitFinished || (event && event.target !== rowEl)) return
+    exitFinished = true
+    rowEl.removeEventListener('transitionend', finishExit)
     deleteEmail([item.emailId])
-    showSwipeOutcome({
-      item,
-      index,
-      action,
-      // A delete with `sync_delete` on is physical, so there is nothing to
-      // undo; the server reports which one happened.
-      canUndo: action === SWIPE_ACTION.ARCHIVE || data?.soft === true,
+    shellEl?.removeAttribute('data-swipe-ready')
+    shellEl?.style.removeProperty('--swipe-progress')
+
+    const request = action === SWIPE_ACTION.ARCHIVE
+      ? props.emailArchive([item.emailId])
+      : props.emailDelete([item.emailId])
+
+    Promise.resolve(request).then(data => {
+      showSwipeOutcome({
+        item,
+        index,
+        action,
+        canUndo: action === SWIPE_ACTION.ARCHIVE || data?.soft === true,
+      })
+    }).catch(error => {
+      console.error(error)
+      restoreSwipedEmail(item, index)
+      ElMessage({
+        message: t('swipeActionFailMsg'),
+        type: 'error',
+        plain: true,
+      })
     })
-  }).catch(error => {
-    console.error(error)
-    // Refused: put the card back exactly where it was.
-    rowEl.style.transition = SWIPE_SPRING
-    rowEl.style.transform = 'translate3d(0, 0, 0)'
-    rowEl.style.opacity = '1'
-    shellEl?.classList.remove('is-removing')
-    shellEl?.classList.remove('is-swiping')
-    shellEl?.removeAttribute('data-swipe-action')
-    ElMessage({
-      message: t('swipeActionFailMsg'),
-      type: 'error',
-      plain: true,
-    })
-  })
+  }
+
+  rowEl.addEventListener('transitionend', finishExit)
+  // transitionend is not guaranteed when the browser backgrounds a tab.
+  window.setTimeout(finishExit, 260)
+}
+
+function restoreSwipedEmail(item, index) {
+  if (emailList.some(row => row.emailId === item.emailId)) return
+  emailList.splice(Math.max(0, Math.min(index, emailList.length)), 0, item)
 }
 
 function showSwipeOutcome({ item, index, action, canUndo }) {
@@ -950,8 +969,7 @@ function undoSwipedEmail({ item, index, action }) {
   request.then(() => {
     // Put it back where it was; `index` may be stale if the list changed in the
     // meantime, so clamp instead of trusting it.
-    const position = Math.max(0, Math.min(index, emailList.length))
-    emailList.splice(position, 0, item)
+    restoreSwipedEmail(item, index)
   }).catch(error => {
     console.error(error)
     ElMessage({
@@ -2996,6 +3014,20 @@ ul {
     /* Below the card, and never a click target: the gesture owns this area. */
     z-index: 0;
     pointer-events: none;
+    background: var(--nova-surface-muted);
+    transition: background-color 100ms ease-out;
+  }
+
+  :deep(.swipe-shell[data-swipe-action='archive'] .swipe-actions) {
+    background: color-mix(in srgb, var(--el-color-primary) 16%, var(--nova-surface-muted));
+  }
+
+  :deep(.swipe-shell[data-swipe-action='delete'] .swipe-actions) {
+    background: color-mix(in srgb, var(--el-color-danger) 18%, var(--nova-surface-muted));
+  }
+
+  :deep(.swipe-shell[data-swipe-ready='true'] .swipe-actions) {
+    filter: saturate(1.25);
   }
 
   :deep(.swipe-action) {
@@ -3017,12 +3049,10 @@ ul {
      dark glyphs that the theme inverts. */
   :deep(.swipe-action-archive) {
     color: var(--el-color-primary);
-    background: color-mix(in srgb, var(--el-color-primary) 12%, var(--nova-surface-muted));
   }
 
   :deep(.swipe-action-delete) {
     color: var(--el-color-danger);
-    background: color-mix(in srgb, var(--el-color-danger) 14%, var(--nova-surface-muted));
   }
 
   /* The card paints over the panels. */
@@ -3044,6 +3074,9 @@ ul {
   :deep(.swipe-shell[data-swipe-action='archive'] .swipe-action-archive),
   :deep(.swipe-shell[data-swipe-action='delete'] .swipe-action-delete) {
     filter: brightness(1.05);
+    opacity: var(--swipe-progress, 0);
+    transform: scale(calc(0.9 + var(--swipe-progress, 0) * 0.1));
+    transition: opacity 80ms linear, transform 80ms ease-out;
   }
 }
 

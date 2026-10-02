@@ -4,7 +4,6 @@ import {
   SWIPE_AXIS,
   SWIPE_AXIS_RATIO,
   SWIPE_COMMIT_MAX,
-  SWIPE_COMMIT_MIN,
   SWIPE_SLOP,
   clampSwipeOffset,
   resolveSwipeAxis,
@@ -74,22 +73,22 @@ describe('swipeActionForOffset', () => {
 
 describe('swipeCommitDistance', () => {
   it('scales with the row width inside the clamp', () => {
-    // 400 * 0.32 = 128, inside [56, 140].
-    expect(swipeCommitDistance(400)).toBeCloseTo(128)
+    // min(400 * 0.30, 100) = 100.
+    expect(swipeCommitDistance(400)).toBeCloseTo(100)
   })
 
   it('never asks for more than the maximum', () => {
     expect(swipeCommitDistance(2000)).toBe(SWIPE_COMMIT_MAX)
   })
 
-  it('never asks for less than the minimum', () => {
-    expect(swipeCommitDistance(100)).toBe(SWIPE_COMMIT_MIN)
+  it('uses 30% even for narrow rows', () => {
+    expect(swipeCommitDistance(100)).toBe(30)
   })
 
-  it('falls back to the minimum when the width is unknown', () => {
-    expect(swipeCommitDistance(0)).toBe(SWIPE_COMMIT_MIN)
-    expect(swipeCommitDistance(undefined)).toBe(SWIPE_COMMIT_MIN)
-    expect(swipeCommitDistance('nonsense')).toBe(SWIPE_COMMIT_MIN)
+  it('falls back to the safe maximum when the width is unknown', () => {
+    expect(swipeCommitDistance(0)).toBe(SWIPE_COMMIT_MAX)
+    expect(swipeCommitDistance(undefined)).toBe(SWIPE_COMMIT_MAX)
+    expect(swipeCommitDistance('nonsense')).toBe(SWIPE_COMMIT_MAX)
   })
 })
 

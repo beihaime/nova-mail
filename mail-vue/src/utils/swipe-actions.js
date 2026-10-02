@@ -33,11 +33,11 @@ export const SWIPE_SLOP = 8
 export const SWIPE_AXIS_RATIO = 1.4
 
 /** Fraction of the row width that commits the action when the finger lifts. */
-export const SWIPE_COMMIT_RATIO = 0.32
+export const SWIPE_COMMIT_RATIO = 0.3
 
-/** The commit distance is clamped into this range so narrow and wide rows both feel right. */
-export const SWIPE_COMMIT_MIN = 56
-export const SWIPE_COMMIT_MAX = 140
+/** The commit distance is 30% of the row, capped at one thumb-width. */
+export const SWIPE_COMMIT_MIN = 0
+export const SWIPE_COMMIT_MAX = 100
 
 /** How far the card may travel, as a fraction of the row width. */
 export const SWIPE_MAX_RATIO = 0.42
@@ -79,7 +79,7 @@ export function swipeCommitDistance(
   { ratio = SWIPE_COMMIT_RATIO, min = SWIPE_COMMIT_MIN, max = SWIPE_COMMIT_MAX } = {},
 ) {
   const rowWidth = Number(width) || 0
-  if (rowWidth <= 0) return min
+  if (rowWidth <= 0) return max
 
   return Math.min(max, Math.max(min, rowWidth * ratio))
 }
