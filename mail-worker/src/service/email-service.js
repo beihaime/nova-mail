@@ -596,6 +596,8 @@ const emailService = {
 			sendType, //发件类型
 			emailId, //邮件id，如果是回复邮件会带
 			receiveEmail, //收件人邮箱
+			cc = [], //抄送
+			bcc = [], //密送
 			text, //邮件纯文本
 			content, //邮件内容
 			subject, //邮件标题
@@ -603,6 +605,7 @@ const emailService = {
 		} = params;
 
 		const { resendTokens, r2Domain, send, domainList } = await settingService.query(c);
+		const allRecipients = [...receiveEmail, ...cc, ...bcc];
 
 		//判断是否关闭发件功能
 		if (send === settingConst.send.CLOSE) {
@@ -613,7 +616,7 @@ const emailService = {
 		const roleRow = await roleService.selectById(c, userRow.type);
 
 		//判断接收方是不是全部为站内邮箱
-		const allInternal = receiveEmail.every(email => {
+		const allInternal = allRecipients.every(email => {
 			const domain = '@' + emailUtils.getDomain(email);
 			return domainList.includes(domain);
 		});
@@ -640,7 +643,7 @@ const emailService = {
 				if (roleRow.sendType === 'count') throw new BizError(t('totalSendLimit'), 403);
 			}
 
-			if (userRow.sendCount + receiveEmail.length > roleRow.sendCount) {
+			if (userRow.sendCount + allRecipients.length > roleRow.sendCount) {
 				if (roleRow.sendType === 'day') throw new BizError(t('daySendLack'), 403);
 				if (roleRow.sendType === 'count') throw new BizError(t('totalSendLack'), 403);
 			}
@@ -710,6 +713,8 @@ const emailService = {
 					name,
 					accountEmail: accountRow.email,
 					receiveEmail,
+					cc,
+					bcc,
 					subject,
 					text,
 					html,
@@ -722,6 +727,8 @@ const emailService = {
 					name,
 					accountEmail: accountRow.email,
 					receiveEmail,
+					cc,
+					bcc,
 					subject,
 					text,
 					html,
@@ -768,6 +775,8 @@ const emailService = {
 		});
 
 		emailData.recipient = JSON.stringify(recipient);
+		emailData.cc = JSON.stringify(cc.map(address => ({ address, name: '' })));
+		emailData.bcc = JSON.stringify(bcc.map(address => ({ address, name: '' })));
 
 		// Every message belongs to a conversation. This is assigned here too — a
 		// mail the user starts is the root of a new thread, and without a key the
@@ -819,7 +828,7 @@ const emailService = {
 
 		//如果权限有发送次数增加用户发送次数
 		if (roleRow.sendCount && roleRow.sendType !== 'internal') {
-			await userService.incrUserSendCount(c, receiveEmail.length, userId);
+			await userService.incrUserSendCount(c, allRecipients.length, userId);
 		}
 
 		//保存到数据库并返回结果
@@ -840,7 +849,7 @@ const emailService = {
 
 		//如果全是站内接收方，直接写入数据库
 		if (allInternal) {
-			await this.HandleOnSiteEmail(c, receiveEmail, emailResult, attList);
+			await this.HandleOnSiteEmail(c, allRecipients, emailResult, attList);
 		}
 
 		await senderAvatarService.attach(c, [emailResult]);
@@ -850,9 +859,9 @@ const emailService = {
 
 		//记录每天发件次数统计
 		if (!daySendTotal) {
-			await c.env.kv.put(kvConst.SEND_DAY_COUNT + dateStr, JSON.stringify(receiveEmail.length), { expirationTtl: 60 * 60 * 24 });
+			await c.env.kv.put(kvConst.SEND_DAY_COUNT + dateStr, JSON.stringify(allRecipients.length), { expirationTtl: 60 * 60 * 24 });
 		} else  {
-			daySendTotal = Number(daySendTotal) + receiveEmail.length
+			daySendTotal = Number(daySendTotal) + allRecipients.length
 			await c.env.kv.put(kvConst.SEND_DAY_COUNT + dateStr, JSON.stringify(daySendTotal), { expirationTtl: 60 * 60 * 24 });
 		}
 
@@ -865,6 +874,9 @@ const emailService = {
 			to: [...params.receiveEmail],
 			subject: params.subject
 		};
+
+		if (params.cc?.length) sendForm.cc = [...params.cc];
+		if (params.bcc?.length) sendForm.bcc = [...params.bcc];
 
 		if (params.text) {
 			sendForm.text = params.text;
@@ -907,6 +919,9 @@ const emailService = {
 			html: params.html,
 			attachments: await this.toResendAttachments(params.attachments)
 		};
+
+		if (params.cc?.length) sendForm.cc = [...params.cc];
+		if (params.bcc?.length) sendForm.bcc = [...params.bcc];
 
 		const messageId = safeMessageId(params.messageId);
 		if (params.sendType === 'reply' && messageId) {
@@ -1066,6 +1081,9 @@ const emailService = {
 
 			//把发件人邮件改成收件
 			const emailValues = {...sendEmailData}
+			// Bcc belongs only to the sender's Sent record. Every delivered copy is
+			// stripped so neither To/Cc nor another Bcc recipient can discover it.
+			emailValues.bcc = '[]';
 			emailValues.status = emailConst.status.RECEIVE;
 			emailValues.type = emailConst.type.RECEIVE;
 			emailValues.toEmail = email;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { contentDisposition, normalizeAttachment, normalizeAttachmentFilename, safeMessageId, validateOutgoingMail } from '../src/utils/outgoing-mail-validation';
+import { contentDisposition, normalizeAttachment, normalizeAttachmentFilename, normalizeRecipientLists, safeMessageId, validateOutgoingMail } from '../src/utils/outgoing-mail-validation';
 
 const validMessage = {
 	receiveEmail: ['person@example.net'],
@@ -16,6 +16,33 @@ describe('outgoing mail validation', () => {
 		expect(message.receiveEmail).toEqual(['person@example.net']);
 		expect(message.attachments[0]).toMatchObject({ filename: 'report.pdf', mimeType: 'application/pdf', type: 'application/pdf', content: 'c2FmZQ==' });
 		expect(normalizeAttachmentFilename('../../Windows\\report.pdf')).toBe('report.pdf');
+	});
+
+	it('keeps To, then Cc, then Bcc while deduplicating addresses across fields', () => {
+		const recipients = normalizeRecipientLists({
+			receiveEmail: ['to@example.net', 'shared@example.net'],
+			cc: ['SHARED@example.net', 'cc@example.net'],
+			bcc: ['CC@example.net', 'bcc@example.net'],
+		});
+		expect(recipients).toEqual({
+			receiveEmail: ['to@example.net', 'shared@example.net'],
+			cc: ['cc@example.net'],
+			bcc: ['bcc@example.net'],
+		});
+	});
+
+	it.each([
+		[{ receiveEmail: ['to@example.net'] }, { receiveEmail: ['to@example.net'], cc: [], bcc: [] }],
+		[{ receiveEmail: ['to@example.net'], cc: ['cc@example.net'] }, { receiveEmail: ['to@example.net'], cc: ['cc@example.net'], bcc: [] }],
+		[{ receiveEmail: ['to@example.net'], bcc: ['bcc@example.net'] }, { receiveEmail: ['to@example.net'], cc: [], bcc: ['bcc@example.net'] }],
+		[{ receiveEmail: ['to@example.net'], cc: ['cc@example.net'], bcc: ['bcc@example.net'] }, { receiveEmail: ['to@example.net'], cc: ['cc@example.net'], bcc: ['bcc@example.net'] }],
+	])('normalizes recipient combination %#', (input, expected) => {
+		expect(normalizeRecipientLists(input)).toEqual(expected);
+	});
+
+	it('rejects invalid Cc or Bcc recipients', () => {
+		expect(() => validateOutgoingMail({ ...validMessage, cc: ['not-an-address'] })).toThrow('Invalid recipient address');
+		expect(() => validateOutgoingMail({ ...validMessage, bcc: ['victim@example.net\\r\\nBcc: attacker@example.net'] })).toThrow('Invalid recipient address');
 	});
 
 	it('rejects CRLF/NUL header injection in recipients, sender names, subjects, filenames, MIME types, and reply references', () => {

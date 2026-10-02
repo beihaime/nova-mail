@@ -17,6 +17,7 @@
         <AppIcon class="icon" @click="changeStar(email)" v-else name="star-outline" :size="19" title="Star" aria-label="Star email"/>
       </span>
       <AppIcon class="icon" v-if="emailStore.contentData.showReply" v-perm="'email:send'"  @click="openReply" name="reply" :size="21" title="Reply" aria-label="Reply" />
+      <Icon class="icon" v-if="emailStore.contentData.showReply" v-perm="'email:send'" @click="openReplyAll" icon="mdi:reply-all-outline" width="21" height="21" :title="$t('replyAll')" :aria-label="$t('replyAll')" />
       <AppIcon class="icon" v-if="emailStore.contentData.showReply" v-perm="'email:send'"  @click="openForward" name="forward" :size="20" title="Forward" aria-label="Forward" />
       <AppIcon class="icon" name="print" :size="19" title="Print" aria-label="Print email" @click="printEmail" />
     </div>
@@ -1198,6 +1199,10 @@ function handleKeyDown(event) {
 
 function openReply() {
   uiStore.writerRef.openReply(email.value)
+}
+
+function openReplyAll() {
+  uiStore.writerRef.openReply(email.value, true)
 }
 
 function openForward() {

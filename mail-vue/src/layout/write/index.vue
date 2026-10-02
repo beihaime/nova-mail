@@ -14,7 +14,7 @@
           <Icon icon="material-symbols-light:close-rounded" width="22" height="22"/>
         </div>
       </div>
-      <div class="container">
+      <div class="container" :style="{ gridTemplateRows: `repeat(${headerRows}, auto) 1fr auto` }">
         <el-input-tag  @add-tag="addTagChange" tag-type="primary" @input="inputChange" size="default" v-model="form.receiveEmail" >
           <template #prefix>
             <div class="item-title" >{{ $t('recipient') }}</div>
@@ -39,9 +39,17 @@
           </template>
           <template #suffix>
             <div style="display: flex;margin-right: 3px;">
+              <button v-if="!ccVisible" class="cc-toggle" type="button" @click.stop="showCc = true">{{ $t('cc') }}</button>
+              <button v-if="!bccVisible" class="cc-toggle" type="button" @click.stop="showBcc = true">{{ $t('bcc') }}</button>
               <Icon icon="fa7-solid:user-plus" width="20" height="20" class="add-contact" @click.stop="openContacts" />
             </div>
           </template>
+        </el-input-tag>
+        <el-input-tag v-if="ccVisible" @add-tag="value => addExtraTag('cc', value)" tag-type="primary" size="default" v-model="form.cc">
+          <template #prefix><div class="item-title">{{ $t('cc') }}</div></template>
+        </el-input-tag>
+        <el-input-tag v-if="bccVisible" @add-tag="value => addExtraTag('bcc', value)" tag-type="primary" size="default" v-model="form.bcc">
+          <template #prefix><div class="item-title">{{ $t('bcc') }}</div></template>
         </el-input-tag>
         <el-input v-model="form.subject" :placeholder="t('subject')" />
         <tinyEditor :def-value="defValue" ref="editor" @change="change" @focus="focusChange" />
@@ -120,7 +128,7 @@ import {useI18n} from "vue-i18n";
 import router from "@/router/index.js";
 import {ElMessageBox} from "element-plus";
 import {accountList} from "@/request/account.js";
-import {validateCompose} from "@/utils/compose-validate.js";
+import {restoreDraftRecipients, validateCompose} from "@/utils/compose-validate.js";
 
 defineExpose({
   open,
@@ -148,6 +156,7 @@ const mySelect = ref()
 let selectStatus = false
 const backReply = reactive({
   receiveEmail: [],
+  cc: [],
   subject: '',
   content: '',
   sendType: ''
@@ -155,6 +164,8 @@ const backReply = reactive({
 const form = reactive({
   sendEmail: '',
   receiveEmail: [],
+  cc: [],
+  bcc: [],
   accountId: -1,
   name: '',
   subject: '',
@@ -167,6 +178,11 @@ const form = reactive({
 })
 
 const selectRecipientList = ref([])
+const showCc = ref(false)
+const showBcc = ref(false)
+const ccVisible = computed(() => showCc.value || form.cc.length > 0)
+const bccVisible = computed(() => showBcc.value || form.bcc.length > 0)
+const headerRows = computed(() => 2 + Number(ccVisible.value) + Number(bccVisible.value))
 
 const contacts = computed(() => writerStore.sendRecipientRecord.map(item => ({email: item})))
 
@@ -255,6 +271,18 @@ function addTagChange(val) {
     }
   })
   if (selectStatus && has) openSelect()
+}
+
+function addExtraTag(key, value) {
+  const addresses = form[key]
+  // Element Plus adds the raw input as a tag before this callback. Replace it
+  // with validated, comma-separated entries just as the To input does.
+  addresses.splice(addresses.length - 1, 1)
+  value.split(/[,，]/).map(item => item.trim()).filter(Boolean).forEach((email) => {
+    if (isEmail(email) && !addresses.some(item => item.toLowerCase() === email.toLowerCase())) {
+      addresses.push(email)
+    }
+  })
 }
 
 function clearContent() {
@@ -366,6 +394,8 @@ async function sendEmail() {
       form.subject = ''
       form.content = ''
       form.receiveEmail = []
+      form.cc = []
+      form.bcc = []
       draftStore.setDraft = {...toRaw(form)}
     }
 
@@ -392,16 +422,21 @@ async function sendEmail() {
 }
 
 function addRecipientRecord() {
+  const recipients = [...new Set([...form.receiveEmail, ...form.cc, ...form.bcc].map(email => email.toLowerCase()))]
   writerStore.sendRecipientRecord = writerStore.sendRecipientRecord.filter(
-      email => !form.receiveEmail.includes(email)
+      email => !recipients.includes(email.toLowerCase())
   );
 
-  writerStore.sendRecipientRecord.unshift(...form.receiveEmail);
+  writerStore.sendRecipientRecord.unshift(...form.receiveEmail, ...form.cc, ...form.bcc);
   writerStore.sendRecipientRecord = writerStore.sendRecipientRecord.slice(0, 500);
 }
 
 function resetForm() {
   form.receiveEmail = []
+  form.cc = []
+  form.bcc = []
+  showCc.value = false
+  showBcc.value = false
   form.subject = ''
   form.content = ''
   form.manyType = null
@@ -412,6 +447,7 @@ function resetForm() {
   backReply.content = ''
   backReply.subject = ''
   backReply.receiveEmail = []
+  backReply.cc = []
   backReply.sendType = ''
   editor.value.clearEditor()
 }
@@ -450,7 +486,8 @@ function openForward(email) {
     nextTick(() => {
       backReply.content = editor.value.getContent()
       backReply.subject = form.subject
-      backReply.receiveEmail = form.receiveEmail
+      backReply.receiveEmail = [...form.receiveEmail]
+      backReply.cc = [...form.cc]
       backReply.sendType = form.sendType
     })
 
@@ -474,13 +511,41 @@ async function replyAccount(email) {
   }
 }
 
-async function openReply(email) {
+function parseAddressList(value) {
+  let addresses = value
+  try { if (typeof addresses === 'string') addresses = JSON.parse(addresses) } catch { return [] }
+  if (!Array.isArray(addresses)) return []
+  return addresses.flatMap(item => item?.group || [item]).map(item => item?.address).filter(Boolean)
+}
+
+function currentSenderAddress() {
+  return (accountStore.currentAccount?.email || userStore.user?.email || '').toLowerCase()
+}
+
+async function openReply(email, replyAll = false) {
 
   resetForm();
 
   email.subject = email.subject || ''
 
-  form.receiveEmail.push(email.sendEmail)
+  const sender = String(email.sendEmail || '')
+  const mine = sender.toLowerCase() === currentSenderAddress()
+  if (replyAll && mine) {
+    form.receiveEmail.push(...parseAddressList(email.recipient))
+    form.cc.push(...parseAddressList(email.cc).filter(address => !form.receiveEmail.some(to => to.toLowerCase() === address.toLowerCase())))
+  } else {
+    form.receiveEmail.push(sender)
+  }
+  if (replyAll && !mine) {
+    const excluded = new Set([currentSenderAddress(), sender.toLowerCase()])
+    for (const address of [...parseAddressList(email.recipient), ...parseAddressList(email.cc)]) {
+      const normalized = address.toLowerCase()
+      if (!excluded.has(normalized)) {
+        excluded.add(normalized)
+        form.cc.push(address)
+      }
+    }
+  }
   form.subject = (
       email.subject.startsWith('Re:') ||
       email.subject.startsWith('Re：') ||
@@ -513,7 +578,8 @@ async function openReply(email) {
     nextTick(() => {
       backReply.content = editor.value.getContent()
       backReply.subject = form.subject
-      backReply.receiveEmail = form.receiveEmail
+      backReply.receiveEmail = [...form.receiveEmail]
+      backReply.cc = [...form.cc]
       backReply.sendType = form.sendType
     })
   })
@@ -537,6 +603,9 @@ function open(preferredAccount) {
 
 function openDraft(draft) {
   Object.assign(form, {...draft})
+  Object.assign(form, restoreDraftRecipients(draft))
+  showCc.value = form.cc.length > 0
+  showBcc.value = form.bcc.length > 0
   defValue.value = ''
   setTimeout(() => defValue.value = form.content)
   show.value = true;
@@ -572,7 +641,7 @@ function close() {
     return;
   }
 
-  if (!(form.content || form.subject || form.receiveEmail.length > 0)) {
+  if (!(form.content || form.subject || form.receiveEmail.length > 0 || form.cc.length > 0 || form.bcc.length > 0)) {
     show.value = false
     resetForm()
     return;
@@ -581,11 +650,12 @@ function close() {
   if (backReply.sendType === 'reply' || backReply.sendType === 'forward') {
     let subjectFlag = form.subject === backReply.subject
     let contentFlag = editor.value.getContent() === backReply.content
-    let receiveFlag = form.receiveEmail.length === 1 && form.receiveEmail[0] === backReply.receiveEmail[0]
+    let receiveFlag = form.receiveEmail.join(',') === backReply.receiveEmail.join(',')
     if (backReply.sendType === 'forward' && form.receiveEmail.length === 0) {
       receiveFlag = true;
     }
-    if (subjectFlag && contentFlag && receiveFlag) {
+    const ccFlag = form.cc.join(',') === backReply.cc.join(',') && form.bcc.length === 0
+    if (subjectFlag && contentFlag && receiveFlag && ccFlag) {
       resetForm();
       close()
       return;
@@ -630,6 +700,14 @@ function close() {
 .write-select .el-select-dropdown {
   min-width: 0 !important;
 }
+.cc-toggle {
+  padding: 2px 5px;
+  color: var(--el-text-color-secondary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.cc-toggle:hover { color: var(--el-color-primary); }
 </style>
 <style scoped lang="scss">
 .send {

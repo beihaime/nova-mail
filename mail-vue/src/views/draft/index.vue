@@ -28,6 +28,7 @@ import {emailDelete} from "@/request/email.js";
 import {starAdd, starCancel} from "@/request/star.js";
 import {defineOptions, ref, watch, toRaw} from "vue";
 import {useUiStore} from "@/store/ui.js";
+import {hasDraftContent} from "@/utils/compose-validate.js";
 import {userDraftStore} from "@/store/draft.js";
 import db from "@/db/db.js"
 
@@ -48,7 +49,7 @@ watch(() => draftStore.setDraft, async () => {
   delete draft.draftId
   delete draft.attachments
 
-  if (!draft.content && !draft.subject && !(draft.receiveEmail.length > 0)) {
+  if (!hasDraftContent(draft)) {
     await db.value.draft.delete(draftId);
     await db.value.att.delete(draftId);
     draftStore.refreshList++

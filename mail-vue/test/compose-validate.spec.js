@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { COMPOSE_ERROR, validateCompose } from '../src/utils/compose-validate.js'
+import { COMPOSE_ERROR, hasDraftContent, restoreDraftRecipients, validateCompose } from '../src/utils/compose-validate.js'
 
 /**
  * Compose validation decides whether a click on Send is allowed at all. It
@@ -65,5 +65,14 @@ describe('validateCompose', () => {
   it('treats a missing argument object as an empty draft', () => {
     expect(validateCompose()).toBe(COMPOSE_ERROR.RECIPIENT)
     expect(validateCompose({})).toBe(COMPOSE_ERROR.RECIPIENT)
+  })
+
+  it('keeps CC/BCC-only drafts and restores their optional recipient lists', () => {
+    expect(hasDraftContent({ cc: ['cc@example.net'] })).toBe(true)
+    expect(hasDraftContent({ bcc: ['bcc@example.net'] })).toBe(true)
+    expect(restoreDraftRecipients({ cc: ['cc@example.net'], bcc: ['bcc@example.net'] })).toEqual({
+      cc: ['cc@example.net'], bcc: ['bcc@example.net'],
+    })
+    expect(restoreDraftRecipients({})).toEqual({ cc: [], bcc: [] })
   })
 })

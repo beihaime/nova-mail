@@ -22,6 +22,31 @@ function isMailbox(value) {
 	return !/[\s<>(),;:\\"\[\]]/u.test(local) && !/[\s<>(),;:\\"\[\]]/u.test(domain) && domain.includes('.') && !domain.startsWith('.') && !domain.endsWith('.');
 }
 
+/**
+ * Validate and deduplicate every outbound recipient list.
+ *
+ * The order is intentional: an address in To wins over Cc, and one in Cc wins
+ * over Bcc.  Lower-casing is used for comparison only so the submitted address
+ * remains intact for delivery and the sent-message record.
+ */
+export function normalizeRecipientLists({ receiveEmail, cc = [], bcc = [] } = {}) {
+	if (!Array.isArray(receiveEmail) || receiveEmail.length === 0) fail('Invalid recipient list');
+	if (!Array.isArray(cc) || !Array.isArray(bcc)) fail('Invalid recipient list');
+
+	const seen = new Set();
+	const clean = (addresses) => addresses.reduce((result, address) => {
+		if (!isMailbox(address)) fail('Invalid recipient address');
+		const key = address.toLowerCase();
+		if (!seen.has(key)) {
+			seen.add(key);
+			result.push(address);
+		}
+		return result;
+	}, []);
+
+	return { receiveEmail: clean(receiveEmail), cc: clean(cc), bcc: clean(bcc) };
+}
+
 export function normalizeAttachmentFilename(filename) {
 	if (typeof filename !== 'string' || CONTROL.test(filename)) fail('Invalid attachment filename');
 	const normalized = filename.normalize('NFC').split(/[\\/]+/).pop().trim();
@@ -75,11 +100,7 @@ export function safeMessageId(value) {
 
 export function validateOutgoingMail(params) {
 	if (!params || typeof params !== 'object') fail('Invalid message');
-	if (!Array.isArray(params.receiveEmail) || params.receiveEmail.length === 0) fail('Invalid recipient list');
-	const receiveEmail = params.receiveEmail.map(address => {
-		if (!isMailbox(address)) fail('Invalid recipient address');
-		return address;
-	});
+	const { receiveEmail, cc, bcc } = normalizeRecipientLists(params);
 	const subject = requireSafeHeader(params.subject, 'subject');
 	if (subject.length > MAIL_LIMITS.MAX_SUBJECT_LENGTH) fail('Subject exceeds the size limit');
 	const name = params.name == null || params.name === '' ? null : requireSafeHeader(params.name, 'sender name');
@@ -87,7 +108,7 @@ export function validateOutgoingMail(params) {
 	if (params.text != null && (typeof params.text !== 'string' || params.text.includes('\0'))) fail('Invalid plain-text body');
 	if (params.content != null && (typeof params.content !== 'string' || params.content.includes('\0'))) fail('Invalid HTML body');
 	if (params.attachments != null && !Array.isArray(params.attachments)) fail('Invalid attachment list');
-	const message = { ...params, receiveEmail, subject, name, text: params.text || '', content: params.content || '', attachments: (params.attachments || []).map(normalizeAttachment) };
+	const message = { ...params, receiveEmail, cc, bcc, subject, name, text: params.text || '', content: params.content || '', attachments: (params.attachments || []).map(normalizeAttachment) };
 	assertOutboundMailLimits(message);
 	return message;
 }

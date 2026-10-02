@@ -48,3 +48,18 @@ export function validateCompose({
 
   return null
 }
+
+/** Preserve legacy drafts while normalizing the optional recipient lists. */
+export function restoreDraftRecipients(draft = {}) {
+  return {
+    cc: Array.isArray(draft.cc) ? draft.cc : [],
+    bcc: Array.isArray(draft.bcc) ? draft.bcc : [],
+  }
+}
+
+/** A CC- or BCC-only draft is still user content and must not be discarded. */
+export function hasDraftContent(draft = {}) {
+  return Boolean(
+    draft.content || draft.subject || draft.receiveEmail?.length || draft.cc?.length || draft.bcc?.length,
+  )
+}

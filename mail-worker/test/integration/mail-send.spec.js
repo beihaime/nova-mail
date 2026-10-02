@@ -14,11 +14,17 @@ import { api, context, createAccount, createAdmin, openSend, sessionFor, updateS
 describe('outbound mail', () => {
 	let admin;
 	let recipient;
+	let secondRecipient;
+	let ccRecipient;
+	let bccRecipient;
 
 	beforeAll(async () => {
 		await openSend();
 		admin = await sessionFor(await createAdmin());
 		recipient = await sessionFor(await createAccount());
+		secondRecipient = await sessionFor(await createAccount());
+		ccRecipient = await sessionFor(await createAccount());
+		bccRecipient = await sessionFor(await createAccount());
 	});
 
 	it('stores the sent copy and delivers it to the recipient', async () => {
@@ -71,6 +77,53 @@ describe('outbound mail', () => {
 			{ token: admin.token },
 		);
 		expect((await senderList.json()).data.list.map((row) => row.subject)).toContain(subject);
+	});
+
+	it('delivers To, Cc, and Bcc internally, deduplicates them, and keeps Bcc private', async () => {
+		const subject = `internal-cc-bcc-${Date.now()}`;
+		const response = await api('/api/email/send', {
+			method: 'POST', token: admin.token,
+			body: {
+				accountId: admin.accountId,
+				receiveEmail: [recipient.email, secondRecipient.email],
+				cc: [secondRecipient.email.toUpperCase(), ccRecipient.email],
+				bcc: [ccRecipient.email.toUpperCase(), bccRecipient.email],
+				subject, content: '<p>hello</p>', text: 'hello', sendType: '', attachments: [],
+			},
+		});
+		const body = await response.json();
+		expect(body.code).toBe(200);
+
+		const sent = await env.db.prepare('SELECT cc, bcc FROM email WHERE email_id = ?').bind(body.data[0].emailId).first();
+		expect(JSON.parse(sent.cc).map(item => item.address)).toEqual([ccRecipient.email]);
+		expect(JSON.parse(sent.bcc).map(item => item.address)).toEqual([bccRecipient.email]);
+
+		const copies = await env.db.prepare('SELECT to_email, cc, bcc FROM email WHERE subject = ? AND type = ?')
+			.bind(subject, emailConst.type.RECEIVE).all();
+		expect(copies.results.map(row => row.to_email).sort()).toEqual([recipient.email, secondRecipient.email, ccRecipient.email, bccRecipient.email].sort());
+		for (const copy of copies.results) {
+			expect(copy.bcc).toBe('[]');
+			expect(JSON.parse(copy.cc).map(item => item.address)).toEqual([ccRecipient.email]);
+		}
+	});
+
+	it('keeps multiple To, reply, forward, and attachment sends working', async () => {
+		const subject = `to-regression-${Date.now()}`;
+		const send = (body) => api('/api/email/send', { method: 'POST', token: admin.token, body });
+		const base = { accountId: admin.accountId, content: '<p>body</p>', text: 'body', attachments: [] };
+		const multi = await send({ ...base, receiveEmail: [recipient.email, secondRecipient.email], subject, sendType: '' });
+		expect((await multi.json()).code).toBe(200);
+
+		const original = await env.db.prepare('SELECT email_id FROM email WHERE subject = ? AND type = ?').bind(subject, emailConst.type.SEND).first();
+		const reply = await send({ ...base, receiveEmail: [recipient.email], subject: `Re: ${subject}`, sendType: 'reply', emailId: original.email_id });
+		expect((await reply.json()).code).toBe(200);
+		const forward = await send({ ...base, receiveEmail: [recipient.email], subject: `Fwd: ${subject}`, sendType: 'forward' });
+		expect((await forward.json()).code).toBe(200);
+		const attachment = await send({ ...base, receiveEmail: [recipient.email], subject: `${subject}-attachment`, attachments: [{ filename: 'note.txt', contentType: 'text/plain', content: 'aGVsbG8=' }], sendType: '' });
+		const attachmentBody = await attachment.json();
+		expect(attachmentBody.code).toBe(200);
+		const stored = await env.db.prepare('SELECT COUNT(*) AS total FROM attachments WHERE email_id = ?').bind(attachmentBody.data[0].emailId).first();
+		expect(stored.total).toBe(1);
 	});
 
 	it('refuses to send when the feature switch is closed', async () => {
