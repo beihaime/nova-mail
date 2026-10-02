@@ -84,7 +84,7 @@
   </el-scrollbar>
   <footer class="aside-footer">
     <div class="send-usage">
-      <AppIcon name="send-action" :size="17" />
+      <AppIcon name="nova-sidebar-sent" :size="17" inline />
 
       <div class="send-usage-body">
         <div class="send-usage-head">
@@ -403,6 +403,7 @@ const openCompose = () => uiStore.writerRef?.open()
 .send-usage > .app-icon {
   flex: 0 0 auto;
   margin-top: 1px;
+  color: var(--el-color-primary);
   opacity: .9;
 }
 

@@ -1862,6 +1862,13 @@ function restoreTrash() {
   border-color: var(--nova-divider);
 }
 
+/* An open message is the reader surface itself. Collapsed thread rows retain
+   the quieter muted surface, while the body and its transparent HTML frame sit
+   on the same `--nova-surface` colour as the rest of the expanded reader. */
+.thread-message.is-expanded {
+  background: var(--nova-surface);
+}
+
 .thread-message {
   /* Content-driven height, and never an outer gap — collapsed or expanded. */
   height: auto;
