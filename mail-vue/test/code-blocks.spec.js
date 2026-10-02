@@ -113,6 +113,7 @@ describe('explicit code blocks', () => {
 
   it('renders a copy affordance and an accurate code line count', () => {
     const html = renderCodeBlock('const a = 1;\nconsole.log(a);', 'javascript')
+    expect(html).toContain('<div class="nova-code-content">')
     expect(html).toContain('data-nova-copy-code="1"')
     expect(html).toContain('2 lines')
     expect(html).toContain('JavaScript')

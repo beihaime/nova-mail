@@ -181,13 +181,14 @@ function buildFrameStyle(theme) {
     pre { white-space: pre-wrap; word-break: break-word; }
     code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
     .nova-code-block {
-      position: relative; max-width: 100%; box-sizing: border-box; margin: 10px 0; padding: 34px 14px 10px;
+      max-width: 100%; box-sizing: border-box; margin: 10px 0; padding: 10px 14px;
       overflow-x: auto; border: 1px solid ${codeBorder}; border-radius: 8px;
       background: ${codeBackground}; white-space: pre; word-break: normal; overflow-wrap: normal;
     }
     .nova-code-block pre { margin: 0; white-space: pre; }
     .nova-code-block code { display: block; min-width: max-content; font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; line-height: 1.3; }
-    .nova-code-toolbar { position: absolute; top: 8px; left: 12px; right: 10px; display: flex; align-items: center; gap: 8px; color: ${quoteText}; font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; }
+    .nova-code-content { min-width: max-content; }
+    .nova-code-toolbar { display: flex; min-width: 100%; align-items: center; gap: 8px; margin-bottom: 8px; color: ${quoteText}; font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; }
     .nova-code-copy { padding: 3px 7px; border: 1px solid ${codeBorder}; border-radius: 5px; color: inherit; background: transparent; font: inherit; cursor: pointer; }
     .nova-code-copy:hover { border-color: ${link}; color: ${link}; }
     .nova-code-language { display: inline-flex; align-items: center; gap: 4px; margin-right: auto; color: ${link}; }

@@ -189,7 +189,10 @@ export function renderCodeBlock(code, language = '') {
   const lineCount = source ? source.split('\n').length : 0
   const lineLabel = `${lineCount} ${lineCount === 1 ? 'line' : 'lines'}`
   const languageLabel = LANGUAGE_LABELS[normalized] || 'Plain text'
-  return `<div class="nova-code-block" data-nova-code-source="${escapeHtml(source)}"><div class="nova-code-toolbar"><span class="nova-code-language"><span class="nova-code-language-icon" aria-hidden="true">&lt;/&gt;</span>${languageLabel}</span><span class="nova-code-lines">${lineLabel}</span><button class="nova-code-copy" type="button" data-nova-copy-code="1" aria-label="Copy code">Copy</button></div><pre><code class="hljs${languageClass}">${html}</code></pre></div>`
+  // Keep the toolbar inside the same overflow content layer as the source. On
+  // narrow screens this makes the language, line count and Copy button move
+  // with a horizontally scrolled long line instead of being pinned in place.
+  return `<div class="nova-code-block" data-nova-code-source="${escapeHtml(source)}"><div class="nova-code-content"><div class="nova-code-toolbar"><span class="nova-code-language"><span class="nova-code-language-icon" aria-hidden="true">&lt;/&gt;</span>${languageLabel}</span><span class="nova-code-lines">${lineLabel}</span><button class="nova-code-copy" type="button" data-nova-copy-code="1" aria-label="Copy code">Copy</button></div><pre><code class="hljs${languageClass}">${html}</code></pre></div></div>`
 }
 
 function languageFromCodeElement(code) {

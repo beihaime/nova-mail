@@ -2136,10 +2136,9 @@ const handleDelete = () => {
    snippets all use this class. It preserves source layout without allowing a
    long line to widen the reader on a phone. */
 .email-text :deep(.nova-code-block) {
-  position: relative;
   max-width: 100%;
   margin: 10px 0;
-  padding: 34px 14px 10px;
+  padding: 10px 14px;
   overflow-x: auto;
   box-sizing: border-box;
   border: 1px solid var(--light-border);
@@ -2163,16 +2162,18 @@ const handleDelete = () => {
   line-height: 1.3;
 }
 
+.email-text :deep(.nova-code-content) {
+  min-width: max-content;
+}
+
 .email-text :deep(.nova-code-prose) { white-space: pre-wrap; }
 
 .email-text :deep(.nova-code-toolbar) {
-  position: absolute;
-  top: 8px;
-  left: 12px;
-  right: 10px;
   display: flex;
+  min-width: 100%;
   align-items: center;
   gap: 8px;
+  margin-bottom: 8px;
   color: var(--regular-text-color);
   font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 11px;
