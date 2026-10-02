@@ -11,39 +11,39 @@
       <el-menu class="nova-sidebar-nav" :collapse="false">
         <el-menu-item @click="router.push({name: 'email'})" index="email"
                       :class="route.meta.name === 'email' ? 'choose-item' : ''">
-          <AppIcon name="inbox" :size="19" />
+          <span class="nav-icon"><AppIcon name="inbox" :size="18" /></span>
           <span class="menu-name">{{$t('inbox')}}</span>
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'send'})" index="send" v-perm="'email:send'"
                       :class="route.meta.name === 'send' ? 'choose-item' : ''">
-          <AppIcon name="sent-nav" :size="19" />
+          <span class="nav-icon"><AppIcon name="sent-nav" :size="18" /></span>
           <span class="menu-name">{{$t('sent')}}</span>
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'draft'})" index="draft" v-perm="'email:send'"
                       :class="route.meta.name === 'draft' ? 'choose-item' : ''">
-          <AppIcon name="drafts-nav" :size="19" />
+          <span class="nav-icon"><AppIcon name="drafts-nav" :size="18" /></span>
           <span class="menu-name">{{$t('drafts')}}</span>
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'star'})" index="star"
                       :class="route.meta.name === 'star' ? 'choose-item' : ''">
-          <AppIcon name="starred-nav" :size="19" />
+          <span class="nav-icon"><AppIcon name="starred-nav" :size="18" /></span>
           <span class="menu-name">{{$t('starred')}}</span>
         </el-menu-item>
         <!-- Only users who may archive (the swipe action reuses `email:delete`)
              can ever have anything in here. -->
         <el-menu-item @click="router.push({name: 'archive'})" index="archive" v-perm="'email:delete'"
                       :class="route.meta.name === 'archive' ? 'choose-item' : ''">
-          <AppIcon name="archive-nav" :size="19" />
+          <span class="nav-icon"><AppIcon name="archive-nav" :size="18" /></span>
           <span class="menu-name">{{$t('archive')}}</span>
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'trash'})" index="trash" v-perm="'email:delete'"
                       :class="route.meta.name === 'trash' ? 'choose-item' : ''">
-          <AppIcon name="trash-nav" :size="19" />
+          <span class="nav-icon"><AppIcon name="trash-nav" :size="18" /></span>
           <span class="menu-name">{{$t('trash')}}</span>
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'setting'})" index="setting"
                       :class="route.meta.name === 'setting' ? 'choose-item' : ''">
-          <AppIcon name="settings-top" :size="19" />
+          <span class="nav-icon"><AppIcon name="settings-top" :size="18" /></span>
           <span class="menu-name">{{$t('settings')}}</span>
         </el-menu-item>
         <div class="manage-title" v-perm="['all-email:query','user:query','role:query','setting:query','analysis:query','reg-key:query']">
@@ -51,32 +51,32 @@
         </div>
         <el-menu-item @click="router.push({name: 'analysis'})" index="analysis" v-perm="'analysis:query'"
                       :class="route.meta.name === 'analysis' ? 'choose-item' : ''">
-          <AppIcon name="history" :size="19" />
+          <span class="nav-icon"><AppIcon name="history" :size="18" /></span>
           <span class="menu-name">{{$t('analytics')}}</span>
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'user'})" index="setting" v-perm="'user:query'"
                       :class="route.meta.name === 'user' ? 'choose-item' : ''">
-          <AppIcon name="users" :size="19" />
+          <span class="nav-icon"><AppIcon name="users" :size="18" /></span>
           <span class="menu-name">{{$t('allUsers')}}</span>
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'all-email'})" index="all-email" v-perm="'all-email:query'"
                       :class="route.meta.name === 'all-email' ? 'choose-item' : ''">
-          <AppIcon name="mail-unread" :size="19" />
+          <span class="nav-icon"><AppIcon name="mail-unread" :size="18" /></span>
           <span class="menu-name">{{$t('allMail')}}</span>
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'role'})" index="setting" v-perm="'role:query'"
                       :class="route.meta.name === 'role' ? 'choose-item' : ''">
-          <AppIcon name="lock" :size="19" />
+          <span class="nav-icon"><AppIcon name="lock" :size="18" /></span>
           <span class="menu-name">{{$t('permissions')}}</span>
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'reg-key'})" index="reg-key" v-perm="'reg-key:query'"
                       :class="route.meta.name === 'reg-key' ? 'choose-item' : ''">
-          <AppIcon name="label-nav" :size="19" />
+          <span class="nav-icon"><AppIcon name="label-nav" :size="18" /></span>
           <span class="menu-name">{{$t('inviteCode')}}</span>
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'sys-setting'})" index="sys-setting" v-perm="'setting:query'"
                       :class="route.meta.name === 'sys-setting' ? 'choose-item' : ''">
-          <AppIcon name="settings-top" :size="19" />
+          <span class="nav-icon"><AppIcon name="settings-top" :size="18" /></span>
           <span class="menu-name">{{$t('SystemSettings')}}</span>
         </el-menu-item>
       </el-menu>
@@ -199,8 +199,8 @@ const openCompose = () => uiStore.writerRef?.open()
 <style lang="scss" scoped>
 
 .compose {
-  margin: 6px 14px 4px;
-  width: calc(100% - 28px);
+  margin: 6px 10px 4px;
+  width: calc(100% - 20px);
   height: 42px;
 
 }
@@ -256,16 +256,22 @@ const openCompose = () => uiStore.writerRef?.open()
 
 .manage-title {
   margin-top: 8px;
-  padding-left: 24px;
+  padding: 0 22px;
   color: var(--secondary-text-color);
   font-size: 12px;
+  line-height: 28px;
 }
 
 :deep(.nova-sidebar-nav .el-menu-item) {
   margin: 1px 10px !important;
   border-radius: 9px;
   height: 38px;
-  padding: 9px 12px !important;
+  padding: 0 12px !important;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 12px;
+  line-height: 1;
   color: var(--el-text-color-regular);
   transition: background-color var(--nova-motion-fast) var(--nova-motion-ease), color var(--nova-motion-fast) var(--nova-motion-ease), box-shadow var(--nova-motion-fast) var(--nova-motion-ease);
 }
@@ -287,7 +293,26 @@ const openCompose = () => uiStore.writerRef?.open()
 
 .menu-name {
   user-select: none;
-  margin-left: 12px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nav-icon {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 20px;
+}
+
+.nav-icon :deep(.app-icon) {
+  width: 18px;
+  height: 18px;
+  display: block;
+  flex: 0 0 auto;
 }
 
 
