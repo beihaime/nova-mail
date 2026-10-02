@@ -181,21 +181,30 @@ function buildFrameStyle(theme) {
     pre { white-space: pre-wrap; word-break: break-word; }
     code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
     .nova-code-block {
-      max-width: 100%; box-sizing: border-box; margin: 10px 0; padding: 10px 14px;
-      overflow-x: auto; border: 1px solid ${codeBorder}; border-radius: 8px;
+      width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; margin: 10px 0; overflow: hidden;
+      border: 1px solid ${codeBorder}; border-radius: 8px;
       background: ${codeBackground}; white-space: pre; word-break: normal; overflow-wrap: normal;
     }
     .nova-code-block pre { margin: 0; white-space: pre; }
     .nova-code-block code { display: block; min-width: max-content; font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; line-height: 1.3; }
-    .nova-code-content { min-width: max-content; }
-    .nova-code-toolbar { display: flex; min-width: 100%; align-items: center; gap: 8px; margin-bottom: 8px; color: ${quoteText}; font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; }
-    .nova-code-copy { padding: 3px 7px; border: 1px solid ${codeBorder}; border-radius: 5px; color: inherit; background: transparent; font: inherit; cursor: pointer; }
+    .nova-code-scroll { min-width: 0; max-width: 100%; overflow-x: auto; overflow-y: auto; overscroll-behavior: contain; }
+    .nova-code-content { min-width: max-content; padding: 0 14px 10px; }
+    .nova-code-toolbar { position: sticky; top: 0; z-index: 1; display: flex; min-width: 0; align-items: center; gap: 8px; padding: 9px 14px 8px; color: ${quoteText}; background: ${codeBackground}; border-bottom: 1px solid ${codeBorder}; font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; }
+    .nova-code-copy { flex: 0 0 auto; padding: 3px 7px; border: 1px solid ${codeBorder}; border-radius: 5px; color: inherit; background: transparent; font: inherit; cursor: pointer; }
     .nova-code-copy:hover { border-color: ${link}; color: ${link}; }
-    .nova-code-language { display: inline-flex; align-items: center; gap: 4px; margin-right: auto; color: ${link}; }
+    .nova-code-language { display: inline-flex; min-width: 0; align-items: center; gap: 4px; margin-right: auto; overflow: hidden; color: ${link}; text-overflow: ellipsis; white-space: nowrap; }
+    .nova-code-lines { flex: 0 0 auto; white-space: nowrap; }
     .nova-code-language-icon { font-weight: 700; }
     .nova-code-line { position: relative; display: block; min-height: 1.3em; padding-left: 3.5em; }
     .nova-code-line::before { position: absolute; left: 0; width: 2.5em; color: ${quoteText}; content: attr(data-line); text-align: right; user-select: none; opacity: .62; }
     .nova-code-prose { white-space: pre-wrap; }
+    @media (max-width: 767px) {
+      .nova-code-block { display: flex; max-height: 420px; flex-direction: column; }
+      .nova-code-scroll { min-height: 0; flex: 1 1 auto; }
+      .nova-code-toolbar { padding: 8px 10px 7px; }
+      .nova-code-content { padding: 0 10px 10px; }
+      .nova-code-lines { display: none; }
+    }
     .hljs-keyword, .hljs-selector-tag, .hljs-built_in { color: ${dark ? '#c4b5fd' : '#7c3aed'}; }
     .hljs-string, .hljs-attr, .hljs-template-variable { color: ${dark ? '#6ee7b7' : '#087f5b'}; }
     .hljs-number, .hljs-literal { color: ${dark ? '#fbbf24' : '#b45309'}; }

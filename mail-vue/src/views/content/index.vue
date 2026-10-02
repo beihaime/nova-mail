@@ -2107,10 +2107,11 @@ const handleDelete = () => {
    snippets all use this class. It preserves source layout without allowing a
    long line to widen the reader on a phone. */
 .email-text :deep(.nova-code-block) {
+  width: 100%;
+  min-width: 0;
   max-width: 100%;
   margin: 10px 0;
-  padding: 10px 14px;
-  overflow-x: auto;
+  overflow: hidden;
   box-sizing: border-box;
   border: 1px solid var(--light-border);
   border-radius: 8px;
@@ -2135,22 +2136,37 @@ const handleDelete = () => {
 
 .email-text :deep(.nova-code-content) {
   min-width: max-content;
+  padding: 0 14px 10px;
 }
 
 .email-text :deep(.nova-code-prose) { white-space: pre-wrap; }
 
+.email-text :deep(.nova-code-scroll) {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .email-text :deep(.nova-code-toolbar) {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   display: flex;
-  min-width: 100%;
+  min-width: 0;
   align-items: center;
   gap: 8px;
-  margin-bottom: 8px;
+  padding: 9px 14px 8px;
+  border-bottom: 1px solid var(--light-border);
   color: var(--regular-text-color);
+  background: var(--base-fill);
   font-family: var(--nova-font-code);
   font-size: 11px;
 }
 
 .email-text :deep(.nova-code-copy) {
+  flex: 0 0 auto;
   padding: 3px 7px;
   border: 1px solid var(--light-border);
   border-radius: 5px;
@@ -2164,13 +2180,18 @@ const handleDelete = () => {
 
 .email-text :deep(.nova-code-language) {
   display: inline-flex;
+  min-width: 0;
   align-items: center;
   gap: 4px;
   color: var(--el-color-primary);
   margin-right: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .email-text :deep(.nova-code-language-icon) { font-weight: 700; }
+.email-text :deep(.nova-code-lines) { flex: 0 0 auto; white-space: nowrap; }
 
 .email-text :deep(.nova-code-line) {
   position: relative;
@@ -2207,6 +2228,8 @@ const handleDelete = () => {
   border-color: #3d4652;
   background: #161b22;
 }
+
+:global(html.dark) .email-text :deep(.nova-code-toolbar) { border-color: #3d4652; background: #161b22; }
 :global(html.dark) .email-text :deep(.hljs-keyword),
 :global(html.dark) .email-text :deep(.hljs-selector-tag),
 :global(html.dark) .email-text :deep(.hljs-built_in) { color: #c4b5fd; }
@@ -2219,6 +2242,23 @@ const handleDelete = () => {
 :global(html.dark) .email-text :deep(.hljs-quote) { color: #9ca3af; }
 :global(html.dark) .email-text :deep(.hljs-title),
 :global(html.dark) .email-text :deep(.hljs-function) { color: #93c5fd; }
+
+@media (max-width: 767px) {
+  .email-text :deep(.nova-code-block) {
+    display: flex;
+    max-height: 420px;
+    flex-direction: column;
+  }
+
+  .email-text :deep(.nova-code-scroll) {
+    min-height: 0;
+    flex: 1 1 auto;
+  }
+
+  .email-text :deep(.nova-code-toolbar) { padding: 8px 10px 7px; }
+  .email-text :deep(.nova-code-content) { padding: 0 10px 10px; }
+  .email-text :deep(.nova-code-lines) { display: none; }
+}
 
 .email-text.email-markdown :deep(code) {
   font-family: var(--nova-font-code);

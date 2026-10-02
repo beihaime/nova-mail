@@ -113,12 +113,34 @@ describe('explicit code blocks', () => {
 
   it('renders a copy affordance and an accurate code line count', () => {
     const html = renderCodeBlock('const a = 1;\nconsole.log(a);', 'javascript')
-    expect(html).toContain('<div class="nova-code-content">')
+    expect(html).toContain('<div class="nova-code-toolbar">')
+    expect(html).toContain('<div class="nova-code-scroll"><div class="nova-code-content">')
     expect(html).toContain('data-nova-copy-code="1"')
     expect(html).toContain('2 lines')
     expect(html).toContain('JavaScript')
     expect(html).toContain('data-line="1"')
     expect(html).toContain('data-line="2"')
     expect(html).toContain('data-nova-code-source="const a = 1;\nconsole.log(a);"')
+  })
+
+  it('keeps the header outside the horizontally scrollable source layer', () => {
+    const source = `public class VeryLongLine { ${'String value = "Nova Mail"; '.repeat(20)} }`
+    const html = renderCodeBlock(source, 'java')
+
+    expect(html.indexOf('nova-code-toolbar')).toBeLessThan(html.indexOf('nova-code-scroll'))
+    expect(html).toContain('>Java</span>')
+    expect(html).toContain('data-nova-copy-code="1"')
+    expect(html).toContain('data-line="1"')
+  })
+
+  it('keeps a large plaintext block in one independently scrollable source layer', () => {
+    const source = Array.from({ length: 220 }, (_, index) => `unclassified_token_${index} = ${'x'.repeat(80)}`).join('\n')
+    const html = renderCodeBlock(source)
+
+    expect(html.match(/nova-code-toolbar/g)).toHaveLength(1)
+    expect(html.match(/nova-code-scroll/g)).toHaveLength(1)
+    expect(html).toContain('Plain text')
+    expect(html).toContain('220 lines')
+    expect(html).toContain('data-line="220"')
   })
 })
