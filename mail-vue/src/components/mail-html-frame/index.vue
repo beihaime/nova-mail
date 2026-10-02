@@ -62,6 +62,12 @@ const props = defineProps({
     default: 'light',
     validator: value => ['light', 'dark'].includes(value)
   },
+  // The isolated document cannot resolve the host's CSS variables. This is the
+  // active palette background used for its html/body and renderer root only.
+  background: {
+    type: String,
+    default: ''
+  },
   title: {
     type: String,
     default: ''
@@ -326,6 +332,7 @@ function rebuild() {
     html: props.html,
     allowImages: props.allowImages,
     theme: props.theme === 'dark' ? 'dark' : 'light',
+    background: props.background,
     nonce,
     title: props.title,
     fallbackText: props.text
@@ -355,7 +362,7 @@ onBeforeUnmount(() => {
 })
 
 watch(
-  () => [props.html, props.allowImages, props.theme],
+  () => [props.html, props.allowImages, props.theme, props.background],
   () => rebuild()
 )
 

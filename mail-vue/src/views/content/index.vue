@@ -146,6 +146,7 @@
                     :text="message.text || ''"
                     :allow-images="isRemoteImagesAllowed(message)"
                     :theme="uiStore.dark ? 'dark' : 'light'"
+                    :background="readerBodyBackground"
                     :title="message.subject || ''"
                     @blocked="count => setBlockedImageCount(message, count)"
                 />
@@ -256,6 +257,7 @@ import { enhancePlainTextCodeBlocks } from '@/utils/code-blocks.js'
 import {looksLikeHtmlDocument} from '@/utils/mail-body-hint.js'
 import {attachmentRisk} from '@/utils/attachment-risk.js'
 import {alertNewMail} from '@/utils/new-mail-alert.js'
+import {DEFAULT_PALETTES} from '@/utils/theme-palette.js'
 
 const uiStore = useUiStore();
 const settingStore = useSettingStore();
@@ -263,6 +265,13 @@ const accountStore = useAccountStore();
 const emailStore = useEmailStore();
 const router = useRouter()
 const route = useRoute()
+// The HTML renderer lives in an isolated iframe, so it cannot inherit the
+// host document's CSS variables. Pass the resolved palette colour explicitly
+// to keep its document root aligned with the reader background.
+const readerBodyBackground = computed(() => {
+  const mode = uiStore.dark ? 'dark' : 'light'
+  return uiStore[`${mode}Palette`]?.background || DEFAULT_PALETTES[mode].background
+})
 const email = computed(() => emailStore.contentData.email || {
   emailId: 0,
   attList: [],

@@ -37,6 +37,15 @@ function build(html, options = {}) {
 }
 
 describe('frame sandbox', () => {
+  it('keeps the frame document canvas on the active reader background', () => {
+    const { document } = build('<body bgcolor="white"><p>Terracotta</p></body>', {
+      background: '#F5F3EE',
+    })
+
+    expect(document).toContain('html, body { margin: 0; padding: 0; background: #F5F3EE !important; }')
+    expect(document).toContain('body > .nova-mail-body { background: #F5F3EE !important; }')
+  })
+
   it('never grants allow-same-origin together with allow-scripts', () => {
     const tokens = MAIL_FRAME_SANDBOX.split(/\s+/)
 

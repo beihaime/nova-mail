@@ -138,8 +138,11 @@ export function createFrameNonce() {
  * hard-coded pixel widths. These rules keep that markup readable (and stop it
  * from overflowing a phone) without overriding what the sender explicitly set.
  */
-function buildFrameStyle(theme) {
+function buildFrameStyle(theme, background) {
   const dark = theme === 'dark'
+  // The value comes from the validated UI palette. `transparent` is only a
+  // defensive fallback for direct utility callers that omit the optional prop.
+  const frameBackground = String(background || 'transparent').trim()
 
   const text = dark ? '#e6e6e6' : '#13181d'
   const link = dark ? '#7cb0f0' : '#0e70df'
@@ -150,7 +153,10 @@ function buildFrameStyle(theme) {
 
   return `
     html { color-scheme: ${dark ? 'dark' : 'light'}; }
-    html, body { margin: 0; padding: 0; background: transparent; }
+    /* Email markup often sets body bgcolor="white" or an inline background.
+       The reader owns the document canvas, while nested message tables/cards
+       retain their sender-provided backgrounds. */
+    html, body { margin: 0; padding: 0; background: ${frameBackground} !important; }
     body {
       font-family: Inter, "Helvetica Neue", Helvetica, "PingFang SC",
                    "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", Arial, sans-serif;
@@ -169,6 +175,7 @@ function buildFrameStyle(theme) {
     /* Own formatting context: children's margins stay inside, so this element's
        height is exactly the mail's height — it is what the reader measures. */
     .nova-mail-body { display: flow-root; }
+    body > .nova-mail-body { background: ${frameBackground} !important; }
     /* Plain-text alternative, shown only when the markup had nothing to render. */
     .nova-fallback { margin: 0; font: inherit; color: inherit; white-space: pre-wrap; word-break: break-word; }
     img { max-width: 100%; height: auto; }
@@ -300,6 +307,7 @@ function buildHeightReporter(nonce) {
  * @param {string} params.html raw mail body (already HTML, not markdown)
  * @param {boolean} [params.allowImages] reader allowed remote images
  * @param {'light'|'dark'} [params.theme] reader theme
+ * @param {string} [params.background] resolved reader background palette colour
  * @param {string} [params.nonce] nonce for the height reporter
  * @param {string} [params.title] document title (subject); untrusted
  * @returns {{document: string, blocked: number, sandbox: string, nonce: string}}
@@ -308,6 +316,7 @@ export function buildMailFrameDocument({
   html,
   allowImages = false,
   theme = 'light',
+  background = '',
   nonce = '',
   title = '',
   fallbackText = '',
@@ -332,7 +341,7 @@ export function buildMailFrameDocument({
 <meta name="referrer" content="no-referrer">
 <meta http-equiv="Content-Security-Policy" content="${escapeAttribute(buildCsp(frameNonce))}">
 <title>${escapeAttribute(title)}</title>
-<style>${buildFrameStyle(theme)}</style>
+<style>${buildFrameStyle(theme, background)}</style>
 </head>
 <body>
 <div class="nova-mail-body" data-nova-mail-body="1">${safeHtml}${fallback ? `<pre class="nova-fallback">${fallback}</pre>` : ''}</div>
