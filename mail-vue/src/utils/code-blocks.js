@@ -142,12 +142,15 @@ export function detectLanguage(code) {
 }
 
 export function renderCodeBlock(code, language = '') {
-  const normalized = normalizeCodeLanguage(language) || detectLanguage(code)
+  const source = String(code || '')
+  const normalized = normalizeCodeLanguage(language) || detectLanguage(source)
   const html = normalized
-    ? hljs.highlight(String(code || ''), { language: normalized, ignoreIllegals: true }).value
-    : escapeHtml(code)
+    ? hljs.highlight(source, { language: normalized, ignoreIllegals: true }).value
+    : escapeHtml(source)
   const languageClass = normalized ? ` language-${normalized}` : ''
-  return `<pre class="nova-code-block"><code class="hljs${languageClass}">${html}</code></pre>`
+  const lineCount = source ? source.split('\n').length : 0
+  const lineLabel = `${lineCount} ${lineCount === 1 ? 'line' : 'lines'}`
+  return `<div class="nova-code-block"><div class="nova-code-toolbar"><span class="nova-code-lines">${lineLabel}</span><button class="nova-code-copy" type="button" data-nova-copy-code="1" aria-label="Copy code">Copy</button></div><pre><code class="hljs${languageClass}">${html}</code></pre></div>`
 }
 
 function languageFromCodeElement(code) {
@@ -167,7 +170,7 @@ export function enhanceCodeBlocks(html) {
     pre.outerHTML = renderCodeBlock(code.textContent || '', languageFromCodeElement(code))
   })
   root.querySelectorAll('code').forEach((code) => {
-    if (code.closest('pre')) return
+    if (code.closest('pre, .nova-code-block')) return
     code.outerHTML = renderCodeBlock(code.textContent || '', languageFromCodeElement(code))
   })
   return root.innerHTML

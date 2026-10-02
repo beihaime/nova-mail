@@ -124,7 +124,7 @@
               <el-alert v-if="message.status === 4" :closable="false" :title="$t('complained')" class="email-msg" type="warning" show-icon />
               <el-alert v-if="message.status === 5" :closable="false" :title="$t('delayed')" class="email-msg" type="warning" show-icon />
 
-              <el-scrollbar class="htm-scrollbar" :class="!message.attachments?.length ? 'bottom-distance' : ''">
+              <el-scrollbar class="htm-scrollbar" :class="!message.attachments?.length ? 'bottom-distance' : ''" @click="copyCodeBlock">
                 <!-- Remote content is opt-in. The body stays untouched until the
                      reader asks for it, so a tracking pixel never fires. -->
                 <div v-if="showRemoteImagesBar(message)" class="remote-images-bar">
@@ -419,6 +419,24 @@ function quotedBody(text) {
   }
 
   return html
+}
+
+async function copyCodeBlock(event) {
+  const button = event.target?.closest?.('[data-nova-copy-code]')
+  if (!button) return
+
+  const code = button.closest('.nova-code-block')?.querySelector('code')?.textContent || ''
+  if (!code) return
+
+  try {
+    await navigator.clipboard.writeText(code)
+    const label = button.textContent
+    button.textContent = 'Copied'
+    window.setTimeout(() => { button.textContent = label }, 1400)
+    ElMessage({ message: t('copySuccessMsg'), type: 'success', plain: true })
+  } catch {
+    ElMessage({ message: t('copyFailMsg'), type: 'error', plain: true })
+  }
 }
 
 /**
@@ -2118,9 +2136,10 @@ const handleDelete = () => {
    snippets all use this class. It preserves source layout without allowing a
    long line to widen the reader on a phone. */
 .email-text :deep(.nova-code-block) {
+  position: relative;
   max-width: 100%;
   margin: 10px 0;
-  padding: 12px 14px;
+  padding: 40px 14px 12px;
   overflow-x: auto;
   box-sizing: border-box;
   border: 1px solid var(--light-border);
@@ -2131,15 +2150,44 @@ const handleDelete = () => {
   overflow-wrap: normal;
 }
 
+.email-text :deep(.nova-code-block pre) {
+  margin: 0;
+  white-space: pre;
+}
+
 .email-text :deep(.nova-code-block code) {
   display: block;
   min-width: max-content;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 13px;
   line-height: 1.55;
 }
 
 .email-text :deep(.nova-code-prose) { white-space: pre-wrap; }
+
+.email-text :deep(.nova-code-toolbar) {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--regular-text-color);
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+}
+
+.email-text :deep(.nova-code-copy) {
+  padding: 3px 7px;
+  border: 1px solid var(--light-border);
+  border-radius: 5px;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.email-text :deep(.nova-code-copy:hover) { border-color: var(--el-color-primary); color: var(--el-color-primary); }
 
 .email-text :deep(.hljs-keyword),
 .email-text :deep(.hljs-selector-tag),

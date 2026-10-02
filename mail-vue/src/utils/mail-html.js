@@ -133,7 +133,7 @@ function installHooks() {
  * @param {string} html
  * @returns {string} markup that only contains presentation-safe HTML
  */
-export function sanitizeMailHtml(html) {
+export function sanitizeMailHtml(html, { allowCodeControls = false } = {}) {
   const source = String(html || '')
   if (!source) return ''
 
@@ -141,7 +141,9 @@ export function sanitizeMailHtml(html) {
 
   return DOMPurify.sanitize(source, {
     USE_PROFILES: { html: true },
-    FORBID_TAGS: FORBIDDEN_TAGS,
+    // A code-copy button is added only after an initial sanitize pass, from our
+    // own renderer. Mail-provided buttons never survive that first pass.
+    FORBID_TAGS: allowCodeControls ? FORBIDDEN_TAGS.filter(tag => tag !== 'button') : FORBIDDEN_TAGS,
     FORBID_ATTR: FORBIDDEN_ATTRS,
     ALLOW_UNKNOWN_PROTOCOLS: false,
     ALLOW_ARIA_ATTR: false,
@@ -306,7 +308,7 @@ export function renderInlineMarkdown(source) {
  * @returns {{html: string, blocked: number}}
  */
 export function prepareMarkdownBody(source, { allowImages = false } = {}) {
-  const html = hardenLinks(sanitizeMailHtml(enhanceCodeBlocks(sanitizeMailHtml(markdown.render(String(source || ''))))))
+  const html = hardenLinks(sanitizeMailHtml(enhanceCodeBlocks(sanitizeMailHtml(markdown.render(String(source || '')))), { allowCodeControls: true }))
 
   if (allowImages) return { html: allowRemoteResources(html), blocked: 0 }
 
@@ -419,7 +421,7 @@ export function looksLikeMarkdownDocument(text) {
  */
 export function prepareMailBody({ html, allowImages = false }) {
   const initial = sanitizeMailHtml(html)
-  const safe = hardenLinks(sanitizeMailHtml(enhanceHtmlTextCodeBlocks(enhanceCodeBlocks(initial))))
+  const safe = hardenLinks(sanitizeMailHtml(enhanceHtmlTextCodeBlocks(enhanceCodeBlocks(initial)), { allowCodeControls: true }))
 
   if (allowImages) return { html: allowRemoteResources(safe), blocked: 0 }
 

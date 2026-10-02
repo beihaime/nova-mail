@@ -81,4 +81,10 @@ describe('explicit code blocks', () => {
     expect(detectLanguage('just some opaque tokens\nwith no useful syntax')).toBe('')
     expect(renderCodeBlock('opaque syntax').replace(/<[^>]+>/g, '')).toContain('opaque syntax')
   })
+
+  it('renders a copy affordance and an accurate code line count', () => {
+    const html = renderCodeBlock('const a = 1;\nconsole.log(a);', 'javascript')
+    expect(html).toContain('data-nova-copy-code="1"')
+    expect(html).toContain('2 lines')
+  })
 })

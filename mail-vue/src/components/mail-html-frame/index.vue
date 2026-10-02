@@ -101,6 +101,7 @@ let timers = []
 // place, so an empty frame is only acted on after a grace period.
 let writtenAt = 0
 let reloadAttempted = false
+let frameClickDocument = null
 
 const frameStyle = computed(() => (
   measured.value ? { height: `${frameHeight.value}px` } : {}
@@ -109,8 +110,36 @@ const frameStyle = computed(() => (
 function releaseFrame() {
   frameObserver?.disconnect()
   frameObserver = null
+  frameClickDocument?.removeEventListener('click', handleFrameClick)
+  frameClickDocument = null
   timers.forEach(clearTimeout)
   timers = []
+}
+
+async function handleFrameClick(event) {
+  const button = event.target?.closest?.('[data-nova-copy-code]')
+  if (!button) return
+
+  const code = button.closest('.nova-code-block')?.querySelector('code')?.textContent || ''
+  if (!code) return
+
+  try {
+    await navigator.clipboard.writeText(code)
+    const label = button.textContent
+    button.textContent = 'Copied'
+    setTimeout(() => { button.textContent = label }, 1400)
+  } catch {
+    // The iframe is deliberately scriptless; this parent-side fallback is only
+    // reached when Clipboard API permissions are unavailable.
+    const area = document.createElement('textarea')
+    area.value = code
+    area.style.position = 'fixed'
+    area.style.opacity = '0'
+    document.body.append(area)
+    area.select()
+    document.execCommand('copy')
+    area.remove()
+  }
 }
 
 /** Read the rendered height straight out of the (same-origin) frame document. */
@@ -216,6 +245,9 @@ function observeFrame() {
   }
 
   if (!doc?.documentElement) return
+
+  frameClickDocument = doc
+  doc.addEventListener('click', handleFrameClick)
 
   if (typeof ResizeObserver !== 'undefined') {
     frameObserver = new ResizeObserver(() => measureFrame())
