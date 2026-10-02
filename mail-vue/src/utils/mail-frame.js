@@ -145,6 +145,8 @@ function buildFrameStyle(theme) {
   const link = dark ? '#7cb0f0' : '#0e70df'
   const quoteLine = dark ? '#4a4a4a' : '#c7cdd4'
   const quoteText = dark ? '#a8a8a8' : '#5f6368'
+  const codeBackground = dark ? '#161b22' : '#f4f6f8'
+  const codeBorder = dark ? '#3d4652' : '#d8dee5'
 
   return `
     html { color-scheme: ${dark ? 'dark' : 'light'}; }
@@ -178,6 +180,17 @@ function buildFrameStyle(theme) {
     a:hover { text-decoration: underline; }
     pre { white-space: pre-wrap; word-break: break-word; }
     code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .nova-code-block {
+      max-width: 100%; box-sizing: border-box; margin: 10px 0; padding: 12px 14px;
+      overflow-x: auto; border: 1px solid ${codeBorder}; border-radius: 8px;
+      background: ${codeBackground}; white-space: pre; word-break: normal; overflow-wrap: normal;
+    }
+    .nova-code-block code { display: block; min-width: max-content; font-size: 13px; line-height: 1.55; }
+    .hljs-keyword, .hljs-selector-tag, .hljs-built_in { color: ${dark ? '#c4b5fd' : '#7c3aed'}; }
+    .hljs-string, .hljs-attr, .hljs-template-variable { color: ${dark ? '#6ee7b7' : '#087f5b'}; }
+    .hljs-number, .hljs-literal { color: ${dark ? '#fbbf24' : '#b45309'}; }
+    .hljs-comment, .hljs-quote { color: ${dark ? '#9ca3af' : '#6b7280'}; font-style: italic; }
+    .hljs-title, .hljs-function { color: ${dark ? '#93c5fd' : '#1d4ed8'}; }
     hr { border: 0; border-top: 1px solid ${quoteLine}; }
 
     /* Gmail-style quoted history. The wrapper is added by

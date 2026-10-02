@@ -1,5 +1,6 @@
 import DOMPurify from 'dompurify'
 import MarkdownIt from 'markdown-it'
+import { enhanceCodeBlocks } from './code-blocks.js'
 
 /**
  * Everything that turns an untrusted mail body into something safe to render.
@@ -305,7 +306,7 @@ export function renderInlineMarkdown(source) {
  * @returns {{html: string, blocked: number}}
  */
 export function prepareMarkdownBody(source, { allowImages = false } = {}) {
-  const html = hardenLinks(sanitizeMailHtml(markdown.render(String(source || ''))))
+  const html = hardenLinks(sanitizeMailHtml(enhanceCodeBlocks(sanitizeMailHtml(markdown.render(String(source || ''))))))
 
   if (allowImages) return { html: allowRemoteResources(html), blocked: 0 }
 
@@ -417,7 +418,7 @@ export function looksLikeMarkdownDocument(text) {
  * @returns {{html: string, blocked: number}}
  */
 export function prepareMailBody({ html, allowImages = false }) {
-  const safe = hardenLinks(sanitizeMailHtml(html))
+  const safe = hardenLinks(sanitizeMailHtml(enhanceCodeBlocks(sanitizeMailHtml(html))))
 
   if (allowImages) return { html: allowRemoteResources(safe), blocked: 0 }
 

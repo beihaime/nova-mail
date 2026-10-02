@@ -251,6 +251,7 @@ import SenderAvatar from '@/components/sender-avatar/index.vue'
 import {buildThreadMessages, threadSubjectKey} from '@/utils/mail-thread.js'
 import {quotedTextToHtml, wrapHtmlQuotes} from '@/utils/quoted-text.js'
 import {MAIL_BODY_TYPE, blockRemoteResources, prepareMarkdownBody, normalizeNestedBody, looksLikeMarkdownDocument} from '@/utils/mail-html.js'
+import { enhancePlainTextCodeBlocks } from '@/utils/code-blocks.js'
 import {looksLikeHtmlDocument} from '@/utils/mail-body-hint.js'
 import {attachmentRisk} from '@/utils/attachment-risk.js'
 import {alertNewMail} from '@/utils/new-mail-alert.js'
@@ -412,7 +413,7 @@ function quotedBody(text) {
   let html = quotedBodyCache.get(key)
 
   if (html === undefined) {
-    html = quotedTextToHtml(String(text || ''), label)
+    html = enhancePlainTextCodeBlocks(quotedTextToHtml(String(text || ''), label))
     if (quotedBodyCache.size > 60) quotedBodyCache.clear()
     quotedBodyCache.set(key, html)
   }
@@ -2112,6 +2113,61 @@ const handleDelete = () => {
   background: var(--base-fill);
   white-space: pre;
 }
+
+/* Markdown fences, HTML <pre>/<code>, and heuristically detected plain-text
+   snippets all use this class. It preserves source layout without allowing a
+   long line to widen the reader on a phone. */
+.email-text :deep(.nova-code-block) {
+  max-width: 100%;
+  margin: 10px 0;
+  padding: 12px 14px;
+  overflow-x: auto;
+  box-sizing: border-box;
+  border: 1px solid var(--light-border);
+  border-radius: 8px;
+  background: var(--base-fill);
+  white-space: pre;
+  word-break: normal;
+  overflow-wrap: normal;
+}
+
+.email-text :deep(.nova-code-block code) {
+  display: block;
+  min-width: max-content;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.email-text :deep(.hljs-keyword),
+.email-text :deep(.hljs-selector-tag),
+.email-text :deep(.hljs-built_in) { color: #7c3aed; }
+.email-text :deep(.hljs-string),
+.email-text :deep(.hljs-attr),
+.email-text :deep(.hljs-template-variable) { color: #087f5b; }
+.email-text :deep(.hljs-number),
+.email-text :deep(.hljs-literal) { color: #b45309; }
+.email-text :deep(.hljs-comment),
+.email-text :deep(.hljs-quote) { color: #6b7280; font-style: italic; }
+.email-text :deep(.hljs-title),
+.email-text :deep(.hljs-function) { color: #1d4ed8; }
+
+:global(html.dark) .email-text :deep(.nova-code-block) {
+  border-color: #3d4652;
+  background: #161b22;
+}
+:global(html.dark) .email-text :deep(.hljs-keyword),
+:global(html.dark) .email-text :deep(.hljs-selector-tag),
+:global(html.dark) .email-text :deep(.hljs-built_in) { color: #c4b5fd; }
+:global(html.dark) .email-text :deep(.hljs-string),
+:global(html.dark) .email-text :deep(.hljs-attr),
+:global(html.dark) .email-text :deep(.hljs-template-variable) { color: #6ee7b7; }
+:global(html.dark) .email-text :deep(.hljs-number),
+:global(html.dark) .email-text :deep(.hljs-literal) { color: #fbbf24; }
+:global(html.dark) .email-text :deep(.hljs-comment),
+:global(html.dark) .email-text :deep(.hljs-quote) { color: #9ca3af; }
+:global(html.dark) .email-text :deep(.hljs-title),
+:global(html.dark) .email-text :deep(.hljs-function) { color: #93c5fd; }
 
 .email-text.email-markdown :deep(code) {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
