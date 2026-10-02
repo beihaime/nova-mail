@@ -272,7 +272,7 @@ const openCompose = () => uiStore.writerRef?.open()
   align-items: center;
   column-gap: 12px;
   line-height: 1;
-  color: var(--el-text-color-regular);
+  color: var(--el-text-color-primary);
   transition: background-color var(--nova-motion-fast) var(--nova-motion-ease), color var(--nova-motion-fast) var(--nova-motion-ease), box-shadow var(--nova-motion-fast) var(--nova-motion-ease);
 }
 
@@ -289,6 +289,11 @@ const openCompose = () => uiStore.writerRef?.open()
 :deep(.nova-sidebar-nav .choose-item .app-icon) {
   filter: none !important;
   opacity: 1 !important;
+}
+
+:deep(.nova-sidebar-nav .el-menu-item:not(.choose-item) .app-icon) {
+  filter: grayscale(1) brightness(0);
+  opacity: .72;
 }
 
 @media (hover: hover) {
@@ -338,12 +343,12 @@ const openCompose = () => uiStore.writerRef?.open()
 /* Most navigation assets are embedded monochrome PNGs inside their SVG files.
  * Keep the active brand/blue icon untouched, while lifting inactive icons only
  * in dark mode so they remain readable without changing the light theme. */
-:global(.dark .el-menu-item:not(.choose-item) .app-icon) {
-  filter: var(--nova-ui-icon-filter);
-  opacity: 1;
+:global(.dark .nova-sidebar-nav .el-menu-item:not(.choose-item) .app-icon) {
+  filter: grayscale(1) brightness(0) invert(1);
+  opacity: .78;
 }
-:global(.dark .el-menu-item:not(.choose-item):hover .app-icon) {
-  filter: var(--nova-ui-icon-filter-hover);
+:global(.dark .nova-sidebar-nav .el-menu-item:not(.choose-item):hover .app-icon) {
+  filter: grayscale(1) brightness(0) invert(1);
 }
 :global(.dark .send-usage > .app-icon) {
   filter: none !important;

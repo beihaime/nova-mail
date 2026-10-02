@@ -5,6 +5,7 @@ import {
     DEFAULT_PALETTES,
     applyPaletteTokens,
     clonePalette,
+    availablePresets,
     findMatchingPreset,
     migrateAppearanceConfig,
     normalizePalette,
@@ -344,9 +345,16 @@ export const useUiStore = defineStore('ui', {
         setThemePreset(mode, preset){
 
             if (!['light', 'dark'].includes(mode)) return
+            if (!availablePresets(mode).includes(preset)) return
 
-            this[`${mode}Palette`] = paletteForPreset(mode, preset)
-            this[`${mode}ThemePreset`] = preset
+            // Named presets always come as a light/dark pair. Applying both
+            // here means a later appearance-mode toggle keeps the selected
+            // theme instead of falling back to the other mode's old palette.
+            for (const paletteMode of ['light', 'dark']) {
+                if (!availablePresets(paletteMode).includes(preset)) continue
+                this[`${paletteMode}Palette`] = paletteForPreset(paletteMode, preset)
+                this[`${paletteMode}ThemePreset`] = preset
+            }
             this.applyTheme()
 
         },
@@ -355,7 +363,9 @@ export const useUiStore = defineStore('ui', {
         resetThemePalette(mode){
 
             if (!['light', 'dark'].includes(mode)) return
-            this.setThemePreset(mode, 'nova-default')
+            this[`${mode}Palette`] = clonePalette(DEFAULT_PALETTES[mode])
+            this[`${mode}ThemePreset`] = 'nova-default'
+            this.applyTheme()
 
         }
 
