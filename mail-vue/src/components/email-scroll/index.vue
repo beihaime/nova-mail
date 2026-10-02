@@ -123,11 +123,11 @@
                    only built where the gesture is actually available. -->
               <div v-if="props.type === 'email' && swipeActionsReady" class="swipe-actions" aria-hidden="true">
                 <div class="swipe-action swipe-action-archive">
-                  <AppIcon name="archive-nav" :size="22"/>
+                  <AppIcon name="nova-sidebar-archive" :size="22" inline />
                   <span>{{ t('archive') }}</span>
                 </div>
                 <div class="swipe-action swipe-action-delete">
-                  <AppIcon name="trash-nav" :size="22"/>
+                  <AppIcon name="nova-sidebar-trash" :size="22" inline />
                   <span>{{ t('delete') }}</span>
                 </div>
               </div>
@@ -3030,10 +3030,8 @@ ul {
     font-weight: 600;
   }
 
-  /* Archive (revealed by dragging right) and Delete (dragging left) are told
-     apart by a tint of the shared accent colours over the muted surface. A
-     saturated fill would fight the monochrome archive/trash SVGs, which are
-     dark glyphs that the theme inverts. */
+  /* Archive (revealed by dragging right) and Delete (dragging left) use the
+     same currentColor outline icons as the Sidebar navigation system. */
   :deep(.swipe-action-archive) {
     color: var(--el-color-primary);
   }

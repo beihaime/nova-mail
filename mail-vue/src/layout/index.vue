@@ -25,7 +25,7 @@
   </el-container>
   <nav v-if="route.name !== 'content'" class="mobile-nav" aria-label="Mail navigation">
     <button class="nova-navigation-button" :class="{active: route.name === 'email'}" @click="router.push({name: 'email'})">
-      <AppIcon name="inbox" :size="24" /><span>{{ $t('inbox') }}</span>
+      <AppIcon name="nova-sidebar-inbox" :size="24" inline /><span>{{ $t('inbox') }}</span>
     </button>
     <button class="nova-navigation-button" @click="uiStore.asideShow = true">
       <AppIcon name="folder-nav" :size="24" /><span>{{ $t('folders') }}</span>
