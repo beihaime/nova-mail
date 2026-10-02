@@ -24,20 +24,21 @@
     </el-container>
   </el-container>
   <nav v-if="route.name !== 'content'" class="mobile-nav" aria-label="Mail navigation">
-    <button :class="{active: route.name === 'email'}" @click="router.push({name: 'email'})">
+    <button class="nova-navigation-button" :class="{active: route.name === 'email'}" @click="router.push({name: 'email'})">
       <AppIcon name="inbox" :size="24" /><span>{{ $t('inbox') }}</span>
     </button>
-    <button @click="uiStore.asideShow = true">
+    <button class="nova-navigation-button" @click="uiStore.asideShow = true">
       <AppIcon name="folder-nav" :size="24" /><span>{{ $t('folders') }}</span>
     </button>
     <button
         v-perm="'email:send'"
+        class="nova-navigation-button"
         :class="{active: route.name === 'draft'}"
         @click="router.push({name: 'draft'})"
     >
       <AppIcon name="drafts-nav" :size="24" /><span>{{ $t('drafts') }}</span>
     </button>
-    <button :class="{active: route.name === 'setting'}" @click="router.push({name: 'setting'})">
+    <button class="nova-navigation-button" :class="{active: route.name === 'setting'}" @click="router.push({name: 'setting'})">
       <AppIcon name="settings-top" :size="24" /><span>{{ $t('settings') }}</span>
     </button>
   </nav>

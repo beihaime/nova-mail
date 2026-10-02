@@ -14,7 +14,7 @@
     >
       <template #first>
         <el-tooltip effect="dark" :content="t('restoreFromTrash')" :show-after="2000">
-          <button class="nova-icon-button" type="button" :disabled="!selectedIds.length" :aria-label="t('restoreFromTrash')" @click="restoreSelected">
+          <button class="nova-icon-button nova-toolbar-button" type="button" :disabled="!selectedIds.length" :aria-label="t('restoreFromTrash')" @click="restoreSelected">
             <Icon icon="solar:restart-linear" width="20" height="20" />
           </button>
         </el-tooltip>

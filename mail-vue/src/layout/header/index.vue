@@ -12,18 +12,18 @@
     </label>
     <div class="toolbar">
       <el-tooltip v-if="uiStore.dark" effect="dark" :content="$t('lightMode')" :show-after="2000">
-        <button class="sun-icon icon-item nova-icon-button" type="button" :aria-label="$t('lightMode')" @click="openDark($event)">
+        <button class="sun-icon icon-item nova-icon-button nova-toolbar-button" type="button" :aria-label="$t('lightMode')" @click="openDark($event)">
           <AppIcon name="theme-toggle" :size="20" />
         </button>
       </el-tooltip>
       <el-tooltip v-else effect="dark" :content="$t('darkMode')" :show-after="2000">
-        <button class="dark-icon icon-item nova-icon-button" type="button" :aria-label="$t('darkMode')" @click="openDark($event)">
+        <button class="dark-icon icon-item nova-icon-button nova-toolbar-button" type="button" :aria-label="$t('darkMode')" @click="openDark($event)">
           <AppIcon name="theme-toggle" :size="20" />
         </button>
       </el-tooltip>
       <el-tooltip effect="dark" :content="$t('noticeTitle')" :show-after="2000">
         <button
-            class="notice icon-item nova-icon-button"
+            class="notice icon-item nova-icon-button nova-toolbar-button"
             type="button"
             :aria-label="$t('noticeTitle')"
             @click="openNotice"
@@ -65,7 +65,7 @@
                 <button
                     v-for="address in accounts"
                     :key="address.accountId"
-                    class="address-option"
+                    class="address-option nova-ghost-button"
                     :class="{ selected: address.accountId === currentAccount.accountId }"
                     @click="selectAccount(address)"
                 >
@@ -89,9 +89,9 @@
               <div v-else class="address-loading">{{ $t('loading') }}</div>
             </div>
             <div class="account-dropdown-actions">
-              <button v-if="hasPerm('account:query')" @click="openManageAddresses"><AppIcon name="user" :size="17" />{{ $t('manageAddresses') }}</button>
-              <button @click="router.push({ name: 'setting' })"><AppIcon name="settings-top" :size="17" />{{ $t('settings') }}</button>
-              <button class="sign-out" :disabled="logoutLoading" @click="clickLogout">{{ $t('logOut') }}</button>
+              <button v-if="hasPerm('account:query')" class="nova-ghost-button" @click="openManageAddresses"><AppIcon name="user" :size="17" />{{ $t('manageAddresses') }}</button>
+              <button class="nova-ghost-button" @click="router.push({ name: 'setting' })"><AppIcon name="settings-top" :size="17" />{{ $t('settings') }}</button>
+              <button class="sign-out nova-ghost-button nova-danger-button" :disabled="logoutLoading" @click="clickLogout">{{ $t('logOut') }}</button>
             </div>
           </div>
         </template>

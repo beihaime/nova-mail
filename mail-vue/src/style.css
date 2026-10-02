@@ -220,10 +220,17 @@ button, input, select, textarea {
     --nova-motion-base: 180ms;
     --nova-motion-slow: 240ms;
     --nova-motion-ease: cubic-bezier(.2, .8, .2, 1);
+    --nova-radius-sm: 8px;
+    --nova-radius-md: 12px;
+    --nova-radius-lg: 16px;
+    --nova-danger: #d84a4a;
+    --nova-warning: #d99823;
+    --nova-success: #2f9e6f;
     /* Shared desktop control language. Components consume these rather than
        introducing their own near-identical button measurements. */
     --nova-button-radius: 9px;
     --nova-button-primary-radius: 10px;
+    --nova-button-height: 34px;
     --nova-icon-button-size: 34px;
     --nova-button-hover: var(--nova-hover);
     --nova-button-active: var(--nm-accent-subtle);
@@ -338,9 +345,79 @@ button:not(:disabled),
     }
 }
 
-/* Shared Nova Mail surface language.  Component styles keep the existing behavior. */
-.el-button { border-radius: 10px; font-weight: 500; }
-.el-button--primary { box-shadow: 0 1px 2px rgba(10, 132, 255, .2); }
+/* Button system ------------------------------------------------------------
+   Element Plus carries the mechanics; these are the single visual contract for
+   its ordinary controls and Nova's native buttons. No variant owns placement. */
+.el-button {
+    min-height: var(--nova-button-height);
+    padding: 0 13px;
+    border: 1px solid var(--nm-border);
+    border-radius: var(--nova-button-radius);
+    color: var(--nm-text-primary);
+    background: var(--nm-surface-elevated);
+    box-shadow: none;
+    font-weight: 600;
+}
+
+.el-button:not(.is-disabled):not(.is-text):not(.is-link):not(.el-button--primary):not(.el-button--danger):hover {
+    border-color: color-mix(in srgb, var(--nm-accent) 38%, var(--nm-border));
+    color: var(--nm-text-primary);
+    background: var(--nm-hover);
+}
+
+.el-button--primary {
+    border-color: var(--nm-accent);
+    color: #fff;
+    background: var(--nm-accent);
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--nm-accent) 30%, transparent);
+}
+
+.el-button--primary:not(.is-disabled):hover {
+    border-color: var(--nm-accent-hover);
+    color: #fff;
+    background: var(--nm-accent-hover);
+    box-shadow: 0 4px 10px color-mix(in srgb, var(--nm-accent) 24%, transparent);
+}
+
+.el-button--danger,
+.nova-danger-button {
+    border-color: color-mix(in srgb, var(--nova-danger) 45%, var(--nm-border));
+    color: var(--nova-danger);
+}
+
+.el-button--danger:not(.is-disabled),
+.nova-danger-button:not(:disabled) { background: transparent; }
+.el-button--danger:not(.is-disabled):hover,
+.nova-danger-button:not(:disabled):hover {
+    border-color: var(--nova-danger);
+    color: #fff;
+    background: var(--nova-danger);
+}
+
+.el-button.is-text,
+.el-button.is-link,
+.nova-ghost-button {
+    border-color: transparent;
+    color: var(--nm-text-secondary);
+    background: transparent;
+    box-shadow: none;
+}
+
+.el-button.is-text:not(.is-disabled):hover,
+.el-button.is-link:not(.is-disabled):hover,
+.nova-ghost-button:not(:disabled):hover {
+    color: var(--nm-accent);
+    background: var(--nm-hover);
+}
+
+.el-button:active:not(.is-disabled) { transform: scale(.98); }
+.el-button:focus-visible,
+.nova-primary-button:focus-visible,
+.nova-secondary-button:focus-visible,
+.nova-ghost-button:focus-visible,
+.nova-icon-button:focus-visible { outline: none; box-shadow: var(--nova-button-focus-ring); }
+.el-button.is-disabled, .el-button:disabled { opacity: var(--nova-button-disabled-opacity); }
+
 .el-input__wrapper, .el-textarea__inner { border-radius: 10px; box-shadow: 0 0 0 1px var(--light-border) inset !important; }
 .el-dialog { border-radius: 16px; overflow: hidden; }
 .el-popper { border-radius: 12px !important; }
@@ -359,6 +436,21 @@ button:not(:disabled),
     background: var(--el-color-primary);
     box-shadow: 0 1px 2px color-mix(in srgb, var(--el-color-primary) 28%, transparent);
     cursor: pointer;
+    font-weight: 600;
+}
+
+.nova-danger-button { border-radius: var(--nova-button-radius); }
+
+.nova-ghost-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--nova-button-height);
+    padding: 0 10px;
+    border: 1px solid transparent;
+    border-radius: var(--nova-button-radius);
+    cursor: pointer;
+    font-size: 13px;
     font-weight: 600;
 }
 
@@ -398,16 +490,31 @@ button:not(:disabled),
     transform: scale(.96);
 }
 
-.nova-primary-button:focus-visible,
-.nova-icon-button:focus-visible,
-.nova-secondary-button:focus-visible {
-    outline: none;
-    box-shadow: var(--nova-button-focus-ring);
+.nova-toolbar-button {
+    border-radius: 8px;
+    color: var(--nm-text-secondary);
 }
+
+.nova-toolbar-button:hover:not(:disabled) {
+    color: var(--nm-text-primary);
+    background: var(--nm-hover);
+}
+
+.nova-toolbar-button.nova-danger-button:hover:not(:disabled) { color: #fff; background: var(--nova-danger); }
+
+.nova-mobile-icon-button {
+    border: 1px solid transparent;
+    border-radius: 8px;
+    color: var(--nm-text-secondary);
+    background: transparent;
+}
+.nova-mobile-icon-button:hover:not(:disabled),
+.nova-mobile-icon-button:active:not(:disabled) { color: var(--nm-accent); background: var(--nm-hover); }
 
 .nova-primary-button:disabled,
 .nova-icon-button:disabled,
-.nova-secondary-button:disabled {
+.nova-secondary-button:disabled,
+.nova-ghost-button:disabled {
     cursor: not-allowed;
     opacity: var(--nova-button-disabled-opacity);
 }
@@ -436,6 +543,22 @@ button:not(:disabled),
     background: var(--nova-button-active);
     transform: scale(.98);
 }
+
+/* Navigation and segmented controls remain in their existing layout slots;
+   only their interactive treatment is normalised. */
+.nova-navigation-button,
+.nova-segmented-button {
+    border: 1px solid transparent;
+    border-radius: var(--nova-button-radius);
+    color: var(--nm-text-secondary);
+    background: transparent;
+    cursor: pointer;
+    font: inherit;
+}
+.nova-navigation-button:hover:not(:disabled),
+.nova-segmented-button:hover:not(:disabled) { color: var(--nm-text-primary); background: var(--nm-hover); }
+.nova-navigation-button.is-active,
+.nova-segmented-button.is-active { color: var(--nm-accent); background: var(--nm-accent-subtle); }
 
 html.dark .nova-icon-button .iconify:not(.nova-star-icon) {
     color: var(--el-text-color-regular) !important;

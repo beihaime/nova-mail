@@ -702,12 +702,14 @@ function close() {
 }
 .cc-toggle {
   padding: 2px 5px;
+  border-radius: 5px;
   color: var(--el-text-color-secondary);
+  background: transparent;
   font: inherit;
   font-size: 12px;
   cursor: pointer;
 }
-.cc-toggle:hover { color: var(--el-color-primary); }
+.cc-toggle:hover { color: var(--el-color-primary); background: var(--nova-hover); }
 </style>
 <style scoped lang="scss">
 .send {

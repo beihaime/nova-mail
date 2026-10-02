@@ -25,7 +25,7 @@
              width instead of splitting it with an action group. -->
         <div class="mobile-filter-actions">
           <button
-              class="mobile-tool-button mobile-sort"
+              class="mobile-tool-button nova-mobile-icon-button mobile-sort"
               :aria-label="t('sortByTime')"
               @click="mobileSortClick"
           >
@@ -33,7 +33,7 @@
           </button>
 
           <button
-              class="mobile-tool-button"
+              class="mobile-tool-button nova-mobile-icon-button"
               :aria-label="mobileSelecting ? t('cancel') : t('multiSelect')"
               @click="toggleMobileSelection"
           >
@@ -51,6 +51,7 @@
           <button
               v-for="filter in mobileFilters"
               :key="filter.key"
+              class="nova-segmented-button"
               :class="{ active: mobileFilter === filter.key }"
               @click="selectMobileFilter(filter.key)"
           >

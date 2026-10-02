@@ -28,11 +28,41 @@ const PRESETS = {
     'soft-light': {
       accent: '#5B7CFA', background: '#F7F6F3', foreground: '#292724', surface: '#FFFEFB', border: '#E7E3DB',
     },
+    'warm-paper': {
+      accent: '#A85D36', background: '#F6F1E8', foreground: '#302923', surface: '#FFFDF8', border: '#E7DCCB',
+    },
+    'quiet-stone': {
+      accent: '#64748B', background: '#F5F5F4', foreground: '#292524', surface: '#FFFFFF', border: '#E7E5E4',
+    },
+    'blue-mist': {
+      accent: '#3B82C4', background: '#F2F7FA', foreground: '#1F2A37', surface: '#FEFEFF', border: '#D7E3EA',
+    },
+    'pine-light': {
+      accent: '#2F7D68', background: '#F2F6F3', foreground: '#1E302B', surface: '#FCFEFC', border: '#D9E6DE',
+    },
   },
   dark: {
     'nova-default': DEFAULT_PALETTES.dark,
     midnight: {
       accent: '#6EA8FE', background: '#111827', foreground: '#E5EDF9', surface: '#172033', border: '#334155',
+    },
+    'oled-night': {
+      accent: '#60A5FA', background: '#000000', foreground: '#EEF2F7', surface: '#101114', border: '#2D3035',
+    },
+    graphite: {
+      accent: '#A6B4C8', background: '#202124', foreground: '#ECEDEF', surface: '#292A2E', border: '#44464C',
+    },
+    'blue-mist': {
+      accent: '#78A9FF', background: '#14202B', foreground: '#E6EFFA', surface: '#1C2A38', border: '#35485B',
+    },
+    forest: {
+      accent: '#69B99D', background: '#14211D', foreground: '#E5F1EB', surface: '#1B2C26', border: '#385248',
+    },
+    'solar-dusk': {
+      accent: '#D6A85E', background: '#1B2027', foreground: '#E8E2D6', surface: '#252B34', border: '#414B58',
+    },
+    'northern-sky': {
+      accent: '#88C0D0', background: '#202A38', foreground: '#E5ECF5', surface: '#2A3647', border: '#4A5B70',
     },
   },
 }
@@ -146,6 +176,12 @@ export function applyPaletteTokens(root, palette, mode) {
   const accentActive = blendHex(colors.accent, isDark ? white : black, isDark ? .20 : .27)
   const accentSubtle = blendHex(colors.background, colors.accent, isDark ? .22 : .10)
   const hover = blendHex(surface, colors.accent, isDark ? .08 : .045)
+  // Status colours are semantic rather than preset inputs: they retain clear
+  // meaning across a user-selected palette while adapting luminance for each
+  // appearance mode.
+  const danger = isDark ? '#FF7B72' : '#C73C3C'
+  const warning = isDark ? '#E3B341' : '#A86E00'
+  const success = isDark ? '#56D364' : '#20824D'
 
   const tokens = {
     // Semantic foundation. New code should consume these; legacy aliases below
@@ -195,6 +231,9 @@ export function applyPaletteTokens(root, palette, mode) {
     '--nova-button-hover': hover,
     '--nova-button-active': accentSubtle,
     '--nova-button-focus-ring': `0 0 0 2px ${blendHex(colors.background, colors.accent, isDark ? .52 : .42)}`,
+    '--nova-danger': danger,
+    '--nova-warning': warning,
+    '--nova-success': success,
     '--el-bg-color': colors.surface,
     '--el-bg-color-page': colors.background,
     '--el-fill-color': surfaceMuted,

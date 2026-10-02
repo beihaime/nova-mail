@@ -10,6 +10,7 @@ import {
   paletteForPreset,
   parseThemeImport,
   resolvePaletteMode,
+  availablePresets,
 } from '../src/utils/theme-palette.js'
 
 describe('theme palettes', () => {
@@ -47,6 +48,7 @@ describe('theme palettes', () => {
     expect(values['--nm-selected']).not.toBe(values['--nm-accent'])
     expect(values['--aside-menu-active-background']).toBe(values['--nm-selected'])
     expect(values['--nova-button-active']).toBe(values['--nm-accent-subtle'])
+    expect(values['--nova-danger']).toBe('#C73C3C')
   })
 
   it('builds the same semantic hierarchy for the default Dark palette', () => {
@@ -57,6 +59,7 @@ describe('theme palettes', () => {
     expect(values['--el-bg-color']).toBe('#17191D')
     expect(values['--nm-surface']).not.toBe(values['--nm-bg'])
     expect(values['--nm-selected']).not.toBe(values['--nm-accent'])
+    expect(values['--nova-danger']).toBe('#FF7B72')
   })
 
   it('derives interaction tokens from a custom palette without reusing its raw accent', () => {
@@ -83,6 +86,41 @@ describe('theme palettes', () => {
   it('resets each palette to the Nova default preset', () => {
     expect(paletteForPreset('light', 'nova-default')).toEqual(DEFAULT_PALETTES.light)
     expect(paletteForPreset('dark', 'nova-default')).toEqual(DEFAULT_PALETTES.dark)
+  })
+
+  it('provides the expanded preset collection without weakening palette validation', () => {
+    expect(availablePresets('light')).toEqual(expect.arrayContaining([
+      'nova-default', 'soft-light', 'warm-paper', 'quiet-stone', 'blue-mist', 'pine-light',
+    ]))
+    expect(availablePresets('dark')).toEqual(expect.arrayContaining([
+      'nova-default', 'midnight', 'oled-night', 'graphite', 'blue-mist', 'forest', 'solar-dusk', 'northern-sky',
+    ]))
+    expect(paletteForPreset('dark', 'forest')).toEqual(expect.objectContaining({ accent: '#69B99D' }))
+
+    for (const mode of ['light', 'dark']) {
+      for (const preset of availablePresets(mode)) {
+        const palette = paletteForPreset(mode, preset)
+        expect(normalizePalette(palette, DEFAULT_PALETTES[mode])).toEqual(palette)
+        expect(findMatchingPreset(mode, palette)).toBe(preset)
+
+        const values = {}
+        applyPaletteTokens({ style: { setProperty: (key, value) => { values[key] = value } } }, palette, mode)
+        expect(values).toEqual(expect.objectContaining({
+          '--nm-bg': palette.background,
+          '--nm-surface-elevated': palette.surface,
+          '--nm-text-primary': palette.foreground,
+          '--nm-text-secondary': expect.any(String),
+          '--nm-text-muted': expect.any(String),
+          '--nm-border': palette.border,
+          '--nm-accent': palette.accent,
+          '--nm-accent-subtle': expect.any(String),
+          '--nm-hover': expect.any(String),
+          '--nm-selected': expect.any(String),
+          '--nova-button-focus-ring': expect.any(String),
+          '--nova-danger': expect.any(String),
+        }))
+      }
+    }
   })
 
   it('resolves System mode without mutating either palette', () => {
