@@ -6,7 +6,14 @@
       <div class="pc-star" v-if="showStar">
         <Icon style="color: var(--el-border-color)" icon="solar:star-line-duotone" width="18" height="18"/>
       </div>
-      <div v-if="!showStar"></div>
+      <div v-if="!showStar" class="pc-star-placeholder"></div>
+      <div class="desktop-avatar-skeleton" aria-hidden="true">
+        <el-skeleton animated>
+          <template #template>
+            <el-skeleton-item variant="circle" />
+          </template>
+        </el-skeleton>
+      </div>
       <div class="title" :class="accountShow ? 'title-column' : 'title-column'">
 
         <div class="email-sender">
@@ -115,6 +122,27 @@ import {Icon} from "@iconify/vue";
   width: 40px;
 }
 
+.desktop-avatar-skeleton {
+  display: grid;
+  place-items: center;
+  width: var(--mail-list-avatar-column);
+  height: var(--mail-list-avatar-column);
+}
+
+.desktop-avatar-skeleton :deep(.el-skeleton__item) {
+  width: var(--mail-list-avatar-column);
+  height: var(--mail-list-avatar-column);
+  top: 0;
+}
+
+@media (min-width: 768px) {
+  .pc-star {
+    display: flex;
+    width: var(--nova-icon-button-size);
+    justify-content: center;
+  }
+}
+
 :deep(.el-skeleton__item) {
   position: relative;
   top: 2px;
@@ -123,27 +151,32 @@ import {Icon} from "@iconify/vue";
 /* Phone inbox rows are 72px with a 14px preview line, so tighten the skeleton
    to the same rhythm. Desktop/tablet keep their original placeholder sizes. */
 @media (max-width: 767px) {
-  :deep(.el-skeleton__item) {
-    top: 1px;
+  .desktop-avatar-skeleton,
+  .pc-star-placeholder {
+    display: none;
   }
-  .phone-time-skeleton {
-    width: 46px;
-    height: .875rem;
-  }
-}
 
-@media (max-width: 1366px) {
   .pc-star {
     display: none;
   }
+
   .phone-star {
     display: block;
     align-self: end;
     padding-right: 16px;
     padding-top: 8px;
   }
+
   .star-pd {
     padding-top: 6px !important;
+  }
+
+  :deep(.el-skeleton__item) {
+    top: 1px;
+  }
+  .phone-time-skeleton {
+    width: 46px;
+    height: .875rem;
   }
 }
 

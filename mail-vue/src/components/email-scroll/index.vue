@@ -183,24 +183,15 @@
                    @pointerleave="onRowPointerLeave"
                    @pointercancel="onRowPointerCancel"
               >
-              <div
-                  class="row-avatar"
-                  :class="{ 'is-selected': item.checked }"
-                  role="button"
-                  tabindex="0"
+              <el-checkbox
+                  v-if="!isPhone"
+                  class="mail-check-column desktop-row-checkbox"
+                  :model-value="item.checked"
+                  :disabled="!item.checked && isSelectMax"
                   :aria-label="item.checked ? t('cancel') : t('multiSelect')"
-                  :aria-pressed="item.checked"
-                  @click.stop="toggleRowSelection(item)"
-                  @keydown.enter.stop.prevent="toggleRowSelection(item)"
-                  @keydown.space.stop.prevent="toggleRowSelection(item)"
-              >
-                <Transition name="avatar-selection" mode="out-in">
-                  <div v-if="item.checked" key="selected" class="selection-indicator" aria-hidden="true">
-                    <Icon icon="mdi:check" width="22" height="22" />
-                  </div>
-                <SenderAvatar v-else key="avatar" :email="item" :size="isPhone ? 46 : 28" />
-                </Transition>
-              </div>
+                  @click.stop
+                  @change="toggleRowSelection(item)"
+              />
               <el-tooltip v-if="showStar" effect="dark" :content="item.isStar ? t('unstar') : t('star')" :show-after="2000">
                 <button
                     class="nova-icon-button pc-star"
@@ -216,7 +207,29 @@
                   />
                 </button>
               </el-tooltip>
-              <div v-if="!showStar"></div>
+              <div v-if="!showStar" class="pc-star-placeholder"></div>
+              <div
+                  v-if="isPhone"
+                  class="row-avatar"
+                  :class="{ 'is-selected': item.checked }"
+                  role="button"
+                  tabindex="0"
+                  :aria-label="item.checked ? t('cancel') : t('multiSelect')"
+                  :aria-pressed="item.checked"
+                  @click.stop="toggleRowSelection(item)"
+                  @keydown.enter.stop.prevent="toggleRowSelection(item)"
+                  @keydown.space.stop.prevent="toggleRowSelection(item)"
+              >
+                <Transition name="avatar-selection" mode="out-in">
+                  <div v-if="item.checked" key="selected" class="selection-indicator" aria-hidden="true">
+                    <Icon icon="mdi:check" width="22" height="22" />
+                  </div>
+                  <SenderAvatar v-else key="avatar" :email="item" :size="46" />
+                </Transition>
+              </div>
+              <div v-else class="row-avatar" aria-hidden="true">
+                <SenderAvatar :email="item" :size="settingStore.mailListDensity === 'compact' ? 26 : 28" />
+              </div>
               <div class="title" :class="accountShow ? 'title-column' : 'title-column'">
 
                 <div class="email-sender" :style=" (showStatus ? 'gap: 10px;' : '') + ((item.unread === EmailUnreadEnum.UNREAD && showUnread)  ? 'font-weight: bold' : '')">
@@ -2420,8 +2433,8 @@ ul {
   margin: 0;
 }
 
-/* Compact desktop mail rows: keep the list dense and columns stable while
-   preserving the existing virtual-list item height (48px). */
+/* Desktop rows and the selection header share the exact checkbox column.
+   Density only changes vertical geometry and the image inside the avatar slot. */
 @media (min-width: 768px) {
   .header-actions {
     grid-template-columns: var(--mail-list-selection-column) minmax(0, 1fr) auto;
@@ -2432,20 +2445,51 @@ ul {
 
   :deep(.email-row:not(.all-email)) {
     display: grid;
-    grid-template-columns: var(--mail-list-avatar-column) var(--nova-icon-button-size) minmax(0, 1fr) 82px;
+    grid-template-columns: var(--mail-list-selection-column) var(--nova-icon-button-size) var(--mail-list-avatar-column) minmax(0, 1fr) 82px;
     align-items: center;
     gap: var(--mail-list-column-gap);
     height: var(--mail-row-height-desktop);
     min-height: var(--mail-row-height-desktop);
     padding: 4px var(--mail-list-horizontal-padding);
+    box-sizing: border-box;
   }
 
-  :deep(.email-row:not(.all-email) .pc-star) {
+  :deep(.email-row:not(.all-email) > .desktop-row-checkbox) {
+    grid-column: 1;
+  }
+
+  :deep(.email-row > .pc-star),
+  :deep(.email-row > .pc-star-placeholder) {
+    display: flex;
+    flex: 0 0 var(--nova-icon-button-size);
     width: var(--nova-icon-button-size);
     justify-content: center;
   }
 
+  :deep(.email-row:not(.all-email) > .pc-star),
+  :deep(.email-row:not(.all-email) > .pc-star-placeholder) {
+    grid-column: 2;
+  }
+
+  :deep(.email-row:not(.all-email) > .row-avatar),
+  :deep(.email-row:not(.all-email) > .desktop-avatar-skeleton) {
+    grid-column: 3;
+  }
+
+  :deep(.email-row > .row-avatar) {
+    pointer-events: none;
+    cursor: inherit;
+  }
+
+  /* The narrow-layout inline meta/action must not duplicate the desktop
+     Star and Time columns between the mobile and wide-screen breakpoints. */
+  :deep(.email-row:not(.all-email) .phone-star),
+  :deep(.email-row:not(.all-email) .phone-time) {
+    display: none;
+  }
+
   :deep(.email-row:not(.all-email) .title) {
+    grid-column: 4;
     display: grid;
     grid-template-columns: minmax(130px, 30%) minmax(0, 1fr) !important;
     align-items: center;
@@ -2463,7 +2507,7 @@ ul {
     overflow: hidden;
 
     display: grid;
-    grid-template-columns: minmax(0, 45%) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 55%) minmax(0, 1fr);
     align-items: center;
   }
 
@@ -2493,8 +2537,12 @@ ul {
     padding-left: 6px;
   }
 
-  :deep(.email-row:not(.all-email) .email-right) {
+  :deep(.email-row:not(.all-email) > .email-right),
+  :deep(.email-row:not(.all-email) > .email-right-skeleton) {
+    grid-column: 5;
     display: block;
+    min-width: 0;
+    overflow: hidden;
     padding-left: 0;
     text-align: right;
   }
@@ -2509,6 +2557,11 @@ ul {
 
   :deep(.email-row:not(.all-email) .user-info) {
     display: none;
+  }
+
+  :deep(.email-row[data-checked="true"]),
+  :deep(.email-row[data-checked="true"]:hover) {
+    background: var(--nova-selected);
   }
 }
 
@@ -2555,9 +2608,9 @@ ul {
     overflow: hidden;
   }
 
-  /* The desktop star column is hidden on touch layouts; the inline star in
-     the sender header remains available when starring is enabled. */
-  :deep(.email-row:not(.all-email) > :nth-child(2)) {
+  /* Desktop-only controls do not consume a mobile grid track. */
+  :deep(.email-row > .desktop-row-checkbox),
+  :deep(.email-row > .pc-star-placeholder) {
     display: none;
   }
 
