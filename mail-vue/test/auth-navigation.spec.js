@@ -17,6 +17,12 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/router', () => ({ default: { replace: mocks.replace, push: mocks.navigate } }))
 vi.mock('@/store/setting.js', () => ({ useSettingStore: () => ({ lang: 'en' }) }))
 vi.mock('@/i18n/index.js', () => ({ default: { global: { t: (key) => key } } }))
+// The 401 handler clears the session through `clearAuthenticatedSession`, which
+// in turn resets every Pinia store. Isolate that dependency so the interceptor
+// test only exercises the token clearing, not the store wiring.
+vi.mock('@/utils/session-state.js', () => ({
+  clearAuthenticatedSession: () => { localStorage.removeItem('token') },
+}))
 
 const { default: http } = await import('@/axios/index.js')
 

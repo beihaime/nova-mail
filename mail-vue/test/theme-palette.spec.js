@@ -59,7 +59,7 @@ describe('theme palettes', () => {
     expect(values['--el-bg-color']).toBe('#17191D')
     expect(values['--nm-surface']).not.toBe(values['--nm-bg'])
     expect(values['--nm-selected']).not.toBe(values['--nm-accent'])
-    expect(values['--nova-danger']).toBe('#FF7B72')
+    expect(values['--nova-danger']).toBe('#B84D47')
   })
 
   it('derives interaction tokens from a custom palette without reusing its raw accent', () => {

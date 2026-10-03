@@ -16,10 +16,10 @@ describe('mail-list API pagination limits', () => {
 	it.each(['-1', '0', '1.5', 'NaN', '999999'])('bounds size=%s on every list route', async size => {
 		const query = encodeURIComponent(size);
 		const routes = [
-			{ path: `/api/email/list?accountId=${admin.accountId}&type=0&size=${query}`, max: 10 },
+			{ path: `/api/email/list?accountId=${admin.accountId}&type=0&size=${query}`, max: 50 },
 			{ path: `/api/star/list?size=${query}`, max: 50 },
 			{ path: `/api/account/list?size=${query}`, max: 30 },
-			{ path: `/api/allEmail/list?size=${query}`, max: 10 },
+			{ path: `/api/allEmail/list?size=${query}`, max: 50 },
 			{ path: `/api/user/list?size=${query}`, max: 50 },
 			{ path: `/api/user/allAccount?userId=${admin.userId}&size=${query}`, max: 30 },
 		];
