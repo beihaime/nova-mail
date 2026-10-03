@@ -1,12 +1,13 @@
 import r2Service from '../service/r2-service';
 import orm from '../entity/orm';
 import { att } from '../entity/att';
-import { and, eq, or } from 'drizzle-orm';
+import { and, eq, or, sql } from 'drizzle-orm';
 import app from '../hono/hono';
 import account from '../entity/account';
 import { isDel } from '../const/entity-const';
 import constant from '../const/constant';
 import { email } from '../entity/email';
+import emailUtils from '../utils/email-utils';
 
 /**
  * Attachment reading.
@@ -127,7 +128,7 @@ function attachmentResponse(attachment, obj) {
 function ownerCondition(c, user) {
 	return or(
 		and(eq(att.userId, user.userId), eq(email.userId, user.userId), eq(account.userId, user.userId)),
-		eq(user.email, c.env.admin)
+		sql`${user.email} COLLATE NOCASE = ${emailUtils.normalizeEmail(c.env.admin)}`
 	);
 }
 

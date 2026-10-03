@@ -7,6 +7,7 @@ import userService from '../service/user-service';
 import permService from '../service/perm-service';
 import { t } from '../i18n/i18n'
 import app from '../hono/hono';
+import emailUtils from '../utils/email-utils';
 
 const publicRoutes = new Set([
 	'POST /login',
@@ -154,7 +155,7 @@ app.use('*', async (c, next) => {
 			return path.startsWith(item);
 		});
 
-		if (userPermIndex === -1 && authInfo.user.email !== c.env.admin) {
+		if (userPermIndex === -1 && !emailUtils.sameEmail(authInfo.user.email, c.env.admin)) {
 			throw new BizError(t('unauthorized'), 403);
 		}
 

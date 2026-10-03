@@ -69,6 +69,8 @@ export async function email(message, env, ctx) {
 		const content = new TextDecoder().decode(raw);
 
 		const email = await PostalMime.parse(content);
+		const envelopeTo = emailUtils.normalizeEmail(message.to);
+		const normalizedFrom = emailUtils.normalizeEmail(email.from?.address);
 		assertAttachmentLimits(email.attachments || []);
 
 		// Which body the reader has to render: html / markdown / plain. The
@@ -84,11 +86,11 @@ export async function email(message, env, ctx) {
 			return;
 		}
 
-		let account = await accountService.selectByEmailIncludeDel({ env: env }, message.to);
+		let account = await accountService.selectByEmailIncludeDel({ env: env }, envelopeTo);
 
 		if (!account) {
-			const baseEmail = emailUtils.getBaseEmail(message.to);
-			if (baseEmail && baseEmail !== message.to) {
+			const baseEmail = emailUtils.getBaseEmail(envelopeTo);
+			if (baseEmail && baseEmail !== envelopeTo) {
 				account = await accountService.selectByEmailIncludeDel({ env: env }, baseEmail);
 			}
 		}
@@ -104,11 +106,11 @@ export async function email(message, env, ctx) {
 			 userRow = await userService.selectByIdIncludeDel({ env: env }, account.userId);
 		}
 
-		if (account && userRow.email !== env.admin) {
+		if (account && !emailUtils.sameEmail(userRow.email, env.admin)) {
 
 			let { banEmail, availDomain } = await roleService.selectByUserId({ env: env }, account.userId);
 
-			if (!roleService.hasAvailDomainPerm(availDomain, message.to)) {
+			if (!roleService.hasAvailDomainPerm(availDomain, envelopeTo)) {
 				message.setReject('The recipient is not authorized to use this domain.');
 				return;
 			}
@@ -125,13 +127,13 @@ export async function email(message, env, ctx) {
 			email.to = [{ address: message.to, name: emailUtils.getName(message.to)}]
 		}
 
-		const toName = email.to.find(item => item.address === message.to)?.name || '';
+		const toName = email.to.find(item => emailUtils.sameEmail(item.address, message.to))?.name || '';
 		const code = await aiService.extractCode({ env }, bodyView, { aiCode, aiCodeFilter });
 
 		const params = {
-			toEmail: message.to,
+			toEmail: envelopeTo,
 			toName: toName,
-			sendEmail: email.from.address,
+			sendEmail: normalizedFrom,
 			name: email.from.name || emailUtils.getName(email.from.address),
 			subject: email.subject,
 			code,
@@ -211,9 +213,9 @@ export async function email(message, env, ctx) {
 
 		if (ruleType === settingConst.ruleType.RULE) {
 
-			const emails = ruleEmail.split(',');
+			const emails = ruleEmail.split(',').map(emailUtils.normalizeEmail);
 
-			if (!emails.includes(message.to)) {
+			if (!emails.includes(envelopeTo)) {
 				return;
 			}
 
@@ -288,7 +290,9 @@ function checkBlock(blackSubjectStr, blackContentStr, blackFromStr, email) {
 	}
 
 	for (const blackFrom of blackFromList) {
-		if (email.from.address === blackFrom || emailUtils.getDomain(email.from.address) === blackFrom) {
+		const normalizedFrom = emailUtils.normalizeEmail(email.from?.address);
+		const normalizedBlackFrom = emailUtils.normalizeEmail(blackFrom);
+		if (emailUtils.sameEmail(normalizedFrom, normalizedBlackFrom) || emailUtils.getDomain(normalizedFrom) === normalizedBlackFrom) {
 			return true
 		}
 	}

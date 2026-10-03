@@ -560,7 +560,9 @@ async function lookupLocalBatch(c, addresses, rawAddresses) {
 	for (const address of addresses) map.set(address, '');
 	if (!addresses.length) return map;
 
-	const candidates = [...new Set([...addresses, ...rawAddresses].map(value => String(value || '').trim()).filter(Boolean))];
+	const candidates = [...new Set([...addresses, ...rawAddresses]
+		.map(value => normalizeEmail(value))
+		.filter(Boolean))];
 	try {
 		const rows = await localAvatarSelect(c)
 			.where(and(inArray(account.email, candidates), eq(account.isDel, 0)))

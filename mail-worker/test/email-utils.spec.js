@@ -1,6 +1,18 @@
 import { describe, it, expect } from 'vitest';
 import emailUtils from '../src/utils/email-utils.js';
 
+describe('emailUtils identity normalization', () => {
+	it('trims and lowercases mailbox identities', () => {
+		expect(emailUtils.normalizeEmail('  Dev@BeiHaiMe.COM ')).toBe('dev@beihaime.com');
+		expect(emailUtils.sameEmail('DEv@beihaime.com', ' dev@beihaime.com ')).toBe(true);
+	});
+
+	it('uses normalized addresses for domain and plus-alias parsing', () => {
+		expect(emailUtils.getDomain(' Dev+Tag@BeiHaiMe.COM ')).toBe('beihaime.com');
+		expect(emailUtils.getBaseEmail(' Dev+Tag@BeiHaiMe.COM ')).toBe('dev@beihaime.com');
+	});
+});
+
 describe('emailUtils.htmlToText', () => {
 	it('drops a full HTML document down to its text', () => {
 		const html = '<!DOCTYPE html><html><head><title>Subject</title><style>.a{color:red}</style></head>'

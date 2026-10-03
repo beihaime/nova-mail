@@ -5,6 +5,10 @@ const CONTROL = /[\u0000-\u001F\u007F-\u009F]/u;
 const MIME_TOKEN = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+\/[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
 const SAFE_INLINE_MIME = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
 
+function normalizeEmailAddress(value) {
+	return value.trim().toLowerCase();
+}
+
 function fail(message) { throw new BizError(message); }
 
 function requireSafeHeader(value, field, { optional = false } = {}) {
@@ -39,7 +43,7 @@ export function normalizeRecipientLists({ receiveEmail, cc = [], bcc = [] } = {}
 		const key = address.toLowerCase();
 		if (!seen.has(key)) {
 			seen.add(key);
-			result.push(address);
+			result.push(normalizeEmailAddress(address));
 		}
 		return result;
 	}, []);

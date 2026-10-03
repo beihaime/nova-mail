@@ -169,7 +169,7 @@ const roleService = {
 	},
 
 	async setDefault(c, params, userId) {
-		if (userContext.getUser(c).email !== c.env.admin) {
+		if (!emailUtils.sameEmail(userContext.getUser(c).email, c.env.admin)) {
 			throw new BizError(t('unauthorized'), 403);
 		}
 		const roleRow = await orm(c).select().from(role).where(eq(role.roleId, params.roleId)).get();
@@ -225,7 +225,7 @@ const roleService = {
 			throw new BizError(t('unauthorized'), 403);
 		}
 
-		if (userContext.getUser(c).email === c.env.admin) {
+		if (emailUtils.sameEmail(userContext.getUser(c).email, c.env.admin)) {
 			return permissions;
 		}
 

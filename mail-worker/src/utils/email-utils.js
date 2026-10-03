@@ -53,9 +53,18 @@ function nodeText(node) {
 
 const emailUtils = {
 
+	/** Canonical identity form used for routing, comparisons and storage. */
+	normalizeEmail(email) {
+		return typeof email === 'string' ? email.trim().toLowerCase() : '';
+	},
+
+	sameEmail(left, right) {
+		return this.normalizeEmail(left) === this.normalizeEmail(right);
+	},
+
 	getDomain(email) {
 		if (typeof email !== 'string') return '';
-		const parts = email.split('@');
+		const parts = this.normalizeEmail(email).split('@');
 		return parts.length === 2 ? parts[1] : '';
 	},
 
@@ -66,7 +75,7 @@ const emailUtils = {
 	},
 
 	getBaseEmail(email) {
-		const parts = email.split('@');
+		const parts = this.normalizeEmail(email).split('@');
 		if (parts.length !== 2) return '';
 		const localPart = parts[0].split('+')[0];
 		return localPart + '@' + parts[1];

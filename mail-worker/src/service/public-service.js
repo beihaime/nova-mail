@@ -16,7 +16,7 @@ import userContext from '../security/user-context';
 
 const publicService = {
 	assertAdmin(c) {
-		if (userContext.getUser(c).email !== c.env.admin) {
+		if (!emailUtils.sameEmail(userContext.getUser(c).email, c.env.admin)) {
 			throw new BizError(t('notAdmin'), 403);
 		}
 	},
@@ -182,7 +182,7 @@ const publicService = {
 
 		userList.push(
 			c.env.db.prepare(
-				`UPDATE account SET user_id = (SELECT user_id FROM user WHERE user.email = account.email) WHERE user_id = 0`
+				`UPDATE account SET user_id = (SELECT user_id FROM user WHERE lower(trim(user.email)) = lower(trim(account.email))) WHERE user_id = 0`
 			)
 		);
 

@@ -32,7 +32,8 @@ const loginService = {
 			await rateLimitUtils.register(c);
 		}
 
-		const { email, password, token, code } = params;
+		let { email, password, token, code } = params;
+		email = emailUtils.normalizeEmail(email);
 
 		let { regKey, register, registerVerify, regVerifyCount, minEmailPrefix, emailPrefixFilter } = await settingService.query(c);
 
@@ -222,7 +223,8 @@ const loginService = {
 
 	async login(c, params, noVerifyPwd = false) {
 
-		const { email, password, token } = params;
+		let { email, password, token } = params;
+		email = emailUtils.normalizeEmail(email);
 
 		if ((!email || !password) && !noVerifyPwd) {
 			throw new BizError(t('emailAndPwdEmpty'));
@@ -287,7 +289,7 @@ const loginService = {
 
 		let authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userRow.userId, { type: 'json' });
 
-		if (authInfo && (authInfo.user.email === userRow.email)) {
+		if (authInfo && emailUtils.sameEmail(authInfo.user.email, userRow.email)) {
 
 			if (authInfo.tokens.length > 10) {
 				authInfo.tokens.shift();

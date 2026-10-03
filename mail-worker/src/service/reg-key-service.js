@@ -6,6 +6,7 @@ import BizError from '../error/biz-error';
 import { formatDetailDate, toUtc } from '../utils/date-uitil';
 import userService from './user-service';
 import { t } from '../i18n/i18n.js';
+import emailUtils from '../utils/email-utils';
 
 const regKeyService = {
 
@@ -93,6 +94,7 @@ const regKeyService = {
 	 * failure rolls the batch back, restoring the key count as well.
 	 */
 	async redeemAndCreateUser(c, { code, email, password, salt }) {
+		email = emailUtils.normalizeEmail(email);
 		const today = formatDetailDate(toUtc().tz('Asia/Shanghai').startOf('day'));
 		const results = await c.env.db.batch([
 			c.env.db.prepare(`

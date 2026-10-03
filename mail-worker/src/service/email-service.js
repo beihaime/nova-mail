@@ -628,6 +628,11 @@ const emailService = {
 	 * just without a conversation key — so nothing is rejected or lost.
 	 */
 	async receive(c, params, cidAttList, r2domain) {
+		params = {
+			...params,
+			sendEmail: emailUtils.normalizeEmail(params.sendEmail),
+			toEmail: emailUtils.normalizeEmail(params.toEmail),
+		};
 		let thread = { threadId: '', parentMessageId: 0 };
 		let supportsThreads = true;
 
@@ -672,6 +677,9 @@ const emailService = {
 			subject, //邮件标题
 			attachments = [] //附件
 		} = params;
+		receiveEmail = receiveEmail.map(emailUtils.normalizeEmail);
+		cc = cc.map(emailUtils.normalizeEmail);
+		bcc = bcc.map(emailUtils.normalizeEmail);
 
 		const { resendTokens, r2Domain, send, domainList } = await settingService.query(c);
 		const allRecipients = [...receiveEmail, ...cc, ...bcc];
@@ -690,7 +698,7 @@ const emailService = {
 			return domainList.includes(domain);
 		});
 
-		if (c.env.admin !== userRow.email) {
+		if (!emailUtils.sameEmail(c.env.admin, userRow.email)) {
 
 			//发件被禁用
 			if (roleRow.sendType === 'ban') {
@@ -705,7 +713,7 @@ const emailService = {
 		}
 
 		//如果不是管理员，权限设置了发送次数
-		if (c.env.admin !== userRow.email && roleRow.sendCount) {
+		if (!emailUtils.sameEmail(c.env.admin, userRow.email) && roleRow.sendCount) {
 
 			if (userRow.sendCount >= roleRow.sendCount) {
 				if (roleRow.sendType === 'day') throw new BizError(t('daySendLimit'), 403);
@@ -729,7 +737,7 @@ const emailService = {
 			throw new BizError(t('sendEmailNotCurUser'));
 		}
 
-		if (c.env.admin !== userRow.email) {
+		if (!emailUtils.sameEmail(c.env.admin, userRow.email)) {
 			//用户没有这个域名的使用权限
 			if(!roleService.hasAvailDomainPerm(roleRow.availDomain, accountRow.email)) {
 				throw new BizError(t('noDomainPermSend'),403)
@@ -1120,14 +1128,14 @@ const emailService = {
 
 		// 对于含+未精确匹配的收件人，获取基础地址账号
 		const plusEmails = receiveEmail.filter(
-			e => e.includes('+') && !accountList.some(a => a.email === e)
+			e => e.includes('+') && !accountList.some(a => emailUtils.sameEmail(a.email, e))
 		);
 		const baseAccounts = [];
 		if (plusEmails.length > 0) {
 			const baseEmails = [...new Set(
 				plusEmails.map(e => emailUtils.getBaseEmail(e)).filter(Boolean)
 			)];
-			const existing = new Set(accountList.map(a => a.email));
+			const existing = new Set(accountList.map(a => emailUtils.normalizeEmail(a.email)));
 			const needed = baseEmails.filter(e => !existing.has(e));
 			if (needed.length > 0) {
 				const rows = await orm(c).select().from(account)
@@ -1159,12 +1167,12 @@ const emailService = {
 			emailValues.toName = emailUtils.getName(email);
 			emailValues.emailId = null;
 
-			let accountRow = allAccounts.find(accountRow => accountRow.email === email);
+			let accountRow = allAccounts.find(accountRow => emailUtils.sameEmail(accountRow.email, email));
 
 			// 精确匹配不到时回退到主地址（去掉 +tag）
 			if (!accountRow && email.includes('+')) {
 				const baseEmail = emailUtils.getBaseEmail(email);
-				accountRow = allAccounts.find(accountRow => accountRow.email === baseEmail);
+				accountRow = allAccounts.find(accountRow => emailUtils.sameEmail(accountRow.email, baseEmail));
 			}
 
 			//如果收件人存在就把邮件信息改成收件人的
@@ -1181,7 +1189,7 @@ const emailService = {
 				let { banEmail, availDomain } = roleRow;
 
 				//如果收件人没有这个域名的使用权限和有邮件拦截，就把邮件改为拒收状态
-				if (email !== c.env.admin) {
+				if (!emailUtils.sameEmail(email, c.env.admin)) {
 
 					if (!roleService.hasAvailDomainPerm(availDomain, email)) {
 						emailValues.status = emailConst.status.BOUNCED;

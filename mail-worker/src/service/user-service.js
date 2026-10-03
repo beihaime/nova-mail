@@ -35,7 +35,7 @@ const userService = {
 		const [account, roleRow, permKeys] = await Promise.all([
 			accountService.selectByEmailIncludeDel(c, userRow.email),
 			roleService.selectById(c, userRow.type),
-			userRow.email === c.env.admin ? Promise.resolve(['*']) : permService.userPermKeys(c, userId)
+			emailUtils.sameEmail(userRow.email, c.env.admin) ? Promise.resolve(['*']) : permService.userPermKeys(c, userId)
 		]);
 
 		const user = {};
@@ -48,7 +48,7 @@ const userService = {
 		user.role = roleRow;
 		user.type = userRow.type;
 
-		if (c.env.admin === userRow.email) {
+		if (emailUtils.sameEmail(c.env.admin, userRow.email)) {
 			user.role = constant.ADMIN_ROLE
 			user.type = 0;
 		}
@@ -71,18 +71,22 @@ const userService = {
 	selectByEmail(c, email) {
 		return orm(c).select().from(user).where(
 			and(
-				sql`${user.email} COLLATE NOCASE = ${email}`,
+				sql`${user.email} COLLATE NOCASE = ${emailUtils.normalizeEmail(email)}`,
 				eq(user.isDel, isDel.NORMAL)))
 			.get();
 	},
 
 	async insert(c, params) {
-		const { userId } = await orm(c).insert(user).values({ ...params }).returning().get();
+		const { email, ...values } = params;
+		const { userId } = await orm(c).insert(user).values({
+			...values,
+			email: emailUtils.normalizeEmail(email),
+		}).returning().get();
 		return userId;
 	},
 
 	selectByEmailIncludeDel(c, email) {
-		return orm(c).select().from(user).where(sql`${user.email} COLLATE NOCASE = ${email}`).get();
+		return orm(c).select().from(user).where(sql`${user.email} COLLATE NOCASE = ${emailUtils.normalizeEmail(email)}`).get();
 	},
 
 	selectByIdIncludeDel(c, userId) {
@@ -240,7 +244,7 @@ const userService = {
 				sendAction.hasPerm = false;
 			}
 
-			if (user.email === c.env.admin) {
+			if (emailUtils.sameEmail(user.email, c.env.admin)) {
 				sendAction.sendType = constant.ADMIN_ROLE.sendType;
 				sendAction.sendCount = constant.ADMIN_ROLE.sendCount;
 				sendAction.hasPerm = true;
@@ -345,6 +349,7 @@ const userService = {
 	async add(c, params) {
 
 		let { email, type, password } = params;
+		email = emailUtils.normalizeEmail(email);
 
 		if (!c.env.domain.includes(emailUtils.getDomain(email))) {
 			throw new BizError(t('notEmailDomain'));

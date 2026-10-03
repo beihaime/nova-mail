@@ -34,8 +34,109 @@ const dbInit = {
 		await this.v3_9DB(c);
 		await this.v3_10DB(c);
 		await this.v3_11DB(c);
+		await this.v3_12DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
+	},
+
+	/**
+	 * v3.12 — canonical email identities and case-insensitive mailbox keys.
+	 *
+	 * Older databases may contain `Dev@…` and `dev@…` as separate rows because
+	 * the original unique indexes were case-sensitive. Normalize first, merge
+	 * those rows into the oldest active identity, re-point dependent mail/data,
+	 * then create the NOCASE unique indexes. Every step is repeatable.
+	 */
+	async v3_12DB(c) {
+		const db = c.env.db;
+		for (const statement of [
+			`UPDATE user SET email = lower(trim(email)) WHERE email != lower(trim(email));`,
+			`UPDATE account SET email = lower(trim(email)) WHERE email != lower(trim(email));`,
+			`UPDATE email SET send_email = lower(trim(send_email)) WHERE send_email IS NOT NULL AND send_email != lower(trim(send_email));`,
+			`UPDATE email SET to_email = lower(trim(to_email)) WHERE to_email IS NOT NULL AND to_email != lower(trim(to_email));`,
+		]) {
+			try { await db.prepare(statement).run(); }
+			catch (e) { console.warn(`跳过邮箱地址规范化：${e.message}`); }
+		}
+
+		const duplicateUsers = await db.prepare(`
+			SELECT lower(trim(email)) AS email
+			FROM user
+			WHERE trim(email) != ''
+			GROUP BY lower(trim(email))
+			HAVING COUNT(*) > 1
+		`).all();
+
+		for (const group of duplicateUsers.results || []) {
+			const rows = await db.prepare(`
+				SELECT user_id, is_del FROM user
+				WHERE lower(trim(email)) = ?
+				ORDER BY is_del ASC, user_id ASC
+			`).bind(group.email).all();
+			const [keeper, ...duplicates] = rows.results || [];
+			if (!keeper) continue;
+			for (const duplicate of duplicates) {
+				await db.batch([
+					db.prepare(`UPDATE account SET user_id = ? WHERE user_id = ?`).bind(keeper.user_id, duplicate.user_id),
+					db.prepare(`UPDATE email SET user_id = ? WHERE user_id = ?`).bind(keeper.user_id, duplicate.user_id),
+					db.prepare(`UPDATE star SET user_id = ? WHERE user_id = ?`).bind(keeper.user_id, duplicate.user_id),
+					db.prepare(`UPDATE attachments SET user_id = ? WHERE user_id = ?`).bind(keeper.user_id, duplicate.user_id),
+					db.prepare(`UPDATE push_subscription SET user_id = ? WHERE user_id = ?`).bind(keeper.user_id, duplicate.user_id),
+					db.prepare(`UPDATE oauth_accounts SET user_id = ? WHERE user_id = ?`).bind(keeper.user_id, duplicate.user_id),
+					db.prepare(`UPDATE oauth SET user_id = ? WHERE user_id = ?`).bind(keeper.user_id, duplicate.user_id),
+					db.prepare(`DELETE FROM user WHERE user_id = ?`).bind(duplicate.user_id),
+				]);
+			}
+		}
+
+		const duplicateAccounts = await db.prepare(`
+			SELECT lower(trim(email)) AS email
+			FROM account
+			WHERE trim(email) != ''
+			GROUP BY lower(trim(email))
+			HAVING COUNT(*) > 1
+		`).all();
+
+		for (const group of duplicateAccounts.results || []) {
+			const rows = await db.prepare(`
+				SELECT account_id, user_id, is_del FROM account
+				WHERE lower(trim(email)) = ?
+				ORDER BY is_del ASC, account_id ASC
+			`).bind(group.email).all();
+			const [keeper, ...duplicates] = rows.results || [];
+			if (!keeper) continue;
+			for (const duplicate of duplicates) {
+				await db.batch([
+					db.prepare(`UPDATE email SET account_id = ?, user_id = ? WHERE account_id = ?`).bind(keeper.account_id, keeper.user_id, duplicate.account_id),
+					db.prepare(`UPDATE attachments SET account_id = ?, user_id = ? WHERE account_id = ?`).bind(keeper.account_id, keeper.user_id, duplicate.account_id),
+					db.prepare(`DELETE FROM account WHERE account_id = ?`).bind(duplicate.account_id),
+				]);
+			}
+		}
+
+		// The legacy exact-case unique indexes can reject the first UPDATE when
+		// two differently-cased rows collapse to the same value. Repeat the
+		// canonicalization after the duplicate rows have been merged.
+		for (const statement of [
+			`UPDATE user SET email = lower(trim(email)) WHERE email != lower(trim(email));`,
+			`UPDATE account SET email = lower(trim(email)) WHERE email != lower(trim(email));`,
+			`UPDATE email SET send_email = lower(trim(send_email)) WHERE send_email IS NOT NULL AND send_email != lower(trim(send_email));`,
+			`UPDATE email SET to_email = lower(trim(to_email)) WHERE to_email IS NOT NULL AND to_email != lower(trim(to_email));`,
+		]) {
+			try { await db.prepare(statement).run(); }
+			catch (e) { console.warn(`邮箱地址二次规范化失败：${e.message}`); }
+		}
+
+		try {
+			await db.batch([
+				db.prepare(`DROP INDEX IF EXISTS idx_account_email`),
+				db.prepare(`DROP INDEX IF EXISTS idx_user_email`),
+				db.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_account_email_nocase ON account (email COLLATE NOCASE)`),
+				db.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_user_email_nocase ON user (email COLLATE NOCASE)`),
+			]);
+		} catch (e) {
+			console.warn(`邮箱地址唯一索引迁移失败：${e.message}`);
+		}
 	},
 
 	/** v3.11 — user-facing mailbox Trash state. Safe for existing D1 databases. */

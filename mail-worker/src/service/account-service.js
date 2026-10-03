@@ -5,7 +5,7 @@ import userService from './user-service';
 import emailService from './email-service';
 import orm from '../entity/orm';
 import account from '../entity/account';
-import { and, asc, eq, gt, inArray, count, sql, ne, or, lt, desc } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, count, sql, or, lt, desc } from 'drizzle-orm';
 import {accountConst, isDel, settingConst} from '../const/entity-const';
 import settingService from './setting-service';
 import turnstileService from './turnstile-service';
@@ -20,6 +20,7 @@ const accountService = {
 		const { addEmailVerify , addEmail, manyEmail, addVerifyCount, minEmailPrefix, emailPrefixFilter } = await settingService.query(c);
 
 		let { email, token } = params;
+		email = emailUtils.normalizeEmail(email);
 
 
 		if (!(addEmail === settingConst.addEmail.OPEN && manyEmail === settingConst.manyEmail.OPEN)) {
@@ -68,7 +69,7 @@ const accountService = {
 		const userRow = await userService.selectById(c, userId);
 		const roleRow = await roleService.selectById(c, userRow.type);
 
-		if (userRow.email !== c.env.admin) {
+		if (!emailUtils.sameEmail(userRow.email, c.env.admin)) {
 
 			if (roleRow.accountCount > 0) {
 				const userAccountCount = await accountService.countUserAccount(c, userId)
@@ -108,7 +109,7 @@ const accountService = {
 	},
 
 	selectByEmailIncludeDel(c, email) {
-		return orm(c).select().from(account).where(sql`${account.email} COLLATE NOCASE = ${email}`).get();
+		return orm(c).select().from(account).where(sql`${account.email} COLLATE NOCASE = ${emailUtils.normalizeEmail(email)}`).get();
 	},
 
 	list(c, params, userId) {
@@ -155,7 +156,7 @@ const accountService = {
 		const user = await userService.selectById(c, userId);
 		const accountRow = await this.selectById(c, accountId);
 
-		if (accountRow.email === user.email) {
+		if (emailUtils.sameEmail(accountRow.email, user.email)) {
 			throw new BizError(t('delMyAccount'));
 		}
 
@@ -183,11 +184,18 @@ const accountService = {
 	},
 
 	async insert(c, params) {
-		await orm(c).insert(account).values({ ...params }).returning();
+		const { email, ...values } = params;
+		await orm(c).insert(account).values({
+			...values,
+			email: emailUtils.normalizeEmail(email),
+		}).returning();
 	},
 
 	async insertList(c, list) {
-		await orm(c).insert(account).values(list).run();
+		await orm(c).insert(account).values(list.map(row => ({
+			...row,
+			email: emailUtils.normalizeEmail(row.email),
+		}))).run();
 	},
 
 	async physicsDeleteByUserIds(c, userIds) {
@@ -216,7 +224,7 @@ const accountService = {
 	},
 
 	async restoreByEmail(c, email) {
-		await orm(c).update(account).set({isDel: isDel.NORMAL}).where(eq(account.email, email)).run();
+		await orm(c).update(account).set({isDel: isDel.NORMAL}).where(sql`${account.email} COLLATE NOCASE = ${emailUtils.normalizeEmail(email)}`).run();
 	},
 
 	async restoreByUserId(c, userId) {
@@ -248,7 +256,10 @@ const accountService = {
 
 		const userRow = await userService.selectByIdIncludeDel(c, userId);
 
-		const list = await orm(c).select().from(account).where(and(eq(account.userId, userId),ne(account.email,userRow.email))).limit(size).offset(num);
+		const list = await orm(c).select().from(account).where(and(
+			eq(account.userId, userId),
+			sql`${account.email} COLLATE NOCASE != ${emailUtils.normalizeEmail(userRow.email)}`
+		)).limit(size).offset(num);
 		const { total } = await orm(c).select({ total: count() }).from(account).where(eq(account.userId, userId)).get();
 
 		return { list, total }
@@ -276,7 +287,7 @@ const accountService = {
 		const userRow = await userService.selectById(c, userId);
 		const mainAccountRow = await accountService.selectByEmailIncludeDel(c, userRow.email);
 		let mainSort = mainAccountRow.sort === 0 ? 2 : mainAccountRow.sort + 1;
-		await orm(c).update(account).set({ sort: mainSort }).where(eq(account.email, userRow.email )).run();
+		await orm(c).update(account).set({ sort: mainSort }).where(sql`${account.email} COLLATE NOCASE = ${emailUtils.normalizeEmail(userRow.email)}`).run();
 		await orm(c).update(account).set({ sort: mainSort - 1 }).where(and(eq(account.accountId, accountId),eq(account.userId,userId))).run();
 	}
 };
