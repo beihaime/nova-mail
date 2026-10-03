@@ -2,8 +2,7 @@
   <div
       class="email-container"
       :class="{
-        'mobile-selecting': mobileSelecting,
-        'mobile-toolbar-visible': mobileSelecting && selectedCount > 0
+        'mobile-selecting': mobileSelecting
       }"
   >
     <div v-if="isPhone" class="mobile-inbox-tools">
@@ -42,11 +41,16 @@
         </div>
       </div>
 
-      <div v-if="type === 'email'" class="mobile-filter-bar">
-        <!-- Four equal cells that together fill the row: every chip owns the
-             same width and centres its own content, so the group reads as one
-             balanced segmented control rather than four ragged pills. All four
-             are text-only, so no chip carries more visual weight than another. -->
+    </div>
+
+    <div
+        class="mail-list-secondary-toolbar"
+        :class="{ 'has-secondary-toolbar': type === 'email' || selectedCount > 0 }"
+    >
+      <Transition name="secondary-toolbar-fade" mode="out-in">
+      <div v-if="isPhone && type === 'email' && selectedCount === 0" key="mobile-filters" class="mobile-filter-bar">
+        <!-- Filter tabs and the mobile selection toolbar share this exact slot
+             so entering selection never adds/removes a layout row. -->
         <div class="mobile-filters">
           <button
               v-for="filter in mobileFilters"
@@ -59,12 +63,12 @@
           </button>
         </div>
       </div>
-    </div>
 
-    <div
-        v-if="!isPhone || (mobileSelecting && selectedCount > 0)"
-        class="header-actions"
-    >
+      <div
+          v-else-if="!isPhone || selectedCount > 0"
+          key="selection-toolbar"
+          class="header-actions"
+      >
       <el-checkbox
           v-model="checkAll"
           class="mail-check-column"
@@ -111,6 +115,8 @@
         <AppIcon v-if="showAccountIcon" class="more-icon icon" name="more-vertical" :size="18"
               @click="changeAccountShow"/>
       </div>
+      </div>
+      </Transition>
     </div>
 
     <div ref="scroll" class="scroll">
@@ -173,10 +179,24 @@
                    @pointerleave="onRowPointerLeave"
                    @pointercancel="onRowPointerCancel"
               >
-              <el-checkbox :class="['mail-check-column', props.type === 'all-email' ? 'all-email-checkbox' : 'checkbox']"
-                           v-model="item.checked"
-                           :disabled="!item.checked && isSelectMax"
-                           @click.stop></el-checkbox>
+              <div
+                  class="row-avatar"
+                  :class="{ 'is-selected': item.checked }"
+                  role="button"
+                  tabindex="0"
+                  :aria-label="item.checked ? t('cancel') : t('multiSelect')"
+                  :aria-pressed="item.checked"
+                  @click.stop="toggleRowSelection(item)"
+                  @keydown.enter.stop.prevent="toggleRowSelection(item)"
+                  @keydown.space.stop.prevent="toggleRowSelection(item)"
+              >
+                <Transition name="avatar-selection" mode="out-in">
+                  <div v-if="item.checked" key="selected" class="selection-indicator" aria-hidden="true">
+                    <Icon icon="mdi:check" width="22" height="22" />
+                  </div>
+                  <SenderAvatar v-else key="avatar" :email="item" :size="isPhone ? 54 : 28" />
+                </Transition>
+              </div>
               <el-tooltip v-if="showStar" effect="dark" :content="item.isStar ? t('unstar') : t('star')" :show-after="2000">
                 <button
                     class="nova-icon-button pc-star"
@@ -193,12 +213,6 @@
                 </button>
               </el-tooltip>
               <div v-if="!showStar"></div>
-              <SenderAvatar
-                  v-if="type === 'email' && isPhone"
-                  class="mobile-sender-avatar"
-                  :email="item"
-                  :size="54"
-              />
               <div class="title" :class="accountShow ? 'title-column' : 'title-column'">
 
                 <div class="email-sender" :style=" (showStatus ? 'gap: 10px;' : '') + ((item.unread === EmailUnreadEnum.UNREAD && showUnread)  ? 'font-weight: bold' : '')">
@@ -215,7 +229,6 @@
                   <div v-else></div>
                   <span class="name">
                     <span>
-                      <SenderAvatar v-if="!isPhone" :email="item" :size="28" />
                       <slot name="name" :email="item"> {{ item.name }}</slot>
                     </span>
                   </span>
@@ -557,6 +570,7 @@ const MAX_SELECT_COUNT = 95;
 const checkedEmailCount = ref(0);
 const selectedCount = computed(() => emailList.filter(item => item.checked).length);
 const isSelectMax = computed(() => checkedEmailCount.value >= MAX_SELECT_COUNT);
+const selectionMode = computed(() => mobileSelecting.value || selectedCount.value > 0)
 let timer = null
 const position = ref(
     DOMRect.fromRect({
@@ -707,6 +721,12 @@ function toggleMobileSelection() {
   if (!mobileSelecting.value) {
     handleCheckAllChange(false)
   }
+}
+
+function toggleRowSelection(item) {
+  if (!item.checked && isSelectMax.value) return
+  if (isPhone.value) mobileSelecting.value = true
+  item.checked = !item.checked
 }
 
 function startLongPress(event, item) {
@@ -1143,6 +1163,10 @@ watch(
     },
     {deep: true}
 );
+
+watch(selectedCount, (count) => {
+  if (count === 0) mobileSelecting.value = false
+})
 
 
 watch(() => emailStore.deleteIds, () => {
@@ -1628,8 +1652,8 @@ function jumpDetails(email, event) {
     return
   }
 
-  if (isPhone.value && mobileSelecting.value) {
-    email.checked = !email.checked
+  if (selectionMode.value) {
+    toggleRowSelection(email)
     return
   }
 
@@ -1769,8 +1793,53 @@ function loadData() {
   align-items: center;
 }
 
+:deep(.row-avatar) {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--mail-list-avatar-column);
+  height: var(--mail-list-avatar-column);
+  flex: 0 0 var(--mail-list-avatar-column);
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 140ms ease, transform 140ms ease;
+}
+
+:deep(.row-avatar .sender-avatar) {
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+:deep(.selection-indicator) {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  color: var(--el-color-white, #fff);
+  background: var(--el-color-primary);
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+:deep(.selection-indicator .iconify) {
+  color: inherit;
+}
+
+.avatar-selection-enter-active,
+.avatar-selection-leave-active {
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.avatar-selection-enter-from,
+.avatar-selection-leave-to {
+  opacity: 0;
+  transform: scale(.86);
+}
+
 .email-container {
   --mail-list-selection-column: 24px;
+  --mail-list-avatar-column: 28px;
   --mail-list-column-gap: 8px;
   --mail-list-horizontal-padding: 14px;
   /* Where the checkbox column starts, from the container's edge. Header and
@@ -1788,6 +1857,11 @@ function loadData() {
   color: var(--el-text-color-primary);
   overflow: hidden;
   height: 100%;
+}
+
+.mail-list-secondary-toolbar {
+  width: 100%;
+  min-width: 0;
 }
 
 .scroll {
@@ -2280,7 +2354,7 @@ ul {
 
   :deep(.email-row:not(.all-email)) {
     display: grid;
-    grid-template-columns: var(--mail-list-selection-column) var(--nova-icon-button-size) minmax(0, 1fr) 82px;
+    grid-template-columns: var(--mail-list-avatar-column) var(--nova-icon-button-size) minmax(0, 1fr) 82px;
     align-items: center;
     gap: var(--mail-list-column-gap);
     height: 48px;
@@ -2365,32 +2439,41 @@ ul {
    avatar, sender, time, subject and preview cannot drift apart. */
 @media (max-width: 767px) {
   .email-container {
-    /* Phone rows draw their content with an 8px inset (see `.email-row.email`)
-       and a 20px selection column, so the header uses the same two numbers and
-       both checkboxes stay on one axis. */
-    --mail-list-selection-column: 20px;
-    --mail-list-checkbox-inset: 8px;
+    --mail-list-avatar-column: 54px;
+    grid-template-rows: auto auto minmax(0, 1fr);
+  }
+
+  .mail-list-secondary-toolbar {
+    min-width: 0;
+    height: 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .mail-list-secondary-toolbar.has-secondary-toolbar {
+    height: 48px;
+    min-height: 48px;
+  }
+
+  .secondary-toolbar-fade-enter-active,
+  .secondary-toolbar-fade-leave-active {
+    transition: opacity 140ms ease;
+  }
+
+  .secondary-toolbar-fade-enter-from,
+  .secondary-toolbar-fade-leave-to {
+    opacity: 0;
   }
 
   :deep(.email-row:not(.all-email)) {
     display: grid;
-    grid-template-columns: var(--mail-list-selection-column) minmax(0, 1fr);
+    grid-template-columns: var(--mail-list-avatar-column) minmax(0, 1fr);
     column-gap: 8px;
     align-items: start;
     height: 83px;
     min-height: 83px;
     padding: 8px 20px 8px 16px;
     box-sizing: border-box;
-  }
-
-  /* Horizontal placement, width and centring come from `.mail-check-column`;
-     only the vertical nudge for the phone row lives here. */
-  :deep(.email-row:not(.all-email) > .checkbox) {
-    grid-column: 1;
-    grid-row: 1;
-    height: 18px;
-    align-self: start;
-    margin-top: 2px;
   }
 
   /* The desktop star column is hidden on touch layouts; the inline star in
@@ -2512,7 +2595,6 @@ ul {
    ========================================================= */
 
 .mobile-inbox-tools,
-.mobile-sender-avatar,
 .mobile-row-star,
 .mobile-filter-empty,
 /* Swipe actions are a phone-only affordance; the media query below lays them
@@ -2523,13 +2605,9 @@ ul {
 
 @media (max-width: 767px) {
   .email-container {
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
     background: var(--nova-surface);
     color: var(--mobile-primary);
-  }
-
-  .email-container.mobile-toolbar-visible {
-    grid-template-rows: auto auto minmax(0, 1fr);
   }
 
   /* ---------- Inbox tools (search + filter rows) ---------- */
@@ -2539,9 +2617,7 @@ ul {
     width: 100%;
     max-width: 100%;
     min-width: 0;
-    /* 4px of air below the filter divider so it no longer touches the first
-       mail row, without adding height to the Inbox header block. */
-    padding: 0 0 4px;
+    padding: 0;
     background: var(--nova-surface);
   }
 
@@ -2643,13 +2719,13 @@ ul {
   /* ---------- Filters ---------- */
 
   .mobile-filter-bar {
-    /* border-box: 40 = 2 (top) + 32 (tabs) + 5 (bottom) + 1 (divider). */
-    height: 40px;
+    height: 48px;
+    min-height: 48px;
     min-width: 0;
 
     /* Symmetric page gutter: the four chips fill the row edge to edge, so the
        group is centred in the bar instead of leaning left. */
-    padding: 2px 12px 5px;
+    padding: 8px 12px;
 
     display: flex;
     align-items: center;
@@ -2745,13 +2821,9 @@ ul {
     opacity: .72 !important;
   }
 
-  /* ---------- Hide desktop action toolbar ---------- */
+  /* ---------- Shared secondary toolbar ---------- */
 
-  .email-container > .header-actions {
-    display: none;
-  }
-
-  .email-container.mobile-selecting > .header-actions {
+  .mail-list-secondary-toolbar > .header-actions {
     display: grid;
 
     /* The selection toolbar is its own full-width region. Its divider must not
@@ -2763,28 +2835,24 @@ ul {
 
     height: 48px;
     min-height: 48px;
-    /* Same left inset as a phone mail row, so the select-all lines up with the
-       row checkboxes it controls. */
-    padding: 4px 8px 4px var(--mail-list-checkbox-inset);
+    padding: 4px 8px;
     column-gap: 4px;
     border-bottom: 1px solid var(--nova-divider);
     box-shadow: none;
   }
 
-  .email-container.mobile-selecting > .header-actions .header-left {
+  .mail-list-secondary-toolbar > .header-actions .header-left {
     width: max-content;
     gap: 4px;
     padding-left: 0 !important;
   }
 
-  .email-container.mobile-selecting > .header-actions .selection-slot,
-  .email-container.mobile-selecting
-    > .header-actions
-    .header-right {
+  .mail-list-secondary-toolbar > .header-actions .selection-slot,
+  .mail-list-secondary-toolbar > .header-actions .header-right {
     display: none;
   }
 
-  .email-container.mobile-selecting > .header-actions .selection-action {
+  .mail-list-secondary-toolbar > .header-actions .selection-action {
     flex: 0 0 38px;
     width: 38px;
     height: 38px;
@@ -2799,8 +2867,8 @@ ul {
     /* Checkbox gutter | fixed avatar | content | fixed time. Keeping these
        tracks stable prevents sender/subject/unread changes from moving the
        avatar or timestamp horizontally. */
-    /* Checkbox gutter | 54px avatar + 16px text gap | content | time. */
-    grid-template-columns: 20px 70px minmax(0, 1fr) 64px;
+    /* Avatar | content | time. The avatar is also the selection control. */
+    grid-template-columns: 54px minmax(0, 1fr) 64px;
 
     column-gap: 0;
 
@@ -2840,36 +2908,16 @@ ul {
     background: var(--nova-selected);
   }
 
-  /* desktop checkbox + star are hidden normally */
-  :deep(.email-row.email > .checkbox),
+  /* The desktop star column is hidden on touch layouts. */
   :deep(.email-row.email > .pc-star),
   :deep(.email-row.email > .email-right) {
     display: none;
   }
 
-  /* ---------- Selection mode ---------- */
-
-  .email-container.mobile-selecting
-    :deep(.email-row.email:not(.all-email)) {
-    /* Selection adds its checkbox track without changing the normal row. */
-    grid-template-columns: var(--mail-list-selection-column) 70px minmax(0, 1fr) 64px;
-  }
-
-  .email-container.mobile-selecting
-    :deep(.email-row.email > .checkbox) {
-    grid-column: 1;
-
-    display: flex;
-
-    /* Vertical nudge only: the column's width, padding and centring are the
-       shared `.mail-check-column` ones the header select-all also uses. */
-    padding: 6px 0 0;
-  }
-
   /* ---------- Sender avatar ---------- */
 
-  .mobile-sender-avatar {
-    grid-column: 2;
+  :deep(.email-row.email > .row-avatar) {
+    grid-column: 1;
 
     width: 54px;
     height: 54px;
@@ -2878,8 +2926,7 @@ ul {
     flex: 0 0 54px;
     flex-shrink: 0;
 
-    /* The 70px track reserves exactly 16px between this 54px container and
-       the message text. */
+    /* The fixed avatar track keeps the message text aligned in every state. */
     justify-self: start;
     align-self: center;
 
@@ -2901,22 +2948,16 @@ ul {
     text-align: center;
   }
 
-  :deep(.mobile-sender-avatar .sender-avatar-image) {
+  :deep(.row-avatar .sender-avatar-image) {
     width: 100%;
     height: 100%;
     object-fit: cover;
   }
 
-  /* The sender-line avatar stays available for desktop, but the dedicated
-     54px avatar owns phone rows. */
-  :deep(.email-row.email .name .sender-avatar) {
-    display: none;
-  }
-
   /* ---------- Message body ---------- */
 
   :deep(.email-row.email > .title) {
-    grid-column: 3;
+    grid-column: 2;
 
     width: 100%;
     min-width: 0;
@@ -2979,7 +3020,7 @@ ul {
   }
 
   :deep(.email-row.email > .email-right) {
-    grid-column: 4;
+    grid-column: 3;
     grid-row: 1;
     display: flex;
     align-self: start;
