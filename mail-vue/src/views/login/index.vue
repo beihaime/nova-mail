@@ -1051,13 +1051,13 @@ function submitRegister() {
   .login-quiet-tagline { left: 24px; top: 94px; font-size: 12px; letter-spacing: .1em; }
   .form-wrapper { position: relative; top: auto; right: auto; bottom: auto; left: auto; width: 100%; max-width: 420px; margin: 0 auto; }
   .login-scene { opacity: .72; }
-  .container { width: 100%; padding: 24px; height: auto; min-height: 0; border-radius: 28px; background: rgba(232,243,255,.78); box-shadow: 0 18px 50px rgba(30,80,140,.16); }
+  .container { width: 100%; padding: 18px 16px; height: auto; min-height: 0; border-radius: 18px; background: rgba(232,243,255,.78); box-shadow: 0 18px 50px rgba(30,80,140,.16); }
   :global(html.dark #login-box div.container) { background: rgba(20,28,43,.82); }
   .form-title { font-size: 24px !important; line-height: 1.2; letter-spacing: -.02em; }
-  .form-desc { margin-top: 4px; margin-bottom: 18px; font-size: 14px; line-height: 1.4; }
-  .container .el-input { width: 100%; min-width: 0; height: 50px; margin-bottom: 14px; font-size: 16px; }
+  .form-desc { margin-top: 3px; margin-bottom: 14px; font-size: 14px; line-height: 1.35; }
+  .container .el-input { width: 100%; min-width: 0; height: 44px; margin-bottom: 10px; font-size: 16px; }
   .container .el-input :deep(.el-input__wrapper) { min-width: 0; width: 100%; }
-  .container .el-input :deep(.el-input__inner) { min-width: 0; width: 100%; height: 48px; font-size: 16px; }
+  .container .el-input :deep(.el-input__inner) { min-width: 0; width: 100%; height: 42px; font-size: 16px; }
   .container .email-input :deep(.el-input__wrapper) { min-width: 0; }
   /* Email row on phones: the username field flexes, while the domain picker
      keeps its natural (content) width so "@beihaime.com" is never truncated.
@@ -1069,8 +1069,8 @@ function submitRegister() {
     flex: 0 0 auto;
     min-width: 0;
     max-width: none;
-    padding-left: 8px !important;
-    padding-right: 6px !important;
+    padding-left: 4px !important;
+    padding-right: 2px !important;
     white-space: nowrap;
   }
   .email-input :deep(.el-input-group__append > div) {
@@ -1083,16 +1083,17 @@ function submitRegister() {
   .email-input :deep(.el-input-group__append > div > div:not(.select)) {
     display: inline-flex;
     align-items: center;
-    gap: 2px;
+    gap: 0;
     white-space: nowrap;
   }
   .email-input :deep(.el-input-group__append .setting-icon) {
     top: 0;
     flex: 0 0 auto;
   }
-  .container .btn { width: 100%; min-width: 0; height: 50px; border-radius: 11px; font-size: 15px; }
-  .oauth-divider { margin: 16px 0 12px; }
-  .switch { margin-top: 18px; }
+  .container .btn { width: 100%; min-width: 0; height: 44px; border-radius: 9px; font-size: 15px; }
+  .container .github-login + .btn { margin-top: 8px !important; }
+  .oauth-divider { margin: 14px 0 10px; }
+  .switch { margin-top: 14px; }
 }
 
 

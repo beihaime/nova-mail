@@ -24,13 +24,7 @@
              below can hand all four filters an equal share of the full row
              width instead of splitting it with an action group. -->
         <div class="mobile-filter-actions">
-          <button
-              class="mobile-tool-button nova-mobile-icon-button mobile-sort"
-              :aria-label="t('sortByTime')"
-              @click="mobileSortClick"
-          >
-            <Icon icon="solar:sort-vertical-linear" width="21" height="21" />
-          </button>
+          <MailSortButton mobile :time-sort="timeSort" @toggle="mobileSortClick" />
 
           <button
               class="mobile-tool-button nova-mobile-icon-button"
@@ -79,6 +73,11 @@
       </div>
 
       <div class="header-right">
+        <MailSortButton
+            v-if="type === 'email' && !isPhone"
+            :time-sort="timeSort"
+            @toggle="mobileSortClick"
+        />
         <span class="email-count" v-if="total">{{ $t('emailCount', {total: total}) }}</span>
         <AppIcon v-if="showAccountIcon" class="more-icon icon" name="more-vertical" :size="18"
               @click="changeAccountShow"/>
@@ -390,6 +389,7 @@ import {EmailUnreadEnum} from "@/enums/email-enum.js";
 import { UseVirtualList } from '@vueuse/components'
 import { useScroll } from '@vueuse/core'
 import SenderAvatar from '@/components/sender-avatar/index.vue'
+import MailSortButton from '@/components/mail-sort-button/index.vue'
 import { MAIL_BODY_TYPE, unwrapNestedMessage, looksLikeMarkdownDocument } from '@/utils/mail-html.js'
 import { stripMarkdown } from '@/utils/quoted-text.js'
 import { nextPageCursor, isLastPage, canRequestPage } from '@/utils/mail-pagination.js'
@@ -2022,6 +2022,7 @@ function loadData() {
     margin-top: 8px;
     margin-left: 15px;
   }
+
 }
 
 .del-status {
