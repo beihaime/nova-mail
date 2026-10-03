@@ -209,7 +209,10 @@
                       <slot name="name" :email="item"> {{ item.name }}</slot>
                     </span>
                   </span>
-                  <span class="phone-time">{{ listClock(item) }}</span>
+                  <span class="phone-time">
+                    <span>{{ listClock(item) }}</span>
+                    <span v-if="item.unread === EmailUnreadEnum.UNREAD && showUnread" class="unread-dot" aria-label="Unread" />
+                  </span>
                 </div>
                 <div>
                   <div class="email-text">
@@ -246,15 +249,6 @@
               <div class="email-right" :style="showUserInfo ? 'align-self: start;':''">
                 <span class="email-time-meta">
                   <span class="email-time">{{ listClock(item) }}</span>
-                  <span v-if="item.unread === EmailUnreadEnum.UNREAD && showUnread" class="unread-dot" aria-label="Unread" />
-                </span>
-              </div>
-              <!-- Fixed right-hand metadata column.  The Inbox's phone layout
-                   deliberately keeps starring out of this dense list so the
-                   subject and preview retain the extra room below the time. -->
-              <div class="mobile-row-meta">
-                <span class="mobile-meta-time">
-                  <span>{{ listClock(item) }}</span>
                   <span v-if="item.unread === EmailUnreadEnum.UNREAD && showUnread" class="unread-dot" aria-label="Unread" />
                 </span>
               </div>
@@ -2145,8 +2139,7 @@ function loadData() {
   padding-right: v-bind(timePaddingRight);
 }
 
-.email-time-meta,
-.mobile-meta-time {
+.email-time-meta {
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
@@ -2370,7 +2363,7 @@ ul {
     align-items: start;
     height: 83px;
     min-height: 83px;
-    padding: 8px 12px;
+    padding: 8px 20px 8px 16px;
     box-sizing: border-box;
   }
 
@@ -2444,7 +2437,18 @@ ul {
   }
 
   :deep(.email-row:not(.all-email) .phone-time) {
-    display: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+    margin-left: auto;
+    min-width: max-content;
+    color: color-mix(in srgb, var(--mobile-secondary) 82%, transparent);
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 20px;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
   }
 
   :deep(.email-row:not(.all-email) .email-text) {
@@ -2493,7 +2497,6 @@ ul {
 
 .mobile-inbox-tools,
 .mobile-sender-avatar,
-.mobile-row-meta,
 .mobile-row-star,
 .mobile-filter-empty,
 /* Swipe actions are a phone-only affordance; the media query below lays them
@@ -2790,7 +2793,7 @@ ul {
     height: 80px;
     min-height: 80px;
 
-    padding: 10px 8px 10px 16px;
+    padding: 10px 20px 10px 16px;
 
     box-sizing: border-box;
 
@@ -2917,18 +2920,13 @@ ul {
     min-width: 0;
 
     display: flex;
-    align-items: baseline;
+    align-items: center;
 
-    gap: 4px;
+    gap: 0;
 
     /* Sender is the strongest line: largest type, heaviest weight, primary ink. */
     line-height: 20px;
     margin-bottom: 1px;
-
-    /* Overflow lives in the row's own meta column now. */
-    /* Time sits over the first line only, leaving the preview below free to
-       use the full body width after the mobile list star was removed. */
-    padding-right: 86px;
 
     color: var(--mobile-primary);
 
@@ -2961,10 +2959,19 @@ ul {
     display: none;
   }
 
-  /* The timestamp moved to the row's metadata column; the inline copy would
-     duplicate it. */
   :deep(.email-row.email .phone-time) {
-    display: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+    margin-left: auto;
+    min-width: max-content;
+    color: color-mix(in srgb, var(--mobile-secondary) 82%, transparent);
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 20px;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
   }
 
   :deep(.email-row.email .email-text) {
@@ -2999,7 +3006,7 @@ ul {
     font-size: 15px;
     line-height: 19px;
     font-weight: 400;
-    padding-right: 86px;
+    padding-right: 0;
   }
 
   :deep(.email-row.email.is-unread .email-subject) {
@@ -3009,9 +3016,6 @@ ul {
   :deep(.email-row.email .email-text .email-content) {
     display: block;
 
-    /* The timestamp is absolutely positioned over the sender line, not a grid
-       column, so the preview can use the whole row width without painting under
-       an interactive star. */
     width: 100%;
     max-width: 100%;
 
@@ -3031,53 +3035,6 @@ ul {
     font-size: 14px;
     line-height: 18px;
     font-weight: 400;
-  }
-
-  /* ---------- Timestamp ---------- */
-
-  .mobile-row-meta {
-    position: absolute;
-    top: 11px;
-    right: 8px;
-
-    /* The date belongs to the sender line only. It no longer reserves a full
-       height column now that the mobile Inbox has no inline star action. */
-    width: auto;
-    max-width: none;
-
-    display: flex;
-    flex-direction: column;
-    /* Time and star both hang off the right edge so the column reads as one
-       right-aligned metadata block. */
-    align-items: flex-end;
-    justify-content: flex-start;
-
-    padding: 0;
-  }
-
-  .mobile-meta-time {
-    display: block;
-
-    max-width: none;
-    white-space: nowrap;
-    text-align: right;
-
-    /* Tabular digits keep the label from twitching as the value changes. */
-    font-variant-numeric: tabular-nums;
-
-    /* Metadata, not message: dimmer than the sender, brighter than before so a
-       date is still legible at this size. */
-    color: color-mix(in srgb, var(--mobile-secondary) 82%, transparent);
-
-    font-size: 13px;
-    line-height: 1.2;
-    font-weight: 400;
-  }
-
-  :deep(.email-row.email .mobile-meta-time .unread-dot) {
-    width: 6px;
-    height: 6px;
-    flex-basis: 6px;
   }
 
   /* ---------- Mobile star ---------- */
