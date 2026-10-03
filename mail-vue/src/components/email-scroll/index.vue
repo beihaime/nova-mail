@@ -254,7 +254,9 @@
                     <!-- Keep list previews sourced from the list payload only.  The
                          detail `text` field is populated when a message is opened
                          and must never leak back into a row. -->
+                    <!-- Empty previews still occupy the third line on phones. -->
                     <span v-if="listPreview(item)" class="email-content">{{ listPreview(item) }}</span>
+                    <span v-else-if="isPhone" class="email-content" aria-hidden="true">&#8203;</span>
                   </div>
 
                   <div class="user-info" v-if="showUserInfo">
@@ -2543,12 +2545,14 @@ ul {
   :deep(.email-row:not(.all-email)) {
     display: grid;
     grid-template-columns: var(--mail-list-avatar-column) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
     column-gap: 8px;
     align-items: start;
     height: var(--mail-row-height-phone-other);
     min-height: var(--mail-row-height-phone-other);
     padding: 8px 20px 8px 16px;
     box-sizing: border-box;
+    overflow: hidden;
   }
 
   /* The desktop star column is hidden on touch layouts; the inline star in
@@ -2572,7 +2576,9 @@ ul {
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
     gap: 8px;
-    line-height: 28px;
+    height: 24px;
+    line-height: 24px;
+    overflow: hidden;
   }
 
   :deep(.email-row:not(.all-email) .email-sender > div:first-child:empty) {
@@ -2629,7 +2635,8 @@ ul {
     display: block;
     min-width: 0;
     width: 100%;
-    margin-top: 2px;
+    height: 41px;
+    margin-top: 0;
     overflow: hidden;
   }
 
@@ -2645,10 +2652,12 @@ ul {
   }
 
   :deep(.email-row:not(.all-email) .email-subject) {
+    height: 20px;
     line-height: 20px;
   }
 
   :deep(.email-row:not(.all-email) .email-content) {
+    height: 20px;
     margin-top: 1px;
     padding-left: 0;
     color: var(--regular-text-color);
@@ -2956,8 +2965,9 @@ ul {
     column-gap: 0;
 
     width: 100%;
-    /* Keep this identical before, during and after selection. The virtual
-       list uses the same value in `itemHeight` above. */
+    /* Normal: 10px top + 60px text track + 10px bottom = 80px. The filter
+       separator stays outside this row; every mail divider is inside it.
+       The virtual list uses the same value in `itemHeight` above. */
     height: var(--mail-row-height-phone);
     min-height: var(--mail-row-height-phone);
 
@@ -3050,7 +3060,8 @@ ul {
     min-width: 0;
     max-width: 100%;
 
-    display: block;
+    display: flex;
+    flex-direction: column;
 
     padding: 0;
 
@@ -3069,6 +3080,7 @@ ul {
     padding-right: 64px;
 
     /* Sender is the strongest line: largest type, heaviest weight, primary ink. */
+    height: 20px;
     line-height: 20px;
     margin-bottom: 1px;
 
@@ -3148,6 +3160,7 @@ ul {
 
     padding-right: 0;
     margin-top: 1px;
+    height: 38px;
 
     line-height: 18px;
 
@@ -3170,6 +3183,7 @@ ul {
     color: var(--mobile-primary);
 
     font-size: 15px;
+    height: 19px;
     line-height: 19px;
     font-weight: 400;
     padding-right: 0;
@@ -3199,6 +3213,7 @@ ul {
     color: var(--mobile-tertiary);
 
     font-size: 14px;
+    height: 18px;
     line-height: 18px;
     font-weight: 400;
   }
@@ -3393,20 +3408,18 @@ ul {
 
 @media (max-width: 767px) {
   .email-container.density-compact :deep(.email-row:not(.all-email):not(.email)) {
-    padding-top: 4px;
-    padding-bottom: 4px;
-  }
-
-  .email-container.density-compact :deep(.email-row:not(.all-email):not(.email) .email-sender) {
-    line-height: 24px;
+    padding-top: 5px;
+    padding-bottom: 5px;
   }
 
   .email-container.density-compact :deep(.email-row:not(.all-email):not(.email) .email-text) {
+    height: 36px;
     margin-top: 0;
   }
 
   .email-container.density-compact :deep(.email-row:not(.all-email):not(.email) .email-subject),
   .email-container.density-compact :deep(.email-row:not(.all-email):not(.email) .email-content) {
+    height: 18px;
     line-height: 18px;
   }
 
@@ -3415,26 +3428,34 @@ ul {
   }
 
   .email-container.density-compact :deep(.email-row.email:not(.all-email)) {
-    padding-top: 5px;
-    padding-bottom: 5px;
+    /* Compact: 8px top + 52px text track + 8px bottom = 68px. */
+    padding-top: 8px;
+    padding-bottom: 8px;
   }
 
   .email-container.density-compact :deep(.email-row.email .title .email-sender) {
+    height: 18px;
     line-height: 18px;
     margin-bottom: 0;
   }
 
   .email-container.density-compact :deep(.email-row.email .email-text) {
+    height: 34px;
     margin-top: 0;
   }
 
   .email-container.density-compact :deep(.email-row.email .email-subject),
   .email-container.density-compact :deep(.email-row.email .email-text .email-content) {
+    height: 17px;
     line-height: 17px;
   }
 
+  .email-container.density-compact :deep(.email-row.email .email-text .email-content) {
+    margin-top: 0;
+  }
+
   .email-container.density-compact :deep(.email-row.email > .email-right) {
-    top: 5px;
+    top: 8px;
   }
 }
 
