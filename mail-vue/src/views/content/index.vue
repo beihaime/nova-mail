@@ -52,10 +52,12 @@
 
                 <!-- Collapsed card: compact recipient line. The expanded card
                      shows the full metadata panel instead (From/To), so this is
-                     hidden there to avoid repeating the same information. -->
+                     hidden there to avoid repeating the same information.
+                     Phones keep the line inert (see `onRecipientLineClick`). -->
                 <div
                     v-if="!isMessageExpanded(message) && recipientLabelFor(message)"
                     class="message-recipient-preview"
+                    @click="onRecipientLineClick"
                 >
                   {{ $t('to') }} {{ recipientLabelFor(message) }}
                 </div>
@@ -63,10 +65,17 @@
                 <!-- Receiver line + header metadata only exist on the expanded
                      card: a collapsed card must not leak header metadata. -->
                 <template v-if="isMessageExpanded(message)">
-                  <button class="recipient-toggle" type="button" @click.stop="toggleMessageMetadata(message)">
+                  <!-- Phones: the same "To …" line as plain, inert text. The
+                       From/To panel below is a desktop affordance, so it is
+                       neither mounted nor toggled here (same 767px breakpoint
+                       the mobile stylesheet uses). -->
+                  <div v-if="isMobileReader" class="message-recipient-preview" @click.stop>
+                    {{ $t('to') }} {{ recipientLabelFor(message) }}
+                  </div>
+                  <button v-else class="recipient-toggle" type="button" @click.stop="toggleMessageMetadata(message)">
                     {{ $t('to') }} {{ recipientLabelFor(message) }} <span aria-hidden="true">⌄</span>
                   </button>
-                  <div v-if="isMetadataOpen(message)" class="message-details" @click.stop>
+                  <div v-if="!isMobileReader && isMetadataOpen(message)" class="message-details" @click.stop>
                     <div class="detail-row">
                       <span class="detail-label">{{ $t('from') }}</span>
                       <span class="detail-value"><span class="detail-name">{{ message.from.name || '—' }}</span> <span class="detail-email">&lt;{{ message.from.email || '—' }}&gt;</span></span>
@@ -374,6 +383,16 @@ function isMetadataOpen(message) {
 
 function toggleMessageMetadata(message) {
   metadataMessages[message.id] = !metadataMessages[message.id]
+}
+
+/**
+ * Phones show the "To …" line as plain text: tapping it must not expand or
+ * collapse anything — neither the From/To panel (a desktop affordance) nor the
+ * message card it sits in. On desktop the event is left alone so the header's
+ * own expand/collapse handler still receives it.
+ */
+function onRecipientLineClick(event) {
+  if (isMobileReader.value) event.stopPropagation()
 }
 
 function recipientLabelFor(message) {
@@ -2466,38 +2485,32 @@ function restoreTrash() {
     max-width: 100%;
     overflow: hidden;
     /* Still ONE compact line: a phone header must not grow two lines for a
-       long address. The metadata panel below shows the complete address. */
+       long address (there is no metadata panel to fall back on at this width). */
     white-space: nowrap;
     text-overflow: ellipsis;
     font-size: 12px;
   }
 
-  .message-head .recipient-toggle {
-    grid-column: 2 / -1;
-    grid-row: 3;
-    margin-top: 4px;
-    max-width: 100%;
-  }
-
-  /* Row 3 while collapsed. The expanded card swaps in the recipient-toggle /
-     metadata panel, which occupy the same grid cell. */
+  /* Row 3: the plain "To …" line, on a collapsed and an expanded card alike.
+     Phones render neither the toggle nor the From/To panel, so this line always
+     owns the cell and can never leave an empty row behind. `cursor: default`
+     opts out of the pointer the tappable header inherits: the line is inert. */
   .message-head .message-recipient-preview {
     grid-column: 2 / -1;
     grid-row: 3;
     margin-top: 4px;
     font-size: 12px;
+    cursor: default;
   }
 
+  /* Desktop-only panel. The placement rules stay for the print path (an A4 page
+     is narrower than this breakpoint, and `@media print` re-shows the panel with
+     `display: grid !important`); on screen it must take up no room at all, so a
+     live resize down to a phone cannot leave an empty row behind. */
   .message-head .message-details {
     grid-column: 2 / -1;
     grid-row: 3;
     margin-top: 8px;
-  }
-
-  /* Once the details box is open it owns From/To, so the header's duplicate
-     "To …" line is hidden. Class-only: the rule lives in this media query, so
-     desktop markup/behaviour is untouched. */
-  .message-head.is-details-open .recipient-toggle {
     display: none;
   }
 
