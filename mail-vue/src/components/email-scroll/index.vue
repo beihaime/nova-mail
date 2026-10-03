@@ -1,5 +1,11 @@
 <template>
-  <div class="email-container" :class="{ 'mobile-selecting': mobileSelecting }">
+  <div
+      class="email-container"
+      :class="{
+        'mobile-selecting': mobileSelecting,
+        'mobile-toolbar-visible': mobileSelecting && selectedCount > 0
+      }"
+  >
     <div v-if="isPhone" class="mobile-inbox-tools">
       <div class="mobile-search-row">
         <label v-if="type === 'email'" class="mobile-search">
@@ -55,7 +61,10 @@
       </div>
     </div>
 
-    <div class="header-actions">
+    <div
+        v-if="!isPhone || (mobileSelecting && selectedCount > 0)"
+        class="header-actions"
+    >
       <el-checkbox
           v-model="checkAll"
           class="mail-check-column"
@@ -187,7 +196,7 @@
                   v-if="type === 'email' && isPhone"
                   class="mobile-sender-avatar"
                   :email="item"
-                  :size="48"
+                  :size="40"
               />
               <div class="title" :class="accountShow ? 'title-column' : 'title-column'">
 
@@ -545,6 +554,7 @@ const dropdownShow = ref(false);
 const rightClickEmail = ref({});
 const MAX_SELECT_COUNT = 95;
 const checkedEmailCount = ref(0);
+const selectedCount = computed(() => emailList.filter(item => item.checked).length);
 const isSelectMax = computed(() => checkedEmailCount.value >= MAX_SELECT_COUNT);
 let timer = null
 const position = ref(
@@ -2512,7 +2522,7 @@ ul {
     color: var(--mobile-primary);
   }
 
-  .email-container.mobile-selecting {
+  .email-container.mobile-toolbar-visible {
     grid-template-rows: auto auto minmax(0, 1fr);
   }
 
@@ -2781,11 +2791,11 @@ ul {
     position: relative;
 
     display: grid;
-    /* Avatar | message body. The old unread-dot gutter is gone; keep a compact
-       safe inset, a 48px avatar, and a 12px text gap. */
-    grid-template-columns: 48px minmax(0, 1fr);
+    /* Unread gutter | avatar | message body. The timestamp is positioned over
+       the sender line, so it does not reserve a column below that line. */
+    grid-template-columns: 16px 50px minmax(0, 1fr);
 
-    column-gap: 12px;
+    column-gap: 0;
 
     width: 100%;
     /* Keep this identical before, during and after selection. The virtual
@@ -2793,7 +2803,7 @@ ul {
     height: 80px;
     min-height: 80px;
 
-    padding: 10px 20px 10px 16px;
+    padding: 10px 8px;
 
     box-sizing: border-box;
 
@@ -2803,15 +2813,16 @@ ul {
     background: var(--nova-surface);
   }
 
-  :deep(.email-row.email:not(.all-email))::after {
+  :deep(.virtual > div + div > .swipe-shell > .email-row.email:not(.all-email))::before {
     content: '';
 
     position: absolute;
-    /* Message dividers belong to the content area, independently of whether
-       the left checkbox column is present. */
+    /* Only rows after the first one paint a divider. This leaves the filter
+       divider as the only line above the first message and avoids a line after
+       the final message/no-more-data marker. */
     left: 8px;
     right: 8px;
-    bottom: 0;
+    top: 0;
 
     height: 1px;
 
@@ -2834,8 +2845,7 @@ ul {
   .email-container.mobile-selecting
     :deep(.email-row.email:not(.all-email)) {
     /* Selection adds its checkbox track without changing the normal row. */
-    grid-template-columns: var(--mail-list-selection-column) 48px minmax(0, 1fr);
-    column-gap: 0;
+    grid-template-columns: var(--mail-list-selection-column) 50px minmax(0, 1fr);
   }
 
   .email-container.mobile-selecting
@@ -2849,27 +2859,18 @@ ul {
     padding: 6px 0 0;
   }
 
-  .email-container.mobile-selecting
-    :deep(.email-row.email .mobile-sender-avatar) {
-    grid-column: 2;
-  }
-
-  .email-container.mobile-selecting
-    :deep(.email-row.email > .title) {
-    grid-column: 3;
-  }
-
   /* ---------- Sender avatar ---------- */
 
   .mobile-sender-avatar {
-    grid-column: 1;
+    grid-column: 2;
 
-    width: 48px;
-    height: 48px;
-    min-width: 48px;
-    min-height: 48px;
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    min-height: 40px;
 
-    /* The 12px grid gap supplies the avatar-to-copy breathing room. */
+    /* Anchored to the start of its 50px track: the remaining 10px is the
+       avatar-to-copy gap. */
     justify-self: start;
 
     display: grid;
@@ -2899,7 +2900,7 @@ ul {
   /* ---------- Message body ---------- */
 
   :deep(.email-row.email > .title) {
-    grid-column: 2;
+    grid-column: 3;
 
     width: 100%;
     min-width: 0;
