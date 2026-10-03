@@ -74,12 +74,36 @@ Nova Mail is a modern web mail client based on the open-source [cloud-mail](http
 - Cloudflare Email Workers receiving, Resend sending/status webhooks, and R2 attachment storage
 - Optional Telegram forwarding, webhook forwarding, verification-code extraction with Workers AI, and analytics
 - English and Simplified Chinese localization
+- Desktop mail keyboard shortcuts for navigation, selection, search, reading, composing, and common mail actions
+
+### Desktop keyboard shortcuts
+
+Keyboard shortcuts are enabled on desktop widths only and are ignored while
+typing in an input, textarea, select, or editable message area. Press `?` to
+open the in-app shortcut reference.
+
+| Keys | Action |
+| --- | --- |
+| `C` | Compose a message |
+| `/` | Focus mail search |
+| `G`, then `I/S/D/A/T` | Go to Inbox, Sent, Drafts, Archive, or Trash |
+| `J` / `↓`, `K` / `↑` | Move through the message list |
+| `Enter` / `O` | Open the selected message |
+| `X` | Select or clear the selected message |
+| `S` | Star or unstar the selected message |
+| `E` | Archive the selected message |
+| `#` / `Delete` | Move the selected message to Trash |
+| `Shift-I` / `Shift-U` | Mark the selected message read or unread |
+| `R` / `A` / `F` | Reply, reply all, or forward while reading |
+| `J` / `K` | Read the next or previous message |
+| `Esc` | Close dialogs, compose, search, profile menus, or the reader |
+| `Ctrl-Enter` | Send the open message |
 
 ### Theme palettes
 
 Nova Mail applies a complete five-color palette to both light and dark modes:
 accent, background, foreground, surface, and border. Select a preset from
-**Settings → Appearance**, then optionally fine-tune or import/export a custom
+**Settings → Visual Style**, then optionally fine-tune or import/export a custom
 palette without changing the mail layout.
 
 Built-in presets: **Nova Default**, **Terracotta**, **Forest**, **Lavender**,
