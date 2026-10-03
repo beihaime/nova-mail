@@ -415,6 +415,38 @@ jobs:
             echo "::warning::vapid_public_key is not on the Worker; Web Push will report itself unavailable."
           fi
 
+      # `/api/bootstrap` validates the `X-Bootstrap-Token` header against
+      # `c.env.BOOTSTRAP_TOKEN` (mail-worker/src/init/bootstrap.js). That value
+      # must live as a Cloudflare Worker *secret* — never a `[vars]` entry in
+      # wrangler-action.toml — and must be on the Worker before the Initialize
+      # database step calls the endpoint, otherwise a fresh D1 database can never
+      # be initialized. The value is piped over stdin so it never appears in the
+      # run log or the process list; `secret list` prints names only.
+      - name: 🔑 配置引导令牌 / Configure bootstrap secret
+        working-directory: ./mail-worker
+        run: |
+          if [ -z "$BOOTSTRAP_TOKEN" ]; then
+            echo "::warning::BOOTSTRAP_TOKEN is unset; first-time database initialization must be completed separately."
+            exit 0
+          fi
+
+          if [ "${#BOOTSTRAP_TOKEN}" -lt 32 ]; then
+            echo "❌ BOOTSTRAP_TOKEN must be at least 32 characters long."
+            exit 1
+          fi
+
+          if ! printf '%s' "$BOOTSTRAP_TOKEN" | pnpm wrangler secret put BOOTSTRAP_TOKEN -c wrangler-action.toml; then
+            echo "❌ Failed to upload BOOTSTRAP_TOKEN as a Worker secret; first-time initialization cannot run."
+            exit 1
+          fi
+
+          if pnpm wrangler secret list -c wrangler-action.toml 2>/dev/null | grep -q 'BOOTSTRAP_TOKEN'; then
+            echo "✅ BOOTSTRAP_TOKEN is on the Worker."
+          else
+            echo "❌ BOOTSTRAP_TOKEN is missing from the Worker secret list."
+            exit 1
+          fi
+
       - name: ♻️ 初始化数据库 / Initialize database
         run: |
           echo "🛠️ Checking database bootstrap status..."
