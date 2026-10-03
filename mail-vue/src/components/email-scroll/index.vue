@@ -25,19 +25,10 @@
           >×</button>
         </label>
 
-        <!-- Sort + multi-select live beside the search field so the filter bar
-             below can hand all four filters an equal share of the full row
-             width instead of splitting it with an action group. -->
+        <!-- The sort control stays at the far edge while the search field takes
+             all remaining room in this row. -->
         <div class="mobile-filter-actions">
           <MailSortButton mobile :time-sort="timeSort" @toggle="mobileSortClick" />
-
-          <button
-              class="mobile-tool-button nova-mobile-icon-button"
-              :aria-label="mobileSelecting ? t('cancel') : t('multiSelect')"
-              @click="toggleMobileSelection"
-          >
-            <Icon icon="solar:menu-dots-bold" width="21" height="21" />
-          </button>
         </div>
       </div>
 
@@ -715,14 +706,6 @@ function listClock(item) {
 
 function mobileSortClick() {
   emit('mobile-sort')
-}
-
-function toggleMobileSelection() {
-  mobileSelecting.value = !mobileSelecting.value
-
-  if (!mobileSelecting.value) {
-    handleCheckAllChange(false)
-  }
 }
 
 function toggleRowSelection(item) {
@@ -2813,14 +2796,21 @@ ul {
     text-overflow: ellipsis;
   }
 
-  /* Sort + multi-select behave as one right-aligned unit beside the search
-     field (see `.mobile-search-row`). */
+  /* Keep sorting at the right edge while the search field owns the remaining
+     width (see `.mobile-search-row`). */
   .mobile-filter-actions {
     flex: 0 0 auto;
 
     display: flex;
     align-items: center;
-    gap: 2px;
+  }
+
+  /* Preserve the existing glyph size while giving the sort action a reliable
+     phone-sized touch target. */
+  .mobile-filter-actions .mobile-sort {
+    flex: 0 0 44px;
+    width: 44px;
+    height: 44px;
   }
 
   .mobile-tool-button {
