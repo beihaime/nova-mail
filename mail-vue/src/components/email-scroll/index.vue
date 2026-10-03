@@ -194,7 +194,7 @@
                   <div v-if="item.checked" key="selected" class="selection-indicator" aria-hidden="true">
                     <Icon icon="mdi:check" width="22" height="22" />
                   </div>
-                <SenderAvatar v-else key="avatar" :email="item" :size="isPhone ? 52 : 28" />
+                <SenderAvatar v-else key="avatar" :email="item" :size="isPhone ? 46 : 28" />
                 </Transition>
               </div>
               <el-tooltip v-if="showStar" effect="dark" :content="item.isStar ? t('unstar') : t('star')" :show-after="2000">
@@ -557,8 +557,6 @@ const mobileFilters = computed(() => [
   { key: 'starred', label: t('starred') }
 ])
 
-let longPressTimer = null
-let longPressTriggered = false
 let skeletonRows = 0
 const timePaddingRight = ref('');
 const keyCount = ref(0);
@@ -627,7 +625,6 @@ onMounted(() => {
 
 onUnmounted(() => {
   clearInterval(timer)
-  clearTimeout(longPressTimer)
   // Match the previous per-instance ref behaviour: leaving the Inbox clears
   // the header search field.
   if (props.type === 'email') emailStore.mobileSearch = ''
@@ -729,29 +726,6 @@ function toggleRowSelection(item) {
   item.checked = !item.checked
 }
 
-function startLongPress(event, item) {
-  if (
-    !isPhone.value ||
-    props.type !== 'email' ||
-    event.pointerType === 'mouse'
-  ) {
-    return
-  }
-
-  longPressTriggered = false
-  clearTimeout(longPressTimer)
-
-  longPressTimer = setTimeout(() => {
-    mobileSelecting.value = true
-    item.checked = true
-    longPressTriggered = true
-  }, 500)
-}
-
-function stopLongPress() {
-  clearTimeout(longPressTimer)
-}
-
 /* ------------------------------------------------------------ swipe actions
  *
  * Mobile-only swipe-to-commit gesture behind Inbox rows. The action layer is
@@ -818,8 +792,6 @@ function abandonSwipe() {
 }
 
 function onRowPointerDown(event, item) {
-  startLongPress(event, item)
-
   if (!swipeEnabled() || event.pointerType === 'mouse') return
 
   // One mail item at a time: the previous drag snaps back immediately.
@@ -865,9 +837,6 @@ function onRowPointerMove(event) {
     return
   }
 
-  // A horizontal drag is never also a long press.
-  stopLongPress()
-
   if (!gesture.captured) {
     // Touch pointers are captured implicitly, pen pointers are not; taking the
     // capture explicitly keeps move/up coming even if the finger leaves the row.
@@ -901,8 +870,6 @@ function onRowPointerMove(event) {
 }
 
 function onRowPointerUp(event) {
-  stopLongPress()
-
   const gesture = swipeGesture
   if (!gesture || event.pointerId !== gesture.pointerId) return
   swipeGesture = null
@@ -920,8 +887,6 @@ function onRowPointerUp(event) {
 }
 
 function onRowPointerLeave() {
-  stopLongPress()
-
   // Touch pointers are implicitly captured, so a locked horizontal drag keeps
   // reporting even when the finger leaves the row. Only an undecided gesture is
   // abandoned here.
@@ -932,8 +897,6 @@ function onRowPointerLeave() {
 }
 
 function onRowPointerCancel() {
-  stopLongPress()
-
   if (!swipeGesture) return
   const gesture = swipeGesture
   swipeGesture = null
@@ -1222,6 +1185,14 @@ function visibleChange(e) {
 }
 
 const handleContextmenu = (event, email) => {
+
+  // The mail list has no long-press action menu on phones. Detail views keep
+  // their own context actions because this guard is scoped to this list.
+  if (isPhone.value) {
+    event.preventDefault()
+    event.stopPropagation()
+    return
+  }
 
   if (props.type === 'draft') {
     return
@@ -1644,11 +1615,6 @@ function jumpDetails(email, event) {
   // A horizontal drag ends with a click too; it must never open the message.
   if (swipeBlockClick) {
     swipeBlockClick = false
-    return
-  }
-
-  if (longPressTriggered) {
-    longPressTriggered = false
     return
   }
 
@@ -2438,7 +2404,7 @@ ul {
    sender, time, subject and preview cannot drift apart. */
 @media (max-width: 767px) {
   .email-container {
-    --mail-list-avatar-column: 52px;
+    --mail-list-avatar-column: 46px;
     grid-template-rows: auto auto minmax(0, 1fr);
   }
 
@@ -2868,7 +2834,7 @@ ul {
        avatar or timestamp horizontally. */
     /* Safe edge | avatar slot | fixed gap | content | time. The avatar is
        also the selection control, so both states share this exact geometry. */
-    grid-template-columns: 52px 14px minmax(0, 1fr) 64px;
+    grid-template-columns: 46px 12px minmax(0, 1fr) 64px;
 
     column-gap: 0;
 
@@ -2921,11 +2887,11 @@ ul {
   :deep(.email-row.email > .row-avatar) {
     grid-column: 1;
 
-    width: 52px;
-    height: 52px;
-    min-width: 52px;
-    min-height: 52px;
-    flex: 0 0 52px;
+    width: 46px;
+    height: 46px;
+    min-width: 46px;
+    min-height: 46px;
+    flex: 0 0 46px;
     flex-shrink: 0;
 
     /* The fixed avatar track keeps the message text aligned in every state. */
