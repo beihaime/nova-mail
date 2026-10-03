@@ -144,6 +144,22 @@
       </el-select>
     </div>
 
+    <div class="time-format">
+      <div class="title">{{ $t('timeFormat') }}</div>
+      <div class="time-format-options" role="radiogroup" :aria-label="$t('timeFormat')">
+        <button
+          v-for="option in timeFormatOptions"
+          :key="option.value"
+          type="button"
+          class="time-format-option nova-segmented-button"
+          :class="{ active: settingStore.timeFormat === option.value }"
+          :aria-checked="settingStore.timeFormat === option.value"
+          role="radio"
+          @click="settingStore.timeFormat = option.value"
+        >{{ option.label }}</button>
+      </div>
+    </div>
+
     <div class="notification">
       <div class="title">{{ $t('notification') }}</div>
 
@@ -252,6 +268,10 @@ const setPwdLoading = ref(false)
 const setNameShow = ref(false)
 const accountName = ref(null)
 const langSelect = ref(settingStore.lang)
+const timeFormatOptions = computed(() => [
+  { value: '24h', label: t('timeFormat24h') },
+  { value: '12h', label: t('timeFormat12h') },
+])
 const githubLoading = ref(false)
 const githubAccount = reactive({ connected: false, login: '', avatarUrl: '' })
 const googleLoading = ref(false)
@@ -802,6 +822,23 @@ function submitPwd() {
     }
   }
 
+  .time-format {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-bottom: 40px;
+  }
+
+  .time-format-options {
+    display: inline-flex;
+    align-self: flex-start;
+    gap: 6px;
+  }
+
+  .time-format-option {
+    min-width: 104px;
+  }
+
   .connected-accounts {
     display: grid;
     gap: 16px;
@@ -1143,6 +1180,8 @@ function submitPwd() {
   .appearance-reset-row :deep(.el-button) { flex: 0 0 auto; }
 
   @media (max-width: 767px) {
+    .time-format-options { width: 100%; }
+    .time-format-option { flex: 1 1 0; min-width: 0; }
     .appearance-row { gap: 12px; padding: 12px; }
     .appearance-mode-row { display: block; }
     .appearance-mode-row .appearance-label { margin-bottom: 10px; }

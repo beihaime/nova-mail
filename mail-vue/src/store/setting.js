@@ -13,11 +13,12 @@ export const useSettingStore = defineStore('setting', {
         // survive reloads and the installed PWA without a server round trip.
         notificationSound: true,
         notificationSoundType: DEFAULT_NOTIFICATION_SOUND,
+        timeFormat: '24h',
     }),
     actions: {
 
     },
     persist: {
-        pick: ['lang', 'notificationSound', 'notificationSoundType'],
+        pick: ['lang', 'notificationSound', 'notificationSoundType', 'timeFormat'],
     },
 })

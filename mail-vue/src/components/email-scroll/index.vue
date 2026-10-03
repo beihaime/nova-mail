@@ -183,19 +183,6 @@
                 </button>
               </el-tooltip>
               <div v-if="!showStar"></div>
-              <!-- Reserved unread gutter. The slot always owns its track, so a
-                   read/unread flip cannot shift the avatar or the message text;
-                   only the dot inside it is conditional. -->
-              <span
-                  v-if="type === 'email'"
-                  class="mobile-unread-slot"
-                  aria-hidden="true"
-              >
-                <span
-                    v-if="item.unread === EmailUnreadEnum.UNREAD && showUnread"
-                    class="mobile-unread-dot"
-                />
-              </span>
               <SenderAvatar
                   v-if="type === 'email' && isPhone"
                   class="mobile-sender-avatar"
@@ -219,16 +206,14 @@
                   <span class="name">
                     <span>
                       <SenderAvatar v-if="!isPhone" :email="item" :size="28" />
-                      <div class="unread" v-if="isMobile && (item.unread === EmailUnreadEnum.UNREAD && showUnread) "/>
                       <slot name="name" :email="item"> {{ item.name }}</slot>
                     </span>
                   </span>
-                  <span class="phone-time">{{ item.formatCreateTime }}</span>
+                  <span class="phone-time">{{ listClock(item) }}</span>
                 </div>
                 <div>
                   <div class="email-text">
                     <span class="email-subject" :style="(item.unread === EmailUnreadEnum.UNREAD && showUnread)  ? 'font-weight: bold' : ''">
-                      <div class="unread" v-if="!isMobile && (item.unread === EmailUnreadEnum.UNREAD && showUnread) "/>
                       <span v-if="item.code" class="code-tag" @click.stop="copyCode(item.code)">[{{ t('codeLabel') }}{{ item.code }}]</span>
                       <span class="subject-text">
                         <slot name="subject" :email="item" >
@@ -259,13 +244,19 @@
                 </div>
               </div>
               <div class="email-right" :style="showUserInfo ? 'align-self: start;':''">
-                <span class="email-time" :style="(item.unread === EmailUnreadEnum.UNREAD && showUnread) ? 'font-weight: bold' : ''">{{ item.formatCreateTime }}</span>
+                <span class="email-time-meta">
+                  <span class="email-time">{{ listClock(item) }}</span>
+                  <span v-if="item.unread === EmailUnreadEnum.UNREAD && showUnread" class="unread-dot" aria-label="Unread" />
+                </span>
               </div>
               <!-- Fixed right-hand metadata column.  The Inbox's phone layout
                    deliberately keeps starring out of this dense list so the
                    subject and preview retain the extra room below the time. -->
-              <div v-if="type === 'email'" class="mobile-row-meta">
-                <span class="mobile-meta-time">{{ listClock(item) }}</span>
+              <div class="mobile-row-meta">
+                <span class="mobile-meta-time">
+                  <span>{{ listClock(item) }}</span>
+                  <span v-if="item.unread === EmailUnreadEnum.UNREAD && showUnread" class="unread-dot" aria-label="Unread" />
+                </span>
               </div>
             </div>
             </div>
@@ -404,7 +395,7 @@ import {useEmailStore} from "@/store/email.js";
 import {useUiStore} from "@/store/ui.js";
 import {useSettingStore} from "@/store/setting.js";
 import {sleep} from "@/utils/time-utils.js"
-import {fromNow, formatListClock} from "@/utils/day.js";
+import {formatListClock} from "@/utils/day.js";
 import {useI18n} from "vue-i18n";
 import {EmailUnreadEnum} from "@/enums/email-enum.js";
 import { UseVirtualList } from '@vueuse/components'
@@ -610,7 +601,7 @@ onActivated(() => {
 onMounted(() => {
   timer = setInterval(() => {
     emailList.forEach(email => {
-      email.formatCreateTime = fromNow(email.createTime);
+      email.formatCreateTime = formatListClock(email.createTime);
     })
   }, 1000 * 60);
 })
@@ -687,9 +678,8 @@ function selectMobileFilter(filter) {
 /**
  * Right-hand list timestamp.
  *
- * A fixed 24-hour clock ("08:05") for today's mail, a short date otherwise —
- * never `fromNow`'s relative wording, which made a column of rows read as
- * prose instead of a scannable set of timestamps.
+ * A clock based on the user's 12/24-hour preference for today's mail, and a
+ * short date otherwise — never relative wording, so the column stays scannable.
  */
 function listClock(item) {
   return item?.createTime ? formatListClock(item.createTime) : (item?.formatCreateTime || '')
@@ -1545,7 +1535,7 @@ function addItem(email) {
     return false;
   }
 
-  email.formatCreateTime = fromNow(email.formatCreateTime);
+  email.formatCreateTime = formatListClock(email.createTime || email.formatCreateTime);
 
   if (props.timeSort) {
     if (noLoading.value) {
@@ -1719,7 +1709,7 @@ function getEmailList(refresh = false) {
 
 function handleList(list) {
   list.forEach(email => {
-    email.formatCreateTime = fromNow(email.createTime);
+    email.formatCreateTime = formatListClock(email.createTime);
     email.test = t('received')
     const statusIconMap = {
       0: { icon: 'ic:round-mark-email-read', color: '#51C76B', content: t('received') },
@@ -2155,6 +2145,25 @@ function loadData() {
   padding-right: v-bind(timePaddingRight);
 }
 
+.email-time-meta,
+.mobile-meta-time {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.unread-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 50%;
+  background: var(--el-color-primary);
+}
+
 :deep(.el-scrollbar__view) {
   height: 100%;
 }
@@ -2329,6 +2338,10 @@ ul {
     text-align: right;
   }
 
+  :deep(.email-row:not(.all-email) .email-time-meta) {
+    width: 100%;
+  }
+
   :deep(.email-row:not(.all-email) .email-time) {
     padding-right: 0;
   }
@@ -2431,12 +2444,7 @@ ul {
   }
 
   :deep(.email-row:not(.all-email) .phone-time) {
-    min-width: max-content;
-    padding: 0;
-    color: var(--secondary-text-color);
-    font-size: 12px;
-    line-height: 28px;
-    white-space: nowrap;
+    display: none;
   }
 
   :deep(.email-row:not(.all-email) .email-text) {
@@ -2484,7 +2492,6 @@ ul {
    ========================================================= */
 
 .mobile-inbox-tools,
-.mobile-unread-slot,
 .mobile-sender-avatar,
 .mobile-row-meta,
 .mobile-row-star,
@@ -2839,42 +2846,6 @@ ul {
     padding: 6px 0 0;
   }
 
-  .email-container.mobile-selecting
-    .mobile-unread-slot {
-    display: none;
-  }
-
-  /* ---------- Unread gutter ---------- */
-
-  /* A permanent 16px track left of the avatar. Read rows keep the empty slot so
-     toggling read/unread never changes the row's horizontal geometry. */
-  .mobile-unread-slot {
-    grid-column: 1;
-
-    /* Match the avatar's box so the dot lines up with the avatar's centre even
-       though the row aligns its items to the top. */
-    align-self: start;
-
-    width: 100%;
-    height: 40px;
-
-    display: grid;
-    place-items: center;
-  }
-
-  .mobile-unread-dot {
-    width: 8px;
-    height: 8px;
-
-    border-radius: 999px;
-
-    /* Centred in the gutter so it reads as "beside the avatar" without being
-       pushed against the avatar's edge now that the tracks are flush. */
-    justify-self: center;
-
-    background: var(--el-color-primary);
-  }
-
   /* ---------- Sender avatar ---------- */
 
   .mobile-sender-avatar {
@@ -2948,7 +2919,7 @@ ul {
     /* Overflow lives in the row's own meta column now. */
     /* Time sits over the first line only, leaving the preview below free to
        use the full body width after the mobile list star was removed. */
-    padding-right: 68px;
+    padding-right: 86px;
 
     color: var(--mobile-primary);
 
@@ -3019,7 +2990,7 @@ ul {
     font-size: 15px;
     line-height: 19px;
     font-weight: 400;
-    padding-right: 68px;
+    padding-right: 86px;
   }
 
   :deep(.email-row.email.is-unread .email-subject) {
@@ -3053,10 +3024,6 @@ ul {
     font-weight: 400;
   }
 
-  /* ---------- Unread blue dot ----------
-     The dot itself lives in the reserved `.mobile-unread-slot` track (see
-     above); no absolutely-positioned pseudo-element pins it to the edge. */
-
   /* ---------- Timestamp ---------- */
 
   .mobile-row-meta {
@@ -3067,7 +3034,7 @@ ul {
     /* The date belongs to the sender line only. It no longer reserves a full
        height column now that the mobile Inbox has no inline star action. */
     width: auto;
-    max-width: 64px;
+    max-width: none;
 
     display: flex;
     flex-direction: column;
@@ -3082,11 +3049,8 @@ ul {
   .mobile-meta-time {
     display: block;
 
-    max-width: 100%;
-
-    overflow: hidden;
+    max-width: none;
     white-space: nowrap;
-    text-overflow: ellipsis;
     text-align: right;
 
     /* Tabular digits keep the label from twitching as the value changes. */
@@ -3096,9 +3060,15 @@ ul {
        date is still legible at this size. */
     color: color-mix(in srgb, var(--mobile-secondary) 82%, transparent);
 
-    font-size: 14px;
+    font-size: 13px;
     line-height: 1.2;
     font-weight: 400;
+  }
+
+  :deep(.email-row.email .mobile-meta-time .unread-dot) {
+    width: 6px;
+    height: 6px;
+    flex-basis: 6px;
   }
 
   /* ---------- Mobile star ---------- */
