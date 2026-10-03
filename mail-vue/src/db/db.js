@@ -3,23 +3,25 @@ import {useUserStore} from "@/store/user.js"
 import { watch, shallowRef } from "vue";
 
 const userStore = useUserStore();
+const db = shallowRef(null)
 
-
-let db =  shallowRef({})
-
-function createDB() {
-    db.value = new Dexie(userStore.user.email);
-    db.value.version(1).stores({
+function createDB(email) {
+    db.value?.close()
+    if (!email) {
+        db.value = null
+        return
+    }
+    const next = new Dexie(email);
+    next.version(1).stores({
         draft: '++draftId,createTime'
     })
 
-    db.value.version(1).stores({
+    next.version(1).stores({
         att: 'draftId'
     })
+    db.value = next
 }
 
-createDB()
-
-watch(() => userStore.user.email,() => createDB())
+watch(() => userStore.user.email, createDB, { immediate: true, flush: 'sync' })
 
 export default db;

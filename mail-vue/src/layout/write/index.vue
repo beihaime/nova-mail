@@ -129,6 +129,7 @@ import router from "@/router/index.js";
 import {ElMessageBox} from "element-plus";
 import {accountList} from "@/request/account.js";
 import {restoreDraftRecipients, validateCompose} from "@/utils/compose-validate.js";
+import {clearAuthenticatedSession} from '@/utils/session-state.js';
 
 defineExpose({
   open,
@@ -412,7 +413,7 @@ async function sendEmail() {
       position: 'bottom-right'
     })
     if (e.code === 401) {
-      localStorage.removeItem('token');
+      clearAuthenticatedSession();
       router.replace('/login');
     }
     show.value = true

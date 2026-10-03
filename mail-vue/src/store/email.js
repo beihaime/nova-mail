@@ -36,9 +36,6 @@ export const useEmailStore = defineStore('email', {
         // only, never persisted.
         notifyCursor: 0,
     }),
-    persist: {
-        pick: ['contentData'],
-    },
     actions: {
         clearStarForEmailIds(emailIds) {
             const ids = new Set((Array.isArray(emailIds) ? emailIds : [emailIds]).map(Number))

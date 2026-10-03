@@ -32,6 +32,7 @@ import { useAccountStore } from '@/store/account.js'
 import { useEmailStore } from '@/store/email.js'
 import emailScroll from '@/components/email-scroll/index.vue'
 import { emailDeleteForever, emailList, emailRead, emailRestore } from '@/request/email.js'
+import { runOptimisticMailMutation } from '@/utils/optimistic-mail-mutation.js'
 import router from '@/router/index.js'
 
 defineOptions({ name: 'trash' })
@@ -60,12 +61,26 @@ function jumpContent(row) {
   router.push('/mail')
 }
 
-async function restoreSelected() {
+function restoreSelected() {
   const ids = selectedIds.value
   if (!ids.length) return
-  await emailRestore(ids)
-  scroll.value.deleteEmail(ids)
-  ElMessage({ message: t('restoreSuccessMsg'), type: 'success', plain: true })
+  let snapshot = []
+
+  // Restoring from Trash follows the same immediate mutation contract as
+  // Archive/Trash: the list changes now, persistence is reconciled later.
+  const mutation = runOptimisticMailMutation({
+    ids,
+    apply: () => { snapshot = scroll.value?.removeEmailsOptimistically?.(ids) || [] },
+    persist: () => emailRestore(ids),
+    rollback: () => scroll.value?.restoreEmailsOptimistically?.(snapshot),
+    onPersistError: error => {
+      console.error(error)
+      ElMessage({ message: t('reqFailErrorMsg'), type: 'error', plain: true })
+    },
+  })
+  if (mutation && snapshot.length) {
+    ElMessage({ message: t('restoreSuccessMsg'), type: 'success', plain: true })
+  }
 }
 
 </script>

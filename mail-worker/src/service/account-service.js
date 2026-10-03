@@ -12,6 +12,7 @@ import turnstileService from './turnstile-service';
 import roleService from './role-service';
 import { t } from '../i18n/i18n';
 import verifyRecordService from './verify-record-service';
+import { pageNumber, pageSize } from '../utils/pagination';
 
 const accountService = {
 
@@ -117,12 +118,8 @@ const accountService = {
 		let { accountId, size, lastSort } = params;
 
 		accountId = Number(accountId);
-		size = Number(size);
+		size = pageSize(size, 30, 30);
 		lastSort = Number(lastSort);
-
-		if (size > 30) {
-			size = 30;
-		}
 
 		if (!accountId) {
 			accountId = 0;
@@ -245,12 +242,8 @@ const accountService = {
 
 		userId = Number(userId)
 
-		num = Number(num)
-		size = Number(size)
-
-		if (size > 30) {
-			size = 30;
-		}
+		num = pageNumber(num)
+		size = pageSize(size, 30, 30)
 
 		num = (num - 1) * size;
 

@@ -21,6 +21,7 @@ import oauthService from "./oauth-service";
 import settingService from './setting-service';
 import starService from './star-service';
 import userContext from '../security/user-context';
+import { pageNumber, pageSize } from '../utils/pagination';
 
 const userService = {
 
@@ -66,6 +67,33 @@ const userService = {
 		}
 		const { salt, hash } = await cryptoUtils.hashPassword(password);
 		await orm(c).update(user).set({ password: hash, salt: salt }).where(eq(user.userId, userId)).run();
+	},
+
+	async changePassword(c, params, userId) {
+		const sessionId = c.get('session')?.session_id;
+		const token = await userContext.getToken(c);
+		if (!sessionId || !token) throw new BizError(t('authExpired'), 401);
+
+		const { password } = params || {};
+		if (typeof password !== 'string' || password.length < 6) {
+			throw new BizError(t('pwdMinLength'));
+		}
+		const { salt, hash } = await cryptoUtils.hashPassword(password);
+		const now = Date.now();
+		// D1 batch is transactional: a failed revocation cannot leave a changed
+		// password with the previous D1 sessions still active.
+		await c.env.db.batch([
+			c.env.db.prepare('UPDATE user SET password = ?, salt = ? WHERE user_id = ?').bind(hash, salt, userId),
+			c.env.db.prepare('UPDATE auth_session SET revoked_at = ? WHERE user_id = ? AND session_id != ? AND revoked_at IS NULL').bind(now, userId, sessionId),
+		]);
+
+		// D1 remains authoritative if KV is temporarily unavailable. Trim KV as
+		// well so it contains only the current session after a successful change.
+		const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
+		if (authInfo) {
+			authInfo.tokens = authInfo.tokens.filter(item => item === token);
+			await c.env.kv.put(KvConst.AUTH_INFO + userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
+		}
 	},
 
 	selectByEmail(c, email) {
@@ -125,22 +153,10 @@ const userService = {
 
 		let { num, size, email, timeSort, status } = params;
 
-		size = Number(size);
-		num = Number(num);
+		size = pageSize(size, 50);
+		num = pageNumber(num);
 		timeSort = Number(timeSort);
 		params.isDel = Number(params.isDel);
-
-		if (isNaN(size)) {
-			size = 50;
-		}
-
-		if (isNaN(num)) {
-			num = 1;
-		}
-
-		if (size > 50) {
-			size = 50;
-		}
 
 		num = (num - 1) * size;
 

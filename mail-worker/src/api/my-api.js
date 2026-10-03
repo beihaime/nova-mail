@@ -9,7 +9,7 @@ app.get('/my/loginUserInfo', async (c) => {
 });
 
 app.put('/my/resetPassword', async (c) => {
-	await userService.resetPassword(c, await c.req.json(), userContext.getUserId(c));
+	await userService.changePassword(c, await c.req.json(), userContext.getUserId(c));
 	return c.json(result.ok());
 });
 
@@ -17,5 +17,4 @@ app.delete('/my/delete', async (c) => {
 	await userService.delete(c, userContext.getUserId(c));
 	return c.json(result.ok());
 });
-
 

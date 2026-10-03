@@ -18,8 +18,9 @@ export const useUserStore = defineStore('user', {
             })
         },
         refreshUserInfo() {
-            loginUserInfo().then(user => {
-                this.user = user
+            loginUserInfo().then(async user => {
+                const {adoptAuthenticatedUser} = await import('@/utils/session-state.js')
+                adoptAuthenticatedUser(user)
             })
         },
         async refreshGithubAccount() {

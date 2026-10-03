@@ -13,6 +13,7 @@ import { roleConst } from '../const/entity-const';
 import email from '../entity/email';
 import rateLimitUtils from '../utils/rate-limit-utils';
 import userContext from '../security/user-context';
+import { pageNumber, pageSize } from '../utils/pagination';
 
 const publicService = {
 	assertAdmin(c) {
@@ -41,19 +42,8 @@ const publicService = {
 			isDel: email.isDel,
 		}).from(email);
 
-		size = Number(size);
-		num = Number(num);
-
-		if (!size || isNaN(size) || size < 1) {
-			size = 20;
-		}
-		if (size > 50) {
-			size = 50;
-		}
-
-		if (!num || isNaN(num) || num < 1) {
-			num = 1;
-		}
+		size = pageSize(size, 20);
+		num = pageNumber(num);
 
 		num = (num - 1) * size;
 

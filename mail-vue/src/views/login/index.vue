@@ -198,6 +198,7 @@ import {useI18n} from "vue-i18n";
 import {githubOauthComplete, googleOauthComplete, oauthBindUser, oauthComplete} from "@/request/ouath.js";
 import {getDeviceId, isInstalledPwa} from '@/utils/device-id.js';
 import {loadMailDensity} from '@/utils/mail-density.js';
+import {adoptAuthenticatedUser, clearUserScopedState} from '@/utils/session-state.js';
 import brandMark from '@/icons/svg/brand-mark.svg'
 // Imported (not a /public URL) so Vite emits a content-hashed file: replacing the
 // artwork produces a new URL and therefore bypasses any cached copy. Public
@@ -536,13 +537,12 @@ const submit = () => {
 }
 
 async function saveToken(token) {
+  clearUserScopedState()
   localStorage.setItem('token', token)
   refreshWebsiteConfig()
   const user = await loginUserInfo();
   await loadMailDensity(settingStore)
-  accountStore.currentAccountId = user.account.accountId;
-  accountStore.currentAccount = user.account;
-  userStore.user = user;
+  adoptAuthenticatedUser(user);
   const routers = permsToRouter(user.permKeys);
   routers.forEach(routerData => {
     router.addRoute('layout', routerData);

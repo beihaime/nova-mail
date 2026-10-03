@@ -2,6 +2,10 @@ import axios from "axios";
 import router from "@/router";
 import i18n from "@/i18n/index.js";
 import {useSettingStore} from "@/store/setting.js";
+import {clearAuthenticatedSession} from '@/utils/session-state.js';
+
+const currentAuthorization = () => `${localStorage.getItem('token')}`
+const isStaleRequest = config => config?.headers?.Authorization !== currentAuthorization()
 
 let http = axios.create({
     baseURL: import.meta.env.VITE_BASE_URL
@@ -9,12 +13,14 @@ let http = axios.create({
 
 http.interceptors.request.use(config => {
     const { lang } = useSettingStore();
-    config.headers.Authorization = `${localStorage.getItem('token')}`
+    config.headers.Authorization = currentAuthorization()
     config.headers['accept-language'] = lang
     return config
 })
 
 http.interceptors.response.use((res) => {
+		// A response started under a previous identity must not populate current stores.
+		if (isStaleRequest(res.config)) return Promise.reject(new Error('Session changed'))
 		if (res.config.responseType === 'blob') {
 			return res.data
 		}
@@ -24,21 +30,20 @@ http.interceptors.response.use((res) => {
             const noMsg = res.config.noMsg;
             const data = res.data
 
-            if (noMsg) {
-
-                data.code === 200 ? resolve(data.data) : reject(data)
-
-            } else if (data.code === 401) {
-                ElMessage({
+            if (data.code === 401) {
+                if (!noMsg) ElMessage({
                     message: data.message,
                     type: 'error',
                     plain: true,
                     grouping: true,
                     repeatNum: -4,
                 })
-                localStorage.removeItem('token')
+                clearAuthenticatedSession()
                 router.replace('/login')
                 reject(data)
+            } else if (noMsg) {
+
+                data.code === 200 ? resolve(data.data) : reject(data)
             } else if (data.code === 403) {
                 ElMessage({
                     message: data.message,
@@ -83,6 +88,13 @@ http.interceptors.response.use((res) => {
         })
     },
     (error) => {
+
+        if (isStaleRequest(error.config)) return Promise.reject(error)
+        if (error.response?.status === 401) {
+            clearAuthenticatedSession()
+            router.replace('/login')
+            return Promise.reject(error)
+        }
 
         if (error.status === 429) {
             ElMessage({
@@ -141,4 +153,3 @@ http.interceptors.response.use((res) => {
     })
 
 export default http
-

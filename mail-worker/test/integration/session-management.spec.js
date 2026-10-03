@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { env } from 'cloudflare:test';
 import { api, createAccount, sessionFor } from './helpers';
 import loginService from '../../src/service/login-service';
+import KvConst from '../../src/const/kv-const';
 
 describe('Devices & Sessions', () => {
   it('lists only the caller sessions and marks the current session', async () => {
@@ -28,6 +29,27 @@ describe('Devices & Sessions', () => {
     expect((await revoke.json()).code).toBe(200);
     const denied = await api('/api/account/sessions', { token: secondToken });
     expect((await denied.json()).code).toBe(401);
+  });
+
+  it('changes a password while keeping only the current D1 and KV session', async () => {
+    const owner = await createAccount();
+    const current = await sessionFor(owner);
+    const otherToken = await loginService.createSession({ env, req: { header: () => '' } }, owner.user);
+
+    const changed = await api('/api/my/resetPassword', {
+      token: current.token, method: 'PUT', body: { password: 'new-test-password' },
+    });
+    expect((await changed.json()).code).toBe(200);
+
+    const other = await api('/api/my/loginUserInfo', { token: otherToken });
+    expect((await other.json()).code).toBe(401);
+    const stillCurrent = await api('/api/my/loginUserInfo', { token: current.token });
+    expect((await stillCurrent.json()).code).toBe(200);
+
+    const sessions = await env.db.prepare('SELECT revoked_at FROM auth_session WHERE user_id = ?').bind(owner.userId).all();
+    expect(sessions.results.filter(row => row.revoked_at === null)).toHaveLength(1);
+    const authInfo = await env.kv.get(KvConst.AUTH_INFO + owner.userId, { type: 'json' });
+    expect(authInfo.tokens).toHaveLength(1);
   });
 
   it('cannot revoke another user session', async () => {

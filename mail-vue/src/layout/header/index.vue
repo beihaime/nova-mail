@@ -157,6 +157,7 @@ import {accountList} from "@/request/account.js";
 import {useAccountStore} from "@/store/account.js";
 import {useEmailStore} from "@/store/email.js";
 import {useMailSearch} from "@/composables/use-mail-search.js";
+import {clearAuthenticatedSession} from '@/utils/session-state.js';
 
 defineExpose({ closeProfilePopup })
 
@@ -332,7 +333,7 @@ function clickLogout() {
   closeProfilePopup()
   logoutLoading.value = true
   logout().then(() => {
-    localStorage.removeItem("token")
+    clearAuthenticatedSession()
     router.replace('/login')
   }).finally(() => {
     logoutLoading.value = false

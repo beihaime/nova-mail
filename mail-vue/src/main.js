@@ -36,6 +36,13 @@ if (isUiPreview) {
     ])
     const pinia = createPinia().use(piniaPersistedState)
     const app = createApp(App).use(pinia)
+    const {clearUserScopedState} = await import('@/utils/session-state.js')
+    window.addEventListener('storage', event => {
+        if (event.key === 'token' && event.oldValue !== event.newValue) {
+            clearUserScopedState()
+            window.location.reload()
+        }
+    })
     let bootError = null
     try {
         bootError = await init()
@@ -43,7 +50,8 @@ if (isUiPreview) {
         // Keep the real error in the console for diagnosis, but do not mount
         // the app with a token that could not be authenticated.
         console.error('Nova Mail failed to initialize', error)
-        localStorage.removeItem('token')
+        const {clearAuthenticatedSession} = await import('@/utils/session-state.js')
+        clearAuthenticatedSession()
         bootError = { error }
     }
     if (bootError) {

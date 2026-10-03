@@ -8,6 +8,7 @@ import { emailListColumns, emailBriefColumns } from '../lib/email-list-columns';
 import { isDel } from '../const/entity-const';
 import attService from "./att-service";
 import senderAvatarService from './sender-avatar-service';
+import { pageSize } from '../utils/pagination';
 import { t } from '../i18n/i18n'
 const starService = {
 
@@ -42,7 +43,7 @@ const starService = {
 	async list(c, params, userId) {
 		let { emailId, size, full } = params;
 		emailId = Number(emailId) || 0;
-		size = Number(size);
+		size = pageSize(size, 50);
 		full = Number(full) === 1;
 		const columns = full ? emailListColumns : emailBriefColumns;
 

@@ -1,6 +1,4 @@
-import {useUserStore} from "@/store/user.js";
 import {useSettingStore} from "@/store/setting.js";
-import {useAccountStore} from "@/store/account.js";
 import {loginUserInfo} from "@/request/my.js";
 import {permsToRouter} from "@/perm/perm.js";
 import router from "@/router";
@@ -8,13 +6,15 @@ import {websiteConfig} from "@/request/setting.js";
 import i18n from "@/i18n/index.js";
 import {resolveLocale, applyDocumentLocale} from "@/i18n/locale.js";
 import {loadMailDensity} from '@/utils/mail-density.js';
+import {adoptAuthenticatedUser, clearAuthenticatedSession, clearUserScopedState} from '@/utils/session-state.js';
 
 export async function init() {
     document.title = '\u200B'
 
+    // Clear any legacy persisted mail before the authenticated identity is known.
+    clearUserScopedState()
+
     const settingStore = useSettingStore();
-    const userStore = useUserStore();
-    const accountStore = useAccountStore();
 
     const token = localStorage.getItem('token');
 
@@ -41,9 +41,7 @@ export async function init() {
 
         if (user) {
             await loadMailDensity(settingStore);
-            accountStore.currentAccountId = user.account.accountId;
-            accountStore.currentAccount = user.account;
-            userStore.user = user;
+            adoptAuthenticatedUser(user);
 
             const routers = permsToRouter(user.permKeys);
             routers.forEach(routerData => {
@@ -54,7 +52,7 @@ export async function init() {
             // place and let the SPA continue as if the session were valid.
             // Clearing it makes the router fail closed and send the user to
             // the login screen after the boot UI is dismissed.
-            localStorage.removeItem('token');
+            clearAuthenticatedSession();
             return { error: authError || new Error('Unable to verify the current session') };
         }
 

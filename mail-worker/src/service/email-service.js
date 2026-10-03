@@ -29,6 +29,7 @@ import { MAIL_BODY } from '../lib/mail-body';
 import threadService from './thread-service';
 import senderAvatarService from './sender-avatar-service';
 import pushService from './push-service';
+import { pageSize } from '../utils/pagination';
 
 const MAX_SEARCH_LENGTH = 200;
 
@@ -122,7 +123,7 @@ const emailService = {
 
 		let { emailId, type, accountId, size, timeSort, allReceive, full, keyword, archived, trashed } = params;
 
-		size = Number(size);
+		size = pageSize(size);
 		// Trash contains both received and sent copies.  Normal folders still send
 		// their concrete numeric type; the owner-only Trash view is the one caller
 		// allowed to request all types.
@@ -149,19 +150,12 @@ const emailService = {
 			throw new BizError(t('emptyAccountId'));
 		}
 
-		if (isNaN(size)) {
-			size = 10;
-		}
 
 		if (isNaN(full)) {
 			full = 1;
 		}
 
 		full = full === 1;
-
-		if (size > 50) {
-			size = 50;
-		}
 
 		if (isNaN(allReceive)) {
 			let accountRow = await accountService.selectById(c, accountId);
@@ -1429,21 +1423,13 @@ const emailService = {
 
 		let { emailId, size, name, subject, accountEmail, userEmail, type, timeSort, full } = params;
 
-		size = Number(size);
+		size = pageSize(size);
 		emailId = Number(emailId) || 0;
 		timeSort = Number(timeSort);
 		full = Number(full);
 
 		if (type === undefined) {
 			type = 'receive';
-		}
-
-		if (isNaN(size)) {
-			size = 10;
-		}
-
-		if (size > 50) {
-			size = 50;
 		}
 
 		if (isNaN(full)) {

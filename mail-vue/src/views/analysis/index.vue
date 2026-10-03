@@ -130,6 +130,7 @@ import {debounce} from "lodash-es";
 import loading from "@/components/loading/index.vue";
 import {useRoute} from "vue-router";
 import {useI18n} from 'vue-i18n';
+import {senderTooltipRendering} from '@/utils/analytics-tooltip.js';
 
 defineOptions({
   name: 'analysis'
@@ -326,13 +327,11 @@ function createSenderPie() {
   let option = {
     tooltip: {
       trigger: 'item',
+      ...senderTooltipRendering,
       textStyle: {
         color: topic.value.color
       },
       backgroundColor: topic.value.background,
-      formatter: params => {
-        return `${params.marker} ${params.name}： ${params.value} (${params.percent}%)`;
-      }
     },
     legend: {
       type: 'scroll',
@@ -925,9 +924,6 @@ function createSendGauge() {
 }
 
 </style>
-
-
-
 
 
 
