@@ -208,6 +208,9 @@
                 </button>
               </el-tooltip>
               <div v-if="!showStar" class="pc-star-placeholder"></div>
+              <span v-if="!isPhone" class="desktop-unread-indicator">
+                <span v-if="item.unread === EmailUnreadEnum.UNREAD && showUnread" class="unread-dot" aria-label="Unread" />
+              </span>
               <div
                   v-if="isPhone"
                   class="row-avatar"
@@ -291,7 +294,7 @@
               <div class="email-right" :style="showUserInfo ? 'align-self: start;':''">
                 <span class="email-time-meta">
                   <span class="email-time">{{ listClock(item) }}</span>
-                  <span v-if="item.unread === EmailUnreadEnum.UNREAD && showUnread" class="unread-dot" aria-label="Unread" />
+                  <span v-if="isPhone && item.unread === EmailUnreadEnum.UNREAD && showUnread" class="unread-dot" aria-label="Unread" />
                 </span>
               </div>
             </div>
@@ -1930,6 +1933,7 @@ function loadData() {
 
 .email-container {
   --mail-list-selection-column: 24px;
+  --mail-list-unread-column: 10px;
   --mail-list-avatar-column: 28px;
   --mail-list-column-gap: 8px;
   --mail-list-horizontal-padding: 14px;
@@ -2445,7 +2449,7 @@ ul {
 
   :deep(.email-row:not(.all-email)) {
     display: grid;
-    grid-template-columns: var(--mail-list-selection-column) var(--nova-icon-button-size) var(--mail-list-avatar-column) minmax(0, 1fr) 82px;
+    grid-template-columns: var(--mail-list-selection-column) var(--nova-icon-button-size) var(--mail-list-unread-column) var(--mail-list-avatar-column) minmax(0, 1fr) 82px;
     align-items: center;
     gap: var(--mail-list-column-gap);
     height: var(--mail-row-height-desktop);
@@ -2471,9 +2475,21 @@ ul {
     grid-column: 2;
   }
 
+  :deep(.email-row > .desktop-unread-indicator) {
+    display: grid;
+    place-items: center;
+    flex: 0 0 var(--mail-list-unread-column);
+    width: var(--mail-list-unread-column);
+    height: var(--mail-list-unread-column);
+  }
+
+  :deep(.email-row:not(.all-email) > .desktop-unread-indicator) {
+    grid-column: 3;
+  }
+
   :deep(.email-row:not(.all-email) > .row-avatar),
   :deep(.email-row:not(.all-email) > .desktop-avatar-skeleton) {
-    grid-column: 3;
+    grid-column: 4;
   }
 
   :deep(.email-row > .row-avatar) {
@@ -2489,7 +2505,7 @@ ul {
   }
 
   :deep(.email-row:not(.all-email) .title) {
-    grid-column: 4;
+    grid-column: 5;
     display: grid;
     grid-template-columns: minmax(130px, 30%) minmax(0, 1fr) !important;
     align-items: center;
@@ -2539,7 +2555,7 @@ ul {
 
   :deep(.email-row:not(.all-email) > .email-right),
   :deep(.email-row:not(.all-email) > .email-right-skeleton) {
-    grid-column: 5;
+    grid-column: 6;
     display: block;
     min-width: 0;
     overflow: hidden;
@@ -2610,7 +2626,8 @@ ul {
 
   /* Desktop-only controls do not consume a mobile grid track. */
   :deep(.email-row > .desktop-row-checkbox),
-  :deep(.email-row > .pc-star-placeholder) {
+  :deep(.email-row > .pc-star-placeholder),
+  :deep(.email-row > .desktop-unread-indicator) {
     display: none;
   }
 

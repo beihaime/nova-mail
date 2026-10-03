@@ -7,6 +7,7 @@
         <Icon style="color: var(--el-border-color)" icon="solar:star-line-duotone" width="18" height="18"/>
       </div>
       <div v-if="!showStar" class="pc-star-placeholder"></div>
+      <div class="desktop-unread-indicator" aria-hidden="true"></div>
       <div class="desktop-avatar-skeleton" aria-hidden="true">
         <el-skeleton animated>
           <template #template>
@@ -152,6 +153,7 @@ import {Icon} from "@iconify/vue";
    to the same rhythm. Desktop/tablet keep their original placeholder sizes. */
 @media (max-width: 767px) {
   .desktop-avatar-skeleton,
+  .desktop-unread-indicator,
   .pc-star-placeholder {
     display: none;
   }
