@@ -64,6 +64,7 @@
     <div class="header-actions">
       <el-checkbox
           v-model="checkAll"
+          class="mail-check-column"
           :indeterminate="isIndeterminate"
           :disabled="!emailList.length || loading"
           @change="handleCheckAllChange"
@@ -142,7 +143,7 @@
                    @pointerleave="onRowPointerLeave"
                    @pointercancel="onRowPointerCancel"
               >
-              <el-checkbox :class=" props.type === 'all-email' ? 'all-email-checkbox' : 'checkbox'"
+              <el-checkbox :class="['mail-check-column', props.type === 'all-email' ? 'all-email-checkbox' : 'checkbox']"
                            v-model="item.checked"
                            :disabled="!item.checked && isSelectMax"
                            @click.stop></el-checkbox>
@@ -1583,10 +1584,31 @@ function loadData() {
 </script>
 <style lang="scss" scoped>
 
+/* The one checkbox column, shared by the header's select-all, every message row
+   and the skeleton rows (a child component, hence `:deep`). Same fixed width, no
+   padding, no margin, content centred: that is what puts every checkbox on one
+   vertical axis. No other rule may set a width, padding or margin here. */
+:deep(.mail-check-column) {
+  display: flex;
+  flex: 0 0 auto;
+  width: var(--mail-list-selection-column);
+  min-width: var(--mail-list-selection-column);
+  max-width: var(--mail-list-selection-column);
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+  justify-content: center;
+  align-items: center;
+}
+
 .email-container {
   --mail-list-selection-column: 24px;
   --mail-list-column-gap: 8px;
   --mail-list-horizontal-padding: 14px;
+  /* Where the checkbox column starts, from the container's edge. Header and
+     rows must agree on this number or their checkboxes cannot share an axis;
+     it mirrors the inset the rows themselves are drawn with. */
+  --mail-list-checkbox-inset: var(--mail-list-horizontal-padding);
   display: grid;
   grid-template-rows: auto 1fr;
   grid-template-columns: minmax(0, 1fr);
@@ -1725,20 +1747,11 @@ function loadData() {
     }
   }
 
-  .checkbox {
-    display: flex;
-    padding-left: 2px;
-    padding-right: 12px;
-    justify-content: center;
-  }
-
+  /* Width, padding and centring come from the shared `.mail-check-column`. The
+     all-mail rows are the one variant with a different height, so they keep
+     their own vertical placement on very wide screens. */
   .all-email-checkbox {
-    display: flex;
-    padding-left: 15px;
-    padding-right: 20px;
-    justify-content: center;
     @media (min-width: 1367px) {
-      justify-content: start;
       height: 100%;
       align-self: start;
       padding-bottom: 30px;
@@ -2070,12 +2083,7 @@ ul {
     grid-template-columns: var(--mail-list-selection-column) minmax(0, 1fr) auto;
     column-gap: var(--mail-list-column-gap);
     padding-right: var(--mail-list-horizontal-padding);
-    padding-left: var(--mail-list-horizontal-padding);
-  }
-
-  .header-actions > :deep(.el-checkbox) {
-    width: var(--mail-list-selection-column);
-    margin: 0;
+    padding-left: var(--mail-list-checkbox-inset);
   }
 
   :deep(.email-row:not(.all-email)) {
@@ -2086,10 +2094,6 @@ ul {
     height: 48px;
     min-height: 48px;
     padding: 4px var(--mail-list-horizontal-padding);
-  }
-
-  :deep(.email-row:not(.all-email) .checkbox) {
-    padding: 0;
   }
 
   :deep(.email-row:not(.all-email) .pc-star) {
@@ -2164,9 +2168,17 @@ ul {
    column; all message content stays together in the second column so the
    avatar, sender, time, subject and preview cannot drift apart. */
 @media (max-width: 767px) {
+  .email-container {
+    /* Phone rows draw their content with an 8px inset (see `.email-row.email`)
+       and a 20px selection column, so the header uses the same two numbers and
+       both checkboxes stay on one axis. */
+    --mail-list-selection-column: 20px;
+    --mail-list-checkbox-inset: 8px;
+  }
+
   :deep(.email-row:not(.all-email)) {
     display: grid;
-    grid-template-columns: 20px minmax(0, 1fr);
+    grid-template-columns: var(--mail-list-selection-column) minmax(0, 1fr);
     column-gap: 8px;
     align-items: start;
     height: 83px;
@@ -2175,14 +2187,13 @@ ul {
     box-sizing: border-box;
   }
 
+  /* Horizontal placement, width and centring come from `.mail-check-column`;
+     only the vertical nudge for the phone row lives here. */
   :deep(.email-row:not(.all-email) > .checkbox) {
     grid-column: 1;
     grid-row: 1;
-    width: 18px;
     height: 18px;
     align-self: start;
-    justify-content: flex-start;
-    padding: 0;
     margin-top: 2px;
   }
 
@@ -2543,10 +2554,12 @@ ul {
   .email-container.mobile-selecting > .header-actions {
     display: grid;
 
-    grid-template-columns: 32px 1fr auto;
+    grid-template-columns: var(--mail-list-selection-column) 1fr auto;
 
     min-height: 48px;
-    padding: 5px 16px;
+    /* Same left inset as a phone mail row, so the select-all lines up with the
+       row checkboxes it controls. */
+    padding: 5px 16px 5px var(--mail-list-checkbox-inset);
   }
 
   .email-container.mobile-selecting > .header-actions .header-left {
@@ -2627,7 +2640,7 @@ ul {
   .email-container.mobile-selecting
     :deep(.email-row.email) {
     /* The checkbox replaces the unread gutter in the first track. */
-    grid-template-columns: 20px 50px minmax(0, 1fr);
+    grid-template-columns: var(--mail-list-selection-column) 50px minmax(0, 1fr);
   }
 
   .email-container.mobile-selecting
@@ -2636,9 +2649,9 @@ ul {
 
     display: flex;
 
-    width: 20px;
+    /* Vertical nudge only: the column's width, padding and centring are the
+       shared `.mail-check-column` ones the header select-all also uses. */
     padding: 6px 0 0;
-    margin: 0;
   }
 
   .email-container.mobile-selecting

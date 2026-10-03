@@ -1,7 +1,7 @@
 <template>
   <div v-for="item in rows" style="background: var(--el-bg-color)">
     <div :class="'email-row ' + type ">
-      <el-checkbox disabled :class=" props.type === 'all-email' ? 'all-email-checkbox' : 'checkbox'"
+      <el-checkbox disabled :class="['mail-check-column', props.type === 'all-email' ? 'all-email-checkbox' : 'checkbox']"
       ></el-checkbox>
       <div class="pc-star" v-if="showStar">
         <Icon style="color: var(--el-border-color)" icon="solar:star-line-duotone" width="18" height="18"/>
