@@ -1,8 +1,8 @@
 <template>
   <div class="email-container" :class="{ 'mobile-selecting': mobileSelecting }">
-    <div v-if="type === 'email'" class="mobile-inbox-tools">
+    <div v-if="isPhone" class="mobile-inbox-tools">
       <div class="mobile-search-row">
-        <label class="mobile-search">
+        <label v-if="type === 'email'" class="mobile-search">
           <AppIcon name="search" :size="18" />
           <input
               v-model.trim="mobileSearchInput"
@@ -36,7 +36,7 @@
         </div>
       </div>
 
-      <div class="mobile-filter-bar">
+      <div v-if="type === 'email'" class="mobile-filter-bar">
         <!-- Four equal cells that together fill the row: every chip owns the
              same width and centres its own content, so the group reads as one
              balanced segmented control rather than four ragged pills. All four
@@ -66,9 +66,9 @@
       </el-checkbox>
       <div class="header-left" :style="'padding-left:' + actionLeft">
 
-        <slot name="first"></slot>
+        <div class="selection-slot"><slot name="first"></slot></div>
         <template v-if="getSelectedMailsIds().length > 0">
-          <el-tooltip v-if="typeof props.emailArchive === 'function'" effect="dark" :content="t('archive')" :show-after="1200">
+          <el-tooltip v-if="selectionActions.archive" effect="dark" :content="t('archive')" :show-after="1200">
             <button
                 v-perm="'email:delete'"
                 class="nova-icon-button nova-toolbar-button selection-action"
@@ -79,7 +79,7 @@
               <AppIcon name="nova-sidebar-archive" :size="20" inline />
             </button>
           </el-tooltip>
-          <el-tooltip v-perm="'email:delete'" effect="dark" :content="t('delete')" :show-after="1200">
+          <el-tooltip v-if="selectionActions.trash || selectionActions.permanentDelete" v-perm="'email:delete'" effect="dark" :content="selectionActions.permanentDelete ? t('deleteForever') : t('delete')" :show-after="1200">
             <button
                 class="nova-icon-button nova-toolbar-button nova-danger-button selection-action"
                 type="button"
@@ -532,6 +532,15 @@ const mobileSearchInput = computed({
 const mobileFilter = ref('all')
 const mobileSelecting = ref(false)
 const keyboardFocusedId = ref(0)
+
+// All list folders use this one toolbar. Delete keeps its normal-folder
+// meaning (move to Trash); only the Trash folder is wired to the permanent
+// delete mutation by the page that owns the list.
+const selectionActions = computed(() => ({
+  archive: props.type !== 'archive' && props.type !== 'trash' && typeof props.emailArchive === 'function',
+  trash: props.type !== 'trash' && typeof props.emailDelete === 'function',
+  permanentDelete: props.type === 'trash' && typeof props.emailDelete === 'function',
+}))
 
 const mobileFilters = computed(() => [
   { key: 'all', label: t('all') },
@@ -1591,7 +1600,7 @@ function jumpDetails(email, event) {
     return
   }
 
-  if (isPhone.value && mobileSelecting.value && props.type === 'email') {
+  if (isPhone.value && mobileSelecting.value) {
     email.checked = !email.checked
     return
   }
@@ -2691,11 +2700,14 @@ ul {
   .email-container.mobile-selecting > .header-actions {
     display: grid;
 
-    /* Keep the selection controls at their intrinsic width. The remaining
-       space is an empty trailing track instead of a stretched action group. */
-    grid-template-columns: var(--mail-list-selection-column) auto 1fr;
+    /* The toolbar itself is intrinsic-width on phones. Do not leave a 1fr
+       track or distribute empty space after the last action. */
+    grid-template-columns: var(--mail-list-selection-column) auto;
+    width: fit-content;
+    max-width: 100%;
+    box-sizing: border-box;
 
-    min-height: 44px;
+    min-height: 48px;
     /* Same left inset as a phone mail row, so the select-all lines up with the
        row checkboxes it controls. */
     padding: 4px 8px 4px var(--mail-list-checkbox-inset);
@@ -2708,14 +2720,17 @@ ul {
     padding-left: 0 !important;
   }
 
-  .email-container.mobile-selecting
-    > .header-actions
-    .header-left
-    > :first-child,
+  .email-container.mobile-selecting > .header-actions .selection-slot,
   .email-container.mobile-selecting
     > .header-actions
     .header-right {
     display: none;
+  }
+
+  .email-container.mobile-selecting > .header-actions .selection-action {
+    flex: 0 0 38px;
+    width: 38px;
+    height: 38px;
   }
 
   /* ---------- Mail row ---------- */

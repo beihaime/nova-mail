@@ -1,6 +1,7 @@
 <template>
   <div class="mail-list-page">
     <emailScroll ref="scroll"
+                 type="archive"
                  :cancel-success="cancelStar"
                  :star-success="addStar"
                  :getEmailList="getEmailList"

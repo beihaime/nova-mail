@@ -2,6 +2,7 @@
   <div class="mail-list-page">
     <emailScroll
         ref="scroll"
+        type="trash"
         :get-email-list="getEmailList"
         :email-delete="emailDeleteForever"
         :email-read="emailRead"
