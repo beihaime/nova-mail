@@ -251,7 +251,11 @@ export function applyPaletteTokens(root, palette, mode) {
   // Status colours are semantic rather than preset inputs: they retain clear
   // meaning across a user-selected palette while adapting luminance for each
   // appearance mode.
-  const danger = isDark ? '#FF7B72' : '#C73C3C'
+  const danger = isDark ? '#B84D47' : '#C73C3C'
+  const dangerHover = isDark ? '#A83F3A' : '#AD3030'
+  const dangerActive = isDark ? '#943531' : '#922727'
+  const dangerSurface = blendHex(colors.background, danger, isDark ? .16 : .08)
+  const dangerBorder = blendHex(colors.border, danger, isDark ? .42 : .50)
   const warning = isDark ? '#E3B341' : '#A86E00'
   const success = isDark ? '#56D364' : '#20824D'
 
@@ -303,6 +307,12 @@ export function applyPaletteTokens(root, palette, mode) {
     '--nova-button-hover': hover,
     '--nova-button-active': accentSubtle,
     '--nova-button-focus-ring': `0 0 0 2px ${blendHex(colors.background, colors.accent, isDark ? .52 : .42)}`,
+    '--nm-danger': danger,
+    '--nm-danger-hover': dangerHover,
+    '--nm-danger-active': dangerActive,
+    '--nm-danger-foreground': '#FFFFFF',
+    '--nm-danger-surface': dangerSurface,
+    '--nm-danger-border': dangerBorder,
     '--nova-danger': danger,
     '--nova-warning': warning,
     '--nova-success': success,

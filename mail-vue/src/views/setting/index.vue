@@ -326,7 +326,7 @@
             <span class="settings-row-title">{{ $t('deleteUser') }}</span>
             <small>{{ $t('delAccountMsg') }}</small>
           </div>
-          <el-button type="danger" @click="deleteConfirm">{{ $t('deleteUserBtn') }}</el-button>
+          <el-button class="settings-danger-button" type="danger" @click="deleteConfirm">{{ $t('deleteUserBtn') }}</el-button>
         </div>
       </div>
     </section>
@@ -1417,9 +1417,47 @@ function submitPwd() {
     }
   }
 
-  .danger-title { color: var(--nova-danger); }
+  .danger-title { color: var(--nm-danger); }
   .danger-row { justify-content: space-between; }
   .danger-row :deep(.el-button) { flex: 0 0 auto; }
+  .danger-row :deep(.settings-row-copy small) { color: var(--nm-text-secondary); }
+
+  /* Account deletion is the only destructive action on this page. Its solid
+     treatment is deliberately scoped so mail-toolbar danger buttons can keep
+     their compact outline/hover affordance. */
+  .danger-row :deep(.settings-danger-button.el-button--danger) {
+    border-color: var(--nm-danger);
+    color: var(--nm-danger-foreground);
+    background: var(--nm-danger);
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--nm-danger) 28%, transparent);
+    opacity: 1;
+  }
+
+  .danger-row :deep(.settings-danger-button.el-button--danger:not(.is-disabled):hover) {
+    border-color: var(--nm-danger-hover);
+    color: var(--nm-danger-foreground);
+    background: var(--nm-danger-hover);
+    box-shadow: 0 3px 8px color-mix(in srgb, var(--nm-danger) 24%, transparent);
+  }
+
+  .danger-row :deep(.settings-danger-button.el-button--danger:not(.is-disabled):active) {
+    border-color: var(--nm-danger-active);
+    color: var(--nm-danger-foreground);
+    background: var(--nm-danger-active);
+  }
+
+  .danger-row :deep(.settings-danger-button.el-button--danger:focus-visible) {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--nm-danger-surface), 0 0 0 4px var(--nm-danger-border);
+  }
+
+  .danger-row :deep(.settings-danger-button.el-button--danger.is-disabled),
+  .danger-row :deep(.settings-danger-button.el-button--danger:disabled) {
+    border-color: var(--nm-danger-border);
+    color: var(--nm-text-secondary);
+    background: var(--nm-danger-surface);
+    box-shadow: none;
+  }
 }
 
 .mail-density-setting { order: 1; }

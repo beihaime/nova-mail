@@ -40,6 +40,15 @@
     --nm-accent-subtle: #e2efff;
     --nm-hover: #f3f7fc;
     --nm-selected: var(--nm-accent-subtle);
+    /* Destructive actions have their own semantic scale. They intentionally
+       do not inherit the user-configurable accent palette: deleting an
+       account must remain unmistakable in every Nova theme. */
+    --nm-danger: #c73c3c;
+    --nm-danger-hover: #ad3030;
+    --nm-danger-active: #922727;
+    --nm-danger-foreground: #ffffff;
+    --nm-danger-surface: #fbeded;
+    --nm-danger-border: #df9494;
     --nova-text-primary: var(--nm-text-primary);
     --nova-text-secondary: var(--nm-text-secondary);
     --nova-text-muted: var(--nm-text-muted);
@@ -222,7 +231,7 @@ button, input, select, textarea {
     --nova-radius-sm: 8px;
     --nova-radius-md: 12px;
     --nova-radius-lg: 16px;
-    --nova-danger: #d84a4a;
+    --nova-danger: var(--nm-danger);
     --nova-warning: #d99823;
     --nova-success: #2f9e6f;
     /* Shared desktop control language. Components consume these rather than
@@ -257,6 +266,12 @@ button, input, select, textarea {
     --nm-accent-subtle: #183a60;
     --nm-hover: #202833;
     --nm-selected: var(--nm-accent-subtle);
+    --nm-danger: #b84d47;
+    --nm-danger-hover: #a83f3a;
+    --nm-danger-active: #943531;
+    --nm-danger-foreground: #ffffff;
+    --nm-danger-surface: #3a2426;
+    --nm-danger-border: #704145;
     --nova-text-primary: var(--nm-text-primary);
     --nova-text-secondary: var(--nm-text-secondary);
     --nova-text-muted: var(--nm-text-muted);
