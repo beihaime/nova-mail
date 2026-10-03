@@ -40,6 +40,26 @@ export const useEmailStore = defineStore('email', {
         pick: ['contentData'],
     },
     actions: {
+        clearStarForEmailIds(emailIds) {
+            const ids = new Set((Array.isArray(emailIds) ? emailIds : [emailIds]).map(Number))
+            if (!ids.size) return
+
+            const scrolls = [this.emailScroll, this.starScroll, this.sendScroll, this.archiveScroll, this.trashScroll]
+            for (const scroll of scrolls) {
+                const list = scroll?.emailList
+                if (!list?.length) continue
+                for (const item of list) {
+                    if (ids.has(Number(item.emailId))) item.isStar = 0
+                }
+            }
+
+            for (const id of ids) {
+                if (this.detailMap[id]) this.detailMap[id].isStar = 0
+                if (Number(this.contentData.email?.emailId) === id) {
+                    this.contentData.email.isStar = 0
+                }
+            }
+        },
         fetchList(request) {
             return request(0).then(data => {
                 request(1).then(fullData => {

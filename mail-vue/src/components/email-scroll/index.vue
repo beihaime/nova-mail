@@ -994,6 +994,7 @@ function springBackSwipe(gesture) {
 
 function commitSwipe(gesture, action) {
   const { rowEl, shellEl, item } = gesture
+  const wasStarred = !!item.isStar
   const width = shellEl?.offsetWidth || 0
   const direction = action === SWIPE_ACTION.ARCHIVE ? 1 : -1
   const index = emailList.findIndex(row => row.emailId === item.emailId)
@@ -1015,6 +1016,7 @@ function commitSwipe(gesture, action) {
     if (exitFinished || (event && event.target !== rowEl)) return
     exitFinished = true
     rowEl.removeEventListener('transitionend', finishExit)
+    emailStore.clearStarForEmailIds([item.emailId])
     deleteEmail([item.emailId])
     // Let Vue remove the virtual-list row first. Cleaning the imperative
     // styles in the same tick could expose the neutral state for one frame.
@@ -1035,6 +1037,7 @@ function commitSwipe(gesture, action) {
       })
     }).catch(error => {
       console.error(error)
+      syncStarState(item, wasStarred)
       restoreSwipedEmail(item, index)
       ElMessage({
         message: t('swipeActionFailMsg'),
@@ -1440,6 +1443,7 @@ function rightDelete(emailId) {
   // Normal-folder row deletion is a reversible move to Trash. Remove first;
   // the following refresh restores authoritative state if the request fails.
   emailStore.deleteIds = [emailId];
+  emailStore.clearStarForEmailIds([emailId])
   props.emailDelete([emailId]).then(() => {
     ElMessage({
       message: t('delSuccessMsg'),
@@ -1460,6 +1464,7 @@ function handleArchive(ids = getSelectedMailsIds()) {
   // mutation provide the authoritative state. A failed request restores the
   // current list from the server.
   emailStore.deleteIds = emailIds
+  emailStore.clearStarForEmailIds(emailIds)
   props.emailArchive(emailIds).then(() => {
     ElMessage({
       message: t('archiveSuccessMsg'),
@@ -1504,7 +1509,10 @@ function handleDelete(ids = getSelectedMailsIds()) {
 
     const emailIds = ids;
     const optimistic = !props.deleteConfirmText
-    if (optimistic) emailStore.deleteIds = emailIds
+    if (optimistic) {
+      emailStore.clearStarForEmailIds(emailIds)
+      emailStore.deleteIds = emailIds
+    }
     props.emailDelete(emailIds).then(() => {
       ElMessage({
         message: props.deleteSuccessText || t('delSuccessMsg'),

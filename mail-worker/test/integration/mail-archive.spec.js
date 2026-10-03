@@ -63,6 +63,18 @@ describe('archiving', () => {
 		expect(stored.is_del).toBe(0);
 	});
 
+	it('clears a star when archiving and does not restore it on unarchive', async () => {
+		const principal = await sessionFor(await createAccount());
+		const row = await seedEmail(principal, { subject: 'starred-archive' });
+		await api('/api/star/add', { method: 'POST', token: principal.token, body: { emailId: row.email_id } });
+
+		await put(principal.token, '/api/email/archive', [row.email_id]);
+		expect(await env.db.prepare('SELECT star_id FROM star WHERE email_id = ?').bind(row.email_id).first()).toBeNull();
+
+		await put(principal.token, '/api/email/unarchive', [row.email_id]);
+		expect(await env.db.prepare('SELECT star_id FROM star WHERE email_id = ?').bind(row.email_id).first()).toBeNull();
+	});
+
 	it('puts the message back with unarchive', async () => {
 		const principal = await sessionFor(await createAccount());
 		const row = await seedEmail(principal, { subject: 'restore-me' });
@@ -304,7 +316,7 @@ describe('Trash and restore', () => {
 		expect((await trash.json()).data.list.map(item => item.subject)).toContain('unique trash search token');
 	});
 
-	it('keeps starred Trash mail out of Starred without removing its star', async () => {
+	it('clears a starred message when it moves to Trash and keeps it unstarred on restore', async () => {
 		const principal = await sessionFor(await createAccount());
 		const row = await seedEmail(principal, { subject: 'starred-trash' });
 		await api('/api/star/add', { method: 'POST', token: principal.token, body: { emailId: row.email_id } });
@@ -312,7 +324,10 @@ describe('Trash and restore', () => {
 
 		const starred = await api('/api/star/list?size=50', { token: principal.token });
 		expect((await starred.json()).data.list.map(item => item.subject)).not.toContain('starred-trash');
-		expect(await env.db.prepare('SELECT star_id FROM star WHERE email_id = ?').bind(row.email_id).first()).toBeTruthy();
+		expect(await env.db.prepare('SELECT star_id FROM star WHERE email_id = ?').bind(row.email_id).first()).toBeNull();
+
+		await put(principal.token, '/api/email/restore', [row.email_id]);
+		expect(await env.db.prepare('SELECT star_id FROM star WHERE email_id = ?').bind(row.email_id).first()).toBeNull();
 	});
 
 	it('empties only the current owner/account Trash', async () => {
