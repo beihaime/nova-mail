@@ -25,8 +25,10 @@ export async function init() {
     let setting = null;
 
     if (token) {
+        let authError = null;
         const userPromise = loginUserInfo().catch(e => {
             console.error(e);
+            authError = e;
             return null;
         });
 
@@ -45,6 +47,13 @@ export async function init() {
             routers.forEach(routerData => {
                 router.addRoute('layout', routerData);
             });
+        } else {
+            // An authentication/database failure must never leave a token in
+            // place and let the SPA continue as if the session were valid.
+            // Clearing it makes the router fail closed and send the user to
+            // the login screen after the boot UI is dismissed.
+            localStorage.removeItem('token');
+            return { error: authError || new Error('Unable to verify the current session') };
         }
 
     } else {
@@ -53,4 +62,6 @@ export async function init() {
         settingStore.domainList = setting.domainList;
         document.title = setting.title;
     }
+
+    return null;
 }

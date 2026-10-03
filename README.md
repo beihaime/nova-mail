@@ -462,7 +462,7 @@ curl --fail-with-body -X POST https://<your-domain>/api/bootstrap \
 
 The pipeline calls this only when `BOOTSTRAP_TOKEN` is configured; initialized databases return 409 without rerunning migrations. Existing installations must apply later migrations through a controlled deployment process before running code that requires them. Two things are worth knowing:
 
-- Each migration statement is wrapped in `try/catch`, so **`success` does not prove a migration applied** — a failed `ALTER TABLE` is only logged. That is why the pipeline reads the schema back and fails when a column is missing. The same check can be run by hand in the D1 console: `SELECT name FROM pragma_table_info('email');`
+- Legacy compatibility migrations may contain repeatable checks, so **`success` does not prove every migration applied** — that is why the pipeline reads the schema back and fails when a required column or table is missing. Authentication migrations are intentionally strict: a failure to create `auth_session` aborts bootstrap instead of allowing an unverifiable session to continue. The same checks can be run by hand in the D1 console: `SELECT name FROM pragma_table_info('email');` and `SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('auth_session', 'user_security_settings');`
 - The token is single-use. Never recreate or reset a production D1 database to make bootstrap available again.
 
 Individual migrations are also kept runnable on their own under `mail-worker/migrations/`. For example, an existing database upgrading to the Trash mailbox must apply v3.11 before it runs a Trash-aware Worker:
@@ -473,6 +473,8 @@ pnpm wrangler d1 execute <database-id> --remote --file migrations/v3_11_trash.sq
 ```
 
 The deployment workflow performs this v3.11 upgrade automatically, before deploying the Worker, when its Cloudflare token has D1 · Edit permission. For a manual deployment, run it once yourself. Do not re-run the file after the columns exist: SQLite has no `ADD COLUMN IF NOT EXISTS`. Verify the result with `SELECT name FROM pragma_table_info('email');`; it must include `trashed`, `trashed_at`, and `trash_archived`.
+
+The v3.13 session migration is also applied by the deployment workflow to the explicit `D1_DATABASE_ID` used by `wrangler-action.toml`. It creates `auth_session` and `user_security_settings` with `IF NOT EXISTS` plus the active-session index. The workflow refuses to create or select a new database when `D1_DATABASE_ID` is missing, prints the binding/name/ID before applying the SQL, and verifies both tables after deployment. For a controlled manual upgrade, run `pnpm wrangler d1 execute <database-id> --remote --file migrations/v3_13_sessions.sql` from `mail-worker` after confirming the ID is the Worker’s actual `db` binding.
 
 #### Troubleshooting
 

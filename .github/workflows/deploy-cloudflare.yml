@@ -236,37 +236,16 @@ jobs:
 
           CONFIG_FILE="wrangler-action.toml"
 
-          if [ -n "$D1_DATABASE_ID" ]; then
-            sed -i "s|\${D1_DATABASE_ID}|${D1_DATABASE_ID}|g" "$CONFIG_FILE"
-            echo "✅ Using the database from environment variables."
-            exit 0
-          fi
-
-          echo "🔍 Checking if the database exists..."
-
-          set +e
-            DB_LIST=$(pnpm wrangler d1 list --json 2>&1)
-            STATUS=$?
-          set -e
-
-          if [ $STATUS -ne 0 ]; then
-            echo "$DB_LIST"
+          # Never silently create or select an empty database for a release.
+          # The same explicit ID is used by schema migration, verification and
+          # the Worker binding below.
+          if [ -z "$D1_DATABASE_ID" ]; then
+            echo "❌ D1_DATABASE_ID is required for an existing production database."
             exit 1
           fi
 
-          if echo "$DB_LIST" | jq -e ".[] | select(.name == \"$NAME\")" >/dev/null; then
-            echo "✅ Database $NAME already exists."
-            D1_ID=$(echo "$DB_LIST" | jq -r ".[] | select(.name == \"$NAME\") | .uuid")
-            echo "D1_DATABASE_ID: $D1_ID"
-          else
-            echo "⚠️ Database $NAME does not exist. Starting creation..."
-            pnpm wrangler d1 create $NAME
-            DB_LIST=$(pnpm wrangler d1 list --json)
-            D1_ID=$(echo "$DB_LIST" | jq -r ".[] | select(.name == \"$NAME\") | .uuid")
-          fi
-
-          sed -i "s|\${D1_DATABASE_ID}|$D1_ID|g" "$CONFIG_FILE"
-          echo "✅ Setup completed."
+          sed -i "s|\${D1_DATABASE_ID}|${D1_DATABASE_ID}|g" "$CONFIG_FILE"
+          echo "✅ Using the explicitly configured D1 database: $D1_DATABASE_ID"
 
       # The Worker serves the SPA from `./dist` ([assets] in wrangler-*.toml) and
       # `dist` is gitignored, so the frontend MUST be built before deploying —
@@ -323,6 +302,26 @@ jobs:
           fi
           pnpm wrangler d1 execute "$DB_ID" --remote --yes \
             --command "CREATE INDEX IF NOT EXISTS idx_email_user_trashed ON email(user_id, trashed, account_id);"
+
+          # v3.13: authentication now requires the server-side session table.
+          # The repository keeps this as an explicit additive migration rather
+          # than enabling Wrangler's full migration history for legacy D1s,
+          # whose older ALTER migrations are not safely replayable.
+          SESSION_SCHEMA=$(pnpm wrangler d1 execute "$DB_ID" --remote --yes --json \
+            --command "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('auth_session', 'user_security_settings');")
+          if ! printf '%s' "$SESSION_SCHEMA" | grep -q '"auth_session"' || \
+             ! printf '%s' "$SESSION_SCHEMA" | grep -q '"user_security_settings"'; then
+            echo "🔐 Applying non-destructive migration: migrations/v3_13_sessions.sql"
+            echo "D1 binding: db"
+            echo "database_name: $(sed -n 's/^database_name = "\([^"]*\)"/\1/p' "$CONFIG_FILE")"
+            echo "database_id: $DB_ID"
+            echo "--- migration SQL ---"
+            cat migrations/v3_13_sessions.sql
+            echo "--- end migration SQL ---"
+            pnpm wrangler d1 execute "$DB_ID" --remote --yes --file migrations/v3_13_sessions.sql
+          else
+            echo "✅ auth_session and user_security_settings already exist in the deployment D1."
+          fi
 
       - name: 🚀 开始部署 / Start deployment
         id: deploy
@@ -435,11 +434,16 @@ jobs:
         run: |
           echo "🔎 Checking required email schema..."
 
+          VERIFY_DB_ID=$(sed -n 's/^database_id = "\([^"]*\)"/\1/p' wrangler-action.toml)
+          echo "D1 binding: db"
+          echo "database_name: $(sed -n 's/^database_name = "\([^"]*\)"/\1/p' wrangler-action.toml)"
+          echo "database_id: $VERIFY_DB_ID"
+
           # `--json` sends errors to stdout as well, so a plain
           # `SCHEMA=$(...)` under `bash -e` would exit on failure and swallow the
           # reason — capture both streams and report them instead.
           set +e
-          SCHEMA=$(pnpm wrangler d1 execute "$D1_DATABASE_ID" --remote --yes --json \
+          SCHEMA=$(pnpm wrangler d1 execute "$VERIFY_DB_ID" --remote --yes --json \
             --command "SELECT name FROM pragma_table_info('email');" 2>&1)
           STATUS=$?
           set -e
@@ -464,10 +468,19 @@ jobs:
             fi
           done
 
-          pnpm wrangler d1 execute "$D1_DATABASE_ID" --remote --yes --json \
+          SESSION_SCHEMA=$(pnpm wrangler d1 execute "$VERIFY_DB_ID" --remote --yes --json \
+            --command "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('auth_session', 'user_security_settings');" 2>&1)
+          echo "$SESSION_SCHEMA"
+          if ! printf '%s' "$SESSION_SCHEMA" | grep -q '"auth_session"' || \
+             ! printf '%s' "$SESSION_SCHEMA" | grep -q '"user_security_settings"'; then
+            echo "❌ Session schema is missing from the deployed D1."
+            exit 1
+          fi
+
+          pnpm wrangler d1 execute "$VERIFY_DB_ID" --remote --yes --json \
             --command "SELECT body_type, COUNT(*) AS total FROM email GROUP BY body_type;"
 
-          echo "✅ Required email columns are present."
+          echo "✅ Required email and session schema are present."
 
       - name: 🗑️ 删除运行记录 / Delete workflow runs
         uses: GitRML/delete-workflow-runs@main

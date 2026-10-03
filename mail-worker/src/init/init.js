@@ -41,13 +41,13 @@ const dbInit = {
 	},
 
 	async v3_13DB(c) {
-		for (const statement of [
-			`CREATE TABLE IF NOT EXISTS auth_session (session_id TEXT PRIMARY KEY, user_id INTEGER NOT NULL, token_hash TEXT NOT NULL UNIQUE, device_id TEXT NOT NULL DEFAULT '', device_type TEXT NOT NULL DEFAULT 'Unknown', browser TEXT NOT NULL DEFAULT 'Unknown', os TEXT NOT NULL DEFAULT 'Unknown', user_agent TEXT NOT NULL DEFAULT '', ip_address TEXT NOT NULL DEFAULT '', country TEXT NOT NULL DEFAULT '', region TEXT NOT NULL DEFAULT '', city TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, last_active_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, revoked_at INTEGER)`,
-			`CREATE INDEX IF NOT EXISTS auth_session_user_active_idx ON auth_session(user_id, revoked_at, expires_at)`,
-			`CREATE TABLE IF NOT EXISTS user_security_settings (user_id INTEGER PRIMARY KEY, login_alert_email INTEGER NOT NULL DEFAULT 1, login_alert_telegram INTEGER NOT NULL DEFAULT 0, telegram_chat_id TEXT NOT NULL DEFAULT '')`,
-		]) {
-			try { await c.env.db.prepare(statement).run(); } catch (e) { console.warn(`跳过会话表迁移：${e.message}`); }
-		}
+		// Session tables are part of the authentication boundary. Do not swallow
+		// DDL errors here: reporting bootstrap as successful while auth_session is
+		// unavailable would leave every authenticated request in an unsafe,
+		// permanently failing state.
+		await c.env.db.prepare(`CREATE TABLE IF NOT EXISTS auth_session (session_id TEXT PRIMARY KEY, user_id INTEGER NOT NULL, token_hash TEXT NOT NULL UNIQUE, device_id TEXT NOT NULL DEFAULT '', device_type TEXT NOT NULL DEFAULT 'Unknown', browser TEXT NOT NULL DEFAULT 'Unknown', os TEXT NOT NULL DEFAULT 'Unknown', user_agent TEXT NOT NULL DEFAULT '', ip_address TEXT NOT NULL DEFAULT '', country TEXT NOT NULL DEFAULT '', region TEXT NOT NULL DEFAULT '', city TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, last_active_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, revoked_at INTEGER)`).run();
+		await c.env.db.prepare(`CREATE INDEX IF NOT EXISTS auth_session_user_active_idx ON auth_session(user_id, revoked_at, expires_at)`).run();
+		await c.env.db.prepare(`CREATE TABLE IF NOT EXISTS user_security_settings (user_id INTEGER PRIMARY KEY, login_alert_email INTEGER NOT NULL DEFAULT 1, login_alert_telegram INTEGER NOT NULL DEFAULT 0, telegram_chat_id TEXT NOT NULL DEFAULT '')`).run();
 		try { await c.env.db.prepare(`ALTER TABLE user_security_settings ADD COLUMN telegram_chat_id TEXT NOT NULL DEFAULT ''`).run(); } catch {}
 	},
 

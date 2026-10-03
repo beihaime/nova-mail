@@ -309,9 +309,20 @@
       <div class="about-brand"><img src="/icons/nova-mail-192.png" alt="Nova Mail" /><strong>Nova Mail</strong></div>
       <p>{{ $t('aboutDescription') }}</p>
       <div class="about-details">
+        <div>
+          <span>{{ $t('author') }}</span>
+          <a class="about-link" href="https://github.com/beihaime" target="_blank" rel="noopener noreferrer">
+            beihaime <span aria-hidden="true">→</span>
+          </a>
+        </div>
+        <div>
+          <span>{{ $t('repository') }}</span>
+          <a class="about-link" href="https://github.com/beihaime/nova-mail" target="_blank" rel="noopener noreferrer">
+            github.com/beihaime/nova-mail <span aria-hidden="true">→</span>
+          </a>
+        </div>
         <div><span>{{ $t('appName') }}</span><span>Nova Mail</span></div>
-        <div v-if="appVersion"><span>{{ $t('version') }}</span><span>{{ appVersion }}</span></div>
-        <div><span>{{ $t('copyright') }}</span><span>Nova Mail</span></div>
+        <div><span>{{ $t('appVersion') }}</span><span>{{ appVersion }}</span></div>
       </div>
     </div>
     <el-dialog v-model="pwdShow" :title="$t('changePassword')" width="340">
@@ -333,6 +344,7 @@ import {accountSetName} from "@/request/account.js";
 import {useAccountStore} from "@/store/account.js";
 import {useI18n} from "vue-i18n";
 import {useSettingStore} from "@/store/setting.js";
+import packageInfo from '../../../package.json';
 import {useUiStore} from "@/store/ui.js";
 import {getSessions, revokeSession, revokeOtherSessions, getLoginAlerts, updateLoginAlerts} from '@/request/security.js';
 import {connectGithubAccount, disconnectGithubAccount, githubConnectedAccount, connectGoogleAccount, disconnectGoogleAccount, googleConnectedAccount} from '@/request/ouath.js';
@@ -364,7 +376,7 @@ const uiStore = useUiStore()
 const userStore = useUserStore();
 const route = useRoute();
 const section = computed(() => route.path === '/settings/account' ? 'account' : route.path === '/settings/personalization' ? 'personalization' : route.path === '/settings/about' ? 'about' : 'home')
-const appVersion = ''
+const appVersion = packageInfo.version ? `v${String(packageInfo.version).replace(/^v/i, '')}` : ''
 const setPwdLoading = ref(false)
 const setNameShow = ref(false)
 const accountName = ref(null)
@@ -993,7 +1005,12 @@ function submitPwd() {
   .about-details { display: grid; gap: 0; max-width: 420px; }
   .about-details > div { display: flex; justify-content: space-between; gap: 20px; padding: 11px 0; border-bottom: 1px solid var(--nova-divider-soft); font-size: 14px; }
   .about-details > div:last-child { border-bottom: 0; }
-  .about-details > div span:last-child { color: var(--nm-text-primary); }
+  .about-details > div > span:last-child,
+  .about-details > div > .about-link { min-width: 0; color: var(--nm-text-primary); text-align: right; }
+  .about-link { max-width: 68%; overflow: hidden; color: var(--nm-accent) !important; text-decoration: none; text-overflow: ellipsis; white-space: nowrap; transition: color var(--nova-motion-fast) var(--nova-motion-ease), opacity var(--nova-motion-fast) var(--nova-motion-ease); }
+  .about-link:hover { color: var(--nm-accent-strong, var(--nm-accent)) !important; }
+  .about-link:active { opacity: .72; }
+  .about-link:focus-visible { outline: none; border-radius: 4px; box-shadow: var(--nova-button-focus-ring); }
 
   .account-link-section {
     order: 4;

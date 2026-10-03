@@ -2,6 +2,9 @@
   <el-config-provider :locale="settingStore.lang === 'zh' ? zhCn : null">
     <router-view />
     <KeyboardShortcuts v-model="showShortcuts" />
+    <div v-if="bootError" class="nova-boot-error" role="alert">
+      {{ $t('startupError') }}
+    </div>
   </el-config-provider>
 </template>
 <script setup>
@@ -18,6 +21,7 @@ import zhCn from 'element-plus/es/locale/lang/zh-cn';
 import('@/icons/index.js')
 const { locale } = useI18n()
 const showShortcuts = ref(false)
+const bootError = ref(Boolean(window.__NOVA_BOOT_ERROR__))
 useKeyboardShortcuts(showShortcuts)
 
 function syncLocale() {
@@ -70,3 +74,21 @@ onBeforeUnmount(() => {
   document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
 </script>
+
+<style scoped>
+.nova-boot-error {
+  position: fixed;
+  z-index: 1000;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  left: 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--nova-danger, var(--el-color-danger));
+  border-radius: var(--nova-button-radius, 10px);
+  color: var(--nm-text-primary, var(--el-text-color-primary));
+  background: var(--nm-surface-elevated, var(--el-bg-color-overlay));
+  box-shadow: var(--nova-shadow-md, 0 8px 24px rgba(0, 0, 0, .12));
+  font-size: 14px;
+  text-align: center;
+}
+</style>
