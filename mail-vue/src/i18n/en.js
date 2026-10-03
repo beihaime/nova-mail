@@ -41,6 +41,8 @@ const en = {
     timeFormat: 'Time format',
     timeFormat24h: '24-hour',
     timeFormat12h: '12-hour',
+    timeFormatExample24h: '13:45',
+    timeFormatExample12h: '1:45 PM',
     analytics: 'Analytics',
     allUsers: 'All Users',
     allMail: 'All Mail',

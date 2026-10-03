@@ -156,7 +156,10 @@
           :aria-checked="settingStore.timeFormat === option.value"
           role="radio"
           @click="settingStore.timeFormat = option.value"
-        >{{ option.label }}</button>
+        >
+          <span class="time-format-option-label">{{ option.label }}</span>
+          <span class="time-format-option-example">{{ option.example }}</span>
+        </button>
       </div>
     </div>
 
@@ -269,8 +272,8 @@ const setNameShow = ref(false)
 const accountName = ref(null)
 const langSelect = ref(settingStore.lang)
 const timeFormatOptions = computed(() => [
-  { value: '24h', label: t('timeFormat24h') },
-  { value: '12h', label: t('timeFormat12h') },
+  { value: '24h', label: t('timeFormat24h'), example: t('timeFormatExample24h') },
+  { value: '12h', label: t('timeFormat12h'), example: t('timeFormatExample12h') },
 ])
 const githubLoading = ref(false)
 const githubAccount = reactive({ connected: false, login: '', avatarUrl: '' })
@@ -729,6 +732,8 @@ function submitPwd() {
 .box {
   /* The page owns its width so long account names / emails can never stretch it
      past the viewport; content shrinks instead (see min-width: 0 below). */
+  display: flex;
+  flex-direction: column;
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -751,6 +756,7 @@ function submitPwd() {
   }
 
   .container {
+    order: 0;
     font-size: 14px;
     display: grid;
     gap: 20px;
@@ -830,16 +836,61 @@ function submitPwd() {
   }
 
   .time-format-options {
-    display: inline-flex;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: min(100%, 320px);
     align-self: flex-start;
-    gap: 6px;
+    gap: 8px;
   }
 
   .time-format-option {
-    min-width: 104px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    min-width: 0;
+    min-height: 58px;
+    padding: 9px 12px;
+    border: 1px solid var(--nm-border);
+    border-radius: var(--nova-button-radius);
+    color: var(--nm-text-secondary);
+    background: var(--nm-surface-elevated);
+    text-align: left;
+    transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease;
+  }
+
+  .time-format-option:hover:not(:disabled) {
+    border-color: var(--nm-accent);
+    color: var(--nm-text-primary);
+    background: var(--nm-hover);
+  }
+
+  .time-format-option.active {
+    border-color: var(--nm-accent);
+    color: var(--nm-accent);
+    background: var(--nm-accent-subtle);
+  }
+
+  .time-format-option:focus-visible {
+    outline: none;
+    box-shadow: var(--nova-button-focus-ring);
+  }
+
+  .time-format-option-label {
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  .time-format-option-example {
+    color: var(--nm-text-muted);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.3;
   }
 
   .connected-accounts {
+    order: 5;
     display: grid;
     gap: 16px;
     margin-bottom: 40px;
@@ -933,12 +984,18 @@ function submitPwd() {
   }
 
   .del-email {
+    order: 6;
     font-size: 14px;
     display: flex;
     flex-direction: column;
     gap: 20px;
   }
 }
+
+.language { order: 1; }
+.appearance { order: 2; }
+.time-format { order: 3; }
+.notification { order: 4; }
 
   /* ---------- Notification sound ---------- */
   .notification {
@@ -1181,7 +1238,7 @@ function submitPwd() {
 
   @media (max-width: 767px) {
     .time-format-options { width: 100%; }
-    .time-format-option { flex: 1 1 0; min-width: 0; }
+    .time-format-option { padding-inline: 10px; }
     .appearance-row { gap: 12px; padding: 12px; }
     .appearance-mode-row { display: block; }
     .appearance-mode-row .appearance-label { margin-bottom: 10px; }

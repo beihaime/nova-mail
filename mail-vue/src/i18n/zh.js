@@ -41,6 +41,8 @@ const zh = {
     timeFormat: '时间格式',
     timeFormat24h: '24 小时制',
     timeFormat12h: '12 小时制',
+    timeFormatExample24h: '13:45',
+    timeFormatExample12h: '1:45 PM',
     analytics: '分析页',
     allUsers: '用户列表',
     allMail: '全部邮件',
