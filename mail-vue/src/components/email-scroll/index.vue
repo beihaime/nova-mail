@@ -2889,7 +2889,7 @@ ul {
     background: var(--nova-surface);
   }
 
-  :deep(.virtual > div > div > .swipe-shell > .email-row.email:not(.all-email):not(.is-last-mail))::after {
+  :deep(.virtual > div > div > .swipe-shell > .email-row.email:not(.all-email))::after {
     content: '';
 
     position: absolute;
