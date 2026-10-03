@@ -1,5 +1,5 @@
 <template>
-  <div class="box mail-reader">
+  <div ref="readerRef" class="box mail-reader" data-nova-mail-reader>
     <div class="header-actions">
       <el-tooltip effect="dark" :content="$t('back')" :show-after="2000"><button class="nova-icon-button nova-toolbar-button toolbar-action" type="button" :aria-label="$t('back')" @click="handleBack"><Icon icon="solar:arrow-left-linear" width="20" height="20" /></button></el-tooltip>
       <el-tooltip v-if="emailStore.contentData.delType === 'trash'" v-perm="'email:delete'" effect="dark" :content="$t('restoreFromTrash')" :show-after="2000"><button class="nova-icon-button nova-toolbar-button toolbar-action" type="button" :aria-label="$t('restoreFromTrash')" @click="restoreTrash"><Icon icon="solar:restart-linear" width="20" height="20" /></button></el-tooltip>
@@ -267,6 +267,7 @@ import {looksLikeHtmlDocument} from '@/utils/mail-body-hint.js'
 import {attachmentRisk} from '@/utils/attachment-risk.js'
 import {alertNewMail} from '@/utils/new-mail-alert.js'
 import {DEFAULT_PALETTES} from '@/utils/theme-palette.js'
+import {playReaderOpen, playReaderClose, readerUnmounted} from '@/utils/mail-transition.js'
 
 const uiStore = useUiStore();
 const settingStore = useSettingStore();
@@ -294,6 +295,9 @@ const srcList = reactive([])
 const pdfPreview = reactive({ show: false, url: '', name: '' })
 let pdfUrl = null
 const scrollRef = ref(null)
+// The reading pane itself: the shared-container transition measures it as the
+// rect an opened preview grows into (and shrinks back out of).
+const readerRef = ref(null)
 
 // The mobile action bar is teleported to <body> so no transformed ancestor
 // (`.main-view` keeps an identity transform from its enter animation) can turn
@@ -1190,6 +1194,10 @@ onMounted(() => {
   openFromNotificationLink()
   tryMarkRead()
   startRealtime()
+  // If a list preview armed the shared-container transition, this pane grows
+  // out of it now; otherwise the call is a no-op and the pane animates in as
+  // usual. Measured a frame later so the surrounding layout has settled.
+  nextTick(() => playReaderOpen(readerRef.value))
   document.addEventListener('visibilitychange', handleVisibilityChange)
   window.addEventListener('keydown', handleKeyDown);
   if (mobileReaderQuery.addEventListener) {
@@ -1200,6 +1208,10 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  // Transition teardown first: an unrelated throw further down must not leave
+  // the parked preview layer or the close guard behind.
+  readerUnmounted()
+  stopCloseGuard()
   closePreview()
   closePdfPreview()
   stopRealtime()
@@ -1212,6 +1224,23 @@ onUnmounted(() => {
   } else {
     mobileReaderQuery.removeListener(handleMobileReaderChange)
   }
+})
+
+/**
+ * Closing the reader runs the reverse transition first: the pane shrinks back
+ * onto the preview it grew out of, and only once it has landed does the route
+ * change — which is what actually unmounts the detail DOM.
+ *
+ * A router-level guard, not `onBeforeRouteLeave`: the desktop layout renders
+ * this pane beside the `<router-view>` instead of inside it, so a
+ * route-record guard would never be registered there. Filtering on `from` keeps
+ * it scoped to this view, and removing it on unmount keeps it from outliving
+ * the reader. It covers every way out (back button, Escape, browser back).
+ */
+const stopCloseGuard = router.beforeEach(async (to, from) => {
+  if (from.name !== 'content' || to.name === 'content') return true
+  await playReaderClose(readerRef.value)
+  return true
 })
 
 function handleKeyDown(event) {

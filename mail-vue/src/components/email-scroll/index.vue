@@ -132,7 +132,8 @@
                     'is-unread': item.unread === EmailUnreadEnum.UNREAD && showUnread
                   }]"
                    :data-checked="item.checked"
-                   @click="jumpDetails(item)"
+                   :data-email-id="item.emailId"
+                   @click="jumpDetails(item, $event)"
                    @click.capture="onRowClickCapture"
                    @contextmenu="handleContextmenu($event, item)"
                    @pointerdown="onRowPointerDown($event, item)"
@@ -402,6 +403,7 @@ import {
   swipeCommitDistance,
 } from '@/utils/swipe-actions.js'
 import { showUndoSnackbar } from '@/utils/undo-snackbar.js'
+import { captureListPreview } from '@/utils/mail-transition.js'
 
 const props = defineProps({
   getEmailList: Function,
@@ -1440,7 +1442,7 @@ function updateCheckStatus() {
   isIndeterminate.value = checkedCount > 0 && !checkAll.value;
 }
 
-function jumpDetails(email) {
+function jumpDetails(email, event) {
   // A horizontal drag ends with a click too; it must never open the message.
   if (swipeBlockClick) {
     swipeBlockClick = false
@@ -1468,6 +1470,12 @@ function jumpDetails(email) {
       return
     }
   }
+
+  // Snapshot the row before the list is replaced by the reader, so the opened
+  // message can grow out of the preview that was clicked (and shrink back into
+  // it on the way out).
+  captureListPreview(event?.currentTarget)
+
   emit('jump', email)
 }
 
