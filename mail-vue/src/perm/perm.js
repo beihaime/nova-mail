@@ -59,64 +59,7 @@ const routers = {
             }
         }
     ],
-    'user:query': [{
-        path: '/all-users',
-        name: 'user',
-        component: () => import('@/views/user/index.vue'),
-        meta: {
-            title: 'allUsers',
-            name: 'user',
-            menu: true
-        }
-    }],
-    'role:query': [{
-        path: '/role',
-        name: 'role',
-        component: () => import('@/views/role/index.vue'),
-        meta: {
-            title: 'permissions',
-            name: 'role',
-            menu: true
-        }
-    }],
-    'setting:query': [{
-        path: '/system-settings',
-        name: 'sys-setting',
-        component: () => import('@/views/sys-setting/index.vue'),
-        meta: {
-            title: 'SystemSettings',
-            name: 'sys-setting',
-            menu: true
-        }
-    }],
-    'reg-key:query': [{
-        path: '/invite-code',
-        name: 'reg-key',
-        component: () => import('@/views/reg-key/index.vue'),
-        meta: {
-            title: 'inviteCode',
-            name: 'reg-key',
-            menu: true
-        }
-    }],
-    'all-email:query': [{
-        path: '/all-mail',
-        name: 'all-email',
-        component: () => import('@/views/all-email/index.vue'),
-        meta: {
-            title: 'allMail',
-            name: 'all-email',
-            menu: true
-        }
-    }],
-    'analysis:query': [{
-        path: '/analysis',
-        name: 'analysis',
-        component: () => import('@/views/analysis/index.vue'),
-        meta: {
-            title: 'analytics',
-            name: 'analysis',
-            menu: true
-        }
-    }]
+    // Admin pages are mounted by the dedicated AdminLayout in router/index.js.
+    // Keeping them out of this map prevents them from being registered beneath
+    // the ordinary MailLayout and appearing in the regular mail sidebar.
 }
