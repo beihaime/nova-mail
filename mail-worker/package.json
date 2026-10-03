@@ -28,6 +28,7 @@
 		"linkedom": "^0.18.10",
 		"postal-mime": "^2.4.3",
 		"resend": "^6.4.1",
+		"tldts": "7.4.13",
 		"ua-parser-js": "^2.0.3",
 		"uuid": "^11.1.0"
 	}

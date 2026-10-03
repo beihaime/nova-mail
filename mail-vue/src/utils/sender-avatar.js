@@ -17,6 +17,7 @@ import http from '@/axios/index.js'
  * @property {string|null} url
  * @property {'local'|'bimi'|'gravatar'|'domain'|'initial'} source
  * @property {boolean} verified
+ * @property {string} [domain] domain favicon host, for a browser-side image failure
  * @property {string} [initials]
  * @property {boolean} [pending] server only ran its cheap path
  */
@@ -72,6 +73,7 @@ export function normalizeSenderAvatar(raw) {
     url: typeof raw.url === 'string' && raw.url ? absoluteSenderAvatarUrl(raw.url) : null,
     source: SOURCES.has(raw.source) ? raw.source : AVATAR_SOURCE.INITIAL,
     verified: raw.verified === true,
+    ...(raw.source === AVATAR_SOURCE.DOMAIN && typeof raw.domain === 'string' ? { domain: raw.domain } : {}),
     ...(typeof raw.initials === 'string' && raw.initials ? { initials: raw.initials } : {}),
     ...(raw.pending ? { pending: true } : {}),
   }
@@ -112,11 +114,12 @@ function cacheKey(email, emailId) {
  * `exclude` skips sources whose image just failed to load, so the next level of
  * the chain is returned (`bimi` → `gravatar` → `domain` → `initial`).
  */
-export function fetchSenderAvatar({ email, emailId = 0, exclude = [] } = {}) {
+export function fetchSenderAvatar({ email, emailId = 0, exclude = [], failedDomains = [] } = {}) {
   const params = { email }
   if (Number(emailId) > 0) params.emailId = Number(emailId)
   const excluded = Array.isArray(exclude) ? exclude.filter(Boolean) : []
   if (excluded.length) params.exclude = excluded.join(',')
+  if (failedDomains.length) params.failedDomains = failedDomains.join(',')
 
   return http
     .get('/avatar', { params, noMsg: true })
@@ -131,9 +134,11 @@ export function fetchSenderAvatar({ email, emailId = 0, exclude = [] } = {}) {
  * lookup is a one-off fallback request and is never cached, so a later render
  * still starts from the best source.
  */
-export function resolveSenderAvatar({ email, emailId = 0, exclude = [] } = {}) {
+export function resolveSenderAvatar({ email, emailId = 0, exclude = [], failedDomains = [] } = {}) {
   const excluded = Array.isArray(exclude) ? exclude.filter(Boolean) : []
-  if (excluded.length) return fetchSenderAvatar({ email, emailId, exclude: excluded })
+  if (excluded.length || failedDomains.length) {
+    return fetchSenderAvatar({ email, emailId, exclude: excluded, failedDomains })
+  }
 
   const key = cacheKey(email, emailId)
   if (!metadataCache.has(key)) {

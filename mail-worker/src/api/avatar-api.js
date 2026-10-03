@@ -6,7 +6,7 @@ import senderAvatarService from '../service/sender-avatar-service';
 /**
  * Authenticated sender-avatar metadata.
  *
- * `GET /api/avatar?email=…&emailId=…&exclude=…`
+ * `GET /api/avatar?email=…&emailId=…&exclude=…&failedDomains=…`
  *
  * The `emailId` (when it belongs to the caller) supplies the message's BIMI
  * selector and authentication results. `exclude` is used by the client when an
@@ -18,6 +18,7 @@ app.get('/avatar', async (c) => {
 		emailId: c.req.query('emailId'),
 		name: c.req.query('name'),
 		exclude: c.req.query('exclude'),
+		failedDomains: c.req.query('failedDomains'),
 		userId: userContext.getUserId(c)
 	});
 	return c.json(result.ok(avatar));

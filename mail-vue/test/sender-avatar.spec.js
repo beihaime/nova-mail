@@ -73,6 +73,11 @@ describe('avatar normalisation', () => {
       .not.toHaveProperty('pending')
     expect(inlineSenderAvatar({})).toBeNull()
   })
+
+  it('preserves the resolved favicon host for browser-side fallback', () => {
+    expect(normalizeSenderAvatar({ url: '/api/avatar/image?id=1', source: 'domain', domain: 'example.co.uk' }))
+      .toMatchObject({ source: 'domain', domain: 'example.co.uk' })
+  })
 })
 
 describe('resolution requests', () => {
@@ -98,6 +103,21 @@ describe('resolution requests', () => {
 
     expect(mocks.get).toHaveBeenCalledWith('/avatar', {
       params: { email: 'user@example.com', emailId: 7, exclude: 'bimi,gravatar' },
+      noMsg: true,
+    })
+  })
+
+  it('skips only a failed favicon host without excluding the domain provider', async () => {
+    mocks.get.mockResolvedValue({ url: '/api/avatar/image?id=2', source: 'domain', domain: 'github.com' })
+
+    const avatar = await resolveSenderAvatar({
+      email: 'dev@notify.github.com',
+      failedDomains: ['notify.github.com'],
+    })
+
+    expect(avatar.domain).toBe('github.com')
+    expect(mocks.get).toHaveBeenCalledWith('/avatar', {
+      params: { email: 'dev@notify.github.com', failedDomains: 'notify.github.com' },
       noMsg: true,
     })
   })

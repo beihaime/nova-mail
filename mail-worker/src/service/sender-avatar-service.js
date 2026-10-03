@@ -1,4 +1,5 @@
 import { and, eq, inArray } from 'drizzle-orm';
+import { getDomain } from 'tldts';
 import orm from '../entity/orm';
 import email from '../entity/email';
 import account from '../entity/account';
@@ -27,7 +28,8 @@ import { verifyBrandAuthentication } from './mail-authentication';
  *                DMARC verifier says so (see service/mail-authentication.js).
  *   3. gravatar— SHA-256 of the trimmed, lower-cased address, `d=404` so a
  *                missing avatar is a clean miss instead of Gravatar's default.
- *   4. domain  — the domain's favicon / `<link rel=icon>`, always unverified.
+ *   4. domain  — full sender domain, then its registrable domain (eTLD+1),
+ *                favicon / `<link rel=icon>`, always unverified.
  *   5. initial — no image; the caller renders the existing initial avatar.
  *
  * Everything a browser is allowed to load is re-served by this Worker through
@@ -40,6 +42,7 @@ import { verifyBrandAuthentication } from './mail-authentication';
  * @property {string|null} url
  * @property {'local'|'bimi'|'gravatar'|'domain'|'initial'} source
  * @property {boolean} verified
+ * @property {string} [domain] favicon host for browser-side image fallback
  * @property {string} [initials]
  * @property {boolean} [pending] metadata only ran its cheap (local/cache) path
  */
@@ -192,6 +195,12 @@ export function validDomain(value) {
 	return raw;
 }
 
+/** The registrable domain, respecting both ICANN and private PSL suffixes. */
+export function registrableDomain(value) {
+	const domain = validDomain(value);
+	return domain ? validDomain(getDomain(domain, { allowPrivateDomains: true })) : '';
+}
+
 /** Trimmed + lower-cased address, or '' when it is not a usable mailbox. */
 export function normalizeEmail(value) {
 	const raw = String(value || '').trim().toLowerCase();
@@ -245,11 +254,14 @@ export function sniffImageType(bytes) {
 	if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg';
 	if (b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x38) return 'image/gif';
 	if (b[0] === 0x42 && b[1] === 0x4d) return 'image/bmp';
+	if ((b[0] === 0x49 && b[1] === 0x49 && b[2] === 0x2a && b[3] === 0x00)
+		|| (b[0] === 0x4d && b[1] === 0x4d && b[2] === 0x00 && b[3] === 0x2a)) return 'image/tiff';
 	if (b.length >= 12 && b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return 'image/webp';
 	if (b.length >= 12 && b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70) {
 		const brand = String.fromCharCode(b[8], b[9], b[10], b[11]).toLowerCase();
 		if (brand.startsWith('avif') || brand.startsWith('avis')) return 'image/avif';
-		if (brand.startsWith('heic') || brand.startsWith('heix') || brand.startsWith('mif1')) return 'image/heif';
+		if (brand.startsWith('heic') || brand.startsWith('heix') || brand.startsWith('hevc')
+			|| brand.startsWith('hevx') || brand.startsWith('mif1')) return 'image/heif';
 	}
 	if (b[0] === 0x00 && b[1] === 0x00 && b[2] === 0x01 && b[3] === 0x00) return 'image/x-icon';
 	return '';
@@ -302,15 +314,18 @@ export function classifyImage(bytes, contentTypeHeader) {
 		const sanitized = sanitizeSvg(bytes);
 		return sanitized ? { bytes: sanitized, contentType: 'image/svg+xml' } : null;
 	}
-	if (declaredRaster) {
+	const sniffed = sniffImageType(bytes);
+	if (declaredRaster && sniffed) {
 		const normalized = declared === 'image/jpg' || declared === 'image/pjpeg'
 			? 'image/jpeg'
 			: declared === 'image/ico'
 				? 'image/x-icon'
 				: declared;
-		return { bytes, contentType: normalized };
+		const matchesBytes = normalized === sniffed
+			|| (normalized === 'image/vnd.microsoft.icon' && sniffed === 'image/x-icon')
+			|| (normalized === 'image/heic' && sniffed === 'image/heif');
+		return { bytes, contentType: matchesBytes ? normalized : sniffed };
 	}
-	const sniffed = sniffImageType(bytes);
 	return sniffed ? { bytes, contentType: sniffed } : null;
 }
 
@@ -694,6 +709,7 @@ async function publicResult(c, resolved, initials) {
 		url: url || null,
 		source: resolved.source,
 		verified: resolved.verified === true,
+		...(resolved.source === AVATAR_SOURCE.DOMAIN ? { domain: resolved.descriptor.d } : {}),
 		initials
 	};
 }
@@ -701,11 +717,13 @@ async function publicResult(c, resolved, initials) {
 export async function resultCacheKey(address, selector, authResults) {
 	// Authentication state is part of the key: a verified message must never
 	// populate the entry an unverified message from the same sender reads.
-	return kvConst.AVATAR_RESULT + await sha256Hex(`${address}|${selector}|${authResults || ''}`);
+	// Version the resolver key so pre-fallback initial results do not hide a
+	// newly available registrable-domain avatar until their old TTL expires.
+	return kvConst.AVATAR_RESULT + 'v2:' + await sha256Hex(`${address}|${selector}|${authResults || ''}`);
 }
 
 async function resolveIdentity(c, identity) {
-	const { address, selector, authResults, localUrl, initials, exclude } = identity;
+	const { address, selector, authResults, localUrl, initials, exclude, failedDomains } = identity;
 	const skip = exclude || new Set();
 	const domain = validDomain(emailUtils.getDomain(address));
 
@@ -725,8 +743,12 @@ async function resolveIdentity(c, identity) {
 	}
 
 	if (domain && !skip.has(AVATAR_SOURCE.DOMAIN)) {
-		const domainLogo = await resolveDomain(c, domain);
-		if (domainLogo) return publicResult(c, domainLogo, initials);
+		const root = registrableDomain(domain);
+		for (const candidate of [...new Set([domain, root].filter(Boolean))]) {
+			if (failedDomains?.has(candidate)) continue;
+			const domainLogo = await resolveDomain(c, candidate);
+			if (domainLogo) return publicResult(c, domainLogo, initials);
+		}
 	}
 
 	return initialAvatar(initials);
@@ -741,7 +763,7 @@ function resultTtl(source) {
 
 async function resolvePublic(c, identity) {
 	const exclude = identity.exclude || new Set();
-	const cacheable = exclude.size === 0;
+	const cacheable = exclude.size === 0 && !identity.failedDomains?.size;
 	const key = cacheable ? await resultCacheKey(identity.address, identity.selector, identity.authResults) : '';
 
 	if (cacheable) {
@@ -796,7 +818,7 @@ async function loadMessageMetaBatch(c, emailIds) {
 const senderAvatarService = {
 
 	/** Resolve one sender address. */
-	async resolve(c, { email: address, emailId, userId, name, exclude } = {}) {
+	async resolve(c, { email: address, emailId, userId, name, exclude, failedDomains } = {}) {
 		const initials = initialsFrom(name, address);
 		const normalized = normalizeEmail(address);
 		if (!normalized) return initialAvatar(initials);
@@ -804,6 +826,8 @@ const senderAvatarService = {
 		const meta = await loadMessageMeta(c, emailId, userId);
 		const selector = meta?.bimiSelector || DEFAULT_BIMI_SELECTOR;
 		const localUrl = await lookupLocalUrl(c, normalized, String(address || '').trim());
+		const senderDomain = validDomain(emailUtils.getDomain(normalized));
+		const domainCandidates = new Set([senderDomain, registrableDomain(senderDomain)]);
 
 		const result = await resolvePublic(c, {
 			address: normalized,
@@ -811,7 +835,12 @@ const senderAvatarService = {
 			authResults: meta?.authResults || '',
 			localUrl,
 			initials,
-			exclude: parseExclude(exclude)
+			exclude: parseExclude(exclude),
+			// Browser decode failures may not be detectable from response headers.
+			// Only sender-domain candidates can be skipped; never trust arbitrary hosts.
+			failedDomains: new Set(String(failedDomains || '').slice(0, 512).split(',')
+				.map(validDomain)
+				.filter(candidate => candidate && domainCandidates.has(candidate)))
 		});
 
 		return { ...result, initials: result.initials || initials };
@@ -892,7 +921,8 @@ const senderAvatarService = {
 			emailId: query.emailId,
 			userId: query.userId,
 			name: query.name,
-			exclude: query.exclude
+			exclude: query.exclude,
+			failedDomains: query.failedDomains
 		});
 	},
 

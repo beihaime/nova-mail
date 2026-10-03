@@ -55,6 +55,7 @@ const avatar = ref(normalizeSenderAvatar(null))
 const imageLoaded = ref(false)
 const imageFailed = ref(false)
 const triedSources = ref(new Set())
+const triedDomains = ref(new Set())
 
 const address = computed(() => senderAddress(props.email))
 const name = computed(() => senderName(props.email))
@@ -79,12 +80,12 @@ let requestToken = 0
  * Render the best thing we already have immediately, then let the server finish
  * the chain in the background when the list only had the cheap path.
  */
-async function load(exclude = []) {
+async function load(exclude = [], failedDomains = []) {
   const token = ++requestToken
   imageFailed.value = false
   imageLoaded.value = false
 
-  const inline = exclude.length ? null : inlineSenderAvatar(props.email)
+  const inline = exclude.length || failedDomains.length ? null : inlineSenderAvatar(props.email)
   if (inline && !inline.pending) {
     avatar.value = inline
     return
@@ -100,7 +101,8 @@ async function load(exclude = []) {
   const resolved = await resolveSenderAvatar({
     email: address.value,
     emailId: emailId.value,
-    exclude
+    exclude,
+    failedDomains
   })
 
   // A newer render (or a newer fallback attempt) has taken over.
@@ -115,18 +117,29 @@ function handleLoad() {
 /** The proxied image can still 404 (expired asset); drop to the next source. */
 function handleError() {
   const source = avatar.value.source
+  if (source === 'domain') {
+    // The Worker already tries both domains when fetching metadata. A browser
+    // decode failure can still happen later, so skip only this failed host.
+    const domain = avatar.value.domain || address.value.split('@')[1]?.toLowerCase()
+    if (domain && !triedDomains.value.has(domain)) {
+      triedDomains.value = new Set([...triedDomains.value, domain])
+      load([...triedSources.value], [...triedDomains.value])
+      return
+    }
+  }
   if (triedSources.value.has(source)) {
     imageFailed.value = true
     return
   }
   triedSources.value = new Set([...triedSources.value, source])
-  load([...triedSources.value])
+  load([...triedSources.value], [...triedDomains.value])
 }
 
 watch(
   () => [address.value, emailId.value],
   () => {
     triedSources.value = new Set()
+    triedDomains.value = new Set()
     load()
   },
   { immediate: true }

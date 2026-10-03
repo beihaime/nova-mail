@@ -6,6 +6,7 @@ import senderAvatarService, {
 	initialsFrom,
 	normalizeEmail,
 	parseExclude,
+	registrableDomain,
 	resultCacheKey,
 	safeRemoteUrl,
 	sanitizeSvg,
@@ -89,6 +90,25 @@ function stubNetwork({ bimiRecord = null, logo = null, logoType = 'image/svg+xml
 	return calls;
 }
 
+function stubDomainNetwork(assets) {
+	const calls = [];
+	vi.stubGlobal('fetch', vi.fn(async input => {
+		const url = String(input instanceof Request ? input.url : input);
+		calls.push(url);
+		if (url.startsWith('https://cloudflare-dns.com/dns-query')) {
+			return jsonResponse({ Answer: url.includes('_bimi.') ? [] : [{ data: PUBLIC_IP, TTL: 600 }] });
+		}
+		if (url.startsWith('https://gravatar.com/avatar/')) return new Response(null, { status: 404 });
+		const host = new URL(url).hostname;
+		if (url.endsWith('/favicon.ico') && assets[host]) {
+			if (assets[host] instanceof Error) throw assets[host];
+			return imageResponse(assets[host], 'image/png');
+		}
+		return new Response(null, { status: 404 });
+	}));
+	return calls;
+}
+
 function context() {
 	return { env: { kv: fakeKv(), jwt_secret: SECRET } };
 }
@@ -145,6 +165,14 @@ describe('BIMI parsing', () => {
 });
 
 describe('domain and address validation', () => {
+	it('finds the registrable domain with the public suffix list', () => {
+		expect(registrableDomain('notify.github.com')).toBe('github.com');
+		expect(registrableDomain('mail.example.co.uk')).toBe('example.co.uk');
+		expect(registrableDomain('mail.example.com.cn')).toBe('example.com.cn');
+		expect(registrableDomain('mail.example.com.tw')).toBe('example.com.tw');
+		expect(registrableDomain('mail.team.github.io')).toBe('team.github.io');
+		expect(registrableDomain('co.uk')).toBe('');
+	});
 	it('rejects IP literals, private hosts, ports and single labels', () => {
 		expect(validDomain('example.com')).toBe('example.com');
 		expect(validDomain('Example.COM.')).toBe('example.com');
@@ -192,6 +220,7 @@ describe('image classification', () => {
 	it('rejects HTML masquerading as an image', () => {
 		expect(classifyImage(new TextEncoder().encode('<html><body>hi</body></html>'), 'text/html')).toBeNull();
 		expect(classifyImage(new TextEncoder().encode('<html></html>'), 'application/octet-stream')).toBeNull();
+		expect(classifyImage(new TextEncoder().encode('<html></html>'), 'image/png')).toBeNull();
 	});
 
 	it('sanitises a remote SVG before it can be served', () => {
@@ -381,6 +410,72 @@ describe('resolution chain', () => {
 		const initialAvatar = await senderAvatarService.resolve(context(), { email: 'user@example.com' });
 		expect(initialAvatar.source).toBe(AVATAR_SOURCE.INITIAL);
 		expect(initialAvatar.url).toBeNull();
+	});
+
+	it('prefers the full sender domain when it has an image', async () => {
+		const calls = stubDomainNetwork({ 'notify.github.com': PNG, 'github.com': PNG });
+		const avatar = await senderAvatarService.resolve(context(), { email: 'dev@notify.github.com' });
+		expect(avatar.source).toBe(AVATAR_SOURCE.DOMAIN);
+		expect(avatar.domain).toBe('notify.github.com');
+		expect(calls).toContain('https://notify.github.com/favicon.ico');
+		expect(calls).not.toContain('https://github.com/favicon.ico');
+	});
+
+	it('falls back to eTLD+1 and caches the failed subdomain and resolved result', async () => {
+		const calls = stubDomainNetwork({ 'example.co.uk': PNG });
+		const c = context();
+		const first = await senderAvatarService.resolve(c, { email: 'dev@mail.example.co.uk' });
+		expect(first.source).toBe(AVATAR_SOURCE.DOMAIN);
+		expect(first.domain).toBe('example.co.uk');
+		expect(calls).toContain('https://mail.example.co.uk/favicon.ico');
+		expect(calls).toContain('https://example.co.uk/favicon.ico');
+
+		const firstCallCount = calls.length;
+		const again = await senderAvatarService.resolve(c, { email: 'dev@mail.example.co.uk' });
+		expect(again.domain).toBe('example.co.uk');
+		expect(calls).toHaveLength(firstCallCount);
+		const rows = [{ emailId: 1, sendEmail: 'dev@mail.example.co.uk', name: 'Dev' }];
+		await senderAvatarService.attach(c, rows);
+		expect(rows[0].avatar.domain).toBe('example.co.uk');
+		expect(calls).toHaveLength(firstCallCount);
+
+		// Another sender reuses the domain-level negative cache, even though its
+		// address-level result has never been resolved before.
+		await senderAvatarService.resolve(c, { email: 'other@mail.example.co.uk' });
+		expect(calls.filter(url => url === 'https://mail.example.co.uk/favicon.ico')).toHaveLength(1);
+	});
+
+	it('falls back after a declared image contains invalid bytes and then to initials', async () => {
+		const bogus = new TextEncoder().encode('<html>not an image</html>');
+		stubDomainNetwork({ 'notify.github.com': bogus, 'github.com': PNG });
+		const root = await senderAvatarService.resolve(context(), { email: 'dev@notify.github.com' });
+		expect(root.domain).toBe('github.com');
+
+		vi.unstubAllGlobals();
+		stubDomainNetwork({ 'notify.github.com': bogus });
+		const initial = await senderAvatarService.resolve(context(), { email: 'dev@notify.github.com' });
+		expect(initial.source).toBe(AVATAR_SOURCE.INITIAL);
+	});
+
+	it('falls back to the registrable domain after a subdomain network error', async () => {
+		stubDomainNetwork({ 'mail.example.com': new Error('network unavailable'), 'example.com': PNG });
+		const avatar = await senderAvatarService.resolve(context(), { email: 'user@mail.example.com' });
+		expect(avatar.domain).toBe('example.com');
+	});
+
+	it('skips only the failed domain after a browser-side image error', async () => {
+		const calls = stubDomainNetwork({ 'notify.github.com': PNG, 'github.com': PNG });
+		const c = context();
+		await senderAvatarService.resolve(c, { email: 'dev@notify.github.com' });
+		const fallback = await senderAvatarService.resolve(c, {
+			email: 'dev@notify.github.com', failedDomains: 'notify.github.com'
+		});
+		expect(fallback.domain).toBe('github.com');
+		expect(calls).toContain('https://github.com/favicon.ico');
+		const initial = await senderAvatarService.resolve(c, {
+			email: 'dev@notify.github.com', failedDomains: 'notify.github.com,github.com'
+		});
+		expect(initial.source).toBe(AVATAR_SOURCE.INITIAL);
 	});
 
 	it('rejects a forged or tampered signed id', async () => {
