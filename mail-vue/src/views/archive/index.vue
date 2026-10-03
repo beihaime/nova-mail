@@ -8,6 +8,8 @@
                  :emailDelete="emailDelete"
                  :email-unread="emailUnread"
                  :email-read="emailRead"
+                 :email-unarchive="emailUnarchive"
+                 :email-restore="emailRestore"
                  :star-add="starAdd"
                  :star-cancel="starCancel"
                  :show-account-icon="false"
@@ -21,7 +23,7 @@
 import {useAccountStore} from "@/store/account.js";
 import {useEmailStore} from "@/store/email.js";
 import emailScroll from "@/components/email-scroll/index.vue"
-import {emailList, emailDelete, emailRead, emailUnread} from "@/request/email.js";
+import {emailList, emailDelete, emailRead, emailUnread, emailUnarchive, emailRestore} from "@/request/email.js";
 import {starAdd, starCancel} from "@/request/star.js";
 import {defineOptions, onMounted, ref} from "vue";
 import router from "@/router/index.js";

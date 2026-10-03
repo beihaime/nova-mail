@@ -244,7 +244,7 @@ import MailHtmlFrame from '@/components/mail-html-frame/index.vue'
 import {computed, reactive, ref, watch, nextTick, onMounted, onUnmounted} from "vue";
 import {useRoute, useRouter} from 'vue-router'
 import {ElMessage, ElMessageBox} from 'element-plus'
-import {emailArchive, emailDelete, emailDeleteForever, emailLatest, emailList, emailRead, emailRestore, emailThread} from "@/request/email.js";
+import {emailLatest, emailList, emailRead, emailThread} from "@/request/email.js";
 import {Icon} from "@iconify/vue";
 import {useEmailStore} from "@/store/email.js";
 import {useAccountStore} from "@/store/account.js";
@@ -268,6 +268,14 @@ import {attachmentRisk} from '@/utils/attachment-risk.js'
 import {alertNewMail} from '@/utils/new-mail-alert.js'
 import {DEFAULT_PALETTES} from '@/utils/theme-palette.js'
 import {playReaderOpen, playReaderClose, readerUnmounted} from '@/utils/mail-transition.js'
+import {
+  archiveMessages,
+  trashMessages,
+  restoreMessages,
+  permanentlyDeleteMessages,
+  setMailReaderContext,
+  clearMailReaderContext,
+} from '@/utils/mail-mutations.js'
 
 const uiStore = useUiStore();
 const settingStore = useSettingStore();
@@ -289,6 +297,16 @@ const email = computed(() => emailStore.contentData.email || {
   text: '',
   recipient: '[]',
 })
+
+// The shared mutation layer closes the reader immediately (before any HTTP)
+// when a mutation targets the currently open message. `emailId` is kept in
+// sync as the user moves to adjacent messages.
+const readerContext = {
+  emailId: email.value?.emailId,
+  close: () => router.back(),
+}
+watch(() => email.value?.emailId, id => { readerContext.emailId = id })
+
 const showPreview = ref(false)
 const srcList = reactive([])
 // PDF attachments are shown in-place, in a frame fed by an object URL.
@@ -1192,6 +1210,7 @@ onMounted(() => {
   openFromNotificationLink()
   tryMarkRead()
   startRealtime()
+  setMailReaderContext(readerContext)
   // The route has already changed; animate only the mounted reading region.
   nextTick(() => playReaderOpen(readerRef.value))
   document.addEventListener('visibilitychange', handleVisibilityChange)
@@ -1203,6 +1222,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  clearMailReaderContext(readerContext)
   readerUnmounted(readerRef.value)
   stopCloseGuard()
   closePreview()
@@ -1524,35 +1544,22 @@ const handleBack = () => {
 
 const handleDelete = () => {
   const isTrash = emailStore.contentData.delType === 'trash'
+  const emailId = email.value?.emailId
+
   const removeCurrent = () => {
+    if (!emailId) return
+
+    // The reader closes and the list drops the row immediately; the request
+    // runs in the background and rolls back (restoring the row + an error)
+    // only if persistence fails.
     if (isTrash) {
-      emailDeleteForever(email.value.emailId).then(() => {
-        ElMessage({ message: t('delSuccessMsg'), type: 'success', plain: true })
-        emailStore.trashScroll?.deleteEmail([email.value.emailId])
-        router.back()
-      })
+      permanentlyDeleteMessages([emailId])
     } else if (emailStore.contentData.delType === 'logic') {
-      const emailId = email.value.emailId
-      emailStore.deleteIds = [emailId]
-      router.back()
-      emailDelete(emailId).then(() => {
-        ElMessage({ message: t('delSuccessMsg'), type: 'success', plain: true })
-      }).catch(error => {
-        console.error(error)
-        emailStore.emailScroll?.refreshList()
-        emailStore.sendScroll?.refreshList()
-        emailStore.starScroll?.refreshList()
-        emailStore.archiveScroll?.refreshList()
-      })
-    } else  {
-      const emailId = email.value.emailId
-      emailStore.deleteIds = [emailId]
-      router.back()
-      allEmailDelete(emailId).then(() => {
-        ElMessage({ message: t('delSuccessMsg'), type: 'success', plain: true })
-      }).catch(error => {
-        console.error(error)
-      })
+      trashMessages([emailId])
+    } else {
+      // Admin All Mail moves a row to its owner's Trash; there is no restore
+      // path from here, so no Undo is offered.
+      trashMessages([emailId], { persist: allEmailDelete, undoable: false })
     }
   }
 
@@ -1571,26 +1578,15 @@ const handleDelete = () => {
 }
 
 function restoreTrash() {
-  emailRestore([email.value.emailId]).then(() => {
-    ElMessage({ message: t('restoreSuccessMsg'), type: 'success', plain: true })
-    emailStore.trashScroll?.deleteEmail([email.value.emailId])
-    router.back()
-  })
+  const emailId = email.value?.emailId
+  if (!emailId) return
+  restoreMessages([emailId])
 }
 
 function archiveCurrent() {
   const emailId = email.value?.emailId
   if (!emailId || emailStore.contentData.delType === 'trash') return
-
-  emailStore.deleteIds = [emailId]
-  emailArchive([emailId]).then(() => {
-    ElMessage({ message: t('archiveSuccessMsg'), type: 'success', plain: true })
-    router.back()
-  }).catch(error => {
-    console.error(error)
-    emailStore.emailScroll?.refreshList()
-    emailStore.archiveScroll?.refreshList()
-  })
+  archiveMessages([emailId])
 }
 
 function adjacentMessage(direction) {

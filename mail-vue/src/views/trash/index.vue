@@ -19,6 +19,11 @@
             <Icon icon="solar:restart-linear" width="20" height="20" />
           </button>
         </el-tooltip>
+        <el-tooltip effect="dark" :content="t('emptyTrash')" :show-after="2000">
+          <button class="nova-icon-button nova-toolbar-button nova-danger-button" type="button" :disabled="!hasMail" :aria-label="t('emptyTrash')" @click="emptyTrashSelected">
+            <Icon icon="solar:trash-bin-trash-linear" width="20" height="20" />
+          </button>
+        </el-tooltip>
       </template>
     </emailScroll>
   </div>
@@ -28,11 +33,12 @@
 import { computed, defineOptions, onMounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
+import { ElMessageBox } from 'element-plus'
 import { useAccountStore } from '@/store/account.js'
 import { useEmailStore } from '@/store/email.js'
 import emailScroll from '@/components/email-scroll/index.vue'
-import { emailDeleteForever, emailList, emailRead, emailRestore } from '@/request/email.js'
-import { runOptimisticMailMutation } from '@/utils/optimistic-mail-mutation.js'
+import { emailDeleteForever, emailList, emailRead } from '@/request/email.js'
+import { restoreMessages, emptyTrash } from '@/utils/mail-mutations.js'
 import router from '@/router/index.js'
 
 defineOptions({ name: 'trash' })
@@ -42,6 +48,7 @@ const scroll = ref(null)
 const emailStore = useEmailStore()
 const accountStore = useAccountStore()
 const selectedIds = computed(() => scroll.value?.getSelectedMailsIds?.() || [])
+const hasMail = computed(() => (scroll.value?.emailList?.length || 0) > 0)
 
 onMounted(() => { emailStore.trashScroll = scroll })
 
@@ -64,23 +71,21 @@ function jumpContent(row) {
 function restoreSelected() {
   const ids = selectedIds.value
   if (!ids.length) return
-  let snapshot = []
+  restoreMessages(ids)
+}
 
-  // Restoring from Trash follows the same immediate mutation contract as
-  // Archive/Trash: the list changes now, persistence is reconciled later.
-  const mutation = runOptimisticMailMutation({
-    ids,
-    apply: () => { snapshot = scroll.value?.removeEmailsOptimistically?.(ids) || [] },
-    persist: () => emailRestore(ids),
-    rollback: () => scroll.value?.restoreEmailsOptimistically?.(snapshot),
-    onPersistError: error => {
-      console.error(error)
-      ElMessage({ message: t('reqFailErrorMsg'), type: 'error', plain: true })
-    },
+function emptyTrashSelected() {
+  if (!hasMail.value) return
+
+  ElMessageBox.confirm(t('emptyTrashConfirm'), {
+    confirmButtonText: t('confirm'),
+    cancelButtonText: t('cancel'),
+    type: 'warning'
+  }).then(() => {
+    // The list clears and the counter drops to zero immediately; the backend
+    // operation runs in the background and rolls the snapshot back on failure.
+    emptyTrash(accountStore.currentAccountId)
   })
-  if (mutation && snapshot.length) {
-    ElMessage({ message: t('restoreSuccessMsg'), type: 'success', plain: true })
-  }
 }
 
 </script>

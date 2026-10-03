@@ -89,6 +89,17 @@
               <AppIcon name="nova-sidebar-archive" :size="20" inline />
             </button>
           </el-tooltip>
+          <el-tooltip v-if="selectionActions.unarchive" effect="dark" :content="t('unarchive')" :show-after="1200">
+            <button
+                v-perm="'email:delete'"
+                class="nova-icon-button nova-toolbar-button selection-action"
+                type="button"
+                :aria-label="t('unarchive')"
+                @click="handleUnarchive"
+            >
+              <AppIcon name="nova-sidebar-inbox" :size="20" inline />
+            </button>
+          </el-tooltip>
           <el-tooltip v-if="selectionActions.trash || selectionActions.permanentDelete" v-perm="'email:delete'" effect="dark" :content="selectionActions.permanentDelete ? t('deleteForever') : t('delete')" :show-after="1200">
             <button
                 class="nova-icon-button nova-toolbar-button nova-danger-button selection-action"
@@ -412,6 +423,14 @@
               </div>
             </template>
           </el-dropdown-item>
+          <el-dropdown-item v-if="props.type === 'archive'" @click="handleUnarchive([rightClickEmail.emailId])">
+            <template #default>
+              <div class="right-dropdown-item">
+                <AppIcon name="nova-sidebar-inbox" :size="18" inline />
+                <span>{{t('unarchive')}}</span>
+              </div>
+            </template>
+          </el-dropdown-item>
           <el-dropdown-item @click="rightDelete(rightClickEmail.emailId)">
             <template #default>
               <div class="right-dropdown-item">
@@ -447,16 +466,22 @@ import { nextPageCursor, isLastPage, canRequestPage } from '@/utils/mail-paginat
 import {
   SWIPE_ACTIONS,
   SWIPE_AXIS,
-  SWIPE_UNDO_MS,
   clampSwipeOffset,
   normalizeSwipeAction,
   resolveSwipeAxis,
   resolveSwipeRelease,
   swipeCommitDistance,
 } from '@/utils/swipe-actions.js'
-import { showUndoSnackbar } from '@/utils/undo-snackbar.js'
 import { MAIL_DENSITY_GEOMETRY, normalizeMailDensity } from '@/utils/mail-density.js'
-import { runOptimisticMailMutation } from '@/utils/optimistic-mail-mutation.js'
+import {
+  archiveMessages,
+  trashMessages,
+  unarchiveMessages,
+  permanentlyDeleteMessages,
+  registerMailListController,
+  unregisterMailListController,
+  setMailClearStarHook,
+} from '@/utils/mail-mutations.js'
 
 const props = defineProps({
   getEmailList: Function,
@@ -571,6 +596,7 @@ const keyboardFocusedId = ref(0)
 // delete mutation by the page that owns the list.
 const selectionActions = computed(() => ({
   archive: props.type !== 'archive' && props.type !== 'trash' && typeof props.emailArchive === 'function',
+  unarchive: props.type === 'archive' && typeof props.emailUnarchive === 'function',
   trash: props.type !== 'trash' && typeof props.emailDelete === 'function',
   permanentDelete: props.type === 'trash' && typeof props.emailDelete === 'function',
 }))
@@ -646,7 +672,21 @@ onActivated(() => {
   })
 })
 
+// The capability surface the shared mutation layer drives. It owns nothing but
+// the local list: remove/restore rows, clear/restore the whole list for Empty
+// Trash, and reconcile with a refetch when a mutation asks for it.
+const mailListController = {
+  remove: ids => removeEmailsOptimistically(ids),
+  restore: snapshot => restoreEmailsOptimistically(snapshot),
+  clearAll: () => clearAllOptimistically(),
+  restoreAll: snapshot => restoreAllOptimistically(snapshot),
+  reconcile: () => refreshList(),
+}
+
 onMounted(() => {
+  registerMailListController(props.type, mailListController)
+  // Archive/trash unstar a row on the server; mirror that across every list.
+  setMailClearStarHook(ids => emailStore.clearStarForEmailIds(ids))
   timer = setInterval(() => {
     emailList.forEach(email => {
       email.formatCreateTime = formatListClock(email.createTime);
@@ -655,6 +695,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  unregisterMailListController(props.type, mailListController)
   clearInterval(timer)
   stopLongPress()
   // Match the previous per-instance ref behaviour: leaving the Inbox clears
@@ -1049,10 +1090,8 @@ function performSwipeAction(item, action) {
 
 function commitSwipe(gesture, action) {
   const { rowEl, shellEl, item } = gesture
-  const wasStarred = !!item.isStar
   const width = shellEl?.offsetWidth || 0
   const direction = gesture.dx > 0 ? 1 : -1
-  const index = emailList.findIndex(row => row.emailId === item.emailId)
 
   if (!SWIPE_ACTIONS[action]) return
 
@@ -1060,7 +1099,7 @@ function commitSwipe(gesture, action) {
     const request = performSwipeAction(item, action)
     springBackSwipe(gesture)
     Promise.resolve(request).then(() => {
-      showSwipeOutcome({ item, index, action, canUndo: false })
+      showSwipeOutcome(action)
     }).catch(error => {
       console.error(error)
       refreshList()
@@ -1079,28 +1118,36 @@ function commitSwipe(gesture, action) {
   rowEl.style.transform = `translate3d(${direction * width}px, 0, 0)`
   rowEl.style.opacity = '0'
 
-  // Complete the visible exit first. This removes the item without waiting for
-  // HTTP, then starts the request; a failed request restores its old position.
+  // Complete the visible exit first, then hand the row to the shared mutation
+  // pipeline — it removes the row, starts the request and offers Undo without
+  // waiting for HTTP. A failed request restores the row to its old position.
   let exitFinished = false
   const finishExit = event => {
     if (exitFinished || (event && event.target !== rowEl)) return
     exitFinished = true
     rowEl.removeEventListener('transitionend', finishExit)
-    const mutation = commitRemovalMutation({
-      ids: [item.emailId],
-      action,
-      undoable: true,
-      snapshot: captureEmailSnapshot([item.emailId]),
-    })
+
+    const message = t(SWIPE_ACTIONS[action]?.labelKey || 'swipeActionNone')
+    if (action === 'archive') {
+      archiveMessages([item.emailId], {
+        persist: props.emailArchive,
+        undoPersist: props.emailUnarchive,
+        message,
+      })
+    } else {
+      trashMessages([item.emailId], {
+        persist: props.emailDelete,
+        undoPersist: props.emailRestore,
+        undoable: typeof props.emailRestore === 'function',
+        message,
+      })
+    }
+
     // Let Vue remove the virtual-list row first. Cleaning the imperative
     // styles in the same tick could expose the neutral state for one frame.
     nextTick(() => {
       if (shellEl?.isConnected) clearSwipeVisuals(gesture)
     })
-
-    // The notice belongs to the local mutation, not the HTTP response. This
-    // keeps swipe feedback instant even on a slow connection.
-    showSwipeOutcome({ item, index, action, canUndo: !!mutation, mutation })
   }
 
   rowEl.addEventListener('transitionend', finishExit)
@@ -1108,25 +1155,8 @@ function commitSwipe(gesture, action) {
   window.setTimeout(finishExit, 260)
 }
 
-function restoreSwipedEmail(item, index) {
-  if (emailList.some(row => row.emailId === item.emailId)) return
-  emailList.splice(Math.max(0, Math.min(index, emailList.length)), 0, item)
-}
-
-function showSwipeOutcome({ item, index, action, canUndo, mutation }) {
-  const message = t(SWIPE_ACTIONS[action]?.labelKey || 'swipeActionNone')
-
-  if (!canUndo) {
-    ElMessage({ message, type: 'success', plain: true })
-    return
-  }
-
-  showUndoSnackbar({
-    message,
-    undoLabel: t('undo'),
-    duration: SWIPE_UNDO_MS,
-    onUndo: () => mutation?.undo(),
-  })
+function showSwipeOutcome(action) {
+  ElMessage({ message: t(SWIPE_ACTIONS[action]?.labelKey || 'swipeActionNone'), type: 'success', plain: true })
 }
 
 const itemHeight = computed(() => {
@@ -1222,12 +1252,6 @@ watch(selectedCount, (count) => {
   if (count === 0) mobileSelecting.value = false
 })
 
-
-watch(() => emailStore.deleteIds, () => {
-  if (emailStore.deleteIds) {
-    deleteEmail(emailStore.deleteIds)
-  }
-})
 
 watch(() => emailStore.cancelStarEmailId, () => {
   emailList.forEach(email => {
@@ -1478,13 +1502,20 @@ function markKeyboardUnread() {
 }
 
 function rightDelete(emailId) {
-  const mutation = commitRemovalMutation({ ids: [emailId], action: 'trash', undoable: true })
-  showRemovalOutcome({ action: 'trash', mutation })
+  // Same pipeline as the toolbar, including the Trash view's permanent-delete
+  // confirmation: a right-clicked Trash row must never bypass confirmation.
+  handleDelete([emailId])
 }
 
 function handleArchive(ids = getSelectedMailsIds()) {
-  const mutation = commitRemovalMutation({ ids, action: 'archive', undoable: true })
-  showRemovalOutcome({ action: 'archive', mutation })
+  archiveMessages(ids, {
+    persist: props.emailArchive,
+    undoPersist: props.emailUnarchive,
+  })
+}
+
+function handleUnarchive(ids = getSelectedMailsIds()) {
+  unarchiveMessages(ids, { persist: props.emailUnarchive })
 }
 
 function handleSearch(type, value) {
@@ -1518,12 +1549,17 @@ function handleDelete(ids = getSelectedMailsIds()) {
     }
 
     const permanent = Boolean(props.deleteConfirmText)
-    const mutation = commitRemovalMutation({
-      ids,
-      action: permanent ? 'permanentDelete' : 'trash',
-      undoable: !permanent,
-    })
-    showRemovalOutcome({ action: permanent ? 'permanentDelete' : 'trash', mutation })
+    if (permanent) {
+      permanentlyDeleteMessages(ids, { persist: props.emailDelete })
+    } else {
+      // Undo is only offered when the folder owns a restore path. The admin
+      // All Mail list moves a row to the owner's Trash but cannot restore it.
+      trashMessages(ids, {
+        persist: props.emailDelete,
+        undoPersist: props.emailRestore,
+        undoable: typeof props.emailRestore === 'function',
+      })
+    }
   }
 
   // Moving a mail to Trash is reversible and should be immediate.  The Trash
@@ -1581,49 +1617,31 @@ function restoreEmailsOptimistically(snapshot) {
   }
 }
 
-function commitRemovalMutation({ ids, action, undoable = false, snapshot = captureEmailSnapshot(ids) } = {}) {
-  const emailIds = [...new Set((ids || []).map(Number).filter(Boolean))]
-  if (!emailIds.length || !snapshot.length) return null
-  const isArchive = action === 'archive'
-  const isTrash = action === 'trash'
-  const persist = isArchive ? props.emailArchive : props.emailDelete
-  if (typeof persist !== 'function') return null
-
-  return runOptimisticMailMutation({
-    ids: emailIds,
-    apply: () => {
-      removeEmailsOptimistically(emailIds, snapshot)
-      if (isArchive || isTrash) emailStore.clearStarForEmailIds(emailIds)
-    },
-    persist: () => persist(emailIds),
-    rollback: () => restoreEmailsOptimistically(snapshot),
-    onPersistError: error => {
-      console.error(error)
-      ElMessage({ message: t('swipeActionFailMsg'), type: 'error', plain: true })
-    },
-    undoApply: undoable ? () => restoreEmailsOptimistically(snapshot) : undefined,
-    undoPersist: undoable
-      ? () => (isArchive ? props.emailUnarchive(emailIds) : props.emailRestore(emailIds))
-      : undefined,
-    redo: undoable ? () => removeEmailsOptimistically(emailIds, captureEmailSnapshot(emailIds)) : undefined,
-    onUndoError: error => {
-      console.error(error)
-      ElMessage({ message: t('undoFailMsg'), type: 'error', plain: true })
-    },
-  })
+function clearAllOptimistically() {
+  const snapshot = emailList.map((item, index) => ({
+    item,
+    index,
+    isStar: item.isStar,
+    checked: item.checked,
+  }))
+  emailList.length = 0
+  total.value = 0
+  checkAll.value = false
+  isIndeterminate.value = false
+  mobileSelecting.value = false
+  return snapshot
 }
 
-function showRemovalOutcome({ action, mutation }) {
-  if (!mutation) return
-  const message = action === 'archive'
-    ? t('archiveSuccessMsg')
-    : (props.deleteSuccessText || t('delSuccessMsg'))
-
-  if (action === 'archive' || action === 'trash') {
-    showUndoSnackbar({ message, undoLabel: t('undo'), onUndo: () => mutation.undo() })
-    return
+function restoreAllOptimistically(snapshot) {
+  if (!snapshot?.length) return
+  for (const entry of [...snapshot].sort((a, b) => a.index - b.index)) {
+    if (emailList.some(item => Number(item.emailId) === Number(entry.item.emailId))) continue
+    entry.item.checked = entry.checked
+    entry.item.isStar = entry.isStar
+    emailList.splice(Math.max(0, Math.min(entry.index, emailList.length)), 0, entry.item)
+    syncStarState(entry.item, entry.isStar)
   }
-  ElMessage({ message, type: 'success', plain: true })
+  total.value = snapshot.length
 }
 
 function addItem(email) {
