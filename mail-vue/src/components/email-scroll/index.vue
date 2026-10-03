@@ -187,7 +187,7 @@
                   v-if="type === 'email' && isPhone"
                   class="mobile-sender-avatar"
                   :email="item"
-                  :size="40"
+                  :size="48"
               />
               <div class="title" :class="accountShow ? 'title-column' : 'title-column'">
 
@@ -2735,18 +2735,22 @@ ul {
   .email-container.mobile-selecting > .header-actions {
     display: grid;
 
-    /* The toolbar itself is intrinsic-width on phones. Do not leave a 1fr
-       track or distribute empty space after the last action. */
+    /* The selection toolbar is its own full-width region. Its divider must not
+       inherit the inset used by message rows. */
     grid-template-columns: var(--mail-list-selection-column) auto;
-    width: fit-content;
+    width: 100%;
     max-width: 100%;
     box-sizing: border-box;
 
+    height: 48px;
     min-height: 48px;
     /* Same left inset as a phone mail row, so the select-all lines up with the
        row checkboxes it controls. */
     padding: 4px 8px 4px var(--mail-list-checkbox-inset);
     column-gap: 4px;
+    border-top: 1px solid var(--nova-divider);
+    border-bottom: 1px solid var(--nova-divider);
+    box-shadow: none;
   }
 
   .email-container.mobile-selecting > .header-actions .header-left {
@@ -2770,28 +2774,23 @@ ul {
 
   /* ---------- Mail row ---------- */
 
-  :deep(.email-row.email) {
+  :deep(.email-row.email:not(.all-email)) {
     position: relative;
 
     display: grid;
-    /* Unread gutter | avatar | message body. The timestamp is positioned over
-       the sender line, so it does not reserve a column below that line.
-       Tracks are flush (no column gap): the avatar sits at the start of its
-       50px track, so its trailing 10px is the avatar -> text gap and the body
-       column gets every remaining pixel. Every track except the body is fixed,
-       so a read/unread flip or a long sender can never move anything.
+    /* Avatar | message body. The old unread-dot gutter is gone; keep a compact
+       safe inset, a 48px avatar, and a 12px text gap. */
+    grid-template-columns: 48px minmax(0, 1fr);
 
-       The avatar and the body's left edge remain fixed while the subject and
-       preview consume all remaining row width. */
-    grid-template-columns: 16px 50px minmax(0, 1fr);
-
-    column-gap: 0;
+    column-gap: 12px;
 
     width: 100%;
+    /* Keep this identical before, during and after selection. The virtual
+       list uses the same value in `itemHeight` above. */
     height: 80px;
     min-height: 80px;
 
-    padding: 10px 8px 10px 8px;
+    padding: 10px 8px 10px 16px;
 
     box-sizing: border-box;
 
@@ -2801,14 +2800,14 @@ ul {
     background: var(--nova-surface);
   }
 
-  :deep(.email-row.email)::after {
+  :deep(.email-row.email:not(.all-email))::after {
     content: '';
 
     position: absolute;
-    /* Spans the whole row: the avatar, the body and the time/star column all
-       sit on the same divider, so the list reads as one continuous table. */
-    left: 0;
-    right: 0;
+    /* Message dividers belong to the content area, independently of whether
+       the left checkbox column is present. */
+    left: 8px;
+    right: 8px;
     bottom: 0;
 
     height: 1px;
@@ -2830,9 +2829,10 @@ ul {
   /* ---------- Selection mode ---------- */
 
   .email-container.mobile-selecting
-    :deep(.email-row.email) {
-    /* The checkbox replaces the unread gutter in the first track. */
-    grid-template-columns: var(--mail-list-selection-column) 50px minmax(0, 1fr);
+    :deep(.email-row.email:not(.all-email)) {
+    /* Selection adds its checkbox track without changing the normal row. */
+    grid-template-columns: var(--mail-list-selection-column) 48px minmax(0, 1fr);
+    column-gap: 0;
   }
 
   .email-container.mobile-selecting
@@ -2846,18 +2846,27 @@ ul {
     padding: 6px 0 0;
   }
 
+  .email-container.mobile-selecting
+    :deep(.email-row.email .mobile-sender-avatar) {
+    grid-column: 2;
+  }
+
+  .email-container.mobile-selecting
+    :deep(.email-row.email > .title) {
+    grid-column: 3;
+  }
+
   /* ---------- Sender avatar ---------- */
 
   .mobile-sender-avatar {
-    grid-column: 2;
+    grid-column: 1;
 
-    width: 40px;
-    height: 40px;
-    min-width: 40px;
-    min-height: 40px;
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    min-height: 48px;
 
-    /* Anchored to the start of its 50px track: the 10px left over is the gap
-       between the avatar and the message body. */
+    /* The 12px grid gap supplies the avatar-to-copy breathing room. */
     justify-self: start;
 
     display: grid;
@@ -2887,7 +2896,7 @@ ul {
   /* ---------- Message body ---------- */
 
   :deep(.email-row.email > .title) {
-    grid-column: 3;
+    grid-column: 2;
 
     width: 100%;
     min-width: 0;
