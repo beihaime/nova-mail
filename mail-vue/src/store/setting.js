@@ -16,6 +16,8 @@ export const useSettingStore = defineStore('setting', {
         timeFormat: '24h',
         swipeLeftAction: 'trash',
         swipeRightAction: 'archive',
+        // Account-scoped preference loaded from /account/preferences after auth.
+        mailListDensity: 'normal',
     }),
     actions: {
 

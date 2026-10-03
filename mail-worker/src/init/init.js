@@ -36,8 +36,15 @@ const dbInit = {
 		await this.v3_11DB(c);
 		await this.v3_12DB(c);
 		await this.v3_13DB(c);
+		await this.v3_14DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
+	},
+
+	async v3_14DB(c) {
+		await c.env.db.prepare(
+			`CREATE TABLE IF NOT EXISTS user_preferences (user_id INTEGER PRIMARY KEY REFERENCES user(user_id) ON DELETE CASCADE, mail_list_density TEXT NOT NULL DEFAULT 'normal' CHECK (mail_list_density IN ('normal', 'compact')))`
+		).run();
 	},
 
 	async v3_13DB(c) {

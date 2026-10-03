@@ -476,6 +476,8 @@ The deployment workflow performs this v3.11 upgrade automatically, before deploy
 
 The v3.13 session migration is also applied by the deployment workflow to the explicit `D1_DATABASE_ID` used by `wrangler-action.toml`. It creates `auth_session` and `user_security_settings` with `IF NOT EXISTS` plus the active-session index. The workflow refuses to create or select a new database when `D1_DATABASE_ID` is missing, prints the binding/name/ID before applying the SQL, and verifies both tables after deployment. For a controlled manual upgrade, run `pnpm wrangler d1 execute <database-id> --remote --file migrations/v3_13_sessions.sql` from `mail-worker` after confirming the ID is the Worker’s actual `db` binding.
 
+The v3.14 migration adds `user_preferences` for account-scoped mail-list density (`normal` by default). The deployment workflow applies it to the same D1 binding before deploying the Worker and verifies the `mail_list_density` column. For manual deployments, apply `mail-worker/migrations/v3_14_user_preferences.sql` to the Worker’s actual D1 database first; local and preview databases must be migrated separately. No existing user or session rows are modified.
+
 #### Troubleshooting
 
 | Symptom | Cause |

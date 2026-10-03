@@ -2,6 +2,16 @@ import app from '../hono/hono';
 import accountService from '../service/account-service';
 import result from '../model/result';
 import userContext from '../security/user-context';
+import userPreferencesService from '../service/user-preferences-service';
+
+app.get('/account/preferences', async (c) => {
+	return c.json(result.ok(await userPreferencesService.get(c, userContext.getUserId(c))));
+});
+
+app.patch('/account/preferences', async (c) => {
+	const body = await c.req.json();
+	return c.json(result.ok(await userPreferencesService.setDensity(c, userContext.getUserId(c), body?.mailListDensity)));
+});
 
 app.get('/account/list', async (c) => {
 	const list = await accountService.list(c, c.req.query(), userContext.getUserId(c));

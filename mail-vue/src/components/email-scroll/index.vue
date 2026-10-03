@@ -2,7 +2,13 @@
   <div
       class="email-container"
       :class="{
-        'mobile-selecting': mobileSelecting
+        'mobile-selecting': mobileSelecting,
+        'density-compact': settingStore.mailListDensity === 'compact'
+      }"
+      :style="{
+        '--mail-row-height-desktop': `${densityGeometry.desktop}px`,
+        '--mail-row-height-phone': `${densityGeometry.phone}px`,
+        '--mail-row-height-phone-other': `${densityGeometry.phoneOther}px`
       }"
   >
     <div v-if="isPhone" class="mobile-inbox-tools">
@@ -431,6 +437,7 @@ import {
   swipeCommitDistance,
 } from '@/utils/swipe-actions.js'
 import { showUndoSnackbar } from '@/utils/undo-snackbar.js'
+import { MAIL_DENSITY_GEOMETRY, normalizeMailDensity } from '@/utils/mail-density.js'
 
 const props = defineProps({
   getEmailList: Function,
@@ -508,6 +515,7 @@ const emit = defineEmits([
 ])
 const {t} = useI18n()
 const settingStore = useSettingStore()
+const densityGeometry = computed(() => MAIL_DENSITY_GEOMETRY[normalizeMailDensity(settingStore.mailListDensity)])
 const uiStore = useUiStore();
 const emailStore = useEmailStore();
 const loading = ref(false);
@@ -1136,13 +1144,12 @@ function undoSwipedEmail({ item, index, action }) {
 const itemHeight = computed(() => {
     if (props.type === 'all-email') {
       return isMobile.value ? 132 : 65;
-    } else  {
-      // Phone inbox rows are 80px tall (see the .email-row.email mobile rules);
-      // keep the virtual list in lock-step so rows never overlap.
-      return isPhone.value && props.type === 'email'
-        ? 80
-        : (isMobile.value ? 83 : 48);
     }
+    // CSS and the virtual list consume the same geometry, including the
+    // 768–1366px range that uses the desktop row layout.
+    return isPhone.value
+      ? (props.type === 'email' ? densityGeometry.value.phone : densityGeometry.value.phoneOther)
+      : densityGeometry.value.desktop;
 })
 
 watch(emailList, () => {
@@ -2426,8 +2433,8 @@ ul {
     grid-template-columns: var(--mail-list-avatar-column) var(--nova-icon-button-size) minmax(0, 1fr) 82px;
     align-items: center;
     gap: var(--mail-list-column-gap);
-    height: 48px;
-    min-height: 48px;
+    height: var(--mail-row-height-desktop);
+    min-height: var(--mail-row-height-desktop);
     padding: 4px var(--mail-list-horizontal-padding);
   }
 
@@ -2538,8 +2545,8 @@ ul {
     grid-template-columns: var(--mail-list-avatar-column) minmax(0, 1fr);
     column-gap: 8px;
     align-items: start;
-    height: 83px;
-    min-height: 83px;
+    height: var(--mail-row-height-phone-other);
+    min-height: var(--mail-row-height-phone-other);
     padding: 8px 20px 8px 16px;
     box-sizing: border-box;
   }
@@ -2951,8 +2958,8 @@ ul {
     width: 100%;
     /* Keep this identical before, during and after selection. The virtual
        list uses the same value in `itemHeight` above. */
-    height: 80px;
-    min-height: 80px;
+    height: var(--mail-row-height-phone);
+    min-height: var(--mail-row-height-phone);
 
     /* Keep the avatar naturally inset from the screen while tightening the
        leading edge. The same slot is used by the selected check indicator. */
@@ -3372,6 +3379,62 @@ ul {
   :deep(.swipe-shell[data-swipe-action] .swipe-action[style*="display: flex"]) {
     filter: brightness(1.05);
     opacity: 1;
+  }
+}
+
+/* Density changes vertical geometry only. The avatar column, text start,
+   timestamp column and horizontal safe-area insets stay identical. */
+@media (min-width: 768px) {
+  .email-container.density-compact :deep(.email-row:not(.all-email)) {
+    padding-top: 3px;
+    padding-bottom: 3px;
+  }
+}
+
+@media (max-width: 767px) {
+  .email-container.density-compact :deep(.email-row:not(.all-email):not(.email)) {
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+
+  .email-container.density-compact :deep(.email-row:not(.all-email):not(.email) .email-sender) {
+    line-height: 24px;
+  }
+
+  .email-container.density-compact :deep(.email-row:not(.all-email):not(.email) .email-text) {
+    margin-top: 0;
+  }
+
+  .email-container.density-compact :deep(.email-row:not(.all-email):not(.email) .email-subject),
+  .email-container.density-compact :deep(.email-row:not(.all-email):not(.email) .email-content) {
+    line-height: 18px;
+  }
+
+  .email-container.density-compact :deep(.email-row:not(.all-email):not(.email) .email-content) {
+    margin-top: 0;
+  }
+
+  .email-container.density-compact :deep(.email-row.email:not(.all-email)) {
+    padding-top: 5px;
+    padding-bottom: 5px;
+  }
+
+  .email-container.density-compact :deep(.email-row.email .title .email-sender) {
+    line-height: 18px;
+    margin-bottom: 0;
+  }
+
+  .email-container.density-compact :deep(.email-row.email .email-text) {
+    margin-top: 0;
+  }
+
+  .email-container.density-compact :deep(.email-row.email .email-subject),
+  .email-container.density-compact :deep(.email-row.email .email-text .email-content) {
+    line-height: 17px;
+  }
+
+  .email-container.density-compact :deep(.email-row.email > .email-right) {
+    top: 5px;
   }
 }
 

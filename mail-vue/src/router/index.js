@@ -51,9 +51,48 @@ const routes = [
             },
             {
                 path: '/settings/account',
-                name: 'setting-account',
+                redirect: to => ({
+                    path: to.query.github || to.query.google
+                        ? '/settings/account-security/connected-accounts'
+                        : '/settings/account-security',
+                    query: to.query
+                })
+            },
+            {
+                path: '/settings/account-security',
+                name: 'setting-account-security',
                 component: () => import('@/views/setting/index.vue'),
-                meta: { title: 'accountSecurity', name: 'setting-account', menu: true }
+                meta: { title: 'accountSecurity', menu: true }
+            },
+            {
+                path: '/settings/account-security/profile',
+                name: 'setting-profile',
+                component: () => import('@/views/setting/index.vue'),
+                meta: { title: 'profile', menu: true }
+            },
+            {
+                path: '/settings/account-security/addresses',
+                name: 'setting-addresses',
+                component: () => import('@/views/setting/index.vue'),
+                meta: { title: 'emailAddresses', menu: true }
+            },
+            {
+                path: '/settings/account-security/connected-accounts',
+                name: 'setting-connected-accounts',
+                component: () => import('@/views/setting/index.vue'),
+                meta: { title: 'connectedAccounts', menu: true }
+            },
+            {
+                path: '/settings/account-security/sessions',
+                name: 'setting-sessions',
+                component: () => import('@/views/setting/index.vue'),
+                meta: { title: 'deviceSessions', menu: true }
+            },
+            {
+                path: '/settings/account-security/delete-account',
+                name: 'setting-delete-account',
+                component: () => import('@/views/setting/index.vue'),
+                meta: { title: 'deleteUser', menu: true }
             },
             {
                 path: '/settings/personalization',
@@ -69,13 +108,7 @@ const routes = [
             },
             {
                 path: '/settings/addresses',
-                name: 'addresses',
-                component: () => import('@/views/addresses/index.vue'),
-                meta: {
-                    title: 'manageAddresses',
-                    name: 'addresses',
-                    menu: true
-                }
+                redirect: '/settings/account-security/addresses'
             },
             {
                 path: '/starred',

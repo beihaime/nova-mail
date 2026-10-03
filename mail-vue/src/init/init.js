@@ -7,6 +7,7 @@ import router from "@/router";
 import {websiteConfig} from "@/request/setting.js";
 import i18n from "@/i18n/index.js";
 import {resolveLocale, applyDocumentLocale} from "@/i18n/locale.js";
+import {loadMailDensity} from '@/utils/mail-density.js';
 
 export async function init() {
     document.title = '\u200B'
@@ -39,6 +40,7 @@ export async function init() {
         document.title = setting.title;
 
         if (user) {
+            await loadMailDensity(settingStore);
             accountStore.currentAccountId = user.account.accountId;
             accountStore.currentAccount = user.account;
             userStore.user = user;

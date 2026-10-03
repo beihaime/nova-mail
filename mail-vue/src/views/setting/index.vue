@@ -2,7 +2,7 @@
   <div class="box">
     <div v-if="section === 'home'" class="settings-home">
       <div class="settings-home-title">{{ $t('settings') }}</div>
-      <button class="settings-category-row" type="button" @click="router.push('/settings/account')">
+      <button class="settings-category-row" type="button" @click="router.push('/settings/account-security')">
         <span class="settings-category-icon"><Icon icon="solar:shield-check-linear" width="22" height="22" /></span>
         <span class="settings-category-copy"><strong>{{ $t('accountSecurity') }}</strong><small>{{ $t('accountSecurityDesc') }}</small></span>
         <Icon class="settings-category-chevron" icon="solar:alt-arrow-right-linear" width="18" height="18" />
@@ -20,14 +20,28 @@
     </div>
 
     <div v-else class="settings-subpage-header">
-      <button class="settings-back-button" type="button" :aria-label="$t('back')" @click="router.push('/settings')">
+      <button class="settings-back-button" type="button" :aria-label="$t('back')" @click="router.replace(settingsBackPath)">
         <Icon icon="solar:arrow-left-linear" width="20" height="20" />
       </button>
-      <h1>{{ section === 'account' ? $t('accountSecurity') : section === 'personalization' ? $t('personalization') : $t('about') }}</h1>
+      <h1>{{ $t(settingsTitleKey) }}</h1>
     </div>
 
-    <div v-if="section === 'account'" class="container">
-      <div class="title">{{$t('profile')}}</div>
+    <div v-if="section === 'account'" class="settings-directory">
+      <div class="settings-directory-heading">{{ $t('accountLabel') }}</div>
+      <button v-for="item in accountEntries" :key="item.path" class="settings-category-row" type="button" @click="router.push(item.path)">
+        <span class="settings-category-icon"><Icon :icon="item.icon" width="22" height="22" /></span>
+        <span class="settings-category-copy"><strong>{{ $t(item.title) }}</strong><small>{{ $t(item.description) }}</small></span>
+        <Icon class="settings-category-chevron" icon="solar:alt-arrow-right-linear" width="18" height="18" />
+      </button>
+      <div class="settings-directory-heading security-heading">{{ $t('security') }}</div>
+      <button v-for="item in securityEntries" :key="item.path" class="settings-category-row" :class="{ 'danger-entry': item.danger }" type="button" @click="router.push(item.path)">
+        <span class="settings-category-icon"><Icon :icon="item.icon" width="22" height="22" /></span>
+        <span class="settings-category-copy"><strong>{{ $t(item.title) }}</strong><small>{{ $t(item.description) }}</small></span>
+        <Icon class="settings-category-chevron" icon="solar:alt-arrow-right-linear" width="18" height="18" />
+      </button>
+    </div>
+
+    <div v-if="section === 'profile'" class="container">
       <div class="item">
         <div>{{$t('username')}}</div>
         <div>
@@ -56,8 +70,7 @@
         </div>
       </div>
     </div>
-    <div v-if="section === 'account'" class="connected-accounts">
-      <div class="title">{{$t('connectedAccounts')}}</div>
+    <div v-if="section === 'connected'" class="connected-accounts">
       <div class="connected-account-row">
         <div class="connected-account-details">
           <el-avatar
@@ -99,12 +112,8 @@
         <el-button v-else type="primary" @click="connectGoogle" :loading="googleLoading">{{$t('connect')}}</el-button>
       </div>
     </div>
-    <div v-if="section === 'account'" class="account-link-section">
-      <div class="title">{{ $t('emailAddresses') }}</div>
-      <button type="button" class="account-link-row" @click="router.push('/settings/addresses')">
-        <span><strong>{{ $t('manageAddresses') }}</strong><small>{{ $t('emailAddressesDesc') }}</small></span>
-        <Icon icon="solar:alt-arrow-right-linear" width="18" height="18" />
-      </button>
+    <div v-if="section === 'addresses'" class="addresses-page">
+      <account page-mode :show-page-intro="false" />
     </div>
 
     <div v-if="section === 'personalization'" class="appearance">
@@ -224,6 +233,26 @@
       </div>
     </div>
 
+    <div v-if="section === 'personalization'" class="mail-density-setting">
+      <div class="title">{{ $t('mailListDensity') }}</div>
+      <p>{{ $t('mailListDensityDesc') }}</p>
+      <div class="time-format-options" role="radiogroup" :aria-label="$t('mailListDensity')">
+        <button
+          v-for="density in ['compact', 'normal']"
+          :key="density"
+          type="button"
+          class="time-format-option nova-segmented-button"
+          :class="{ active: settingStore.mailListDensity === density }"
+          :aria-checked="settingStore.mailListDensity === density"
+          :disabled="densitySaving"
+          role="radio"
+          @click="changeMailDensity(density)"
+        >
+          <span class="time-format-option-label">{{ $t(density === 'compact' ? 'mailDensityCompact' : 'mailDensityNormal') }}</span>
+        </button>
+      </div>
+    </div>
+
     <div v-if="section === 'personalization'" class="notification">
       <div class="title">{{ $t('notification') }}</div>
 
@@ -272,25 +301,23 @@
         ⚠ {{ $t('notificationSoundFailed') }}: {{ notificationSoundStatus.lastError }}
       </p>
     </div>
-    <div v-if="section === 'account'" class="del-email" v-perm="'my:delete'">
-      <div class="title">{{$t('deleteUser')}}</div>
+    <div v-if="section === 'delete' && canDeleteAccount" class="del-email">
       <div style="color: var(--regular-text-color);">
         {{$t('delAccountMsg')}}
       </div>
       <div>
-        <el-button type="primary" @click="deleteConfirm">{{$t('deleteUserBtn')}}</el-button>
+        <el-button type="danger" @click="deleteConfirm">{{$t('deleteUserBtn')}}</el-button>
       </div>
     </div>
-    <div v-if="section === 'account'" class="security">
-      <div class="title">{{ $t('security') }}</div>
+    <div v-if="section === 'sessions'" class="security">
       <div class="security-subsection">
-        <div class="security-subtitle">{{ $t('devicesAndSessions') }}</div>
         <div class="session-list" v-loading="sessionsLoading">
           <div v-for="session in sessions" :key="session.id" class="session-row">
             <div class="session-details">
               <div class="session-title">{{ session.browser }} · {{ session.os }}</div>
               <div class="session-meta">{{ session.deviceType }} · {{ session.location }}</div>
               <div class="session-meta">{{ $t('lastActive') }}: {{ formatSessionTime(session.lastActiveAt) }} · {{ session.ipAddress }}</div>
+              <div class="session-meta">{{ $t('loginTime') }}: {{ formatSessionTime(session.createdAt) }}</div>
               <span v-if="session.current" class="session-current">{{ $t('thisDevice') }}</span>
             </div>
             <el-button v-if="!session.current" text type="danger" :loading="revokingSession === session.id" @click="signOutSession(session)">{{ $t('signOut') }}</el-button>
@@ -338,12 +365,14 @@
 import {onMounted, reactive, ref, computed, watch, defineOptions} from 'vue'
 import {resetPassword, userDelete} from "@/request/my.js";
 import {useUserStore} from "@/store/user.js";
+import {hasPerm} from '@/perm/perm.js';
 import router from "@/router/index.js";
 import {useRoute} from "vue-router";
 import {accountSetName} from "@/request/account.js";
 import {useAccountStore} from "@/store/account.js";
 import {useI18n} from "vue-i18n";
 import {useSettingStore} from "@/store/setting.js";
+import account from '@/layout/account/index.vue';
 import packageInfo from '../../../package.json';
 import {useUiStore} from "@/store/ui.js";
 import {getSessions, revokeSession, revokeOtherSessions, getLoginAlerts, updateLoginAlerts} from '@/request/security.js';
@@ -352,6 +381,7 @@ import {Icon} from '@iconify/vue';
 import {applyThemeTransition} from "@/utils/theme-transition.js";
 import {availablePresets, PALETTE_KEYS, parseThemeImport, normalizeHex} from '@/utils/theme-palette.js';
 import {SWIPE_ACTION_OPTIONS} from '@/utils/swipe-actions.js';
+import {setMailListDensity} from '@/request/preferences.js';
 import {
   NOTIFICATION_SOUNDS,
   notificationSoundStatus,
@@ -375,8 +405,51 @@ const settingStore = useSettingStore()
 const uiStore = useUiStore()
 const userStore = useUserStore();
 const route = useRoute();
-const section = computed(() => route.path === '/settings/account' ? 'account' : route.path === '/settings/personalization' ? 'personalization' : route.path === '/settings/about' ? 'about' : 'home')
+const accountPath = '/settings/account-security'
+const section = computed(() => {
+  const path = route.path
+  if (path === accountPath) return 'account'
+  if (path === `${accountPath}/profile`) return 'profile'
+  if (path === `${accountPath}/addresses`) return 'addresses'
+  if (path === `${accountPath}/connected-accounts`) return 'connected'
+  if (path === `${accountPath}/sessions`) return 'sessions'
+  if (path === `${accountPath}/delete-account`) return 'delete'
+  if (path === '/settings/personalization') return 'personalization'
+  if (path === '/settings/about') return 'about'
+  return 'home'
+})
+const settingsBackPath = computed(() => ['profile', 'addresses', 'connected', 'sessions', 'delete'].includes(section.value) ? accountPath : '/settings')
+const settingsTitleKey = computed(() => ({
+  account: 'accountSecurity', profile: 'profile', addresses: 'emailAddresses',
+  connected: 'connectedAccounts', sessions: 'deviceSessions', delete: 'deleteUser',
+  personalization: 'personalization', about: 'about',
+})[section.value] || 'settings')
+const accountEntries = [
+  { path: `${accountPath}/profile`, title: 'profile', description: 'profileDesc', icon: 'solar:user-circle-linear' },
+  { path: `${accountPath}/addresses`, title: 'emailAddresses', description: 'emailAddressesDesc', icon: 'solar:letter-linear' },
+  { path: `${accountPath}/connected-accounts`, title: 'connectedAccounts', description: 'connectedAccountsDesc', icon: 'solar:link-linear' },
+]
+const canDeleteAccount = computed(() => Array.isArray(userStore.user?.permKeys) && hasPerm('my:delete'))
+const securityEntries = computed(() => [
+  { path: `${accountPath}/sessions`, title: 'deviceSessions', description: 'deviceSessionsDesc', icon: 'solar:devices-linear' },
+  ...(canDeleteAccount.value ? [{ path: `${accountPath}/delete-account`, title: 'deleteUser', description: 'deleteAccountDesc', icon: 'solar:trash-bin-trash-linear', danger: true }] : []),
+])
 const appVersion = packageInfo.version ? `v${String(packageInfo.version).replace(/^v/i, '')}` : ''
+const densitySaving = ref(false)
+async function changeMailDensity(density) {
+  if (densitySaving.value || settingStore.mailListDensity === density) return
+  const previous = settingStore.mailListDensity
+  settingStore.mailListDensity = density
+  densitySaving.value = true
+  try {
+    await setMailListDensity(density)
+  } catch (error) {
+    settingStore.mailListDensity = previous
+    console.error('Nova Mail: unable to save mail list density', error)
+  } finally {
+    densitySaving.value = false
+  }
+}
 const setPwdLoading = ref(false)
 const setNameShow = ref(false)
 const accountName = ref(null)
@@ -677,7 +750,7 @@ onMounted(async () => {
     preloadNotificationSound(settingStore.notificationSoundType)
   }
 
-  if (section.value === 'account') {
+  if (section.value === 'connected') {
     try {
       const account = await githubConnectedAccount()
       Object.assign(githubAccount, account)
@@ -694,8 +767,9 @@ onMounted(async () => {
     } catch {
       // The endpoint can be unavailable until the non-destructive migration runs.
     }
-    await refreshSecurity()
   }
+
+  if (section.value === 'sessions') await refreshSecurity()
 
   if (section.value === 'personalization') {
     // Re-register a device whose endpoint rotated (or whose row was cleaned up
@@ -911,13 +985,16 @@ function submitPwd() {
   max-width: 100%;
   min-width: 0;
   box-sizing: border-box;
+  height: 100%;
+  overflow-y: auto;
   padding: 40px 40px;
 
   @media (max-width: 767px) {
-    padding: 24px 20px calc(30px + env(safe-area-inset-bottom, 0px));
+    padding: calc(env(safe-area-inset-top, 0px) + 24px) 20px 30px;
   }
 
   .settings-home,
+  .settings-directory,
   .settings-subpage-header,
   .about-page {
     width: min(100%, 760px);
@@ -928,6 +1005,14 @@ function submitPwd() {
     display: grid;
     gap: 8px;
   }
+
+  .settings-directory { display: grid; gap: 8px; align-content: start; }
+  .settings-directory-heading { margin: 6px 14px 3px; color: var(--nm-text-muted); font-size: 12px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; }
+  .settings-directory-heading.security-heading { margin-top: 22px; }
+  .settings-category-row.danger-entry .settings-category-icon,
+  .settings-category-row.danger-entry .settings-category-copy strong { color: var(--nova-danger); }
+  .settings-category-row.danger-entry .settings-category-icon { background: color-mix(in srgb, var(--nova-danger) 10%, transparent); }
+  .addresses-page { flex: 1 1 auto; min-height: 0; width: min(100%, 760px); margin-inline: auto; }
 
   .settings-home-title {
     margin-bottom: 12px;
@@ -1182,6 +1267,19 @@ function submitPwd() {
     font-size: 12px;
     font-variant-numeric: tabular-nums;
     line-height: 1.3;
+  }
+
+  .mail-density-setting {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 40px;
+  }
+
+  .mail-density-setting p {
+    margin: 0;
+    color: var(--nm-text-muted);
+    font-size: 13px;
   }
 
   .connected-accounts {

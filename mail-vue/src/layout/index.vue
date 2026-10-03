@@ -3,7 +3,8 @@
       class="layout"
       :class="{
         'has-mobile-nav': route.name !== 'content',
-        'aside-open': uiStore.asideShow && isMobile
+        'aside-open': uiStore.asideShow && isMobile,
+        'is-settings-route': route.path.startsWith('/settings')
       }">
     <el-aside
         class="aside"
@@ -16,7 +17,7 @@
     ></div>
     <el-container class="main-container">
       <el-main>
-        <el-header>
+        <el-header v-if="!isSettingsMobile">
             <Header ref="headerRef" />
         </el-header>
         <Main />
@@ -41,7 +42,7 @@
       <span class="mobile-nav-icon"><AppIcon name="nova-sidebar-drafts" :size="24" inline /></span>
       <span class="mobile-nav-label">{{ $t('drafts') }}</span>
     </button>
-    <button class="nova-navigation-button" :class="{active: ['setting', 'setting-account', 'setting-personalization', 'setting-about'].includes(route.name)}" @click="router.push({name: 'setting'})">
+    <button class="nova-navigation-button" :class="{active: route.path.startsWith('/settings')}" @click="router.push({name: 'setting'})">
       <span class="mobile-nav-icon"><AppIcon name="nova-sidebar-settings" :size="24" inline /></span>
       <span class="mobile-nav-label">{{ $t('settings') }}</span>
     </button>
@@ -62,7 +63,7 @@
 import Aside from '@/layout/aside/index.vue'
 import Header from '@/layout/header/index.vue'
 import Main from '@/layout/main/index.vue'
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import {useUiStore} from "@/store/ui.js";
 import writer from '@/layout/write/index.vue'
 import router from '@/router/index.js'
@@ -74,13 +75,16 @@ const uiStore = useUiStore();
 const writerRef = ref({})
 const headerRef = ref(null)
 const route = useRoute()
+const isSettingsMobile = computed(() => isPhoneViewport.value && route.path.startsWith('/settings'))
 
 // New-mail sound on every route: the Inbox and the reader poll on their own, so
 // this covers the rest without adding a second request where they already run.
 useGlobalMailAlert()
 const isMobile = ref(window.innerWidth < 1025)
+const isPhoneViewport = ref(window.innerWidth < 768)
 const handleResize = () => {
   isMobile.value = window.innerWidth < 1025
+  isPhoneViewport.value = window.innerWidth < 768
   uiStore.asideShow = window.innerWidth > 1024;
 }
 
@@ -264,6 +268,9 @@ onBeforeUnmount(() => {
   .layout.has-mobile-nav {
     padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
   }
+
+  .layout.is-settings-route .main-container { height: 100%; min-height: 0; }
+  .layout.is-settings-route .el-main { min-height: 0; }
 
   .el-header {
     height: calc(60px + env(safe-area-inset-top, 0px));

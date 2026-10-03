@@ -41,7 +41,7 @@
           <span class="nav-icon"><AppIcon name="nova-sidebar-trash" :size="18" inline /></span>
           <span class="menu-name">{{$t('trash')}}</span>
         </el-menu-item>
-        <el-menu-item class="nova-navigation-button" @click="router.push({name: 'setting'})" index="setting"
+        <el-menu-item v-if="showDesktopSettings" class="nova-navigation-button" @click="router.push({name: 'setting'})" index="setting"
                       :class="route.meta.name === 'setting' ? 'choose-item' : ''">
           <span class="nav-icon"><AppIcon name="nova-sidebar-settings" :size="18" inline /></span>
           <span class="menu-name">{{$t('settings')}}</span>
@@ -114,12 +114,14 @@ import {useSettingStore} from "@/store/setting.js";
 import {useUiStore} from "@/store/ui.js";
 import {useUserStore} from "@/store/user.js";
 import {computed} from "vue";
+import {useMediaQuery} from '@vueuse/core'
 import packageInfo from '../../../package.json'
 
 const settingStore = useSettingStore();
 const route = useRoute();
 const uiStore = useUiStore();
 const userStore = useUserStore();
+const showDesktopSettings = useMediaQuery('(min-width: 768px)')
 
 const sendQuotaType = computed(
   () => userStore.user?.role?.sendType || ''

@@ -1,6 +1,6 @@
 <template>
-  <div class="account-box" :class="{ 'address-page': pageMode }">
-    <div v-if="pageMode" class="address-page-intro">
+  <div class="account-box" :class="{ 'address-page': pageMode, 'address-page-no-intro': pageMode && !showPageIntro }">
+    <div v-if="pageMode && showPageIntro" class="address-page-intro">
       <div>
         <h1>{{ $t('manageAddresses') }}</h1>
         <p>{{ $t('manageAddressesDesc') }}</p>
@@ -161,7 +161,10 @@ import {useI18n} from "vue-i18n";
 import {AccountAllReceiveEnum} from "@/enums/account-enum.js";
 
 const {t} = useI18n();
-const props = defineProps({ pageMode: { type: Boolean, default: false } })
+const props = defineProps({
+  pageMode: { type: Boolean, default: false },
+  showPageIntro: { type: Boolean, default: true },
+})
 const pageMode = computed(() => props.pageMode)
 const userStore = useUserStore();
 const accountStore = useAccountStore();
@@ -708,6 +711,10 @@ path[fill="#ffdda1"] {
       .account { margin-bottom: 11px; }
     }
   }
+
+  &.address-page-no-intro .scrollbar {
+    height: calc(100% - 48px);
+  }
 }
 
 
@@ -744,6 +751,7 @@ path[fill="#ffdda1"] {
   .account-box.address-page .address-page-intro h1 { font-size: 21px; }
   .account-box.address-page .head-opt { padding: 0 16px; }
   .account-box.address-page .scrollbar { height: calc(100% - 130px); padding-top: 10px; }
+  .account-box.address-page-no-intro .scrollbar { height: calc(100% - 48px); }
   .account-box.address-page .item { margin: 0 12px 8px; }
 }
 

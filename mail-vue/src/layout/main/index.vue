@@ -1,5 +1,5 @@
 <template>
-  <div :class="accountShow && hasPerm('account:query') ? 'main-box-show' : 'main-box-hide'">
+  <div :class="[accountShow && hasPerm('account:query') ? 'main-box-show' : 'main-box-hide', { 'settings-workspace': route.path.startsWith('/settings') }]">
     <div :class="accountShow && hasPerm('account:query') ? 'block-show' : 'block-hide'" @click="uiStore.accountShow = false"></div>
     <account  :class="accountShow && hasPerm('account:query') ? 'show' : 'hide'" />
     <div v-if="isDesktopReading" class="desktop-mail-workspace">
@@ -175,6 +175,11 @@ const handleResize = () => {
   .main-box-show,
   .main-box-hide {
     height: calc(100% - 60px - env(safe-area-inset-top, 0px));
+  }
+
+  .main-box-show.settings-workspace,
+  .main-box-hide.settings-workspace {
+    height: 100%;
   }
 }
 
