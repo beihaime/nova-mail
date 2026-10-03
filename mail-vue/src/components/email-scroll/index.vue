@@ -67,9 +67,29 @@
       <div class="header-left" :style="'padding-left:' + actionLeft">
 
         <slot name="first"></slot>
-        <AppIcon v-perm="'email:delete'" class="icon delete" name="nova-sidebar-trash" :size="18" inline
-              v-if="getSelectedMailsIds().length > 0"
-              @click="handleDelete"/>
+        <template v-if="getSelectedMailsIds().length > 0">
+          <el-tooltip v-if="typeof props.emailArchive === 'function'" effect="dark" :content="t('archive')" :show-after="1200">
+            <button
+                v-perm="'email:delete'"
+                class="nova-icon-button nova-toolbar-button selection-action"
+                type="button"
+                :aria-label="t('archive')"
+                @click="handleArchive"
+            >
+              <AppIcon name="nova-sidebar-archive" :size="20" inline />
+            </button>
+          </el-tooltip>
+          <el-tooltip v-perm="'email:delete'" effect="dark" :content="t('delete')" :show-after="1200">
+            <button
+                class="nova-icon-button nova-toolbar-button nova-danger-button selection-action"
+                type="button"
+                :aria-label="t('delete')"
+                @click="handleDelete"
+            >
+              <AppIcon name="nova-sidebar-trash" :size="20" inline />
+            </button>
+          </el-tooltip>
+        </template>
       </div>
 
       <div class="header-right">
@@ -1242,6 +1262,26 @@ function rightDelete(emailId) {
   props.emailDelete([emailId]).then(() => {
     ElMessage({
       message: t('delSuccessMsg'),
+      type: 'success',
+      plain: true
+    })
+  }).catch(error => {
+    refreshList()
+    console.error(error)
+  })
+}
+
+function handleArchive() {
+  const emailIds = getSelectedMailsIds()
+  if (!emailIds.length || typeof props.emailArchive !== 'function') return
+
+  // Remove from every affected list immediately, then let the existing archive
+  // mutation provide the authoritative state. A failed request restores the
+  // current list from the server.
+  emailStore.deleteIds = emailIds
+  props.emailArchive(emailIds).then(() => {
+    ElMessage({
+      message: t('archiveSuccessMsg'),
       type: 'success',
       plain: true
     })
@@ -2549,16 +2589,21 @@ ul {
   .email-container.mobile-selecting > .header-actions {
     display: grid;
 
-    grid-template-columns: var(--mail-list-selection-column) 1fr auto;
+    /* Keep the selection controls at their intrinsic width. The remaining
+       space is an empty trailing track instead of a stretched action group. */
+    grid-template-columns: var(--mail-list-selection-column) auto 1fr;
 
-    min-height: 48px;
+    min-height: 44px;
     /* Same left inset as a phone mail row, so the select-all lines up with the
        row checkboxes it controls. */
-    padding: 5px 16px 5px var(--mail-list-checkbox-inset);
+    padding: 4px 8px 4px var(--mail-list-checkbox-inset);
+    column-gap: 4px;
   }
 
   .email-container.mobile-selecting > .header-actions .header-left {
-    gap: 12px;
+    width: max-content;
+    gap: 4px;
+    padding-left: 0 !important;
   }
 
   .email-container.mobile-selecting
