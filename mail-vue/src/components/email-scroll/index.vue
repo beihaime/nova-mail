@@ -805,6 +805,10 @@ function onRowPointerDown(event, item) {
     dx: 0,
     dy: 0,
     axis: null,
+    // Once a swipe commits, this remains authoritative until the row has
+    // left the DOM. Resetting the offset first would briefly put both actions
+    // back into their resting state during the exit animation.
+    swipeAction: null,
   }
 
   rowEl.style.transition = 'none'
@@ -852,10 +856,12 @@ function onRowPointerMove(event) {
   const width = gesture.shellEl?.offsetWidth || 0
   const offset = clampSwipeOffset(gesture.dx, width)
   const threshold = swipeCommitDistance(width)
+  const swipeAction = swipeActionForOffset(offset)
 
   gesture.rowEl.style.transform = `translate3d(${offset}px, 0, 0)`
   gesture.shellEl?.classList.add('is-swiping')
-  gesture.shellEl?.setAttribute('data-swipe-action', swipeActionForOffset(offset) || '')
+  gesture.swipeAction = swipeAction
+  gesture.shellEl?.setAttribute('data-swipe-action', swipeAction || '')
   if (Math.abs(offset) >= threshold) gesture.shellEl?.setAttribute('data-swipe-ready', 'true')
   else gesture.shellEl?.removeAttribute('data-swipe-ready')
   gesture.shellEl?.style.setProperty('--swipe-progress', String(Math.min(1, Math.abs(offset) / threshold)))
@@ -943,6 +949,10 @@ function commitSwipe(gesture, action) {
   const direction = action === SWIPE_ACTION.ARCHIVE ? 1 : -1
   const index = emailList.findIndex(row => row.emailId === item.emailId)
 
+  // Lock the action before starting the exit. The row must never pass through
+  // the neutral state while it is still rendered.
+  gesture.swipeAction = action
+  shellEl?.setAttribute('data-swipe-action', action)
   shellEl?.classList.add('is-removing')
   rowEl.style.transition = SWIPE_SETTLE
   rowEl.style.transform = `translate3d(${direction * width}px, 0, 0)`
@@ -956,8 +966,11 @@ function commitSwipe(gesture, action) {
     exitFinished = true
     rowEl.removeEventListener('transitionend', finishExit)
     deleteEmail([item.emailId])
-    shellEl?.removeAttribute('data-swipe-ready')
-    shellEl?.style.removeProperty('--swipe-progress')
+    // Let Vue remove the virtual-list row first. Cleaning the imperative
+    // styles in the same tick could expose the neutral state for one frame.
+    nextTick(() => {
+      if (shellEl?.isConnected) clearSwipeVisuals(gesture)
+    })
 
     const request = action === SWIPE_ACTION.ARCHIVE
       ? props.emailArchive([item.emailId])
@@ -3173,7 +3186,6 @@ ul {
     z-index: 0;
     pointer-events: none;
     background: var(--nova-surface-muted);
-    transition: background-color 100ms ease-out;
   }
 
   :deep(.swipe-shell[data-swipe-action='archive'] .swipe-actions) {
@@ -3189,7 +3201,9 @@ ul {
   }
 
   :deep(.swipe-action) {
-    display: flex;
+    /* Both actions are absent at rest. Direction changes use display rather
+       than opacity so the previous action cannot linger for a frame. */
+    display: none;
     flex-direction: column;
     align-items: center;
     justify-content: center;
@@ -3229,10 +3243,9 @@ ul {
   /* Emphasise whichever action the current drag would commit to. */
   :deep(.swipe-shell[data-swipe-action='archive'] .swipe-action-archive),
   :deep(.swipe-shell[data-swipe-action='delete'] .swipe-action-delete) {
+    display: flex;
     filter: brightness(1.05);
-    opacity: var(--swipe-progress, 0);
-    transform: scale(calc(0.9 + var(--swipe-progress, 0) * 0.1));
-    transition: opacity 80ms linear, transform 80ms ease-out;
+    opacity: 1;
   }
 }
 
