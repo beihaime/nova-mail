@@ -2789,9 +2789,10 @@ ul {
     position: relative;
 
     display: grid;
-    /* Unread gutter | avatar | message body. The timestamp is positioned over
-       the sender line, so it does not reserve a column below that line. */
-    grid-template-columns: 16px 50px minmax(0, 1fr);
+    /* Checkbox gutter | fixed avatar | content | fixed time. Keeping these
+       tracks stable prevents sender/subject/unread changes from moving the
+       avatar or timestamp horizontally. */
+    grid-template-columns: 20px 80px minmax(0, 1fr) 64px;
 
     column-gap: 0;
 
@@ -2843,7 +2844,7 @@ ul {
   .email-container.mobile-selecting
     :deep(.email-row.email:not(.all-email)) {
     /* Selection adds its checkbox track without changing the normal row. */
-    grid-template-columns: var(--mail-list-selection-column) 50px minmax(0, 1fr);
+    grid-template-columns: var(--mail-list-selection-column) 80px minmax(0, 1fr) 64px;
   }
 
   .email-container.mobile-selecting
@@ -2862,14 +2863,15 @@ ul {
   .mobile-sender-avatar {
     grid-column: 2;
 
-    width: 40px;
-    height: 40px;
-    min-width: 40px;
-    min-height: 40px;
+    width: 56px;
+    height: 56px;
+    min-width: 56px;
+    min-height: 56px;
 
-    /* Anchored to the start of its 50px track: the remaining 10px is the
-       avatar-to-copy gap. */
+    /* The track reserves 8px after the checkbox and 16px before content. */
     justify-self: start;
+    align-self: center;
+    margin-left: 8px;
 
     display: grid;
     place-items: center;
@@ -2918,10 +2920,7 @@ ul {
     width: 100%;
     min-width: 0;
 
-    display: flex;
-    align-items: center;
-
-    gap: 0;
+    display: block;
 
     /* Sender is the strongest line: largest type, heaviest weight, primary ink. */
     line-height: 20px;
@@ -2944,7 +2943,6 @@ ul {
   }
 
   :deep(.email-row.email .title .email-sender .name) {
-    flex: 1;
     min-width: 0;
 
     display: block;
@@ -2958,19 +2956,40 @@ ul {
     display: none;
   }
 
+  /* The sender-line copy of the time is hidden on phones. The dedicated
+     email-right track below owns the single, aligned timestamp column. */
   :deep(.email-row.email .phone-time) {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    flex: 0 0 auto;
-    margin-left: auto;
-    min-width: max-content;
-    color: color-mix(in srgb, var(--mobile-secondary) 82%, transparent);
+    display: none;
+  }
+
+  :deep(.email-row.email > .email-right) {
+    grid-column: 4;
+    grid-row: 1;
+    display: flex;
+    align-self: start;
+    justify-content: flex-end;
+    min-width: 0;
+    padding: 0;
+    text-align: right;
+  }
+
+  :deep(.email-row.email > .email-right .email-time-meta) {
+    width: auto;
+    min-width: 0;
+  }
+
+  :deep(.email-row.email > .email-right .email-time) {
+    padding-right: 0;
+    color: var(--mobile-tertiary);
     font-size: 13px;
     font-weight: 400;
     line-height: 20px;
     white-space: nowrap;
-    font-variant-numeric: tabular-nums;
+  }
+
+  :deep(.email-row.email.is-unread > .email-right .email-time) {
+    color: var(--el-color-primary);
+    font-weight: 600;
   }
 
   :deep(.email-row.email .email-text) {
