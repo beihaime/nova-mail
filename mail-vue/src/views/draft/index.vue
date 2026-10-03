@@ -26,8 +26,9 @@
 import emailScroll from "@/components/email-scroll/index.vue"
 import {emailDelete} from "@/request/email.js";
 import {starAdd, starCancel} from "@/request/star.js";
-import {defineOptions, ref, watch, toRaw} from "vue";
+import {defineOptions, onMounted, ref, watch, toRaw} from "vue";
 import {useUiStore} from "@/store/ui.js";
+import {useEmailStore} from "@/store/email.js";
 import {hasDraftContent} from "@/utils/compose-validate.js";
 import {userDraftStore} from "@/store/draft.js";
 import db from "@/db/db.js"
@@ -38,7 +39,12 @@ defineOptions({
 
 const draftStore = userDraftStore();
 const uiStore = useUiStore();
+const emailStore = useEmailStore();
 const scroll = ref({})
+
+onMounted(() => {
+  emailStore.draftScroll = scroll
+})
 
 watch(() => draftStore.setDraft, async () => {
 

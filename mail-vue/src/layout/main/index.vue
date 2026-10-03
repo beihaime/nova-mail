@@ -3,7 +3,7 @@
     <div :class="accountShow && hasPerm('account:query') ? 'block-show' : 'block-hide'" @click="uiStore.accountShow = false"></div>
     <account  :class="accountShow && hasPerm('account:query') ? 'show' : 'hide'" />
     <div v-if="isDesktopReading" class="desktop-mail-workspace">
-      <ContentPane class="desktop-reading-pane" />
+      <ContentPane ref="contentRef" class="desktop-reading-pane" />
     </div>
     <router-view v-else class="main-view" v-slot="{ Component,route }">
       <keep-alive :include="['email','all-email','send','sys-setting','star','user','role','analysis','reg-key','draft','trash']">
@@ -23,6 +23,7 @@ import ContentPane from '@/views/content/index.vue'
 
 const settingStore = useSettingStore()
 const uiStore = useUiStore();
+const contentRef = ref(null)
 const route = useRoute()
 let  innerWidth =  window.innerWidth
 const isDesktop = ref(window.innerWidth >= 1024)
@@ -92,6 +93,7 @@ function showNotice(data) {
 }
 
 onMounted(() => {
+  uiStore.readerRef = contentRef
   // Accounts remain available from the list toolbar, but should not permanently
   // consume a desktop column in the mail workspace.
   if (isDesktop.value) uiStore.accountShow = false
@@ -100,6 +102,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  uiStore.readerRef = null
   window.removeEventListener('resize', handleResize)
   document.body.classList.remove('mail-pane-resizing')
 })

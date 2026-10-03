@@ -107,7 +107,7 @@
 </template>
 <script setup>
 import tinyEditor from '@/components/tiny-editor/index.vue'
-import {h, nextTick, onMounted, onUnmounted, reactive, ref, toRaw, computed} from "vue";
+import {h, nextTick, reactive, ref, toRaw, computed} from "vue";
 import {Icon} from "@iconify/vue";
 import {useUserStore} from "@/store/user.js";
 import {emailSend} from "@/request/email.js";
@@ -134,7 +134,10 @@ defineExpose({
   open,
   openReply,
   openForward,
-  openDraft
+  openDraft,
+  sendEmail,
+  close,
+  isOpen: () => show.value,
 })
 
 const {t} = useI18n()
@@ -611,20 +614,6 @@ function openDraft(draft) {
   show.value = true;
   editor.value.focus()
 }
-
-const handleKeyDown = (event) => {
-  if (event.key === 'Escape') {
-    close()
-  }
-};
-
-onMounted(() => {
-  window.addEventListener('keydown', handleKeyDown);
-});
-
-onUnmounted(() => {
-  window.removeEventListener('keydown', handleKeyDown);
-});
 
 function close() {
 

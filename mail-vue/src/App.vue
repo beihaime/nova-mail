@@ -1,19 +1,24 @@
 <template>
   <el-config-provider :locale="settingStore.lang === 'zh' ? zhCn : null">
     <router-view />
+    <KeyboardShortcuts v-model="showShortcuts" />
   </el-config-provider>
 </template>
 <script setup>
 import { useI18n } from "vue-i18n";
-import { watch, onMounted, onBeforeUnmount } from "vue";
+import { ref, watch, onMounted, onBeforeUnmount } from "vue";
 import {useSettingStore} from "@/store/setting.js";
 import {useUiStore} from "@/store/ui.js";
 import {applyDocumentLocale} from "@/i18n/locale.js";
+import KeyboardShortcuts from '@/components/keyboard-shortcuts/index.vue'
+import {useKeyboardShortcuts} from '@/composables/use-keyboard-shortcuts.js'
 const settingStore = useSettingStore()
 const uiStore = useUiStore()
 import zhCn from 'element-plus/es/locale/lang/zh-cn';
 import('@/icons/index.js')
 const { locale } = useI18n()
+const showShortcuts = ref(false)
+useKeyboardShortcuts(showShortcuts)
 
 function syncLocale() {
   locale.value = settingStore.lang

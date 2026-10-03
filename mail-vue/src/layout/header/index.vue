@@ -162,6 +162,8 @@ import {useAccountStore} from "@/store/account.js";
 import {useEmailStore} from "@/store/email.js";
 import {useMailSearch} from "@/composables/use-mail-search.js";
 
+defineExpose({ closeProfilePopup })
+
 const {t} = useI18n();
 const route = useRoute();
 const settingStore = useSettingStore();

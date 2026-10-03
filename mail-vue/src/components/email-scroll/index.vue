@@ -148,6 +148,7 @@
                 </div>
               </div>
               <div :class="['email-row', props.type, {
+                    'keyboard-focused': keyboardFocusedId === item.emailId,
                     'right-checked': item.rightChecked,
                     'is-unread': item.unread === EmailUnreadEnum.UNREAD && showUnread
                   }]"
@@ -428,6 +429,7 @@ import { showUndoSnackbar } from '@/utils/undo-snackbar.js'
 const props = defineProps({
   getEmailList: Function,
   emailDelete: Function,
+  emailUnread: Function,
   emailRead: Function,
   // Mobile swipe actions. Optional: without them the gesture stays disabled, so
   // the other lists (Sent, Starred, drafts) keep their current behaviour.
@@ -529,6 +531,7 @@ const mobileSearchInput = computed({
 })
 const mobileFilter = ref('all')
 const mobileSelecting = ref(false)
+const keyboardFocusedId = ref(0)
 
 const mobileFilters = computed(() => [
   { key: 'all', label: t('all') },
@@ -577,7 +580,15 @@ defineExpose({
   latestEmail,
   noLoading,
   total,
-  getSelectedMailsIds
+  getSelectedMailsIds,
+  moveKeyboardSelection,
+  openKeyboardSelection,
+  toggleKeyboardSelection,
+  starKeyboardSelection,
+  archiveKeyboardSelection,
+  deleteKeyboardSelection,
+  markKeyboardRead,
+  markKeyboardUnread
 })
 
 onActivated(() => {
@@ -1241,7 +1252,7 @@ function changeAccountShow() {
 }
 
 function emailRead(emailId) {
-  props.emailRead([emailId])
+  props.emailRead?.([emailId])
   localRead([emailId]);
 }
 
@@ -1252,6 +1263,92 @@ function localRead(emailIds) {
       emailList[index].unread = EmailUnreadEnum.READ;
       emailList[index].checked = false;
     }
+  })
+}
+
+function localUnread(emailIds) {
+  emailIds.forEach(emailId => {
+    const item = emailList.find(email => email.emailId === emailId)
+    if (item) {
+      item.unread = EmailUnreadEnum.UNREAD
+      item.checked = false
+    }
+    const detail = emailStore.detailMap[emailId]
+    if (detail) detail.unread = EmailUnreadEnum.UNREAD
+  })
+}
+
+function keyboardTarget() {
+  return emailList.find(item => item.emailId === keyboardFocusedId.value) || null
+}
+
+function setKeyboardFocus(index) {
+  if (!emailList.length) return null
+
+  const nextIndex = Math.max(0, Math.min(index, emailList.length - 1))
+  const item = emailList[nextIndex]
+  keyboardFocusedId.value = item.emailId
+
+  nextTick(() => {
+    const row = document.querySelector(`[data-email-id="${item.emailId}"]`)
+    row?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  })
+
+  return item
+}
+
+function moveKeyboardSelection(direction) {
+  const currentIndex = emailList.findIndex(item => item.emailId === keyboardFocusedId.value)
+  const nextIndex = currentIndex < 0
+    ? (direction > 0 ? 0 : emailList.length - 1)
+    : currentIndex + direction
+  return setKeyboardFocus(nextIndex)
+}
+
+function openKeyboardSelection() {
+  const item = keyboardTarget()
+  if (item) jumpDetails(item, null)
+}
+
+function toggleKeyboardSelection() {
+  const item = keyboardTarget()
+  if (item) item.checked = !item.checked
+}
+
+function starKeyboardSelection() {
+  const item = keyboardTarget()
+  if (item) starChange(item)
+}
+
+function actionIdsForKeyboard() {
+  return getSelectedMailsIds().length
+    ? getSelectedMailsIds()
+    : (keyboardTarget()?.emailId ? [keyboardTarget().emailId] : [])
+}
+
+function archiveKeyboardSelection() {
+  handleArchive(actionIdsForKeyboard())
+}
+
+function deleteKeyboardSelection() {
+  const ids = actionIdsForKeyboard()
+  if (ids.length) handleDelete(ids)
+}
+
+function markKeyboardRead() {
+  const ids = actionIdsForKeyboard()
+  if (!ids.length) return
+  props.emailRead?.(ids)
+  localRead(ids)
+}
+
+function markKeyboardUnread() {
+  const ids = actionIdsForKeyboard()
+  if (!ids.length || typeof props.emailUnread !== 'function') return
+  localUnread(ids)
+  props.emailUnread(ids).catch(error => {
+    refreshList()
+    console.error(error)
   })
 }
 
@@ -1271,8 +1368,8 @@ function rightDelete(emailId) {
   })
 }
 
-function handleArchive() {
-  const emailIds = getSelectedMailsIds()
+function handleArchive(ids = getSelectedMailsIds()) {
+  const emailIds = ids
   if (!emailIds.length || typeof props.emailArchive !== 'function') return
 
   // Remove from every affected list immediately, then let the existing archive
@@ -1313,7 +1410,7 @@ async function copyCode(code) {
   }
 }
 
-function handleDelete() {
+function handleDelete(ids = getSelectedMailsIds()) {
   const removeSelected = () => {
     if (props.type === 'draft') {
       const draftIds = getSelectedDraftsIds();
@@ -1321,7 +1418,7 @@ function handleDelete() {
       return;
     }
 
-    const emailIds = getSelectedMailsIds();
+    const emailIds = ids;
     const optimistic = !props.deleteConfirmText
     if (optimistic) emailStore.deleteIds = emailIds
     props.emailDelete(emailIds).then(() => {
@@ -1745,6 +1842,11 @@ function loadData() {
   }
   &:hover { background: var(--nova-hover); }
   &:active { background: var(--nova-selected); }
+  &.keyboard-focused {
+    background: var(--nova-selected);
+    outline: 1px solid color-mix(in srgb, var(--el-color-primary) 42%, transparent);
+    outline-offset: -1px;
+  }
   .user-info {
     display: flex;
     flex-wrap: wrap;

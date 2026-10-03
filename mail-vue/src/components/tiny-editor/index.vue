@@ -159,6 +159,12 @@ function initEditor() {
       ed.on('focus', () => {
         emit('focus', focus);
       })
+      ed.on('keydown', (event) => {
+        if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key === 'Enter') {
+          window.dispatchEvent(new CustomEvent('nova-compose-send'))
+          event.preventDefault()
+        }
+      })
     },
     autofocus: true,
     branding: false,

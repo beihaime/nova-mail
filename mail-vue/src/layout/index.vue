@@ -17,7 +17,7 @@
     <el-container class="main-container">
       <el-main>
         <el-header>
-            <Header />
+            <Header ref="headerRef" />
         </el-header>
         <Main />
       </el-main>
@@ -72,6 +72,7 @@ import {useGlobalMailAlert} from '@/composables/use-global-mail-alert.js'
 
 const uiStore = useUiStore();
 const writerRef = ref({})
+const headerRef = ref(null)
 const route = useRoute()
 
 // New-mail sound on every route: the Inbox and the reader poll on their own, so
@@ -85,12 +86,14 @@ const handleResize = () => {
 
 onMounted(() => {
   uiStore.writerRef = writerRef
+  uiStore.headerRef = headerRef
 
   window.addEventListener('resize', handleResize)
   handleResize()
 })
 
 onBeforeUnmount(() => {
+  uiStore.headerRef = null
   window.removeEventListener('resize', handleResize)
 })
 </script>

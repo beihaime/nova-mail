@@ -99,6 +99,9 @@ export const useUiStore = defineStore('ui', {
 
         writerRef: null,
 
+        headerRef: null,
+        readerRef: null,
+
         changePreview: 0,
 
         previewData: {},

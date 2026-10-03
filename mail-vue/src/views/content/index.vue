@@ -244,7 +244,7 @@ import MailHtmlFrame from '@/components/mail-html-frame/index.vue'
 import {computed, reactive, ref, watch, nextTick, onMounted, onUnmounted} from "vue";
 import {useRoute, useRouter} from 'vue-router'
 import {ElMessage, ElMessageBox} from 'element-plus'
-import {emailDelete, emailDeleteForever, emailLatest, emailList, emailRead, emailRestore, emailThread} from "@/request/email.js";
+import {emailArchive, emailDelete, emailDeleteForever, emailLatest, emailList, emailRead, emailRestore, emailThread} from "@/request/email.js";
 import {Icon} from "@iconify/vue";
 import {useEmailStore} from "@/store/email.js";
 import {useAccountStore} from "@/store/account.js";
@@ -1195,7 +1195,6 @@ onMounted(() => {
   // The route has already changed; animate only the mounted reading region.
   nextTick(() => playReaderOpen(readerRef.value))
   document.addEventListener('visibilitychange', handleVisibilityChange)
-  window.addEventListener('keydown', handleKeyDown);
   if (mobileReaderQuery.addEventListener) {
     mobileReaderQuery.addEventListener('change', handleMobileReaderChange)
   } else {
@@ -1212,7 +1211,6 @@ onUnmounted(() => {
   document.removeEventListener('visibilitychange', handleVisibilityChange)
   emailStore.contentData.showUnread = false;
   readRequesting = false
-  window.removeEventListener('keydown', handleKeyDown);
   if (mobileReaderQuery.removeEventListener) {
     mobileReaderQuery.removeEventListener('change', handleMobileReaderChange)
   } else {
@@ -1236,12 +1234,17 @@ const stopCloseGuard = router.beforeEach(async (to, from) => {
   return true
 })
 
-function handleKeyDown(event) {
-  if (event.key !== 'Escape') return;
-  if (showPreview.value) return;
+function handleEscape() {
+  if (showPreview.value) {
+    closePreview()
+    return
+  }
   // The PDF viewer is its own layer: Escape closes it, it must not also leave
   // the reader.
-  if (pdfPreview.show) return;
+  if (pdfPreview.show) {
+    closePdfPreview()
+    return
+  }
   if (document.querySelector('.el-message-box')) return;
   const writeBox = document.querySelector('.write-box');
   if (writeBox && writeBox.offsetParent !== null) return;
@@ -1574,6 +1577,51 @@ function restoreTrash() {
     router.back()
   })
 }
+
+function archiveCurrent() {
+  const emailId = email.value?.emailId
+  if (!emailId || emailStore.contentData.delType === 'trash') return
+
+  emailStore.deleteIds = [emailId]
+  emailArchive([emailId]).then(() => {
+    ElMessage({ message: t('archiveSuccessMsg'), type: 'success', plain: true })
+    router.back()
+  }).catch(error => {
+    console.error(error)
+    emailStore.emailScroll?.refreshList()
+    emailStore.archiveScroll?.refreshList()
+  })
+}
+
+function adjacentMessage(direction) {
+  const rows = Object.values(emailStore.detailMap)
+    .filter(item => item?.emailId && (emailStore.contentData.delType !== 'trash' || item.trashed))
+    .reduce((all, item) => all.some(row => row.emailId === item.emailId) ? all : [...all, item], [])
+    .sort((a, b) => Number(b.emailId) - Number(a.emailId))
+
+  const currentId = Number(email.value?.emailId) || 0
+  const currentIndex = rows.findIndex(item => Number(item.emailId) === currentId)
+  const target = rows[currentIndex < 0 ? 0 : currentIndex + direction]
+  if (!target) return
+
+  emailStore.contentData.email = emailStore.detailMap[target.emailId] || target
+  emailStore.contentData.delType = emailStore.contentData.delType || 'logic'
+  emailStore.contentData.showUnread = true
+  emailStore.contentData.showStar = emailStore.contentData.delType !== 'trash'
+  emailStore.contentData.showReply = true
+}
+
+defineExpose({
+  handleBack,
+  handleEscape,
+  openReply,
+  openReplyAll,
+  openForward,
+  changeStar,
+  archiveCurrent,
+  handleDelete,
+  adjacentMessage,
+})
 </script>
 <style scoped lang="scss">
 .box {
