@@ -159,6 +159,7 @@
               <div :class="['email-row', props.type, {
                     'keyboard-focused': keyboardFocusedId === item.emailId,
                     'right-checked': item.rightChecked,
+                    'is-last-mail': index === lastVisibleMailIndex,
                     'is-unread': item.unread === EmailUnreadEnum.UNREAD && showUnread
                   }]"
                    :data-checked="item.checked"
@@ -673,6 +674,13 @@ const visibleList = computed(() => {
 
     return matchesFilter && matchesSearch
   })
+})
+
+const lastVisibleMailIndex = computed(() => {
+  for (let index = visibleList.value.length - 1; index >= 0; index -= 1) {
+    if (!visibleList.value[index].expand) return index
+  }
+  return -1
 })
 
 function selectMobileFilter(filter) {
@@ -2759,7 +2767,6 @@ ul {
        row checkboxes it controls. */
     padding: 4px 8px 4px var(--mail-list-checkbox-inset);
     column-gap: 4px;
-    border-top: 1px solid var(--nova-divider);
     border-bottom: 1px solid var(--nova-divider);
     box-shadow: none;
   }
@@ -2813,20 +2820,20 @@ ul {
     background: var(--nova-surface);
   }
 
-  :deep(.virtual > div + div > .swipe-shell > .email-row.email:not(.all-email))::before {
+  :deep(.virtual > div > div > .swipe-shell > .email-row.email:not(.all-email):not(.is-last-mail))::after {
     content: '';
 
     position: absolute;
-    /* Only rows after the first one paint a divider. This leaves the filter
-       divider as the only line above the first message and avoids a line after
-       the final message/no-more-data marker. */
+    /* Each row owns the divider below it. Keeping it inside the row avoids
+       changing the virtual list's fixed 80px item height. */
     left: 8px;
     right: 8px;
-    top: 0;
+    bottom: 0;
 
     height: 1px;
 
     background: var(--nova-divider-soft, color-mix(in srgb, var(--nova-divider) 55%, transparent));
+    pointer-events: none;
   }
 
   :deep(.email-row.email:active) {
