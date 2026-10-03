@@ -173,15 +173,13 @@
                 )
 
 
-            // First paint only. `style.css` owns the real value: it derives
-            // `--nova-mobile-header-bg` from `--nova-surface`, and `applyTheme()`
-            // re-reads it on every theme change. The literals below merely mirror
-            // that token for the instant before the stylesheet is available, so
-            // the very first frame already matches the phone header.
-            let mobileHeaderBg =
-                isDark
-                    ? '#17191d'
-                    : '#FFFFFF'
+            // First paint only. Login uses artwork-matched status-bar colours;
+            // mailbox pages continue to derive the value from the phone-header
+            // token once the stylesheet is available.
+            const isLoginPath = window.location.pathname === '/login'
+            let mobileHeaderBg = isLoginPath
+                ? (isDark ? '#10243f' : '#dbeafe')
+                : (isDark ? '#17191d' : '#FFFFFF')
 
 
             try {
@@ -194,7 +192,7 @@
                         .trim()
 
 
-                if (token && !token.includes('var(')) {
+                if (!isLoginPath && token && !token.includes('var(')) {
 
                     mobileHeaderBg = token
 
@@ -220,13 +218,11 @@
 
 
             // iOS only supports `default` / `black` / `black-translucent`, and
-            // reads this once at launch. `black-translucent` lets the header
-            // colour fill the status-bar strip instead of a pure-black band.
+            // reads this once at launch. Login uses an opaque style so its
+            // status bar remains a solid artwork-matched colour.
             statusBarMeta?.setAttribute(
                 'content',
-                isDark
-                    ? 'black-translucent'
-                    : 'default'
+                isLoginPath ? (isDark ? 'black' : 'default') : (isDark ? 'black-translucent' : 'default')
             )
 
 

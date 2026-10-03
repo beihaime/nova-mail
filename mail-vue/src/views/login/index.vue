@@ -1,6 +1,5 @@
 <template>
-  <div id="login-box" :class="{ 'has-custom-background': hasCustomBackground }" v-loading="oauthLoading" element-loading-text="登录中...">
-    <div class="login-background" :style="background" aria-hidden="true"></div>
+  <div id="login-box" :class="{ 'has-custom-background': hasCustomBackground }" :style="background" v-loading="oauthLoading" element-loading-text="登录中...">
     <div class="login-scene" aria-hidden="true">
       <div class="login-sky-glow"></div>
     </div>
@@ -181,7 +180,7 @@
 <script setup>
 import router from "@/router";
 import {useRoute} from "vue-router";
-import {computed, nextTick, reactive, ref} from "vue";
+import {computed, nextTick, onBeforeUnmount, reactive, ref, watch} from "vue";
 import {login} from "@/request/login.js";
 import {register} from "@/request/login.js";
 import {websiteConfig} from "@/request/setting.js";
@@ -223,6 +222,25 @@ const isDark = computed(() => {
 
   return false
 })
+
+const LOGIN_STATUS_BAR_COLORS = {
+  light: '#dbeafe',
+  dark: '#10243f',
+}
+
+function updateLoginStatusBar() {
+  const metaTag = document.getElementById('theme-color-meta')
+    || document.querySelector('meta[name="theme-color"]')
+  metaTag?.setAttribute('content', isDark.value
+    ? LOGIN_STATUS_BAR_COLORS.dark
+    : LOGIN_STATUS_BAR_COLORS.light)
+
+  const statusBarMeta = document.getElementById('apple-status-bar-meta')
+  statusBarMeta?.setAttribute('content', isDark.value ? 'black' : 'default')
+}
+
+watch(isDark, updateLoginStatusBar, { immediate: true })
+onBeforeUnmount(() => uiStore.applyTheme())
 
 const loginLoading = ref(false)
 const bindLoading = ref(false)
@@ -962,20 +980,8 @@ function submitRegister() {
   background:#dbeafe;
 }
 
-.login-background {
-  position: fixed;
-  z-index: 0;
-  inset: 0;
-  min-height: 100dvh;
-  pointer-events: none;
-  background-repeat: no-repeat;
-  background-position: center center;
-  background-size: cover;
-}
-
 .login-scene {
   position: fixed;
-  z-index: 1;
   inset: 0;
   overflow: hidden;
   pointer-events: none;
@@ -1058,10 +1064,10 @@ function submitRegister() {
 }
 
 @media (max-width: 767px) {
-  #login-box { min-height: 100dvh; height: auto; overflow-y: auto; padding: calc(126px + env(safe-area-inset-top)) 16px calc(56px + env(safe-area-inset-bottom)); box-sizing: border-box; }
-  .login-brand { top: calc(22px + env(safe-area-inset-top)); left: 22px; }
-  .login-copyright { left: 22px; bottom: calc(14px + env(safe-area-inset-bottom)); }
-  .login-quiet-tagline { left: 24px; top: calc(94px + env(safe-area-inset-top)); font-size: 12px; letter-spacing: .1em; }
+  #login-box { min-height: 100dvh; height: auto; overflow-y: auto; padding: 126px 16px 56px; box-sizing: border-box; }
+  .login-brand { top: 22px; left: 22px; }
+  .login-copyright { left: 22px; bottom: 14px; }
+  .login-quiet-tagline { left: 24px; top: 94px; font-size: 12px; letter-spacing: .1em; }
   .form-wrapper { position: relative; top: auto; right: auto; bottom: auto; left: auto; width: 100%; max-width: 420px; margin: 0 auto; }
   .login-scene { opacity: .72; }
   .container { width: 100%; padding: 18px 16px; height: auto; min-height: 0; border-radius: 18px; background: rgba(232,243,255,.78); box-shadow: 0 18px 50px rgba(30,80,140,.16); }
