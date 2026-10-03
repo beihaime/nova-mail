@@ -2925,7 +2925,9 @@ ul {
   /* ---------- Message body ---------- */
 
   :deep(.email-row.email > .title) {
-    grid-column: 3;
+    /* Let the body span through the former time column. Only the sender line
+       reserves room for the separately positioned time meta below. */
+    grid-column: 3 / 5;
 
     width: 100%;
     min-width: 0;
@@ -2946,6 +2948,8 @@ ul {
     min-width: 0;
 
     display: block;
+
+    padding-right: 64px;
 
     /* Sender is the strongest line: largest type, heaviest weight, primary ink. */
     line-height: 20px;
@@ -2988,8 +2992,10 @@ ul {
   }
 
   :deep(.email-row.email > .email-right) {
-    grid-column: 4;
-    grid-row: 1;
+    position: absolute;
+    top: 10px;
+    right: 16px;
+    width: 64px;
     display: flex;
     align-self: start;
     justify-content: flex-end;
