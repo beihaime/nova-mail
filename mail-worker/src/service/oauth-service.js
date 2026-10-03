@@ -59,8 +59,8 @@ const oauthService = {
 		return url.toString();
 	},
 
-	async startLogin(c, provider) {
-		return this.authorizeUrl(c, provider, await oauthTransactions.create(c, { provider }));
+	async startLogin(c, provider, deviceId = '', pwa = false) {
+		return this.authorizeUrl(c, provider, await oauthTransactions.create(c, { provider, deviceId, pwa }));
 	},
 
 	async startLink(c, provider, userId, sessionToken) {
@@ -154,7 +154,7 @@ const oauthService = {
 			if (!account) return loginUrl(c, { oauth: 'unlinked' });
 			const user = await userService.selectById(c, account.user_id);
 			if (!user) return loginUrl(c, { oauth: 'unlinked' });
-			const jwt = await loginService.createSession(c, user);
+			const jwt = await loginService.createSession(c, user, { deviceId: transaction.device_id, pwa: Boolean(transaction.pwa) });
 			const grant = await oauthTransactions.createGrant(c, jwt, transaction.state, transaction.browser_token);
 			return loginUrl(c, { oauth: 'complete', grant });
 		} catch (error) {

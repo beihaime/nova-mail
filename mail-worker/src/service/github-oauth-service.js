@@ -33,7 +33,7 @@ const githubOauthService = {
 		return url.toString();
 	},
 
-	async startLogin(c) { return this.authorizeUrl(c, await oauthTransactions.create(c, { provider: PROVIDER })); },
+	async startLogin(c, deviceId = '', pwa = false) { return this.authorizeUrl(c, await oauthTransactions.create(c, { provider: PROVIDER, deviceId, pwa })); },
 	async startLink(c, userId, sessionToken) {
 		if (!sessionToken) throw new BizError('Authentication is required');
 		return this.authorizeUrl(c, await oauthTransactions.create(c, { provider: PROVIDER, intent: 'link', userId, sessionToken }));
@@ -83,17 +83,17 @@ const githubOauthService = {
 			if (c.req.query('error')) return loginUrl(c, { github: 'denied' });
 			transaction = await oauthTransactions.consume(c, PROVIDER, c.req.query('state'));
 			const githubUser = await this.getGithubUser(c, c.req.query('code'), transaction);
-			if (transaction.intent === 'link') { await this.link(c, transaction, githubUser); return new URL('/settings?github=connected', c.req.url).toString(); }
+			if (transaction.intent === 'link') { await this.link(c, transaction, githubUser); return new URL('/settings/account?github=connected', c.req.url).toString(); }
 			const account = await this.findAccount(c, githubUser.id);
 			if (!account) return loginUrl(c, { github: 'unlinked' });
 			const user = await userService.selectById(c, account.user_id);
 			if (!user) return loginUrl(c, { github: 'unlinked' });
-			const token = await loginService.createSession(c, user);
+			const token = await loginService.createSession(c, user, { deviceId: transaction.device_id, pwa: Boolean(transaction.pwa) });
 			const grant = await oauthTransactions.createGrant(c, token, transaction.state, transaction.browser_token);
 			return loginUrl(c, { github: 'complete', grant });
 		} catch (error) {
 			console.warn('GitHub OAuth callback rejected', { message: error.message });
-			return transaction?.intent === 'link' ? new URL('/settings?github=failed', c.req.url).toString() : loginUrl(c, { github: 'failed' });
+			return transaction?.intent === 'link' ? new URL('/settings/account?github=failed', c.req.url).toString() : loginUrl(c, { github: 'failed' });
 		}
 	},
 

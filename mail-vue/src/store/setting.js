@@ -14,11 +14,13 @@ export const useSettingStore = defineStore('setting', {
         notificationSound: true,
         notificationSoundType: DEFAULT_NOTIFICATION_SOUND,
         timeFormat: '24h',
+        swipeLeftAction: 'trash',
+        swipeRightAction: 'archive',
     }),
     actions: {
 
     },
     persist: {
-        pick: ['lang', 'notificationSound', 'notificationSoundType', 'timeFormat'],
+        pick: ['lang', 'notificationSound', 'notificationSoundType', 'timeFormat', 'swipeLeftAction', 'swipeRightAction'],
     },
 })

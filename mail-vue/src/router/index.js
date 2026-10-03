@@ -49,6 +49,24 @@ const routes = [
                 }
             },
             {
+                path: '/settings/account',
+                name: 'setting-account',
+                component: () => import('@/views/setting/index.vue'),
+                meta: { title: 'accountSecurity', name: 'setting-account', menu: true }
+            },
+            {
+                path: '/settings/personalization',
+                name: 'setting-personalization',
+                component: () => import('@/views/setting/index.vue'),
+                meta: { title: 'personalization', name: 'setting-personalization', menu: true }
+            },
+            {
+                path: '/settings/about',
+                name: 'setting-about',
+                component: () => import('@/views/setting/index.vue'),
+                meta: { title: 'about', name: 'setting-about', menu: true }
+            },
+            {
                 path: '/settings/addresses',
                 name: 'addresses',
                 component: () => import('@/views/addresses/index.vue'),

@@ -41,7 +41,7 @@
       <span class="mobile-nav-icon"><AppIcon name="nova-sidebar-drafts" :size="24" inline /></span>
       <span class="mobile-nav-label">{{ $t('drafts') }}</span>
     </button>
-    <button class="nova-navigation-button" :class="{active: route.name === 'setting'}" @click="router.push({name: 'setting'})">
+    <button class="nova-navigation-button" :class="{active: ['setting', 'setting-account', 'setting-personalization', 'setting-about'].includes(route.name)}" @click="router.push({name: 'setting'})">
       <span class="mobile-nav-icon"><AppIcon name="nova-sidebar-settings" :size="24" inline /></span>
       <span class="mobile-nav-label">{{ $t('settings') }}</span>
     </button>
@@ -315,6 +315,25 @@ onBeforeUnmount(() => {
     color: var(--regular-text-color);
     font-size: 12px;
     line-height: 13px;
+    position: relative;
+    isolation: isolate;
+    background: transparent;
+  }
+
+  /* Keep the button itself as the full-width touch target, while the selected
+     treatment hugs the icon/label cluster instead of becoming a large tab. */
+  .mobile-nav button.active::before {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    top: 50%;
+    left: 50%;
+    width: min(92px, calc(100% - 8px));
+    height: 52px;
+    border-radius: 18px;
+    background: var(--nm-accent-subtle, color-mix(in srgb, var(--el-color-primary) 12%, transparent));
+    transform: translate(-50%, -50%);
+    pointer-events: none;
   }
 
   .mobile-nav-icon {

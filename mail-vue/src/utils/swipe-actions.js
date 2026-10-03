@@ -17,6 +17,25 @@ export const SWIPE_ACTION = {
   DELETE: 'delete',
 }
 
+// User-configurable actions. Keep presentation metadata here so the list and
+// Settings page share one vocabulary when more actions are added later.
+export const SWIPE_ACTIONS = Object.freeze({
+  archive: { id: 'archive', icon: 'nova-sidebar-archive', labelKey: 'swipeActionArchive', removable: true },
+  trash: { id: 'trash', icon: 'nova-sidebar-trash', labelKey: 'swipeActionTrash', removable: true },
+  read: { id: 'read', icon: 'nova-sidebar-mail', labelKey: 'swipeActionRead' },
+  unread: { id: 'unread', icon: 'nova-sidebar-mail', labelKey: 'swipeActionUnread' },
+  star: { id: 'star', icon: 'nova-sidebar-starred', labelKey: 'swipeActionStar' },
+  none: { id: 'none', icon: '', labelKey: 'swipeActionNone' },
+})
+
+export const SWIPE_ACTION_OPTIONS = Object.freeze(Object.values(SWIPE_ACTIONS))
+export const DEFAULT_SWIPE_LEFT_ACTION = 'trash'
+export const DEFAULT_SWIPE_RIGHT_ACTION = 'archive'
+
+export function normalizeSwipeAction(value, fallback = 'none') {
+  return Object.prototype.hasOwnProperty.call(SWIPE_ACTIONS, value) ? value : fallback
+}
+
 export const SWIPE_AXIS = {
   HORIZONTAL: 'horizontal',
   VERTICAL: 'vertical',

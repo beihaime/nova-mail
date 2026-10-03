@@ -40,9 +40,11 @@ const oauthTransactionService = {
 			c.env.db.prepare('CREATE TABLE IF NOT EXISTS oauth_transactions (state TEXT PRIMARY KEY, provider TEXT NOT NULL, intent TEXT NOT NULL, browser_token TEXT NOT NULL, code_verifier TEXT, nonce TEXT, user_id INTEGER, session_token TEXT, expires_at INTEGER NOT NULL)'),
 			c.env.db.prepare('CREATE TABLE IF NOT EXISTS oauth_login_grants (grant TEXT PRIMARY KEY, transaction_state TEXT NOT NULL, browser_token TEXT NOT NULL, token TEXT NOT NULL, expires_at INTEGER NOT NULL)')
 		]);
+		try { await c.env.db.prepare('ALTER TABLE oauth_transactions ADD COLUMN device_id TEXT').run(); } catch {}
+		try { await c.env.db.prepare('ALTER TABLE oauth_transactions ADD COLUMN pwa INTEGER DEFAULT 0').run(); } catch {}
 	},
 
-	async create(c, { provider, intent = 'login', userId = null, sessionToken = null, usePkce = true }) {
+	async create(c, { provider, intent = 'login', userId = null, sessionToken = null, usePkce = true, deviceId = '', pwa = false }) {
 		await this.ensureTables(c);
 		const state = randomToken();
 		const browserToken = randomToken();
@@ -51,8 +53,8 @@ const oauthTransactionService = {
 		const expiresAt = Date.now() + TRANSACTION_TTL_SECONDS * 1000;
 		await c.env.db.prepare(`
 			INSERT INTO oauth_transactions (state, provider, intent, browser_token, code_verifier, nonce, user_id, session_token, expires_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-		`).bind(state, provider, intent, browserToken, verifier, nonce, userId, sessionToken, expiresAt).run();
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`).bind(state, provider, intent, browserToken, verifier, nonce, userId, sessionToken, expiresAt, deviceId, Number(Boolean(pwa))).run();
 		cookie(c, state, browserToken, TRANSACTION_TTL_SECONDS);
 		return { state, verifier, nonce, codeChallenge: verifier ? await sha256Base64Url(verifier) : null };
 	},

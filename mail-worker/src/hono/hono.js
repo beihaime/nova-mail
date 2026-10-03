@@ -40,7 +40,7 @@ app.use('*', async (c, next) => {
 	const middleware = cors({
 		origin: (origin) => resolveCorsOrigin(c, origin),
 		allowHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-		allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+		allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 		maxAge: 86400
 	});
 	return middleware(c, next);

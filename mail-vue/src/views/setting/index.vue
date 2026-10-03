@@ -1,6 +1,32 @@
 <template>
   <div class="box">
-    <div class="container">
+    <div v-if="section === 'home'" class="settings-home">
+      <div class="settings-home-title">{{ $t('settings') }}</div>
+      <button class="settings-category-row" type="button" @click="router.push('/settings/account')">
+        <span class="settings-category-icon"><Icon icon="solar:shield-check-linear" width="22" height="22" /></span>
+        <span class="settings-category-copy"><strong>{{ $t('accountSecurity') }}</strong><small>{{ $t('accountSecurityDesc') }}</small></span>
+        <Icon class="settings-category-chevron" icon="solar:alt-arrow-right-linear" width="18" height="18" />
+      </button>
+      <button class="settings-category-row" type="button" @click="router.push('/settings/personalization')">
+        <span class="settings-category-icon"><Icon icon="solar:palette-linear" width="22" height="22" /></span>
+        <span class="settings-category-copy"><strong>{{ $t('personalization') }}</strong><small>{{ $t('personalizationDesc') }}</small></span>
+        <Icon class="settings-category-chevron" icon="solar:alt-arrow-right-linear" width="18" height="18" />
+      </button>
+      <button class="settings-category-row" type="button" @click="router.push('/settings/about')">
+        <span class="settings-category-icon"><Icon icon="solar:info-circle-linear" width="22" height="22" /></span>
+        <span class="settings-category-copy"><strong>{{ $t('about') }}</strong><small>{{ $t('aboutDesc') }}</small></span>
+        <Icon class="settings-category-chevron" icon="solar:alt-arrow-right-linear" width="18" height="18" />
+      </button>
+    </div>
+
+    <div v-else class="settings-subpage-header">
+      <button class="settings-back-button" type="button" :aria-label="$t('back')" @click="router.push('/settings')">
+        <Icon icon="solar:arrow-left-linear" width="20" height="20" />
+      </button>
+      <h1>{{ section === 'account' ? $t('accountSecurity') : section === 'personalization' ? $t('personalization') : $t('about') }}</h1>
+    </div>
+
+    <div v-if="section === 'account'" class="container">
       <div class="title">{{$t('profile')}}</div>
       <div class="item">
         <div>{{$t('username')}}</div>
@@ -30,7 +56,7 @@
         </div>
       </div>
     </div>
-    <div class="connected-accounts">
+    <div v-if="section === 'account'" class="connected-accounts">
       <div class="title">{{$t('connectedAccounts')}}</div>
       <div class="connected-account-row">
         <div class="connected-account-details">
@@ -73,8 +99,15 @@
         <el-button v-else type="primary" @click="connectGoogle" :loading="googleLoading">{{$t('connect')}}</el-button>
       </div>
     </div>
+    <div v-if="section === 'account'" class="account-link-section">
+      <div class="title">{{ $t('emailAddresses') }}</div>
+      <button type="button" class="account-link-row" @click="router.push('/settings/addresses')">
+        <span><strong>{{ $t('manageAddresses') }}</strong><small>{{ $t('emailAddressesDesc') }}</small></span>
+        <Icon icon="solar:alt-arrow-right-linear" width="18" height="18" />
+      </button>
+    </div>
 
-    <div class="appearance">
+    <div v-if="section === 'personalization'" class="appearance">
       <div class="title">{{ $t('visualStyle') }}</div>
 
       <div class="appearance-editor">
@@ -131,7 +164,7 @@
       </div>
     </div>
 
-    <div class="language">
+    <div v-if="section === 'personalization'" class="language">
       <div class="title">{{$t('language')}}</div>
       <el-select
           :model-value="langSelect"
@@ -144,7 +177,7 @@
       </el-select>
     </div>
 
-    <div class="time-format">
+    <div v-if="section === 'personalization'" class="time-format">
       <div class="title">{{ $t('timeFormat') }}</div>
       <div class="time-format-options" role="radiogroup" :aria-label="$t('timeFormat')">
         <button
@@ -163,7 +196,35 @@
       </div>
     </div>
 
-    <div class="notification">
+    <div v-if="section === 'personalization'" class="swipe-actions-setting">
+      <div class="title">{{ $t('swipeActions') }}</div>
+      <div class="swipe-actions-options">
+        <div class="swipe-action-setting-row">
+          <span class="swipe-action-direction">← {{ $t('swipeLeft') }}</span>
+          <el-select v-model="settingStore.swipeLeftAction" class="swipe-action-select" :aria-label="$t('swipeLeft')">
+            <el-option
+                v-for="option in swipeActionOptions"
+                :key="option.id"
+                :label="$t(option.labelKey)"
+                :value="option.id"
+            />
+          </el-select>
+        </div>
+        <div class="swipe-action-setting-row">
+          <span class="swipe-action-direction">{{ $t('swipeRight') }} →</span>
+          <el-select v-model="settingStore.swipeRightAction" class="swipe-action-select" :aria-label="$t('swipeRight')">
+            <el-option
+                v-for="option in swipeActionOptions"
+                :key="option.id"
+                :label="$t(option.labelKey)"
+                :value="option.id"
+            />
+          </el-select>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="section === 'personalization'" class="notification">
       <div class="title">{{ $t('notification') }}</div>
 
       <div class="notification-row">
@@ -211,13 +272,46 @@
         ⚠ {{ $t('notificationSoundFailed') }}: {{ notificationSoundStatus.lastError }}
       </p>
     </div>
-    <div class="del-email" v-perm="'my:delete'">
+    <div v-if="section === 'account'" class="del-email" v-perm="'my:delete'">
       <div class="title">{{$t('deleteUser')}}</div>
       <div style="color: var(--regular-text-color);">
         {{$t('delAccountMsg')}}
       </div>
       <div>
         <el-button type="primary" @click="deleteConfirm">{{$t('deleteUserBtn')}}</el-button>
+      </div>
+    </div>
+    <div v-if="section === 'account'" class="security">
+      <div class="title">{{ $t('security') }}</div>
+      <div class="security-subsection">
+        <div class="security-subtitle">{{ $t('devicesAndSessions') }}</div>
+        <div class="session-list" v-loading="sessionsLoading">
+          <div v-for="session in sessions" :key="session.id" class="session-row">
+            <div class="session-details">
+              <div class="session-title">{{ session.browser }} · {{ session.os }}</div>
+              <div class="session-meta">{{ session.deviceType }} · {{ session.location }}</div>
+              <div class="session-meta">{{ $t('lastActive') }}: {{ formatSessionTime(session.lastActiveAt) }} · {{ session.ipAddress }}</div>
+              <span v-if="session.current" class="session-current">{{ $t('thisDevice') }}</span>
+            </div>
+            <el-button v-if="!session.current" text type="danger" :loading="revokingSession === session.id" @click="signOutSession(session)">{{ $t('signOut') }}</el-button>
+          </div>
+          <div v-if="!sessions.length && !sessionsLoading" class="session-empty">{{ $t('noActiveSessions') }}</div>
+        </div>
+        <el-button v-if="sessions.some(session => !session.current)" class="revoke-others-button" @click="signOutOtherSessions">{{ $t('signOutOtherDevices') }}</el-button>
+      </div>
+      <div class="security-subsection login-alerts">
+        <div class="security-subtitle">{{ $t('loginAlerts') }}</div>
+        <div class="security-setting-row"><span>{{ $t('email') }}</span><el-switch v-model="loginAlerts.email" :loading="loginAlertsLoading" @change="saveLoginAlerts" /></div>
+        <div class="security-setting-row"><div><span>{{ $t('telegram') }}</span><small v-if="!loginAlerts.telegramAvailable">{{ $t('notConnected') }}</small></div><el-switch v-model="loginAlerts.telegram" :disabled="!loginAlerts.telegramAvailable" :loading="loginAlertsLoading" @change="saveLoginAlerts" /></div>
+      </div>
+    </div>
+    <div v-if="section === 'about'" class="about-page">
+      <div class="about-brand"><img src="/icons/nova-mail-192.png" alt="Nova Mail" /><strong>Nova Mail</strong></div>
+      <p>{{ $t('aboutDescription') }}</p>
+      <div class="about-details">
+        <div><span>{{ $t('appName') }}</span><span>Nova Mail</span></div>
+        <div v-if="appVersion"><span>{{ $t('version') }}</span><span>{{ appVersion }}</span></div>
+        <div><span>{{ $t('copyright') }}</span><span>Nova Mail</span></div>
       </div>
     </div>
     <el-dialog v-model="pwdShow" :title="$t('changePassword')" width="340">
@@ -240,10 +334,12 @@ import {useAccountStore} from "@/store/account.js";
 import {useI18n} from "vue-i18n";
 import {useSettingStore} from "@/store/setting.js";
 import {useUiStore} from "@/store/ui.js";
+import {getSessions, revokeSession, revokeOtherSessions, getLoginAlerts, updateLoginAlerts} from '@/request/security.js';
 import {connectGithubAccount, disconnectGithubAccount, githubConnectedAccount, connectGoogleAccount, disconnectGoogleAccount, googleConnectedAccount} from '@/request/ouath.js';
 import {Icon} from '@iconify/vue';
 import {applyThemeTransition} from "@/utils/theme-transition.js";
 import {availablePresets, PALETTE_KEYS, parseThemeImport, normalizeHex} from '@/utils/theme-palette.js';
+import {SWIPE_ACTION_OPTIONS} from '@/utils/swipe-actions.js';
 import {
   NOTIFICATION_SOUNDS,
   notificationSoundStatus,
@@ -267,6 +363,8 @@ const settingStore = useSettingStore()
 const uiStore = useUiStore()
 const userStore = useUserStore();
 const route = useRoute();
+const section = computed(() => route.path === '/settings/account' ? 'account' : route.path === '/settings/personalization' ? 'personalization' : route.path === '/settings/about' ? 'about' : 'home')
+const appVersion = ''
 const setPwdLoading = ref(false)
 const setNameShow = ref(false)
 const accountName = ref(null)
@@ -275,10 +373,16 @@ const timeFormatOptions = computed(() => [
   { value: '24h', label: t('timeFormat24h'), example: t('timeFormatExample24h') },
   { value: '12h', label: t('timeFormat12h'), example: t('timeFormatExample12h') },
 ])
+const swipeActionOptions = SWIPE_ACTION_OPTIONS
 const githubLoading = ref(false)
 const githubAccount = reactive({ connected: false, login: '', avatarUrl: '' })
 const googleLoading = ref(false)
 const googleAccount = reactive({ connected: false, email: '', avatarUrl: '' })
+const sessions = ref([])
+const sessionsLoading = ref(false)
+const revokingSession = ref('')
+const loginAlertsLoading = ref(false)
+const loginAlerts = reactive({ email: true, telegram: false, telegramAvailable: false })
 const themeImportInput = ref(null)
 const colorInputs = reactive({})
 
@@ -430,6 +534,54 @@ async function refreshPushState() {
   }
 }
 
+function formatSessionTime(value) {
+  const minutes = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 60000))
+  if (minutes < 1) return t('justNow')
+  if (minutes < 60) return t('minutesAgo', { count: minutes })
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return t('hoursAgo', { count: hours })
+  return new Intl.DateTimeFormat(settingStore.lang, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
+}
+
+async function refreshSecurity() {
+  sessionsLoading.value = true
+  try {
+    const [sessionRows, alertSettings] = await Promise.all([getSessions(), getLoginAlerts()])
+    sessions.value = sessionRows || []
+    Object.assign(loginAlerts, alertSettings || {})
+  } finally {
+    sessionsLoading.value = false
+  }
+}
+
+async function signOutSession(session) {
+  revokingSession.value = session.id
+  try {
+    await revokeSession(session.id)
+    sessions.value = sessions.value.filter((item) => item.id !== session.id)
+  } finally {
+    revokingSession.value = ''
+  }
+}
+
+function signOutOtherSessions() {
+  ElMessageBox.confirm(t('signOutOtherDevicesConfirm'), { confirmButtonText: t('signOut'), cancelButtonText: t('cancel'), type: 'warning' }).then(async () => {
+    await revokeOtherSessions()
+    sessions.value = sessions.value.filter((session) => session.current)
+    ElMessage({ message: t('signedOutOtherDevices'), type: 'success', plain: true })
+  })
+}
+
+async function saveLoginAlerts() {
+  if (loginAlertsLoading.value) return
+  loginAlertsLoading.value = true
+  try {
+    Object.assign(loginAlerts, await updateLoginAlerts({ email: loginAlerts.email, telegram: loginAlerts.telegram }))
+  } finally {
+    loginAlertsLoading.value = false
+  }
+}
+
 const PUSH_FAILURE_MESSAGE = {
   [PUSH_STATUS.DENIED]: 'pushDeniedMsg',
   [PUSH_STATUS.UNSUPPORTED]: 'pushUnsupportedMsg',
@@ -504,32 +656,41 @@ defineOptions({
 })
 
 onMounted(async () => {
+  if (section.value === 'about' || section.value === 'home') return
+
   // Normalise a value persisted by an older build, then warm the sound the
   // user is most likely to audition.
-  settingStore.notificationSoundType = setNotificationSoundType(settingStore.notificationSoundType)
-  preloadNotificationSound(settingStore.notificationSoundType)
-
-  try {
-    const account = await githubConnectedAccount()
-    Object.assign(githubAccount, account)
-    userStore.githubConnected = Boolean(account?.connected)
-    userStore.githubAvatar = account?.connected && account?.avatarUrl ? account.avatarUrl : ''
-    const google = await googleConnectedAccount()
-    Object.assign(googleAccount, google)
-    userStore.googleConnected = Boolean(google?.connected)
-    userStore.googleAvatar = google?.connected && google?.avatarUrl ? google.avatarUrl : ''
-    const status = route.query.google
-    if (status === 'connected') ElMessage({ message: t('googleConnected'), type: 'success', plain: true })
-    if (status === 'failed') ElMessage({ message: t('googleLoginFailed'), type: 'warning', plain: true })
-    if (status === 'denied') ElMessage({ message: t('googleAuthorizationCancelled'), type: 'warning', plain: true })
-  } catch {
-    // The endpoint can be unavailable until the non-destructive migration runs.
+  if (section.value === 'personalization') {
+    settingStore.notificationSoundType = setNotificationSoundType(settingStore.notificationSoundType)
+    preloadNotificationSound(settingStore.notificationSoundType)
   }
 
-  // Re-register a device whose endpoint rotated (or whose row was cleaned up
-  // after a 404/410), then show the real state. Both are best effort.
-  await syncPushSubscription()
-  await refreshPushState()
+  if (section.value === 'account') {
+    try {
+      const account = await githubConnectedAccount()
+      Object.assign(githubAccount, account)
+      userStore.githubConnected = Boolean(account?.connected)
+      userStore.githubAvatar = account?.connected && account?.avatarUrl ? account.avatarUrl : ''
+      const google = await googleConnectedAccount()
+      Object.assign(googleAccount, google)
+      userStore.googleConnected = Boolean(google?.connected)
+      userStore.googleAvatar = google?.connected && google?.avatarUrl ? google.avatarUrl : ''
+      const status = route.query.google
+      if (status === 'connected') ElMessage({ message: t('googleConnected'), type: 'success', plain: true })
+      if (status === 'failed') ElMessage({ message: t('googleLoginFailed'), type: 'warning', plain: true })
+      if (status === 'denied') ElMessage({ message: t('googleAuthorizationCancelled'), type: 'warning', plain: true })
+    } catch {
+      // The endpoint can be unavailable until the non-destructive migration runs.
+    }
+    await refreshSecurity()
+  }
+
+  if (section.value === 'personalization') {
+    // Re-register a device whose endpoint rotated (or whose row was cleaned up
+    // after a 404/410), then show the real state. Both are best effort.
+    await syncPushSubscription()
+    await refreshPushState()
+  }
 })
 
 async function connectGithub() {
@@ -741,8 +902,125 @@ function submitPwd() {
   padding: 40px 40px;
 
   @media (max-width: 767px) {
-    padding: 30px 30px;
+    padding: 24px 20px calc(30px + env(safe-area-inset-bottom, 0px));
   }
+
+  .settings-home,
+  .settings-subpage-header,
+  .about-page {
+    width: min(100%, 760px);
+    margin-inline: auto;
+  }
+
+  .settings-home {
+    display: grid;
+    gap: 8px;
+  }
+
+  .settings-home-title {
+    margin-bottom: 12px;
+    color: var(--nm-text-primary);
+    font-size: 22px;
+    font-weight: 700;
+  }
+
+  .settings-category-row {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 74px;
+    padding: 13px 14px;
+    gap: 14px;
+    border: 1px solid transparent;
+    border-radius: var(--nova-button-radius);
+    color: var(--nm-text-primary);
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color var(--nova-motion-fast) var(--nova-motion-ease), border-color var(--nova-motion-fast) var(--nova-motion-ease);
+  }
+
+  .settings-category-row:hover,
+  .settings-category-row:focus-visible {
+    border-color: var(--nova-divider);
+    background: var(--nm-hover);
+  }
+
+  .settings-category-row:focus-visible,
+  .settings-back-button:focus-visible {
+    outline: none;
+    box-shadow: var(--nova-button-focus-ring);
+  }
+
+  .settings-category-icon {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
+    border-radius: 12px;
+    color: var(--nm-accent);
+    background: var(--nm-accent-subtle);
+  }
+
+  .settings-category-copy {
+    display: grid;
+    min-width: 0;
+    flex: 1 1 auto;
+    gap: 3px;
+  }
+
+  .settings-category-copy strong { font-size: 15px; font-weight: 600; }
+  .settings-category-copy small { overflow: hidden; color: var(--nm-text-muted); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+  .settings-category-chevron { flex: 0 0 auto; color: var(--nm-text-muted); }
+
+  .settings-subpage-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 38px;
+    margin-bottom: 28px;
+  }
+
+  .settings-subpage-header h1 { margin: 0; color: var(--nm-text-primary); font-size: 22px; line-height: 1.2; }
+  .settings-back-button { display: grid; place-items: center; width: 36px; height: 36px; border: 0; border-radius: 10px; color: var(--nm-text-secondary); background: transparent; cursor: pointer; }
+  .settings-back-button:hover { color: var(--nm-text-primary); background: var(--nm-hover); }
+
+  .about-page { display: grid; gap: 22px; color: var(--nm-text-secondary); }
+  .about-brand { display: flex; align-items: center; gap: 12px; color: var(--nm-text-primary); font-size: 20px; font-weight: 700; }
+  .about-brand img { width: 40px; height: 40px; border-radius: 10px; }
+  .about-page p { margin: 0; color: var(--nm-text-secondary); line-height: 1.6; }
+  .about-details { display: grid; gap: 0; max-width: 420px; }
+  .about-details > div { display: flex; justify-content: space-between; gap: 20px; padding: 11px 0; border-bottom: 1px solid var(--nova-divider-soft); font-size: 14px; }
+  .about-details > div:last-child { border-bottom: 0; }
+  .about-details > div span:last-child { color: var(--nm-text-primary); }
+
+  .account-link-section {
+    order: 4;
+    display: grid;
+    gap: 12px;
+    margin-bottom: 40px;
+    font-size: 14px;
+  }
+
+  .account-link-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: min(100%, 460px);
+    min-height: 52px;
+    padding: 9px 12px;
+    border: 1px solid var(--el-border-color-lighter);
+    border-radius: var(--nova-button-radius);
+    color: var(--nm-text-primary);
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .account-link-row:hover { background: var(--nm-hover); }
+  .account-link-row > span { display: grid; gap: 2px; }
+  .account-link-row small { color: var(--nm-text-muted); font-size: 12px; }
 
   .update-pwd {
     display: flex;
@@ -890,7 +1168,7 @@ function submitPwd() {
   }
 
   .connected-accounts {
-    order: 5;
+    order: 6;
     display: grid;
     gap: 16px;
     margin-bottom: 40px;
@@ -984,7 +1262,7 @@ function submitPwd() {
   }
 
   .del-email {
-    order: 6;
+    order: 8;
     font-size: 14px;
     display: flex;
     flex-direction: column;
@@ -995,7 +1273,9 @@ function submitPwd() {
 .language { order: 1; }
 .appearance { order: 2; }
 .time-format { order: 3; }
-.notification { order: 4; }
+.swipe-actions-setting { order: 4; }
+.notification { order: 5; }
+.security { order: 7; }
 
   /* ---------- Notification sound ---------- */
   .notification {
@@ -1004,6 +1284,70 @@ function submitPwd() {
     gap: 14px;
     margin-bottom: 40px;
     font-size: 14px;
+  }
+
+  .security {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    margin-bottom: 40px;
+    font-size: 14px;
+  }
+
+  .security-subsection { display: grid; gap: 12px; }
+  .security-subtitle { font-weight: 600; }
+  .session-list { display: grid; border: 1px solid var(--el-border-color-lighter); border-radius: 12px; overflow: hidden; }
+  .session-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-width: 0; padding: 14px 16px; border-bottom: 1px solid var(--el-border-color-lighter); }
+  .session-row:last-child { border-bottom: 0; }
+  .session-details { min-width: 0; flex: 1; }
+  .session-title { font-weight: 600; }
+  .session-meta { color: var(--el-text-color-secondary); font-size: 13px; margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .session-current { display: inline-block; margin-top: 7px; color: var(--el-color-primary); font-size: 12px; }
+  .session-empty { padding: 16px; color: var(--el-text-color-secondary); }
+  .revoke-others-button { justify-self: start; }
+  .security-setting-row { display: flex; align-items: center; justify-content: space-between; min-height: 42px; padding: 10px 12px; border: 1px solid var(--el-border-color-lighter); border-radius: var(--nova-button-radius); }
+  .security-setting-row small { display: block; color: var(--el-text-color-secondary); font-size: 12px; margin-top: 2px; }
+
+  .swipe-actions-setting {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-bottom: 40px;
+  }
+
+  .swipe-actions-options {
+    display: grid;
+    gap: 10px;
+    width: min(100%, 460px);
+  }
+
+  .swipe-action-setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-height: 42px;
+    padding: 7px 10px 7px 12px;
+    border: 1px solid var(--el-border-color-lighter);
+    border-radius: var(--nova-button-radius);
+    background: var(--nm-surface-elevated);
+  }
+
+  .swipe-action-direction {
+    color: var(--nm-text-secondary);
+    font-size: 14px;
+    white-space: nowrap;
+  }
+
+  .swipe-action-select {
+    width: 180px;
+    flex: 0 1 180px;
+  }
+
+  @media (max-width: 767px) {
+    .swipe-action-setting-row { gap: 10px; padding-left: 10px; }
+    .swipe-action-direction { font-size: 13px; }
+    .swipe-action-select { width: 160px; flex-basis: 160px; }
   }
 
   .notification-row {
@@ -1237,6 +1581,14 @@ function submitPwd() {
   .appearance-reset-row :deep(.el-button) { flex: 0 0 auto; }
 
   @media (max-width: 767px) {
+    .settings-home-title { font-size: 20px; }
+    .settings-category-row { min-height: 68px; padding-inline: 8px; gap: 12px; }
+    .settings-category-icon { width: 36px; height: 36px; flex-basis: 36px; border-radius: 10px; }
+    .settings-category-copy strong { font-size: 14px; }
+    .settings-category-copy small { font-size: 12px; }
+    .settings-subpage-header { margin-bottom: 22px; }
+    .settings-subpage-header h1 { font-size: 20px; }
+    .about-page { gap: 18px; }
     .time-format-options { width: 100%; }
     .time-format-option { padding-inline: 10px; }
     .appearance-row { gap: 12px; padding: 12px; }

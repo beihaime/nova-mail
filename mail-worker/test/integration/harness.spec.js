@@ -20,6 +20,8 @@ describe('integration harness', () => {
 		expect(tables).toContain('account');
 		expect(tables).toContain('setting');
 		expect(tables).toContain('push_subscription');
+		expect(tables).toContain('auth_session');
+		expect(tables).toContain('user_security_settings');
 	});
 
 	it('applies the ALTER-based migrations, not just the base tables', async () => {

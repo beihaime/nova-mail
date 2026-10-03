@@ -23,6 +23,8 @@ import rateLimitUtils from '../utils/rate-limit-utils';
 import orm from '../entity/orm';
 import user from '../entity/user';
 import { and, eq } from 'drizzle-orm';
+import sessionService from './session-service';
+import securityAlertService from './security-alert-service';
 
 const loginService = {
 
@@ -223,7 +225,7 @@ const loginService = {
 
 	async login(c, params, noVerifyPwd = false) {
 
-		let { email, password, token } = params;
+		let { email, password, token, device_id, pwa } = params;
 		email = emailUtils.normalizeEmail(email);
 
 		if ((!email || !password) && !noVerifyPwd) {
@@ -268,10 +270,10 @@ const loginService = {
 			userRow.salt = salt;
 		}
 
-		return await this.createSession(c, userRow);
+		return await this.createSession(c, userRow, { deviceId: device_id, pwa });
 	},
 
-	async createSession(c, userRow) {
+	async createSession(c, userRow, metadata = {}) {
 		if (!userRow || userRow.isDel === isDel.DELETE) {
 			throw new BizError(t('notExistUser'));
 		}
@@ -312,15 +314,24 @@ const loginService = {
 		await userService.updateUserInfo(c, userRow.userId);
 
 		await c.env.kv.put(KvConst.AUTH_INFO + userRow.userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
+		const created = await sessionService.create(c, userRow.userId, uuid, metadata);
+		if (created.isNewDevice) {
+			const session = await c.env.db.prepare('SELECT * FROM auth_session WHERE session_id = ?').bind(created.sessionId).first();
+			securityAlertService.notifyNewDevice(c, userRow, session).catch((error) => console.warn('Nova Mail: security alert failed', error.message));
+		}
 		return jwt;
 	},
 
 	async logout(c, userId) {
-		const token = userContext.getToken(c);
+		const token = await userContext.getToken(c);
 		const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
-		const index = authInfo.tokens.findIndex(item => item === token);
-		authInfo.tokens.splice(index, 1);
-		await c.env.kv.put(KvConst.AUTH_INFO + userId, JSON.stringify(authInfo));
+		if (authInfo?.tokens) {
+			const index = authInfo.tokens.findIndex(item => item === token);
+			if (index > -1) authInfo.tokens.splice(index, 1);
+			await c.env.kv.put(KvConst.AUTH_INFO + userId, JSON.stringify(authInfo));
+		}
+		const session = c.get('session');
+		if (session) await c.env.db.prepare('UPDATE auth_session SET revoked_at = ? WHERE session_id = ? AND user_id = ?').bind(Date.now(), session.session_id, userId).run();
 	}
 
 };

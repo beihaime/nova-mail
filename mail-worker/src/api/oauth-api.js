@@ -6,7 +6,7 @@ import googleOauthService from "../service/google-oauth-service";
 import userContext from '../security/user-context';
 
 app.get('/oauth/linuxdo/login', async (c) => {
-	return c.redirect(await oauthService.startLogin(c, 'linuxdo'));
+	return c.redirect(await oauthService.startLogin(c, 'linuxdo', c.req.query('device_id'), c.req.query('pwa') === 'true'));
 });
 
 app.get('/oauth/linuxdo/callback', async (c) => {
@@ -14,7 +14,7 @@ app.get('/oauth/linuxdo/callback', async (c) => {
 });
 
 app.get('/oauth/github/login', async (c) => {
-	return c.redirect(await githubOauthService.startLogin(c));
+	return c.redirect(await githubOauthService.startLogin(c, c.req.query('device_id'), c.req.query('pwa') === 'true'));
 });
 
 app.get('/oauth/github/callback', async (c) => {
@@ -42,7 +42,7 @@ app.delete('/oauth/github/account', async (c) => {
 });
 
 app.get('/oauth/google/login', async (c) => {
-	return c.redirect(await googleOauthService.startLogin(c));
+	return c.redirect(await googleOauthService.startLogin(c, c.req.query('device_id'), c.req.query('pwa') === 'true'));
 });
 
 app.get('/oauth/google/callback', async (c) => {

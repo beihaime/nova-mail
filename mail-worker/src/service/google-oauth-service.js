@@ -50,8 +50,8 @@ const googleOauthService = {
 		return url.toString();
 	},
 
-	async startLogin(c) {
-		return this.authorizeUrl(c, await oauthTransactions.create(c, { provider: PROVIDER }));
+	async startLogin(c, deviceId = '', pwa = false) {
+		return this.authorizeUrl(c, await oauthTransactions.create(c, { provider: PROVIDER, deviceId, pwa }));
 	},
 
 	async startLink(c, userId, sessionToken) {
@@ -63,7 +63,7 @@ const googleOauthService = {
 		const row = await oauthTransactions.consume(c, PROVIDER, state);
 		if (!row.nonce || !row.code_verifier) throw new BizError('Invalid OAuth transaction');
 		return { intent: row.intent, userId: row.user_id, sessionToken: row.session_token,
-			nonce: row.nonce, codeVerifier: row.code_verifier, state: row.state, browserToken: row.browser_token };
+			nonce: row.nonce, codeVerifier: row.code_verifier, state: row.state, browserToken: row.browser_token, device_id: row.device_id, pwa: row.pwa };
 	},
 
 	async exchangeCode(c, code, state) {
@@ -160,23 +160,23 @@ const googleOauthService = {
 		try {
 			state = await this.consumeState(c, c.req.query('state'));
 			if (c.req.query('error')) {
-				return state.intent === 'link' ? new URL('/settings?google=denied', c.req.url).toString() : loginUrl(c, { google: 'denied' });
+				return state.intent === 'link' ? new URL('/settings/account?google=denied', c.req.url).toString() : loginUrl(c, { google: 'denied' });
 			}
 			const googleUser = await this.getGoogleUser(c, c.req.query('code'), state);
 			if (state.intent === 'link') {
 				await this.link(c, state, googleUser);
-				return new URL('/settings?google=connected', c.req.url).toString();
+				return new URL('/settings/account?google=connected', c.req.url).toString();
 			}
 			const account = await this.findAccount(c, googleUser.id);
 			if (!account) return loginUrl(c, { google: 'unlinked' });
 			const user = await userService.selectById(c, account.user_id);
 			if (!user) return loginUrl(c, { google: 'unlinked' });
-			const token = await loginService.createSession(c, user);
+			const token = await loginService.createSession(c, user, { deviceId: state.device_id, pwa: Boolean(state.pwa) });
 			const grant = await oauthTransactions.createGrant(c, token, state.state, state.browserToken);
 			return loginUrl(c, { google: 'complete', grant });
 		} catch (error) {
 			console.warn('Google OAuth callback rejected', { message: error.message });
-			return state?.intent === 'link' ? new URL('/settings?google=failed', c.req.url).toString() : loginUrl(c, { google: 'failed' });
+			return state?.intent === 'link' ? new URL('/settings/account?google=failed', c.req.url).toString() : loginUrl(c, { google: 'failed' });
 		}
 	},
 

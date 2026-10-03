@@ -144,13 +144,20 @@
                    been dragged away. Never receives pointer input itself, and is
                    only built where the gesture is actually available. -->
               <div v-if="props.type === 'email' && swipeActionsReady" class="swipe-actions" aria-hidden="true">
-                <div class="swipe-action swipe-action-archive">
-                  <AppIcon name="nova-sidebar-archive" :size="22" inline />
-                  <span>{{ t('archive') }}</span>
-                </div>
-                <div class="swipe-action swipe-action-delete">
-                  <AppIcon name="nova-sidebar-trash" :size="22" inline />
-                  <span>{{ t('delete') }}</span>
+                <div
+                    v-for="slot in swipeActionSlots"
+                    :key="slot.direction"
+                    class="swipe-action"
+                    :class="`swipe-action-${slot.direction}`"
+                    :data-action="slot.action"
+                >
+                  <AppIcon
+                      v-if="slot.config.icon"
+                      :name="slot.config.icon"
+                      :size="22"
+                      :inline="slot.config.icon.startsWith('nova-sidebar-')"
+                  />
+                  <span>{{ t(slot.config.labelKey) }}</span>
                 </div>
               </div>
               <div :class="['email-row', props.type, {
@@ -414,13 +421,13 @@ import { MAIL_BODY_TYPE, unwrapNestedMessage, looksLikeMarkdownDocument } from '
 import { stripMarkdown } from '@/utils/quoted-text.js'
 import { nextPageCursor, isLastPage, canRequestPage } from '@/utils/mail-pagination.js'
 import {
-  SWIPE_ACTION,
+  SWIPE_ACTIONS,
   SWIPE_AXIS,
   SWIPE_UNDO_MS,
   clampSwipeOffset,
+  normalizeSwipeAction,
   resolveSwipeAxis,
   resolveSwipeRelease,
-  swipeActionForOffset,
   swipeCommitDistance,
 } from '@/utils/swipe-actions.js'
 import { showUndoSnackbar } from '@/utils/undo-snackbar.js'
@@ -764,8 +771,31 @@ let swipeBlockClick = false
 
 const swipeActionsReady = computed(() =>
   typeof props.emailDelete === 'function' &&
-  typeof props.emailArchive === 'function'
+  typeof props.emailArchive === 'function' &&
+  swipeActionSlots.value.length > 0
 )
+
+const swipeActionSlots = computed(() => [
+  { direction: 'left', action: normalizeSwipeAction(settingStore.swipeLeftAction, 'trash') },
+  { direction: 'right', action: normalizeSwipeAction(settingStore.swipeRightAction, 'archive') },
+].map(slot => ({ ...slot, config: SWIPE_ACTIONS[slot.action] }))
+  .filter(slot => slot.action !== SWIPE_ACTIONS.none.id && canRunSwipeAction(slot.action)))
+
+function canRunSwipeAction(action) {
+  return {
+    archive: typeof props.emailArchive === 'function',
+    trash: typeof props.emailDelete === 'function',
+    read: typeof props.emailRead === 'function',
+    unread: typeof props.emailUnread === 'function',
+    star: typeof props.starAdd === 'function' && typeof props.starCancel === 'function',
+  }[action] === true
+}
+
+function configuredSwipeActionForOffset(offset) {
+  if (offset > 0) return swipeActionSlots.value.find(slot => slot.direction === 'right')?.action || null
+  if (offset < 0) return swipeActionSlots.value.find(slot => slot.direction === 'left')?.action || null
+  return null
+}
 
 function swipeEnabled() {
   return isPhone.value
@@ -775,14 +805,9 @@ function swipeEnabled() {
 }
 
 function setSwipeActionVisibility(shellEl, action) {
-  const archiveEl = shellEl?.querySelector('.swipe-action-archive')
-  const deleteEl = shellEl?.querySelector('.swipe-action-delete')
-
-  // Keep the direction invariant in the DOM as well as in CSS. Inline display
-  // switches synchronously, so a stale selector or a virtual-list patch cannot
-  // leave the opposite action visible for a frame.
-  if (archiveEl) archiveEl.style.display = action === SWIPE_ACTION.ARCHIVE ? 'flex' : 'none'
-  if (deleteEl) deleteEl.style.display = action === SWIPE_ACTION.DELETE ? 'flex' : 'none'
+  shellEl?.querySelectorAll('.swipe-action').forEach(element => {
+    element.style.display = element.dataset.action === action ? 'flex' : 'none'
+  })
 }
 
 function clearSwipeVisuals(gesture, { keepAction = false } = {}) {
@@ -876,7 +901,7 @@ function onRowPointerMove(event) {
   const width = gesture.shellEl?.offsetWidth || 0
   const offset = clampSwipeOffset(gesture.dx, width)
   const threshold = swipeCommitDistance(width)
-  const swipeAction = swipeActionForOffset(offset)
+  const swipeAction = configuredSwipeActionForOffset(offset)
 
   gesture.rowEl.style.transform = `translate3d(${offset}px, 0, 0)`
   gesture.shellEl?.classList.add('is-swiping')
@@ -975,12 +1000,45 @@ function springBackSwipe(gesture) {
   shellEl?.style.removeProperty('--swipe-progress')
 }
 
+function performSwipeAction(item, action) {
+  if (action === 'read') {
+    localRead([item.emailId])
+    return props.emailRead([item.emailId])
+  }
+
+  if (action === 'unread') {
+    localUnread([item.emailId])
+    return props.emailUnread([item.emailId])
+  }
+
+  if (action === 'star') {
+    return starChange(item, { rethrow: true })
+  }
+
+  return Promise.resolve()
+}
+
 function commitSwipe(gesture, action) {
   const { rowEl, shellEl, item } = gesture
   const wasStarred = !!item.isStar
   const width = shellEl?.offsetWidth || 0
-  const direction = action === SWIPE_ACTION.ARCHIVE ? 1 : -1
+  const direction = gesture.dx > 0 ? 1 : -1
   const index = emailList.findIndex(row => row.emailId === item.emailId)
+
+  if (!SWIPE_ACTIONS[action]) return
+
+  if (!SWIPE_ACTIONS[action].removable) {
+    const request = performSwipeAction(item, action)
+    springBackSwipe(gesture)
+    Promise.resolve(request).then(() => {
+      showSwipeOutcome({ item, index, action, canUndo: false })
+    }).catch(error => {
+      console.error(error)
+      refreshList()
+      ElMessage({ message: t('swipeActionFailMsg'), type: 'error', plain: true })
+    })
+    return
+  }
 
   // Lock the action before starting the exit. The row must never pass through
   // the neutral state while it is still rendered.
@@ -1007,7 +1065,7 @@ function commitSwipe(gesture, action) {
       if (shellEl?.isConnected) clearSwipeVisuals(gesture)
     })
 
-    const request = action === SWIPE_ACTION.ARCHIVE
+    const request = action === 'archive'
       ? props.emailArchive([item.emailId])
       : props.emailDelete([item.emailId])
 
@@ -1016,7 +1074,7 @@ function commitSwipe(gesture, action) {
         item,
         index,
         action,
-        canUndo: action === SWIPE_ACTION.ARCHIVE || data?.soft === true,
+        canUndo: action === 'archive' || data?.soft === true,
       })
     }).catch(error => {
       console.error(error)
@@ -1041,7 +1099,7 @@ function restoreSwipedEmail(item, index) {
 }
 
 function showSwipeOutcome({ item, index, action, canUndo }) {
-  const message = action === SWIPE_ACTION.ARCHIVE ? t('archiveSuccessMsg') : t('delSuccessMsg')
+  const message = t(SWIPE_ACTIONS[action]?.labelKey || 'swipeActionNone')
 
   if (!canUndo) {
     ElMessage({ message, type: 'success', plain: true })
@@ -1057,9 +1115,9 @@ function showSwipeOutcome({ item, index, action, canUndo }) {
 }
 
 function undoSwipedEmail({ item, index, action }) {
-  const request = action === SWIPE_ACTION.ARCHIVE
-    ? props.emailUnarchive([item.emailId])
-    : props.emailRestore([item.emailId])
+  const request = action === 'archive'
+      ? props.emailUnarchive([item.emailId])
+      : props.emailRestore([item.emailId])
 
   request.then(() => {
     // Put it back where it was; `index` may be stale if the list changed in the
@@ -1291,28 +1349,30 @@ function syncStarState(email, value) {
   }
 }
 
-function starChange(email) {
+function starChange(email, { rethrow = false } = {}) {
   if (!email.isStar) {
-    if (!props.allowStar) return
+    if (!props.allowStar) return Promise.reject(new Error('Star action is disabled'))
 
     syncStarState(email, 1)
 
-    props.starAdd(email.emailId).then(() => {
+    return props.starAdd(email.emailId).then(() => {
       syncStarState(email, 1)
       props.starSuccess(email)
     }).catch(e => {
       console.error(e)
       syncStarState(email, 0)
+      if (rethrow) throw e
     })
   } else {
     syncStarState(email, 0)
 
-    props.starCancel(email.emailId).then(() => {
+    return props.starCancel(email.emailId).then(() => {
       syncStarState(email, 0)
       props.cancelSuccess?.(email)
     }).catch(e => {
       console.error(e)
       syncStarState(email, 1)
+      if (rethrow) throw e
     })
   }
 }
@@ -3238,11 +3298,14 @@ ul {
     background: var(--nova-surface-muted);
   }
 
-  :deep(.swipe-shell[data-swipe-action='archive'] .swipe-actions) {
+  :deep(.swipe-shell[data-swipe-action='archive'] .swipe-actions),
+  :deep(.swipe-shell[data-swipe-action='read'] .swipe-actions),
+  :deep(.swipe-shell[data-swipe-action='unread'] .swipe-actions),
+  :deep(.swipe-shell[data-swipe-action='star'] .swipe-actions) {
     background: color-mix(in srgb, var(--el-color-primary) 16%, var(--nova-surface-muted));
   }
 
-  :deep(.swipe-shell[data-swipe-action='delete'] .swipe-actions) {
+  :deep(.swipe-shell[data-swipe-action='trash'] .swipe-actions) {
     background: color-mix(in srgb, var(--el-color-danger) 18%, var(--nova-surface-muted));
   }
 
@@ -3268,16 +3331,25 @@ ul {
     font-weight: 600;
   }
 
-  /* Archive (revealed by dragging right) and Delete (dragging left) use the
-     same currentColor outline icons as the Sidebar navigation system. */
-  :deep(.swipe-action-archive) {
+  /* The action on the right is revealed by dragging right; the action on the
+     left is revealed by dragging left. */
+  :deep(.swipe-action-right) {
     left: 0;
-    color: var(--el-color-primary);
   }
 
-  :deep(.swipe-action-delete) {
+  :deep(.swipe-action-left) {
     right: 0;
+  }
+
+  :deep(.swipe-action[data-action='trash']) {
     color: var(--el-color-danger);
+  }
+
+  :deep(.swipe-action[data-action='archive']),
+  :deep(.swipe-action[data-action='read']),
+  :deep(.swipe-action[data-action='unread']),
+  :deep(.swipe-action[data-action='star']) {
+    color: var(--el-color-primary);
   }
 
   /* The card paints over the panels. */
@@ -3295,10 +3367,9 @@ ul {
     background: var(--nova-surface);
   }
 
-  /* Emphasise whichever action the current drag would commit to. */
-  :deep(.swipe-shell[data-swipe-action='archive'] .swipe-action-archive),
-  :deep(.swipe-shell[data-swipe-action='delete'] .swipe-action-delete) {
-    display: flex;
+  /* Inline visibility is switched by the gesture so an old action cannot
+     flash while a virtual-list row is being reused. */
+  :deep(.swipe-shell[data-swipe-action] .swipe-action[style*="display: flex"]) {
     filter: brightness(1.05);
     opacity: 1;
   }

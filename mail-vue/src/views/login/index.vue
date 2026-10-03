@@ -196,6 +196,7 @@ import {loginUserInfo} from "@/request/my.js";
 import {permsToRouter} from "@/perm/perm.js";
 import {useI18n} from "vue-i18n";
 import {githubOauthComplete, googleOauthComplete, oauthBindUser, oauthComplete} from "@/request/ouath.js";
+import {getDeviceId, isInstalledPwa} from '@/utils/device-id.js';
 import brandMark from '@/icons/svg/brand-mark.svg'
 // Imported (not a /public URL) so Vite emits a content-hashed file: replacing the
 // artwork produces a new URL and therefore bypasses any cached copy. Public
@@ -380,7 +381,7 @@ const getEmailName = (email) => {
 
 function oauthLogin(provider) {
   const apiBase = (import.meta.env.VITE_BASE_URL || '/api').replace(/\/$/, '')
-  window.location.assign(`${apiBase}/oauth/${provider}/login`)
+  window.location.assign(`${apiBase}/oauth/${provider}/login?device_id=${encodeURIComponent(getDeviceId())}&pwa=${isInstalledPwa()}`)
 }
 
 oauthGetUser();
@@ -429,7 +430,7 @@ async function oauthGetUser() {
 
 function startGithubLogin() {
   const apiBase = (import.meta.env.VITE_BASE_URL || '/api').replace(/\/$/, '')
-  window.location.assign(`${apiBase}/oauth/github/login`)
+  window.location.assign(`${apiBase}/oauth/github/login?device_id=${encodeURIComponent(getDeviceId())}&pwa=${isInstalledPwa()}`)
 }
 
 function bind() {
