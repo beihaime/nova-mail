@@ -2434,9 +2434,8 @@ ul {
   }
 }
 
-/* Mobile rows use one stable two-column layout. The checkbox owns the first
-   column; all message content stays together in the second column so the
-   avatar, sender, time, subject and preview cannot drift apart. */
+/* Mobile rows use one stable avatar/content/time layout so the avatar,
+   sender, time, subject and preview cannot drift apart. */
 @media (max-width: 767px) {
   .email-container {
     --mail-list-avatar-column: 54px;
@@ -2878,7 +2877,9 @@ ul {
     height: 80px;
     min-height: 80px;
 
-    padding: 10px 8px;
+    /* Keep the avatar naturally inset from the screen while tightening the
+       leading edge. The same slot is used by the selected check indicator. */
+    padding: 10px 8px 10px 12px;
 
     box-sizing: border-box;
 
