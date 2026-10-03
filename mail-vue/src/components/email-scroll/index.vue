@@ -196,7 +196,7 @@
                   v-if="type === 'email' && isPhone"
                   class="mobile-sender-avatar"
                   :email="item"
-                  :size="40"
+                  :size="54"
               />
               <div class="title" :class="accountShow ? 'title-column' : 'title-column'">
 
@@ -2792,7 +2792,8 @@ ul {
     /* Checkbox gutter | fixed avatar | content | fixed time. Keeping these
        tracks stable prevents sender/subject/unread changes from moving the
        avatar or timestamp horizontally. */
-    grid-template-columns: 20px 80px minmax(0, 1fr) 64px;
+    /* Checkbox gutter | 54px avatar + 16px text gap | content | time. */
+    grid-template-columns: 20px 70px minmax(0, 1fr) 64px;
 
     column-gap: 0;
 
@@ -2844,7 +2845,7 @@ ul {
   .email-container.mobile-selecting
     :deep(.email-row.email:not(.all-email)) {
     /* Selection adds its checkbox track without changing the normal row. */
-    grid-template-columns: var(--mail-list-selection-column) 80px minmax(0, 1fr) 64px;
+    grid-template-columns: var(--mail-list-selection-column) 70px minmax(0, 1fr) 64px;
   }
 
   .email-container.mobile-selecting
@@ -2863,15 +2864,17 @@ ul {
   .mobile-sender-avatar {
     grid-column: 2;
 
-    width: 56px;
-    height: 56px;
-    min-width: 56px;
-    min-height: 56px;
+    width: 54px;
+    height: 54px;
+    min-width: 54px;
+    min-height: 54px;
+    flex: 0 0 54px;
+    flex-shrink: 0;
 
-    /* The track reserves 8px after the checkbox and 16px before content. */
+    /* The 70px track reserves exactly 16px between this 54px container and
+       the message text. */
     justify-self: start;
     align-self: center;
-    margin-left: 8px;
 
     display: grid;
     place-items: center;
@@ -2891,8 +2894,14 @@ ul {
     text-align: center;
   }
 
-  /* stable SenderAvatar inside the sender line stays available
-     for desktop, but the dedicated 40px avatar owns phone rows */
+  :deep(.mobile-sender-avatar .sender-avatar-image) {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  /* The sender-line avatar stays available for desktop, but the dedicated
+     54px avatar owns phone rows. */
   :deep(.email-row.email .name .sender-avatar) {
     display: none;
   }
