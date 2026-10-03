@@ -557,6 +557,10 @@ const mobileFilters = computed(() => [
   { key: 'starred', label: t('starred') }
 ])
 
+let longPressTimer = null
+let longPressTriggered = false
+let longPressStartX = 0
+let longPressStartY = 0
 let skeletonRows = 0
 const timePaddingRight = ref('');
 const keyCount = ref(0);
@@ -625,6 +629,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   clearInterval(timer)
+  stopLongPress()
   // Match the previous per-instance ref behaviour: leaving the Inbox clears
   // the header search field.
   if (props.type === 'email') emailStore.mobileSearch = ''
@@ -726,6 +731,33 @@ function toggleRowSelection(item) {
   item.checked = !item.checked
 }
 
+function startLongPress(event, item) {
+  if (!isPhone.value || event.pointerType === 'mouse' || longPressTimer) return
+  if (!item.checked && isSelectMax.value) return
+
+  longPressStartX = event.clientX
+  longPressStartY = event.clientY
+  longPressTriggered = false
+  longPressTimer = setTimeout(() => {
+    longPressTimer = null
+    mobileSelecting.value = true
+    item.checked = true
+    longPressTriggered = true
+  }, 500)
+}
+
+function stopLongPress() {
+  if (longPressTimer) clearTimeout(longPressTimer)
+  longPressTimer = null
+}
+
+function cancelLongPressOnMove(event) {
+  if (!longPressTimer) return
+  const dx = event.clientX - longPressStartX
+  const dy = event.clientY - longPressStartY
+  if (Math.hypot(dx, dy) > 10) stopLongPress()
+}
+
 /* ------------------------------------------------------------ swipe actions
  *
  * Mobile-only swipe-to-commit gesture behind Inbox rows. The action layer is
@@ -792,6 +824,8 @@ function abandonSwipe() {
 }
 
 function onRowPointerDown(event, item) {
+  startLongPress(event, item)
+
   if (!swipeEnabled() || event.pointerType === 'mouse') return
 
   // One mail item at a time: the previous drag snaps back immediately.
@@ -819,6 +853,8 @@ function onRowPointerDown(event, item) {
 }
 
 function onRowPointerMove(event) {
+  cancelLongPressOnMove(event)
+
   const gesture = swipeGesture
   if (!gesture || event.pointerId !== gesture.pointerId) return
 
@@ -870,11 +906,16 @@ function onRowPointerMove(event) {
 }
 
 function onRowPointerUp(event) {
+  stopLongPress()
+
   const gesture = swipeGesture
   if (!gesture || event.pointerId !== gesture.pointerId) return
   swipeGesture = null
 
-  if (gesture.axis !== SWIPE_AXIS.HORIZONTAL) return
+  if (gesture.axis !== SWIPE_AXIS.HORIZONTAL) {
+    gesture.rowEl.style.transition = ''
+    return
+  }
 
   const { action, commit } = resolveSwipeRelease({
     dx: gesture.dx,
@@ -887,6 +928,8 @@ function onRowPointerUp(event) {
 }
 
 function onRowPointerLeave() {
+  stopLongPress()
+
   // Touch pointers are implicitly captured, so a locked horizontal drag keeps
   // reporting even when the finger leaves the row. Only an undecided gesture is
   // abandoned here.
@@ -897,6 +940,8 @@ function onRowPointerLeave() {
 }
 
 function onRowPointerCancel() {
+  stopLongPress()
+
   if (!swipeGesture) return
   const gesture = swipeGesture
   swipeGesture = null
@@ -912,6 +957,13 @@ function onRowPointerCancel() {
  * real pointer sequence.
  */
 function onRowClickCapture(event) {
+  if (longPressTriggered) {
+    longPressTriggered = false
+    event.stopPropagation()
+    event.preventDefault()
+    return
+  }
+
   if (!swipeBlockClick) return
 
   swipeBlockClick = false
