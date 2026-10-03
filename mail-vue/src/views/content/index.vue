@@ -1358,6 +1358,22 @@ async function previewAttachment(att) {
   }
 }
 
+/**
+ * Close the in-place image viewer and release the object URL it was reading.
+ *
+ * Restored: the body of this function was dropped by accident in the
+ * attachment-preview refactor, which left every reader unmount throwing
+ * (`closePreview is not defined`) in dev — where a lifecycle error is rethrown
+ * and aborts the surrounding patch, so the list came back empty after closing a
+ * message. The transition hand-off also depends on the unmount finishing.
+ */
+function closePreview() {
+  showPreview.value = false
+  srcList.length = 0
+  if (previewUrl) URL.revokeObjectURL(previewUrl)
+  previewUrl = null
+}
+
 function openPdfPreview(url, filename) {
   closePdfPreview()
   pdfUrl = url
