@@ -404,7 +404,6 @@ import {
   swipeCommitDistance,
 } from '@/utils/swipe-actions.js'
 import { showUndoSnackbar } from '@/utils/undo-snackbar.js'
-import { captureListPreview } from '@/utils/mail-transition.js'
 
 const props = defineProps({
   getEmailList: Function,
@@ -1471,11 +1470,6 @@ function jumpDetails(email, event) {
       return
     }
   }
-
-  // Snapshot the row before the list is replaced by the reader, so the opened
-  // message can grow out of the preview that was clicked (and shrink back into
-  // it on the way out).
-  captureListPreview(event?.currentTarget)
 
   emit('jump', email)
 }

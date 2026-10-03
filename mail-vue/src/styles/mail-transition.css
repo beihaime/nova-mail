@@ -1,140 +1,49 @@
-/**
- * Mail open / close shared-container transition.
- *
- * These rules are global on purpose: the animation layer lives on <body>,
- * outside every component's DOM, and it has to drive the reader (which is owned
- * by `views/content`) and the list row it came from (owned by
- * `components/email-scroll`) at the same time.
- *
- * State is expressed with classes on <html>, set by `utils/mail-transition.js`:
- *   .nova-mail-flying  — a flight is in progress
- *   .nova-mail-open    — the reader is mounted but still hidden (open flight)
- *   .nova-mail-reveal  — the card has grown into place: stagger the reader in
- *   .nova-mail-closing — the reverse flight is running: stagger the reader out
- *
- * Colours and radii are never hard-coded here: the engine samples them from the
- * live elements, so both themes (and any future palette) are covered.
- */
+/* Mail reader transition only. No geometry, scale, shared-element, or layer. */
 
-:root {
-  --nova-mail-flight-ease: cubic-bezier(.2, 0, 0, 1);
-  --nova-mail-reveal: 120ms;
-  --nova-mail-part: 110ms;
+.mail-reader.nova-mail-reader-opening,
+.mail-reader.nova-mail-reader-closing,
+html.nova-mail-reader-opening .mail-reader,
+html.nova-mail-reader-closing .mail-reader {
+  will-change: opacity, transform;
 }
 
-/* The layer is the flying card: fixed, above the app, never interactive. */
-.nova-mail-fly-layer {
-  position: fixed;
-  inset: 0;
-  z-index: 1500;
-  pointer-events: none;
-  contain: layout style;
+.mail-reader.nova-mail-reader-opening,
+html.nova-mail-reader-opening .mail-reader {
+  animation: nova-mail-reader-in 160ms ease-out both;
 }
 
-/* The surface owns the geometry: its box is what grows from the preview rect to
-   the reading pane (the engine animates width/height, not a scale), while the
-   snapshot inside keeps its natural, un-stretched size. */
-.nova-mail-fly-surface {
-  position: fixed;
-  top: 0;
-  left: 0;
-  transform-origin: top left;
-  overflow: hidden;
-  will-change: transform, border-radius, box-shadow, background-color;
-  backface-visibility: hidden;
+.mail-reader.nova-mail-reader-closing,
+html.nova-mail-reader-closing .mail-reader {
+  animation: nova-mail-reader-out 140ms ease-out both;
 }
 
-.nova-mail-fly-content {
-  width: 100%;
-  height: 100%;
+/* The mobile action bar is teleported to body, so it follows the same state. */
+html.nova-mail-reader-opening .reader-bottom-actions {
+  animation: nova-mail-reader-in 160ms ease-out both;
 }
 
-/* The snapshot is a picture: nothing inside it may react to the pointer. */
-.nova-mail-fly-content,
-.nova-mail-fly-content * {
-  pointer-events: none !important;
+html.nova-mail-reader-closing .reader-bottom-actions {
+  animation: nova-mail-reader-out 140ms ease-out both;
 }
 
-/* The view wrappers run `nova-view-in` when they mount. During a flight the
-   layer owns the motion, and leaving that keyframe running would restart it (as
-   a slide of the whole pane) the moment the flight classes come off. */
-html.nova-mail-flying .main-view,
-html.nova-mail-flying .desktop-mail-workspace {
-  animation: none !important;
+@keyframes nova-mail-reader-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-/* ---- Open: the reader waits, hidden, until the card has grown into it ----- */
-html.nova-mail-open [data-nova-mail-reader],
-html.nova-mail-open .reader-bottom-actions {
-  opacity: 0;
+@keyframes nova-mail-reader-out {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-4px); }
 }
 
-html.nova-mail-reveal [data-nova-mail-reader] {
-  opacity: 1;
-  transition: opacity var(--nova-mail-reveal) linear;
-}
-
-html.nova-mail-reveal .reader-bottom-actions {
-  opacity: 1;
-  transition: opacity var(--nova-mail-reveal) linear 40ms;
-}
-
-/* Progressive disclosure, top-down: toolbar, then subject, then the message
-   cards (header + body). `backwards` fill only: before each part's delay it is
-   hidden, and once it ends the element is back to its own styles, so nothing
-   lingers after the flight classes are removed. */
-html.nova-mail-reveal [data-nova-mail-reader] .header-actions {
-  animation: nova-mail-part-in var(--nova-mail-part) var(--nova-mail-flight-ease) backwards;
-}
-
-html.nova-mail-reveal [data-nova-mail-reader] .email-title {
-  animation: nova-mail-part-in var(--nova-mail-part) var(--nova-mail-flight-ease) 25ms backwards;
-}
-
-html.nova-mail-reveal [data-nova-mail-reader] .thread {
-  animation: nova-mail-part-in 130ms var(--nova-mail-flight-ease) 50ms backwards;
-}
-
-/* ---- Close: the reading pane comes apart in the opposite order -----------
-   Slower than the reveal on purpose: the content has to stay legible for most
-   of the shrink, so the pane reads as a message folding away rather than an
-   empty box. Everything is hidden before the cross-fade back to the preview. */
-html.nova-mail-closing [data-nova-mail-reader] .thread {
-  animation: nova-mail-part-out 180ms linear both;
-}
-
-html.nova-mail-closing [data-nova-mail-reader] .email-title {
-  animation: nova-mail-part-out 150ms linear 40ms both;
-}
-
-html.nova-mail-closing [data-nova-mail-reader] .header-actions {
-  animation: nova-mail-part-out 140ms linear 80ms both;
-}
-
-html.nova-mail-closing .reader-bottom-actions {
-  animation: nova-mail-part-out 100ms linear both;
-}
-
-@keyframes nova-mail-part-in {
-  from { opacity: 0; transform: translate3d(0, 4px, 0); }
-  to { opacity: 1; transform: none; }
-}
-
-@keyframes nova-mail-part-out {
-  from { opacity: 1; }
-  to { opacity: 0; }
-}
-
-/* Reduced motion: the engine skips the geometry entirely and only fades the
-   reader in / out, so every staggered part animation is dropped here. */
 @media (prefers-reduced-motion: reduce) {
-  html.nova-mail-reveal [data-nova-mail-reader] .header-actions,
-  html.nova-mail-reveal [data-nova-mail-reader] .email-title,
-  html.nova-mail-reveal [data-nova-mail-reader] .thread,
-  html.nova-mail-closing [data-nova-mail-reader] .thread,
-  html.nova-mail-closing [data-nova-mail-reader] .email-title,
-  html.nova-mail-closing [data-nova-mail-reader] .header-actions,
-  html.nova-mail-closing .reader-bottom-actions {
+  .mail-reader.nova-mail-reader-opening,
+  .mail-reader.nova-mail-reader-closing,
+  html.nova-mail-reader-opening .mail-reader,
+  html.nova-mail-reader-closing .mail-reader,
+  html.nova-mail-reader-opening .reader-bottom-actions,
+  html.nova-mail-reader-closing .reader-bottom-actions {
     animation: none;
+    transform: none;
   }
 }

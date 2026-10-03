@@ -295,8 +295,6 @@ const srcList = reactive([])
 const pdfPreview = reactive({ show: false, url: '', name: '' })
 let pdfUrl = null
 const scrollRef = ref(null)
-// The reading pane itself: the shared-container transition measures it as the
-// rect an opened preview grows into (and shrinks back out of).
 const readerRef = ref(null)
 
 // The mobile action bar is teleported to <body> so no transformed ancestor
@@ -1194,9 +1192,7 @@ onMounted(() => {
   openFromNotificationLink()
   tryMarkRead()
   startRealtime()
-  // If a list preview armed the shared-container transition, this pane grows
-  // out of it now; otherwise the call is a no-op and the pane animates in as
-  // usual. Measured a frame later so the surrounding layout has settled.
+  // The route has already changed; animate only the mounted reading region.
   nextTick(() => playReaderOpen(readerRef.value))
   document.addEventListener('visibilitychange', handleVisibilityChange)
   window.addEventListener('keydown', handleKeyDown);
@@ -1208,9 +1204,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  // Transition teardown first: an unrelated throw further down must not leave
-  // the parked preview layer or the close guard behind.
-  readerUnmounted()
+  readerUnmounted(readerRef.value)
   stopCloseGuard()
   closePreview()
   closePdfPreview()
@@ -1227,9 +1221,8 @@ onUnmounted(() => {
 })
 
 /**
- * Closing the reader runs the reverse transition first: the pane shrinks back
- * onto the preview it grew out of, and only once it has landed does the route
- * change — which is what actually unmounts the detail DOM.
+ * Closing the reader fades the reading region out first, then lets the route
+ * change. The list is restored as a normal route, without a reverse flight.
  *
  * A router-level guard, not `onBeforeRouteLeave`: the desktop layout renders
  * this pane beside the `<router-view>` instead of inside it, so a
@@ -1587,7 +1580,6 @@ function restoreTrash() {
   height: 100%;
   overflow: hidden;
   position: relative;
-  animation: nova-view-in var(--nova-motion-base) var(--nova-motion-ease) forwards;
 }
 
 .header-actions {
