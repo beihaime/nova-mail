@@ -102,7 +102,7 @@
         </template>
       </div>
 
-      <div class="header-right">
+      <div class="header-right" :class="{ 'desktop-sort-group': type === 'email' && !isPhone }">
         <MailSortButton
             v-if="type === 'email' && !isPhone"
             :time-sort="timeSort"
@@ -2445,6 +2445,14 @@ ul {
     column-gap: var(--mail-list-column-gap);
     padding-right: var(--mail-list-horizontal-padding);
     padding-left: var(--mail-list-checkbox-inset);
+  }
+
+  .header-right.desktop-sort-group {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    padding-right: 2px;
   }
 
   :deep(.email-row:not(.all-email)) {
