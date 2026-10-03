@@ -84,7 +84,7 @@
                 class="nova-icon-button nova-toolbar-button selection-action"
                 type="button"
                 :aria-label="t('archive')"
-                @click="handleArchive"
+                @click="handleArchive()"
             >
               <AppIcon name="nova-sidebar-archive" :size="20" inline />
             </button>
@@ -95,7 +95,7 @@
                 class="nova-icon-button nova-toolbar-button selection-action"
                 type="button"
                 :aria-label="t('unarchive')"
-                @click="handleUnarchive"
+                @click="handleUnarchive()"
             >
               <AppIcon name="nova-sidebar-inbox" :size="20" inline />
             </button>
@@ -105,7 +105,7 @@
                 class="nova-icon-button nova-toolbar-button nova-danger-button selection-action"
                 type="button"
                 :aria-label="t('delete')"
-                @click="handleDelete"
+                @click="handleDelete()"
             >
               <AppIcon name="nova-sidebar-trash" :size="20" inline />
             </button>
@@ -995,11 +995,17 @@ function onRowPointerUp(event) {
     return
   }
 
-  const { action, commit } = resolveSwipeRelease({
+  const { commit } = resolveSwipeRelease({
     dx: gesture.dx,
     dy: gesture.dy,
     width: gesture.shellEl?.offsetWidth || 0,
   })
+
+  // The release action must be the *configured* swipe action (Archive / Move to
+  // Trash / …), not the raw left/right direction. `resolveSwipeRelease` reports
+  // a generic "delete" direction that has no configured-action entry, so using
+  // its action here silently dropped left-swipe Delete.
+  const action = gesture.swipeAction || configuredSwipeActionForOffset(gesture.dx)
 
   if (commit && action) commitSwipe(gesture, action)
   else springBackSwipe(gesture)

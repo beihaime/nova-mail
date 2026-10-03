@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import {
+  DEFAULT_SWIPE_LEFT_ACTION,
+  DEFAULT_SWIPE_RIGHT_ACTION,
   SWIPE_ACTION,
+  SWIPE_ACTIONS,
   SWIPE_AXIS,
   SWIPE_AXIS_RATIO,
   SWIPE_COMMIT_MAX,
   SWIPE_SLOP,
   clampSwipeOffset,
+  normalizeSwipeAction,
   resolveSwipeAxis,
   resolveSwipeRelease,
   swipeActionForOffset,
@@ -161,5 +165,23 @@ describe('resolveSwipeRelease', () => {
 
     expect(resolveSwipeRelease({ dx: threshold, dy: 0, width }).commit).toBe(true)
     expect(resolveSwipeRelease({ dx: threshold - 1, dy: 0, width }).commit).toBe(false)
+  })
+})
+
+describe('configured swipe action catalog', () => {
+  // `resolveSwipeRelease`/`swipeActionForOffset` report a raw direction
+  // ("archive" / "delete"). The list component must map that direction to a
+  // *configured* action before looking it up, because "delete" is not an action
+  // id — the catalog calls it "trash". Pinning the defaults here stops the
+  // component from ever handing a raw direction to `SWIPE_ACTIONS[...]` again.
+  it('default directions resolve to real, removable catalog actions', () => {
+    expect(SWIPE_ACTIONS[DEFAULT_SWIPE_RIGHT_ACTION].removable).toBe(true)
+    expect(SWIPE_ACTIONS[DEFAULT_SWIPE_LEFT_ACTION].removable).toBe(true)
+  })
+
+  it('keeps the raw left direction distinct from the catalog id', () => {
+    expect(SWIPE_ACTIONS[SWIPE_ACTION.DELETE]).toBeUndefined()
+    expect(normalizeSwipeAction(DEFAULT_SWIPE_LEFT_ACTION)).toBe('trash')
+    expect(normalizeSwipeAction(DEFAULT_SWIPE_RIGHT_ACTION)).toBe('archive')
   })
 })
