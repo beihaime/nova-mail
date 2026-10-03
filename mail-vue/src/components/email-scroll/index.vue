@@ -747,9 +747,7 @@ let swipeBlockClick = false
 
 const swipeActionsReady = computed(() =>
   typeof props.emailDelete === 'function' &&
-  typeof props.emailArchive === 'function' &&
-  typeof props.emailUnarchive === 'function' &&
-  typeof props.emailRestore === 'function'
+  typeof props.emailArchive === 'function'
 )
 
 function swipeEnabled() {
@@ -3162,6 +3160,9 @@ ul {
     gap: 2px;
 
     width: 96px;
+    position: absolute;
+    top: 0;
+    bottom: 0;
 
     font-size: 12px;
     font-weight: 600;
@@ -3170,10 +3171,12 @@ ul {
   /* Archive (revealed by dragging right) and Delete (dragging left) use the
      same currentColor outline icons as the Sidebar navigation system. */
   :deep(.swipe-action-archive) {
+    left: 0;
     color: var(--el-color-primary);
   }
 
   :deep(.swipe-action-delete) {
+    right: 0;
     color: var(--el-color-danger);
   }
 
