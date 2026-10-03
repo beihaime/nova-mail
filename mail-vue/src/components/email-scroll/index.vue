@@ -765,6 +765,17 @@ function swipeEnabled() {
     && swipeActionsReady.value
 }
 
+function setSwipeActionVisibility(shellEl, action) {
+  const archiveEl = shellEl?.querySelector('.swipe-action-archive')
+  const deleteEl = shellEl?.querySelector('.swipe-action-delete')
+
+  // Keep the direction invariant in the DOM as well as in CSS. Inline display
+  // switches synchronously, so a stale selector or a virtual-list patch cannot
+  // leave the opposite action visible for a frame.
+  if (archiveEl) archiveEl.style.display = action === SWIPE_ACTION.ARCHIVE ? 'flex' : 'none'
+  if (deleteEl) deleteEl.style.display = action === SWIPE_ACTION.DELETE ? 'flex' : 'none'
+}
+
 function clearSwipeVisuals(gesture, { keepAction = false } = {}) {
   const { rowEl, shellEl } = gesture
   if (rowEl) {
@@ -773,6 +784,7 @@ function clearSwipeVisuals(gesture, { keepAction = false } = {}) {
     rowEl.style.opacity = ''
   }
   shellEl?.classList.remove('is-swiping', 'is-removing')
+  setSwipeActionVisibility(shellEl, keepAction ? gesture.swipeAction : null)
   if (!keepAction) shellEl?.removeAttribute('data-swipe-action')
   if (!keepAction) shellEl?.removeAttribute('data-swipe-ready')
   if (!keepAction) shellEl?.style.removeProperty('--swipe-progress')
@@ -861,6 +873,7 @@ function onRowPointerMove(event) {
   gesture.rowEl.style.transform = `translate3d(${offset}px, 0, 0)`
   gesture.shellEl?.classList.add('is-swiping')
   gesture.swipeAction = swipeAction
+  setSwipeActionVisibility(gesture.shellEl, swipeAction)
   gesture.shellEl?.setAttribute('data-swipe-action', swipeAction || '')
   if (Math.abs(offset) >= threshold) gesture.shellEl?.setAttribute('data-swipe-ready', 'true')
   else gesture.shellEl?.removeAttribute('data-swipe-ready')
@@ -938,6 +951,7 @@ function springBackSwipe(gesture) {
   rowEl.addEventListener('transitionend', settle)
 
   shellEl?.classList.remove('is-swiping')
+  setSwipeActionVisibility(shellEl, null)
   shellEl?.removeAttribute('data-swipe-action')
   shellEl?.removeAttribute('data-swipe-ready')
   shellEl?.style.removeProperty('--swipe-progress')
@@ -952,6 +966,7 @@ function commitSwipe(gesture, action) {
   // Lock the action before starting the exit. The row must never pass through
   // the neutral state while it is still rendered.
   gesture.swipeAction = action
+  setSwipeActionVisibility(shellEl, action)
   shellEl?.setAttribute('data-swipe-action', action)
   shellEl?.classList.add('is-removing')
   rowEl.style.transition = SWIPE_SETTLE
