@@ -194,7 +194,7 @@
                   <div v-if="item.checked" key="selected" class="selection-indicator" aria-hidden="true">
                     <Icon icon="mdi:check" width="22" height="22" />
                   </div>
-                  <SenderAvatar v-else key="avatar" :email="item" :size="isPhone ? 54 : 28" />
+                <SenderAvatar v-else key="avatar" :email="item" :size="isPhone ? 52 : 28" />
                 </Transition>
               </div>
               <el-tooltip v-if="showStar" effect="dark" :content="item.isStar ? t('unstar') : t('star')" :show-after="2000">
@@ -2438,7 +2438,7 @@ ul {
    sender, time, subject and preview cannot drift apart. */
 @media (max-width: 767px) {
   .email-container {
-    --mail-list-avatar-column: 54px;
+    --mail-list-avatar-column: 52px;
     grid-template-rows: auto auto minmax(0, 1fr);
   }
 
@@ -2866,8 +2866,9 @@ ul {
     /* Checkbox gutter | fixed avatar | content | fixed time. Keeping these
        tracks stable prevents sender/subject/unread changes from moving the
        avatar or timestamp horizontally. */
-    /* Avatar | content | time. The avatar is also the selection control. */
-    grid-template-columns: 54px minmax(0, 1fr) 64px;
+    /* Safe edge | avatar slot | fixed gap | content | time. The avatar is
+       also the selection control, so both states share this exact geometry. */
+    grid-template-columns: 52px 14px minmax(0, 1fr) 64px;
 
     column-gap: 0;
 
@@ -2879,7 +2880,7 @@ ul {
 
     /* Keep the avatar naturally inset from the screen while tightening the
        leading edge. The same slot is used by the selected check indicator. */
-    padding: 10px 8px 10px 12px;
+    padding: 10px 16px;
 
     box-sizing: border-box;
 
@@ -2895,8 +2896,8 @@ ul {
     position: absolute;
     /* Each row owns the divider below it. Keeping it inside the row avoids
        changing the virtual list's fixed 80px item height. */
-    left: 8px;
-    right: 8px;
+    left: 16px;
+    right: 16px;
     bottom: 0;
 
     height: 1px;
@@ -2920,11 +2921,11 @@ ul {
   :deep(.email-row.email > .row-avatar) {
     grid-column: 1;
 
-    width: 54px;
-    height: 54px;
-    min-width: 54px;
-    min-height: 54px;
-    flex: 0 0 54px;
+    width: 52px;
+    height: 52px;
+    min-width: 52px;
+    min-height: 52px;
+    flex: 0 0 52px;
     flex-shrink: 0;
 
     /* The fixed avatar track keeps the message text aligned in every state. */
@@ -2958,7 +2959,7 @@ ul {
   /* ---------- Message body ---------- */
 
   :deep(.email-row.email > .title) {
-    grid-column: 2;
+    grid-column: 3;
 
     width: 100%;
     min-width: 0;
@@ -3021,7 +3022,7 @@ ul {
   }
 
   :deep(.email-row.email > .email-right) {
-    grid-column: 3;
+    grid-column: 4;
     grid-row: 1;
     display: flex;
     align-self: start;
