@@ -5,6 +5,22 @@ import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
 import {ElementPlusResolver} from 'unplugin-vue-components/resolvers'
 import {VitePWA} from 'vite-plugin-pwa';
+import {execFileSync} from 'node:child_process'
+
+// The Worker serves the built HTML with `script-src … 'sha256-<hash>'` instead
+// of `'unsafe-inline'`, and that hash is a byte-for-byte digest of index.html's
+// first-paint <script>. Recompute it from the same index.html on every build so
+// a theme or status-bar edit can never ship a CSP that blocks the script. The
+// script runs in its own process: importing it would bundle its `import.meta.url`
+// paths into this config, where they no longer point at the repository.
+const spaCspHash = () => ({
+    name: 'nova-spa-csp-hash',
+    apply: 'build',
+    buildStart() {
+        const script = path.resolve(__dirname, '../mail-worker/scripts/sync-spa-csp.mjs')
+        process.stdout.write(execFileSync(process.execPath, [script], {encoding: 'utf8'}))
+    },
+})
 
 export default defineConfig(({mode}) => {
     const env = loadEnv(mode, process.cwd(), 'VITE')
@@ -16,6 +32,7 @@ export default defineConfig(({mode}) => {
         },
         base: env.VITE_STATIC_URL || '/',
         plugins: [vue(),
+            spaCspHash(),
             VitePWA({
                 injectRegister: 'script-defer',
                 includeAssets: [

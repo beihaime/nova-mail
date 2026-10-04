@@ -8,6 +8,8 @@
 		"test": "pnpm run test:unit && pnpm run test:integration",
 		"test:unit": "vitest run --config vitest.unit.config.js",
 		"test:integration": "vitest run --config vitest.integration.config.js",
+		"csp:sync": "node scripts/sync-spa-csp.mjs",
+		"csp:check": "node scripts/sync-spa-csp.mjs --check",
 		"deploy": "wrangler deploy",
 		"deploy:test": "wrangler deploy --config wrangler-test.toml",
 		"start": "wrangler dev",

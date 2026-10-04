@@ -1,5 +1,7 @@
-// The hash permits only index.html's fixed first-paint theme script. Update it
-// when that inline script changes; the unit test checks the source hash.
+// The hash permits only index.html's fixed first-paint theme script. It is
+// generated from that script by scripts/sync-spa-csp.mjs, which the frontend
+// build runs automatically; test/spa-csp.unit.spec.js re-derives it, so a stale
+// value fails CI instead of silently blocking the first paint.
 export const SPA_CSP = [
 	"default-src 'self'",
 	"script-src 'self' https://challenges.cloudflare.com 'sha256-kAp+KGQWePKoI/YKEoGlNJt7QL9Lq8B0Q/le7tXiQf0='",
