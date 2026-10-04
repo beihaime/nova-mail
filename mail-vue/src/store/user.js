@@ -1,6 +1,4 @@
 import { defineStore } from 'pinia'
-import {loginUserInfo} from "@/request/my.js";
-import {githubConnectedAccount, googleConnectedAccount} from "@/request/ouath.js";
 
 export const useUserStore = defineStore('user', {
     state: () => ({
@@ -12,12 +10,14 @@ export const useUserStore = defineStore('user', {
         refreshList: 0,
     }),
     actions: {
-        refreshUserList() {
+        async refreshUserList() {
+            const {loginUserInfo} = await import('@/request/my.js')
             loginUserInfo().then(user => {
                 this.refreshList ++
             })
         },
-        refreshUserInfo() {
+        async refreshUserInfo() {
+            const {loginUserInfo} = await import('@/request/my.js')
             loginUserInfo().then(async user => {
                 const {adoptAuthenticatedUser} = await import('@/utils/session-state.js')
                 adoptAuthenticatedUser(user)
@@ -25,6 +25,7 @@ export const useUserStore = defineStore('user', {
         },
         async refreshGithubAccount() {
             try {
+                const {githubConnectedAccount} = await import('@/request/ouath.js')
                 const account = await githubConnectedAccount()
                 this.githubConnected = Boolean(account?.connected)
                 this.githubAvatar = account?.connected && account?.avatarUrl ? account.avatarUrl : ''
@@ -37,6 +38,7 @@ export const useUserStore = defineStore('user', {
         },
         async refreshGoogleAccount() {
             try {
+                const {googleConnectedAccount} = await import('@/request/ouath.js')
                 const account = await googleConnectedAccount()
                 this.googleConnected = Boolean(account?.connected)
                 this.googleAvatar = account?.connected && account?.avatarUrl ? account.avatarUrl : ''

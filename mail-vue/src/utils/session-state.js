@@ -5,6 +5,7 @@ import { useSettingStore } from '@/store/setting.js'
 import { useUiStore } from '@/store/ui.js'
 import { useUserStore } from '@/store/user.js'
 import { useWriterStore } from '@/store/writer.js'
+import { watch } from 'vue'
 
 export function clearUserScopedState() {
   useEmailStore().$reset()
@@ -37,4 +38,11 @@ export function adoptAuthenticatedUser(user) {
   account.currentAccountId = user.account.accountId
   account.currentAccount = user.account
   useUserStore().user = user
+}
+
+export function watchMailboxChanges() {
+  const account = useAccountStore()
+  return watch(() => account.currentAccountId, (current, previous) => {
+    if (previous && current !== previous) useEmailStore().clearMailboxContent()
+  }, { flush: 'sync' })
 }

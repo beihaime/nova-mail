@@ -667,6 +667,7 @@ watch(quoteLabel, () => {
 async function fetchThreadMessages() {
   const current = email.value
   const emailId = Number(current?.emailId) || 0
+  const mailboxEpoch = emailStore.mailboxEpoch
 
   if (!emailId) {
     serverThread.value = []
@@ -681,7 +682,7 @@ async function fetchThreadMessages() {
     const data = await emailThread(emailId, accountId, allReceive)
 
     // The reader moved to another message while this was in flight.
-    if ((Number(email.value?.emailId) || 0) !== emailId) return
+    if (emailStore.mailboxEpoch !== mailboxEpoch || (Number(email.value?.emailId) || 0) !== emailId) return
 
     const messages = Array.isArray(data?.messages) ? data.messages : []
     serverThread.value = messages
@@ -714,11 +715,11 @@ async function fetchThreadMessages() {
 watch(
     () => Number(email.value?.emailId) || 0,
     (id, previous) => {
-      if (!id || id === previous) return
+      if (id === previous) return
       serverThread.value = []
-      fetchThreadMessages()
+      if (id) fetchThreadMessages()
     },
-    { immediate: true }
+    { immediate: true, flush: 'sync' }
 )
 
 /**
@@ -734,11 +735,13 @@ async function openFromNotificationLink() {
   const emailId = Number(route.query.emailId) || 0
   if (!emailId) return
   if (Number(emailStore.contentData.email?.emailId) === emailId) return
+  const mailboxEpoch = emailStore.mailboxEpoch
 
   try {
     const accountId = Number(emailStore.contentData.email?.accountId) || accountStore.currentAccountId
     const allReceive = accountStore.currentAccount?.allReceive
     const data = await emailThread(emailId, accountId, allReceive)
+    if (emailStore.mailboxEpoch !== mailboxEpoch) return
     const messages = Array.isArray(data?.messages) ? data.messages : []
 
     if (!messages.length) return

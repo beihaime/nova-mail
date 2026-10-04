@@ -35,8 +35,20 @@ export const useEmailStore = defineStore('email', {
         // mail never rings twice (e.g. right after switching route). Session
         // only, never persisted.
         notifyCursor: 0,
+        mailboxEpoch: 0,
     }),
     actions: {
+        clearMailboxContent() {
+            this.mailboxEpoch += 1
+            this.contentData = { email: null, delType: null, showStar: true, showReply: true, showUnread: false }
+            this.detailMap = {}
+            this.threadMessages = []
+            this.searchKeyword = ''
+            this.mobileSearch = ''
+            for (const scroll of [this.emailScroll, this.starScroll, this.sendScroll, this.archiveScroll, this.trashScroll]) {
+                if (scroll?.emailList) scroll.emailList.length = 0
+            }
+        },
         clearStarForEmailIds(emailIds) {
             const ids = new Set((Array.isArray(emailIds) ? emailIds : [emailIds]).map(Number))
             if (!ids.size) return
@@ -58,8 +70,11 @@ export const useEmailStore = defineStore('email', {
             }
         },
         fetchList(request) {
+            const epoch = this.mailboxEpoch
             return request(0).then(data => {
+                if (epoch !== this.mailboxEpoch) return Array.isArray(data) ? [] : { ...data, list: [], total: 0 }
                 request(1).then(fullData => {
+                    if (epoch !== this.mailboxEpoch) return
                     const list = Array.isArray(fullData) ? fullData : fullData?.list
                     this.applyFullList(list)
                 }).catch(e => {

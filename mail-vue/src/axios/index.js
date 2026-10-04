@@ -5,7 +5,7 @@ import {useSettingStore} from "@/store/setting.js";
 import {clearAuthenticatedSession} from '@/utils/session-state.js';
 
 const currentAuthorization = () => `${localStorage.getItem('token')}`
-const isStaleRequest = config => config?.headers?.Authorization !== currentAuthorization()
+const isStaleRequest = config => Boolean(config) && config.headers?.Authorization !== currentAuthorization()
 
 let http = axios.create({
     baseURL: import.meta.env.VITE_BASE_URL

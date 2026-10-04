@@ -6,6 +6,7 @@ import emailService from './service/email-service';
 import kvObjService from './service/kv-obj-service';
 import oauthService from './service/oauth-service';
 import analysisService from './service/analysis-service';
+import { withSpaCsp } from './security/spa-csp';
 export default {
 	 async fetch(req, env, ctx) {
 
@@ -27,7 +28,7 @@ export default {
 			 return await kvObjService.toObjResp( { env }, url.pathname.substring(1));
 		 }
 
-		return env.assets.fetch(req);
+		return withSpaCsp(await env.assets.fetch(req));
 	},
 	email: email,
 	async scheduled(c, env, ctx) {

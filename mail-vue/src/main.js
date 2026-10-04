@@ -36,7 +36,8 @@ if (isUiPreview) {
     ])
     const pinia = createPinia().use(piniaPersistedState)
     const app = createApp(App).use(pinia)
-    const {clearUserScopedState} = await import('@/utils/session-state.js')
+    const {clearUserScopedState, watchMailboxChanges} = await import('@/utils/session-state.js')
+    watchMailboxChanges()
     window.addEventListener('storage', event => {
         if (event.key === 'token' && event.oldValue !== event.newValue) {
             clearUserScopedState()
