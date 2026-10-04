@@ -362,13 +362,22 @@ jobs:
       # cannot use one-time bootstrap for upgrades, so make compatible schema
       # upgrades before the new Worker is deployed.
       - name: 🔎 检查现有数据库 / Check existing schema
+        id: schema
         working-directory: ./mail-worker
         run: |
           CONFIG_FILE="wrangler-action.toml"
           DB_ID=$(sed -n 's/^database_id = "\([^"]*\)"/\1/p' wrangler-action.toml)
           SCHEMA=$(pnpm wrangler d1 execute "$DB_ID" --remote --yes --json \
-            --command "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'email';")
-          if ! printf '%s' "$SCHEMA" | grep -q '"email"'; then
+            --command "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('email', 'setting');")
+          # The same signal the Worker uses (see isApplicationInitialized in
+          # src/init/bootstrap.js): a populated `setting` row means the database
+          # is initialized. A database without it is a first-time install and the
+          # one-time bootstrap endpoint is required. `|| true` keeps a missing
+          # `setting` table from aborting this probe.
+          INITIALIZED=$(pnpm wrangler d1 execute "$DB_ID" --remote --yes --json \
+            --command "SELECT 1 AS initialized FROM setting LIMIT 1;" || true)
+          if ! printf '%s' "$SCHEMA" | grep -q '"email"' || ! printf '%s' "$INITIALIZED" | grep -q '"initialized"'; then
+            echo "new_database=true" >> "$GITHUB_OUTPUT"
             echo "New database; one-time bootstrap will create the schema."
             exit 0
           fi
@@ -547,6 +556,10 @@ jobs:
           echo "🔎 Verifying the deployed schema against the current Worker's requirements..."
           bash scripts/verify-schema.sh "$DB_ID"
 
+          # Existing installation: the schema above is already migrated and
+          # verified, so the one-time bootstrap endpoint must not be called.
+          echo "new_database=false" >> "$GITHUB_OUTPUT"
+
       - name: 🚀 开始部署 / Start deployment
         id: deploy
         working-directory: ./mail-worker
@@ -648,11 +661,12 @@ jobs:
       # `/api/bootstrap` validates the `X-Bootstrap-Token` header against
       # `c.env.BOOTSTRAP_TOKEN` (mail-worker/src/init/bootstrap.js). That value
       # must live as a Cloudflare Worker *secret* — never a `[vars]` entry in
-      # wrangler-action.toml — and must be on the Worker before the Initialize
-      # database step calls the endpoint, otherwise a fresh D1 database can never
-      # be initialized. The value is piped over stdin so it never appears in the
-      # run log or the process list; `secret list` prints names only.
+      # wrangler-action.toml — and only a first-time installation needs it. An
+      # existing installation skips this step, so a stale or absent repository
+      # secret can no longer churn the Worker or fail an upgrade. The value is
+      # piped over stdin so it never reaches the log or the process list.
       - name: 🔑 配置引导令牌 / Configure bootstrap secret
+        if: steps.schema.outputs.new_database == 'true'
         working-directory: ./mail-worker
         run: |
           if [ -z "$BOOTSTRAP_TOKEN" ]; then
@@ -677,37 +691,31 @@ jobs:
             exit 1
           fi
 
+      # Only an uninitialized database needs the one-time endpoint. The script
+      # takes that decision from the schema step, never POSTs on an existing
+      # installation, and separates a Nova Mail rejection (404 = bad token) from
+      # a Cloudflare/WAF/edge response that never reached the Worker.
+      # BOOTSTRAP_TOKEN and the URLs are passed through the environment and the
+      # token is never printed or redacted into the log.
       - name: ♻️ 初始化数据库 / Initialize database
+        working-directory: ./mail-worker
+        env:
+          NEW_DATABASE: ${{ steps.schema.outputs.new_database }}
+          BOOTSTRAP_URL: ${{ steps.deploy.outputs.worker_url }}
+          BOOTSTRAP_FALLBACK_URL: ${{ steps.deploy.outputs.worker_url }}
         run: |
           echo "🛠️ Checking database bootstrap status..."
-          sleep 15
 
-          WORKER_URL="${CUSTOM_DOMAIN:+https://$CUSTOM_DOMAIN}"
-          WORKER_URL="${WORKER_URL:-${{ steps.deploy.outputs.worker_url }}}"
-
-          if [ -z "$WORKER_URL" ]; then
-            echo "❌ Preview URL not available. Please set CUSTOM_DOMAIN."
-            exit 1
+          if [ "$NEW_DATABASE" = "true" ]; then
+            # Give the freshly deployed Worker a moment to propagate.
+            sleep 15
           fi
 
-          if [ -z "$BOOTSTRAP_TOKEN" ]; then
-            echo "::warning::BOOTSTRAP_TOKEN is unset; first-time database initialization must be completed separately."
-            exit 0
+          if [ -n "$CUSTOM_DOMAIN" ]; then
+            BOOTSTRAP_URL="https://$CUSTOM_DOMAIN"
           fi
 
-          HTTP_CODE=$(curl --silent --show-error --max-redirs 0 -X POST \
-            -H "X-Bootstrap-Token: $BOOTSTRAP_TOKEN" \
-            -w "%{http_code}" -o response.txt "$WORKER_URL/api/bootstrap")
-          RESPONSE_BODY=$(cat response.txt)
-
-          if [ "$HTTP_CODE" = "200" ] && [ "$RESPONSE_BODY" = "success" ]; then
-            echo "✅ New database initialized."
-          elif [ "$HTTP_CODE" = "409" ]; then
-            echo "✅ Database was already initialized; bootstrap was not repeated."
-          else
-            echo "❌ Bootstrap failed. HTTP: $HTTP_CODE"
-            exit 1
-          fi
+          node scripts/bootstrap-database.mjs --new-database "$NEW_DATABASE"
 
       # Bootstrap runs only on new installations. Existing databases need
       # migrations applied out of band before deploying code that requires them.
