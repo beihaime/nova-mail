@@ -67,3 +67,19 @@ CREATE TABLE IF NOT EXISTS resend_webhook_event (
 	resend_email_id TEXT NOT NULL,
 	created_at INTEGER NOT NULL
 );
+
+
+
+-- v3.23 recipient delivery records. ALTER-only event lifecycle columns are
+-- guarded by the deployment workflow because SQLite lacks ADD COLUMN IF NOT
+-- EXISTS; new installations receive them through init.js.
+CREATE TABLE IF NOT EXISTS resend_recipient_delivery (
+  email_id INTEGER NOT NULL,
+  recipient TEXT NOT NULL,
+  status INTEGER NOT NULL,
+  status_rank INTEGER NOT NULL,
+  message TEXT,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY(email_id, recipient)
+);
+CREATE INDEX IF NOT EXISTS idx_resend_recipient_delivery_email ON resend_recipient_delivery(email_id);

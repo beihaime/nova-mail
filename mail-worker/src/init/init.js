@@ -45,6 +45,7 @@ const dbInit = {
 		await this.v3_20DB(c);
 		await this.v3_21DB(c);
 		await this.v3_22DB(c);
+		await this.v3_23DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
 	},
@@ -92,6 +93,24 @@ const dbInit = {
 	async v3_22DB(c) {
 		const present = await c.env.db.prepare("SELECT 1 FROM pragma_table_info('outbound_send') WHERE name = 'reconcile_lease_token'").first();
 		if (!present) await c.env.db.prepare("ALTER TABLE outbound_send ADD COLUMN reconcile_lease_token TEXT NOT NULL DEFAULT ''").run();
+	},
+
+	/** Durable, retryable Resend webhook processing and recipient delivery state. */
+	async v3_23DB(c) {
+		for (const statement of [
+			"ALTER TABLE resend_webhook_event ADD COLUMN status TEXT NOT NULL DEFAULT 'received'",
+			"ALTER TABLE resend_webhook_event ADD COLUMN processing_until INTEGER NOT NULL DEFAULT 0",
+			"ALTER TABLE resend_webhook_event ADD COLUMN applied_at INTEGER",
+		]) {
+			try { await c.env.db.prepare(statement).run(); }
+			catch (e) { console.warn(`Skipping Resend webhook migration: ${e.message}`); }
+		}
+		await c.env.db.prepare(`CREATE TABLE IF NOT EXISTS resend_recipient_delivery (
+			email_id INTEGER NOT NULL, recipient TEXT NOT NULL, status INTEGER NOT NULL, status_rank INTEGER NOT NULL,
+			message TEXT, updated_at INTEGER NOT NULL,
+			PRIMARY KEY(email_id, recipient)
+		)`).run();
+		await c.env.db.prepare('CREATE INDEX IF NOT EXISTS idx_resend_recipient_delivery_email ON resend_recipient_delivery(email_id)').run();
 	},
 
 	/** Durable outbound lifecycle and uniqueness for retried finalization. */

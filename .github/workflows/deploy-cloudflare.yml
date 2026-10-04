@@ -191,17 +191,75 @@ jobs:
 
           echo "✅ Environment setup completed."
 
-      - name: 🔐 配置 JWT 签名密钥 / Configure JWT signing secret
+      - name: 🧭 规划 JWT 密钥迁移 / Plan JWT secret migration
+        id: jwt_migration
         working-directory: ./mail-worker
         run: |
-          # stdin keeps the signing key out of generated config, command lines,
-          # artifacts, and deployment summaries. Set JWT_SECRET as a GitHub
-          # Actions secret, never as a repository/environment variable.
-          if ! printf '%s' "$JWT_SECRET" | pnpm wrangler secret put jwt_secret -c wrangler-action.toml; then
-            echo "❌ Failed to upload jwt_secret as a Worker secret."
+          # A Worker cannot carry a plain-text `[vars]` binding and a secret with
+          # the same name. Installations deployed before the JWT hardening still
+          # hold `jwt_secret` as a plain-text binding, so a separate
+          # `wrangler secret put` fails with
+          #   Binding name 'jwt_secret' already in use
+          # and aborts the run before the deploy that would have removed it — a
+          # permanent deadlock. Detect that legacy binding once and let this
+          # deployment replace it; later runs take the normal path.
+          #
+          # Only binding *names* from the Cloudflare API are read here. No secret
+          # value is read, printed or written by this step.
+          CONFIG_FILE="wrangler-action.toml"
+
+          settings_status=0
+          settings=""
+          set +e
+          settings=$(curl --silent --show-error --max-time 30 \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$NAME/settings")
+          settings_status=$?
+          set -e
+
+          if [ "$settings_status" -ne 0 ] || ! printf '%s' "$settings" | jq -e '.success == true' >/dev/null 2>&1; then
+            echo "ℹ️ Could not read the live Worker bindings (first deployment or restricted token); assuming no legacy var."
+            echo "legacy_jwt_var=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          legacy=$(printf '%s' "$settings" | jq '[.result.bindings[]? | select((.type == "plain_text" or .type == "json") and .name == "jwt_secret")] | length')
+
+          if [ "$legacy" -eq 0 ]; then
+            echo "✅ No legacy plain-text jwt_secret binding; the deployment uploads the secret normally."
+            echo "legacy_jwt_var=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "🔁 Legacy plain-text jwt_secret binding detected; this deployment will replace it."
+
+          # Removing unspecified vars is exactly how the legacy binding goes
+          # away, so first make sure only repository-managed vars are involved.
+          # The set is the keys declared in the generated [vars] plus every key
+          # this repository has ever declared (so an optional var that is simply
+          # unset in this run is not mistaken for an unknown one).
+          declared=$(sed -n '/^\[vars\]/,/^\[/p' "$CONFIG_FILE" \
+            | sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\) *=.*/\1/p')
+          managed=$(printf '%s\nai_model\nanalysis_cache\ndomain\nadmin\nproject_link\nTURNSTILE_HOSTNAME\n' "$declared")
+          unexpected=$(printf '%s' "$settings" | jq -r --arg managed "$managed" '
+            [.result.bindings[]?
+              | select(.type == "plain_text" or .type == "json")
+              | .name
+              | select(. != "jwt_secret")
+              | . as $name
+              | select((($managed | split("\n")) | index($name)) == null)] | .[]')
+          if [ -n "$unexpected" ]; then
+            echo "❌ The Worker has plain-text vars this repository does not manage:"
+            printf '   - %s\n' $unexpected
+            echo "Declare them in wrangler-action.toml [vars] before this migration, so it cannot drop them."
             exit 1
           fi
-          echo "✅ jwt_secret uploaded as a Worker secret."
+
+          # keep_vars stays true on every later run; only this migration deploy is
+          # allowed to remove the legacy binding.
+          sed -i 's/^keep_vars *= *true/keep_vars = false/' "$CONFIG_FILE"
+          echo "legacy_jwt_var=true" >> "$GITHUB_OUTPUT"
+          echo "✅ This deployment will replace the legacy plain-text binding with a Worker secret."
 
       - name: ⚡ 设置KV数据库 / Set up KV database
         working-directory: ./mail-worker
@@ -355,7 +413,7 @@ jobs:
             exit 1
           fi
 
-          # v3.16 – v3.22: the outbound send-lifecycle schema. New installations
+          # v3.16 – v3.23: the outbound send-lifecycle schema. New installations
           # receive it from the one-time bootstrap; an existing installation can
           # never bootstrap again, so without this a released Worker that queries
           # `email.send_operation_id` or `outbound_send` fails every request with
@@ -389,6 +447,10 @@ jobs:
           # The table now exists, so its later columns can be guaranteed too.
           ensure_column outbound_send reconcile_lease_until "INTEGER NOT NULL DEFAULT 0"
           ensure_column outbound_send reconcile_lease_token "TEXT NOT NULL DEFAULT ''"
+          # A webhook remains retryable until its durable status mutation commits.
+          ensure_column resend_webhook_event status "TEXT NOT NULL DEFAULT 'received'"
+          ensure_column resend_webhook_event processing_until "INTEGER NOT NULL DEFAULT 0"
+          ensure_column resend_webhook_event applied_at "INTEGER"
 
           echo "🔁 Applying non-destructive migration: migrations/v3_16_send_lifecycle_indexes.sql"
           pnpm wrangler d1 execute "$DB_ID" --remote --yes --file migrations/v3_16_send_lifecycle_indexes.sql
@@ -398,10 +460,28 @@ jobs:
         working-directory: ./mail-worker
         run: |
           echo "🚀 Starting deployment..."
-          # The deploy summary prints every `[vars]` entry. `domain` and
-          # `jwt_secret` are both credentials in this repository's configuration,
-          # and the logs of a public repository are public, so mask them.
-          pnpm wrangler deploy -c wrangler-action.toml 2>&1 \
+
+          # The signing key ships *with* the deployment instead of through a
+          # separate `wrangler secret put`. The dedicated secrets endpoint cannot
+          # create a secret while a plain-text var of the same name exists, and
+          # it cannot remove that var; one deployment replaces both in a single
+          # atomic version, so the Worker is never live without a signing key.
+          #
+          # The value goes to a 0600 file under $RUNNER_TEMP (outside the
+          # checkout) and is deleted when the step ends. It never reaches a log,
+          # a command-line argument, a committed file or an artifact.
+          SECRETS_FILE="$(mktemp "${RUNNER_TEMP:-/tmp}/nova-jwt.XXXXXX")"
+          chmod 600 "$SECRETS_FILE"
+          cleanup_secrets_file() { rm -f "$SECRETS_FILE"; }
+          trap cleanup_secrets_file EXIT
+          # `jq -Rs` reads the value from stdin, so it is not exposed in argv.
+          printf '%s' "$JWT_SECRET" | jq -Rs '{jwt_secret: .}' > "$SECRETS_FILE"
+
+          # The deploy summary prints every `[vars]` entry. `domain` is a
+          # credential in this repository's configuration and the logs of a
+          # public repository are public, so mask it (and any stale jwt_secret
+          # line, defensively).
+          pnpm wrangler deploy -c wrangler-action.toml --secrets-file "$SECRETS_FILE" 2>&1 \
             | tee deploy.log \
             | grep -v "https://.*\.workers\.dev" \
             | sed -E -e 's/env\.domain .*/env.domain (***)/' -e 's/env\.jwt_secret .*/env.jwt_secret (***)/' \
@@ -570,15 +650,25 @@ jobs:
             fi
           done
 
-          # v3.16 – v3.22: the send-lifecycle tables are created by the existing-
+          # v3.16 – v3.23: the send-lifecycle tables are created by the existing-
           # installation migration, not by bootstrap, so verify them explicitly.
           # A Worker deployed against a database without them answers 502.
           LIFECYCLE_SCHEMA=$(pnpm wrangler d1 execute "$VERIFY_DB_ID" --remote --yes --json \
-            --command "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('outbound_send', 'outbound_send_snapshot', 'outbound_send_attachment', 'storage_cleanup', 'resend_webhook_event');" 2>&1)
+            --command "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('outbound_send', 'outbound_send_snapshot', 'outbound_send_attachment', 'storage_cleanup', 'resend_webhook_event', 'resend_recipient_delivery');" 2>&1)
           echo "$LIFECYCLE_SCHEMA"
-          for table in outbound_send outbound_send_snapshot outbound_send_attachment storage_cleanup resend_webhook_event; do
+          for table in outbound_send outbound_send_snapshot outbound_send_attachment storage_cleanup resend_webhook_event resend_recipient_delivery; do
             if ! printf '%s' "$LIFECYCLE_SCHEMA" | grep -q "\"$table\""; then
               echo "❌ $table is missing from the deployed D1."
+              exit 1
+            fi
+          done
+
+          WEBHOOK_EVENT_SCHEMA=$(pnpm wrangler d1 execute "$VERIFY_DB_ID" --remote --yes --json \
+            --command "SELECT name FROM pragma_table_info('resend_webhook_event') WHERE name IN ('status', 'processing_until', 'applied_at');" 2>&1)
+          echo "$WEBHOOK_EVENT_SCHEMA"
+          for column in status processing_until applied_at; do
+            if ! printf '%s' "$WEBHOOK_EVENT_SCHEMA" | grep -q "\"$column\""; then
+              echo "❌ resend_webhook_event.$column is missing: its migration did not apply."
               exit 1
             fi
           done

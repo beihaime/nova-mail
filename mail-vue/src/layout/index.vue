@@ -53,12 +53,17 @@
     <Icon icon="solar:pen-2-linear" width="21" height="21" />
   </button>
   <writer ref="writerRef" />
+  <!-- The address dialogs live at the layout root: the account switcher is hidden
+       with opacity/transform by the main layout, so an in-place dialog inside it
+       would never be visible. -->
+  <account-dialogs />
 </template>
 
 <script setup>
 import Aside from '@/layout/aside/index.vue'
 import Header from '@/layout/header/index.vue'
 import Main from '@/layout/main/index.vue'
+import AccountDialogs from '@/components/account-dialogs/index.vue'
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import {useUiStore} from "@/store/ui.js";
 import writer from '@/layout/write/index.vue'
