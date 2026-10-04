@@ -1645,10 +1645,10 @@ function submitPwd() {
     width: 100%;
     min-height: 78px;
     box-sizing: border-box;
-    display: grid;
-    grid-template-rows: 38px 15px;
-    align-content: center;
-    justify-items: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     gap: 7px;
     padding: 8px;
     border: 1px solid var(--nova-divider);
@@ -1677,13 +1677,13 @@ function submitPwd() {
 
   .theme-miniature {
     position: relative;
-    /* A preview is an icon, not a fluid row. Giving every mode the same
-       fixed box prevents the System split's paint from appearing to pull its
-       outer rectangle toward either edge of a differently sized card. */
-    width: min(72px, 100%);
-    height: 38px;
-    justify-self: center;
-    margin-inline: auto;
+    /* All modes use this same fixed outer box. System's light/dark gradient
+       is painted inside it, never allowed to determine its layout width. */
+    inline-size: 72px;
+    block-size: 38px;
+    max-inline-size: 100%;
+    align-self: center;
+    margin: 0;
     flex-shrink: 0;
     overflow: hidden;
     display: block;
