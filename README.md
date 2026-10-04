@@ -44,6 +44,8 @@
 
 Nova Mail is a self-hosted webmail application built on Cloudflare Workers. It combines a Vue 3 client with a Worker that receives mail through Cloudflare Email Routing, stores mailbox data in D1, and serves the application at the edge.
 
+> **Fork notice:** Nova Mail is derived from [maillab/cloud-mail](https://github.com/maillab/cloud-mail). The [MIT License](LICENSE) retains the original project's copyright notice alongside Nova Mail's modifications.
+
 [Report an issue](https://github.com/beihaime/nova-mail/issues) · [MIT License](LICENSE)
 
 ## Preview
@@ -78,6 +80,42 @@ Nova Mail is a self-hosted webmail application built on Cloudflare Workers. It c
 - Device/session inventory, individual or other-session revocation, and optional login alerts by email or Telegram.
 - Account deletion controls and role-based permissions.
 - Administrator views for analytics, users and accounts, all mail, roles, invite codes, and system settings.
+
+## Sending HTML and Markdown mail
+
+Nova Mail chooses the reader from the stored body type. HTML is sanitized and rendered in a sandboxed iframe; Markdown is rendered with `markdown-it`; plain text is escaped. Inbox previews are flattened to text.
+
+Send `Content-Type` as a message header, followed by one blank line and then the body. For HTML mail, prefer `multipart/alternative` with a plain-text fallback first:
+
+```text
+From: Tester <tester@example.com>
+To: you@example.com
+Subject: HTML preview
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="nova-demo"
+
+--nova-demo
+Content-Type: text/plain; charset=utf-8
+
+Hello from Nova Mail
+
+--nova-demo
+Content-Type: text/html; charset=utf-8
+
+<!doctype html>
+<html>
+  <body style="margin:0;padding:24px;font-family:sans-serif">
+    <h1>HTML preview</h1>
+    <p>This message renders as <strong>HTML</strong>.</p>
+    <a href="https://example.com">Open example.com</a>
+  </body>
+</html>
+--nova-demo--
+```
+
+`text/markdown` is also supported. Do not paste a complete raw message inside another message body. Remote images require reader consent; scripts, event handlers, external stylesheets, and unsafe URLs are removed before HTML preview.
+
+For code-block recognition rules, supported languages, rendering examples, and the security model, see [Code blocks and syntax highlighting](doc/CODE_HIGHLIGHTING.md).
 
 ## Architecture
 

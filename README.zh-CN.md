@@ -44,6 +44,8 @@
 
 Nova Mail 是部署在 Cloudflare Workers 上的自托管 Web 邮件应用。它由 Vue 3 客户端和 Worker 组成：Worker 通过 Cloudflare Email Routing 接收邮件，在 D1 中保存邮箱数据，并在边缘提供应用静态资源。
 
+> **Fork 说明：** Nova Mail 基于 [maillab/cloud-mail](https://github.com/maillab/cloud-mail) 演进而来。[MIT License](LICENSE) 保留原项目的版权声明以及 Nova Mail 的修改版权声明。
+
 [报告问题](https://github.com/beihaime/nova-mail/issues) · [MIT License](LICENSE)
 
 ## 预览
@@ -78,6 +80,42 @@ Nova Mail 是部署在 Cloudflare Workers 上的自托管 Web 邮件应用。它
 - 支持设备/会话列表、逐个撤销、撤销其他会话，以及可选的邮件或 Telegram 登录提醒。
 - 支持账户删除和基于角色的权限控制。
 - 管理后台提供数据分析、用户与账户、全部邮件、角色、邀请码和系统设置。
+
+## 发送 HTML 与 Markdown 邮件
+
+Nova Mail 根据保存的正文类型选择阅读器：HTML 会先净化，再在沙箱 iframe 中预览；Markdown 使用 `markdown-it` 渲染；纯文本会转义。收件箱预览会展平为文本。
+
+请将 `Content-Type` 放在邮件头中，留一个空行后再写正文。发送 HTML 邮件时，建议使用 `multipart/alternative`，并先提供纯文本备选：
+
+```text
+From: Tester <tester@example.com>
+To: you@example.com
+Subject: HTML preview
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="nova-demo"
+
+--nova-demo
+Content-Type: text/plain; charset=utf-8
+
+Hello from Nova Mail
+
+--nova-demo
+Content-Type: text/html; charset=utf-8
+
+<!doctype html>
+<html>
+  <body style="margin:0;padding:24px;font-family:sans-serif">
+    <h1>HTML preview</h1>
+    <p>This message renders as <strong>HTML</strong>.</p>
+    <a href="https://example.com">Open example.com</a>
+  </body>
+</html>
+--nova-demo--
+```
+
+同样支持 `text/markdown`。不要把完整原始邮件嵌入另一封邮件正文。远程图片需要读者确认后才加载；脚本、事件属性、外部样式表和不安全 URL 会在 HTML 预览前被移除。
+
+代码块的识别规则、支持的语言、渲染示例与安全模型，请参阅[代码块与语法高亮说明](doc/CODE_HIGHLIGHTING.zh-CN.md)。
 
 ## 架构
 
