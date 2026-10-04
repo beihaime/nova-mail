@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { checkSchema, REQUIRED_COLUMNS } from '../scripts/schema-manifest.mjs';
+import { verifyDeployedSchema } from '../scripts/verify-schema.mjs';
 
 /**
  * End-to-end guard for the *existing-installation* migration path.
@@ -160,6 +161,22 @@ describeSqlite('existing-installation schema path', () => {
 		const first = deployedSchema(db);
 		applyExistingInstallPath(db);
 		expect(deployedSchema(db)).toEqual(first);
+	});
+
+	it('is verified by the deployment verifier against a real SQLite engine', async () => {
+		const db = legacyDatabase();
+		applyExistingInstallPath(db);
+
+		// The verifier's exact SQL strings, run against real SQLite (the same
+		// engine family D1 exposes), including the per-table literal
+		// `pragma_table_info` queries and the identity-invariant query.
+		const execute = (sql) => ({
+			status: 0,
+			stdout: JSON.stringify([{ results: db.prepare(sql).all(), success: true }]),
+		});
+
+		const result = await verifyDeployedSchema({ execute, log: () => {}, errorLog: () => {} });
+		expect(result).toEqual({ ok: true, missing: [], violations: [] });
 	});
 
 	it('applies every guarded column the workflow declares', () => {
