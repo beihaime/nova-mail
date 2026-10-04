@@ -141,7 +141,7 @@
               role="radio"
               @click="selectTheme(option.value, $event)"
             >
-              <span class="theme-miniature" :class="`theme-miniature-${option.value}`" aria-hidden="true"><i></i><b></b><em></em></span>
+              <span class="theme-miniature" :style="themePreviewStyle(option.value)" aria-hidden="true"><i></i><b></b><em></em></span>
               <span>{{ option.label }}</span>
             </button>
           </div>
@@ -270,15 +270,13 @@
 
     <section v-if="section === 'personalization'" class="settings-section notification">
       <h2 class="settings-section-title">{{ $t('notification') }}</h2>
-      <div class="settings-panel">
-
-      <div class="settings-row notification-row">
-        <div class="notification-label">
-          <span>{{ $t('pushNotification') }}</span>
-          <small class="notification-status" :class="{ 'is-on': pushOn }">{{ pushStatusText }}</small>
+      <div class="settings-panel notification-panel">
+      <div class="settings-row notification-row notification-toggle-row">
+        <div class="settings-row-copy">
+          <span class="settings-row-title">{{ $t('pushNotification') }}</span>
+          <small class="notification-status">{{ !pushOn || !pushAvailable ? pushStatusText : $t('pushNotificationDesc') }}</small>
         </div>
-        <div class="notification-actions">
-          <el-button v-if="pushOn" :loading="pushTesting" @click="sendTestPush">{{ $t('pushTest') }}</el-button>
+        <div class="notification-switch">
           <el-switch
               :model-value="pushOn"
               :loading="pushLoading"
@@ -288,13 +286,17 @@
         </div>
       </div>
 
-      <div class="settings-row notification-row">
-        <span class="notification-label">{{ $t('notificationSound') }}</span>
+      <div v-if="pushOn" class="notification-test-row">
+        <el-button class="nova-secondary-button" :loading="pushTesting" @click="sendTestPush">{{ $t('pushTest') }}</el-button>
+      </div>
+
+      <div class="settings-row notification-row notification-toggle-row">
+        <span class="settings-row-title">{{ $t('notificationSound') }}</span>
         <el-switch v-model="settingStore.notificationSound"/>
       </div>
 
-      <div class="settings-row notification-row">
-        <span class="notification-label">{{ $t('notificationSoundType') }}</span>
+      <div class="settings-row notification-row notification-sound-row">
+        <span class="settings-row-title">{{ $t('notificationSoundType') }}</span>
         <div class="notification-actions">
           <el-select v-model="soundType" class="notification-select">
             <el-option
@@ -390,7 +392,7 @@
   </div>
 </template>
 <script setup>
-import {onMounted, reactive, ref, computed, watch, defineOptions} from 'vue'
+import {onMounted, onBeforeUnmount, reactive, ref, computed, watch, defineOptions} from 'vue'
 import {resetPassword, userDelete} from "@/request/my.js";
 import {useUserStore} from "@/store/user.js";
 import {hasPerm} from '@/perm/perm.js';
@@ -409,6 +411,7 @@ import {Icon} from '@iconify/vue';
 import {applyThemeTransition} from "@/utils/theme-transition.js";
 import {availablePresets, PALETTE_KEYS, parseThemeImport, normalizeHex} from '@/utils/theme-palette.js';
 import {SWIPE_ACTION_OPTIONS} from '@/utils/swipe-actions.js';
+import {formatDateTime, formatTime} from '@/utils/day.js';
 import {clearAuthenticatedSession} from '@/utils/session-state.js';
 import {setMailListDensity} from '@/request/preferences.js';
 import {
@@ -483,10 +486,35 @@ const setPwdLoading = ref(false)
 const setNameShow = ref(false)
 const accountName = ref(null)
 const langSelect = ref(settingStore.lang)
+const timeFormatNow = ref(new Date())
 const timeFormatOptions = computed(() => [
-  { value: '24h', label: t('timeFormat24h'), example: t('timeFormatExample24h') },
-  { value: '12h', label: t('timeFormat12h'), example: t('timeFormatExample12h') },
+  { value: '24h', label: t('timeFormat24h'), example: formatTime(timeFormatNow.value, '24h') },
+  { value: '12h', label: t('timeFormat12h'), example: formatTime(timeFormatNow.value, '12h') },
 ])
+let timeFormatTimer = null
+let timeFormatTimeout = null
+
+function stopTimeFormatClock() {
+  if (timeFormatTimeout) window.clearTimeout(timeFormatTimeout)
+  if (timeFormatTimer) window.clearInterval(timeFormatTimer)
+  timeFormatTimeout = null
+  timeFormatTimer = null
+}
+
+function startTimeFormatClock() {
+  stopTimeFormatClock()
+  const refresh = () => { timeFormatNow.value = new Date() }
+  refresh()
+  timeFormatTimeout = window.setTimeout(() => {
+    refresh()
+    timeFormatTimer = window.setInterval(refresh, 60000)
+  }, 60000 - (Date.now() % 60000))
+}
+
+watch(section, (current) => {
+  if (current === 'personalization') startTimeFormatClock()
+  else stopTimeFormatClock()
+}, { immediate: true })
 const swipeActionOptions = SWIPE_ACTION_OPTIONS
 const githubLoading = ref(false)
 const githubAccount = reactive({ connected: false, login: '', avatarUrl: '' })
@@ -544,6 +572,21 @@ const themePresetOptions = computed(() => {
   return [...availablePresets(activePaletteMode.value), 'custom'].map((value) => ({ value, label: labels[value] }))
 })
 const colorTokens = computed(() => PALETTE_KEYS.map((key) => ({ key, label: t(`themeColor${key[0].toUpperCase()}${key.slice(1)}`) })))
+
+function themePreviewStyle(mode) {
+  const light = uiStore.lightPalette
+  const dark = uiStore.darkPalette
+  const split = (key) => mode === 'system'
+    ? `linear-gradient(90deg, ${light[key]} 0 50%, ${dark[key]} 50% 100%)`
+    : (mode === 'dark' ? dark[key] : light[key])
+  return {
+    '--preview-background': split('background'),
+    '--preview-surface': split('surface'),
+    '--preview-foreground': split('foreground'),
+    '--preview-accent': split('accent'),
+    '--preview-border': split('border'),
+  }
+}
 
 function setPreset(preset) {
   if (preset === 'custom') return
@@ -654,7 +697,7 @@ function formatSessionTime(value) {
   if (minutes < 60) return t('minutesAgo', { count: minutes })
   const hours = Math.floor(minutes / 60)
   if (hours < 24) return t('hoursAgo', { count: hours })
-  return new Intl.DateTimeFormat(settingStore.lang, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
+  return formatDateTime(value)
 }
 
 async function refreshSecurity() {
@@ -806,6 +849,10 @@ onMounted(async () => {
     await syncPushSubscription()
     await refreshPushState()
   }
+})
+
+onBeforeUnmount(() => {
+  stopTimeFormatClock()
 })
 
 async function connectGithub() {
@@ -1506,9 +1553,16 @@ function submitPwd() {
     justify-content: space-between;
   }
 
-  .notification-label { min-width: 0; }
+  .notification-toggle-row { min-height: 66px; }
+  .notification-switch { flex: 0 0 auto; }
 
-  .notification-label > span { display: block; }
+  .notification-test-row {
+    display: flex;
+    padding: 0 16px 12px;
+    border-bottom: 1px solid var(--nova-divider);
+  }
+
+  .notification-test-row :deep(.el-button) { min-width: 0; }
 
   /* Status under the label: muted by default, primary once enabled. */
   .notification-status {
@@ -1517,8 +1571,6 @@ function submitPwd() {
     color: var(--regular-text-color);
     font-size: 12px;
   }
-
-  .notification-status.is-on { color: var(--el-color-primary); }
 
   .notification-actions {
     display: flex;
@@ -1531,7 +1583,7 @@ function submitPwd() {
     flex: 0 0 auto;
   }
 
-  .notification-select { width: 150px; }
+  .notification-select { width: min(240px, 100%); flex: 1 1 180px; }
 
   .notification-play {
     display: inline-flex;
@@ -1550,17 +1602,10 @@ function submitPwd() {
   }
 
   @media (max-width: 767px) {
-    .notification-row {
-      flex-direction: column;
-      align-items: stretch;
-      gap: 12px;
-    }
-
-    .notification-actions {
-      justify-content: space-between;
-    }
-
-    .notification-select { flex: 1; width: auto; }
+    .notification-sound-row { flex-wrap: wrap; }
+    .notification-sound-row > .settings-row-title { flex: 1 0 100%; }
+    .notification-actions { width: 100%; justify-content: space-between; }
+    .notification-select { width: auto; }
   }
 
   /* ---------- Appearance ---------- */
@@ -1590,14 +1635,20 @@ function submitPwd() {
   }
 
   .theme-options {
-    display: flex;
-    flex: 0 1 auto;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    flex: 0 1 308px;
     gap: 10px;
   }
 
   .theme-option {
-    width: 96px;
+    width: 100%;
+    min-height: 78px;
+    box-sizing: border-box;
     display: grid;
+    grid-template-rows: 38px 15px;
+    align-content: center;
+    justify-items: center;
     gap: 7px;
     padding: 8px;
     border: 1px solid var(--nova-divider);
@@ -1607,7 +1658,7 @@ function submitPwd() {
     cursor: pointer;
     font-size: 12px;
     font-weight: 500;
-    text-align: left;
+    text-align: center;
   }
 
   .theme-option:hover {
@@ -1626,12 +1677,15 @@ function submitPwd() {
 
   .theme-miniature {
     position: relative;
+    width: 100%;
     height: 38px;
     overflow: hidden;
     display: block;
     border: 1px solid color-mix(in srgb, var(--nova-divider) 80%, transparent);
     border-radius: 5px;
-    background: #fff;
+    box-sizing: border-box;
+    background: var(--preview-background);
+    border-color: var(--preview-border);
   }
 
   .theme-miniature::before {
@@ -1639,7 +1693,7 @@ function submitPwd() {
     position: absolute;
     inset: 0 auto 0 0;
     width: 17px;
-    background: #eef1f5;
+    background: var(--preview-surface);
   }
 
   .theme-miniature i,
@@ -1651,18 +1705,12 @@ function submitPwd() {
     height: 4px;
     display: block;
     border-radius: 2px;
-    background: #d5dbe5;
+    background: var(--preview-foreground);
   }
 
-  .theme-miniature i { top: 8px; background: #0a84ff; }
+  .theme-miniature i { top: 8px; background: var(--preview-accent); }
   .theme-miniature b { top: 17px; }
   .theme-miniature em { top: 26px; right: 17px; }
-  .theme-miniature-dark { background: #17191d; border-color: #343944; }
-  .theme-miniature-dark::before { background: #20242b; }
-  .theme-miniature-dark b, .theme-miniature-dark em { background: #59616d; }
-  .theme-miniature-system { background: linear-gradient(90deg, #fff 0 50%, #17191d 50% 100%); }
-  .theme-miniature-system::before { background: linear-gradient(90deg, #eef1f5 0 50%, #20242b 50% 100%); }
-  .theme-miniature-system b, .theme-miniature-system em { background: linear-gradient(90deg, #d5dbe5 0 50%, #59616d 50% 100%); }
 
   .appearance-actions, .color-control {
     display: flex;
@@ -1746,7 +1794,7 @@ function submitPwd() {
       gap: 7px;
     }
 
-    .theme-option { width: auto; min-width: 0; padding: 6px; }
+    .theme-option { width: auto; min-width: 0; min-height: 72px; grid-template-rows: 32px 15px; padding: 6px; }
     .theme-miniature { height: 32px; }
     .theme-miniature i { top: 7px; }
     .theme-miniature b { top: 15px; }

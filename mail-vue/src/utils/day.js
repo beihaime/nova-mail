@@ -7,17 +7,36 @@ const settingStore = useSettingStore();
 dayjs.extend(utc)
 dayjs.extend(timezone)
 dayjs.locale(settingStore.lang === 'en' ? 'en' : 'zh-cn')
-const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+export function deviceTimeZone() {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone
+}
+
+/** Parse API UTC/ISO values once, then render in the browser's actual zone. */
+export function localDate(time) {
+    return dayjs.utc(time).tz(deviceTimeZone())
+}
+
+export function isTodayLocal(time, now = new Date()) {
+    return localDate(time).isSame(localDate(now), 'day')
+}
 
 /** Shared clock formatter for mail lists and message metadata. */
-export function formatTime(time) {
-    const d = dayjs.utc(time).tz(timeZone);
-    return settingStore.timeFormat === '12h' ? d.format('h:mm A') : d.format('HH:mm');
+export function formatTime(time, timeFormat = settingStore.timeFormat) {
+    const d = localDate(time);
+    return timeFormat === '12h' ? d.format('h:mm A') : d.format('HH:mm');
+}
+
+export function formatDateTime(time, timeFormat = settingStore.timeFormat) {
+    const locale = settingStore.lang === 'en' ? 'en' : 'zh-CN'
+    return new Intl.DateTimeFormat(locale, {
+        dateStyle: 'medium', timeStyle: 'short', hour12: timeFormat === '12h',
+        timeZone: deviceTimeZone(),
+    }).format(localDate(time).toDate())
 }
 
 export function fromNow(date) {
-    const d = dayjs.utc(date).tz(timeZone);
-    const now = dayjs();
+    const d = localDate(date);
+    const now = localDate(new Date());
     const diffSeconds = now.diff(d, 'second');
     const diffMinutes = now.diff(d, 'minute');
     const diffHours = now.diff(d, 'hour');
@@ -72,8 +91,8 @@ export function updateNow(date) {
 }
 
 export function formatDetailDate(time) {
-    const d = dayjs.utc(time).tz(timeZone);
-    const now = dayjs();
+    const d = localDate(time);
+    const now = localDate(new Date());
 
     const isSameYear = now.year() === d.year();
 
@@ -94,8 +113,8 @@ export function formatDetailDate(time) {
  * `formatDetailDate` string; this is only used under the 767px breakpoint.
  */
 export function formatCompactDate(time) {
-    const d = dayjs.utc(time).tz(timeZone);
-    const now = dayjs();
+    const d = localDate(time);
+    const now = localDate(new Date());
 
     if (now.isSame(d, 'day')) {
         return formatTime(time);
@@ -121,8 +140,8 @@ export function formatCompactDate(time) {
  */
 export function formatListClock(time) {
     const isEnglish = settingStore.lang === 'en';
-    const d = dayjs.utc(time).tz(timeZone).locale(isEnglish ? 'en' : 'zh-cn');
-    const now = dayjs();
+    const d = localDate(time).locale(isEnglish ? 'en' : 'zh-cn');
+    const now = localDate(new Date());
 
     if (now.isSame(d, 'day')) return formatTime(time);
 
@@ -138,7 +157,7 @@ export function formatListClock(time) {
 }
 
 export function tzDayjs(time) {
-    return dayjs.utc(time).tz(timeZone)
+    return localDate(time)
 }
 
 export function toUtc(time) {

@@ -26,12 +26,10 @@
   </el-container>
   <nav v-if="route.name !== 'content'" class="mobile-nav" aria-label="Mail navigation">
     <button class="nova-navigation-button" :class="{active: route.name === 'email'}" @click="router.push({name: 'email'})">
-      <span class="mobile-nav-icon"><AppIcon name="nova-sidebar-inbox" :size="24" inline /></span>
-      <span class="mobile-nav-label">{{ $t('inbox') }}</span>
+      <span class="mobile-nav-pill"><span class="mobile-nav-icon"><AppIcon name="nova-sidebar-inbox" :size="24" inline /></span><span class="mobile-nav-label">{{ $t('inbox') }}</span></span>
     </button>
     <button class="nova-navigation-button" @click="uiStore.asideShow = true">
-      <span class="mobile-nav-icon"><AppIcon name="nova-sidebar-folder" :size="24" inline /></span>
-      <span class="mobile-nav-label">{{ $t('folders') }}</span>
+      <span class="mobile-nav-pill"><span class="mobile-nav-icon"><AppIcon name="nova-sidebar-folder" :size="24" inline /></span><span class="mobile-nav-label">{{ $t('folders') }}</span></span>
     </button>
     <button
         v-perm="'email:send'"
@@ -39,12 +37,10 @@
         :class="{active: route.name === 'draft'}"
         @click="router.push({name: 'draft'})"
     >
-      <span class="mobile-nav-icon"><AppIcon name="nova-sidebar-drafts" :size="24" inline /></span>
-      <span class="mobile-nav-label">{{ $t('drafts') }}</span>
+      <span class="mobile-nav-pill"><span class="mobile-nav-icon"><AppIcon name="nova-sidebar-drafts" :size="24" inline /></span><span class="mobile-nav-label">{{ $t('drafts') }}</span></span>
     </button>
     <button class="nova-navigation-button" :class="{active: route.path.startsWith('/settings')}" @click="router.push({name: 'setting'})">
-      <span class="mobile-nav-icon"><AppIcon name="nova-sidebar-settings" :size="24" inline /></span>
-      <span class="mobile-nav-label">{{ $t('settings') }}</span>
+      <span class="mobile-nav-pill"><span class="mobile-nav-icon"><AppIcon name="nova-sidebar-settings" :size="24" inline /></span><span class="mobile-nav-label">{{ $t('settings') }}</span></span>
     </button>
   </nav>
   <button
@@ -329,18 +325,29 @@ onBeforeUnmount(() => {
 
   /* Keep the button itself as the full-width touch target, while the selected
      treatment hugs the icon/label cluster instead of becoming a large tab. */
-  .mobile-nav button.active::before {
-    content: '';
-    position: absolute;
-    z-index: -1;
-    top: 50%;
-    left: 50%;
+  /* The button remains the full hit target. Its one child owns every visual
+     selected state, preventing the shared navigation-button state and a local
+     pseudo-element from drawing competing pills. */
+  .mobile-nav .nova-navigation-button,
+  .mobile-nav .nova-navigation-button:hover:not(:disabled),
+  .mobile-nav .nova-navigation-button:active:not(:disabled) {
+    background: transparent;
+  }
+
+  .mobile-nav-pill {
     width: min(92px, calc(100% - 8px));
-    height: 52px;
+    height: 44px;
+    display: grid;
+    grid-template-rows: 24px 13px;
+    align-content: center;
+    justify-items: center;
+    row-gap: 1px;
     border-radius: 18px;
+    box-sizing: border-box;
+  }
+
+  .mobile-nav button.active .mobile-nav-pill {
     background: var(--nm-accent-subtle, color-mix(in srgb, var(--el-color-primary) 12%, transparent));
-    transform: translate(-50%, -50%);
-    pointer-events: none;
   }
 
   .mobile-nav-icon {
