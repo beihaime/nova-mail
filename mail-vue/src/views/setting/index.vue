@@ -1691,8 +1691,9 @@ function submitPwd() {
   .theme-miniature::before {
     content: '';
     position: absolute;
-    inset: 0 auto 0 0;
-    width: 17px;
+    inset: 4px;
+    z-index: 0;
+    border-radius: 2px;
     background: var(--preview-surface);
   }
 
@@ -1700,6 +1701,7 @@ function submitPwd() {
   .theme-miniature b,
   .theme-miniature em {
     position: absolute;
+    z-index: 1;
     left: 23px;
     right: 6px;
     height: 4px;

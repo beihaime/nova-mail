@@ -307,13 +307,10 @@ onBeforeUnmount(() => {
     min-width: 0;
     height: 44px;
     min-height: 44px;
-    padding: 3px 0 2px;
+    padding: 0;
 
     display: grid;
-    grid-template-rows: 24px 13px;
-    align-content: center;
-    justify-items: center;
-    row-gap: 1px;
+    place-items: center;
 
     color: var(--regular-text-color);
     font-size: 12px;
@@ -337,11 +334,12 @@ onBeforeUnmount(() => {
   .mobile-nav-pill {
     width: min(92px, calc(100% - 8px));
     height: 44px;
+    padding: 4px 8px 3px;
     display: grid;
-    grid-template-rows: 24px 13px;
+    grid-template-rows: 22px 12px;
     align-content: center;
     justify-items: center;
-    row-gap: 1px;
+    row-gap: 2px;
     border-radius: 18px;
     box-sizing: border-box;
   }
@@ -351,8 +349,8 @@ onBeforeUnmount(() => {
   }
 
   .mobile-nav-icon {
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -361,17 +359,17 @@ onBeforeUnmount(() => {
   }
 
   .mobile-nav button :deep(.mobile-nav-icon .app-icon) {
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
     opacity: .68;
   }
 
   .mobile-nav-label {
     display: block;
-    max-height: 13px;
+    max-height: 12px;
     font-size: 12px;
     font-weight: 400;
-    line-height: 13px;
+    line-height: 12px;
     max-width: 100%;
     overflow: hidden;
     white-space: nowrap;
