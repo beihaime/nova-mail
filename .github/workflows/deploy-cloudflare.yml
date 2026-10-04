@@ -355,6 +355,44 @@ jobs:
             exit 1
           fi
 
+          # v3.16 – v3.22: the outbound send-lifecycle schema. New installations
+          # receive it from the one-time bootstrap; an existing installation can
+          # never bootstrap again, so without this a released Worker that queries
+          # `email.send_operation_id` or `outbound_send` fails every request with
+          # "no such column" and the SPA reports "Please update the database as
+          # documented". Apply the additive pieces here, before the deploy.
+          #
+          # SQLite has no `ADD COLUMN IF NOT EXISTS`, so every column is guarded
+          # by `pragma_table_info`. A partially applied migration still recovers,
+          # and a fully migrated database is a no-op.
+          ensure_column() {
+            local table="$1" column="$2" definition="$3"
+            local present
+            present=$(pnpm wrangler d1 execute "$DB_ID" --remote --yes --json \
+              --command "SELECT name FROM pragma_table_info('$table') WHERE name = '$column';")
+            if printf '%s' "$present" | grep -q "\"$column\""; then
+              echo "✅ $table.$column already exists."
+            else
+              echo "➕ Adding $table.$column"
+              pnpm wrangler d1 execute "$DB_ID" --remote --yes \
+                --command "ALTER TABLE $table ADD COLUMN $column $definition;"
+            fi
+          }
+
+          ensure_column email send_operation_id "TEXT NOT NULL DEFAULT ''"
+          ensure_column attachments send_operation_id "TEXT NOT NULL DEFAULT ''"
+          ensure_column attachments send_ordinal "INTEGER NOT NULL DEFAULT -1"
+
+          echo "🔁 Applying non-destructive migration: migrations/v3_16_send_lifecycle.sql"
+          pnpm wrangler d1 execute "$DB_ID" --remote --yes --file migrations/v3_16_send_lifecycle.sql
+
+          # The table now exists, so its later columns can be guaranteed too.
+          ensure_column outbound_send reconcile_lease_until "INTEGER NOT NULL DEFAULT 0"
+          ensure_column outbound_send reconcile_lease_token "TEXT NOT NULL DEFAULT ''"
+
+          echo "🔁 Applying non-destructive migration: migrations/v3_16_send_lifecycle_indexes.sql"
+          pnpm wrangler d1 execute "$DB_ID" --remote --yes --file migrations/v3_16_send_lifecycle_indexes.sql
+
       - name: 🚀 开始部署 / Start deployment
         id: deploy
         working-directory: ./mail-worker
@@ -525,9 +563,32 @@ jobs:
             exit 0
           fi
 
-          for column in body_type trashed trashed_at trash_archived; do
+          for column in body_type trashed trashed_at trash_archived send_operation_id; do
             if ! printf '%s' "$SCHEMA" | grep -q "\"$column\""; then
               echo "❌ email.$column is missing: its migration did not apply."
+              exit 1
+            fi
+          done
+
+          # v3.16 – v3.22: the send-lifecycle tables are created by the existing-
+          # installation migration, not by bootstrap, so verify them explicitly.
+          # A Worker deployed against a database without them answers 502.
+          LIFECYCLE_SCHEMA=$(pnpm wrangler d1 execute "$VERIFY_DB_ID" --remote --yes --json \
+            --command "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('outbound_send', 'outbound_send_snapshot', 'outbound_send_attachment', 'storage_cleanup', 'resend_webhook_event');" 2>&1)
+          echo "$LIFECYCLE_SCHEMA"
+          for table in outbound_send outbound_send_snapshot outbound_send_attachment storage_cleanup resend_webhook_event; do
+            if ! printf '%s' "$LIFECYCLE_SCHEMA" | grep -q "\"$table\""; then
+              echo "❌ $table is missing from the deployed D1."
+              exit 1
+            fi
+          done
+
+          ATTACHMENT_SCHEMA=$(pnpm wrangler d1 execute "$VERIFY_DB_ID" --remote --yes --json \
+            --command "SELECT name FROM pragma_table_info('attachments') WHERE name IN ('send_operation_id', 'send_ordinal');" 2>&1)
+          echo "$ATTACHMENT_SCHEMA"
+          for column in send_operation_id send_ordinal; do
+            if ! printf '%s' "$ATTACHMENT_SCHEMA" | grep -q "\"$column\""; then
+              echo "❌ attachments.$column is missing: its migration did not apply."
               exit 1
             fi
           done
