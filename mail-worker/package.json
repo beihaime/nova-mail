@@ -16,16 +16,16 @@
 		"threads:rebuild": "node scripts/rebuild-threads.mjs"
 	},
 	"devDependencies": {
-		"@cloudflare/vitest-pool-workers": "^0.7.5",
-		"vitest": "~3.0.7",
-		"wrangler": "^4.90.0"
+		"@cloudflare/vitest-pool-workers": "^0.9.14",
+		"vitest": "~3.2.7",
+		"wrangler": "^4.147.0"
 	},
 	"dependencies": {
 		"@aws-sdk/client-s3": "^3.882.0",
-		"@cloudflare/vite-plugin": "1.6.0",
+		"@cloudflare/vite-plugin": "1.62.5",
 		"dayjs": "^1.11.13",
-		"drizzle-orm": "^0.42.0",
-		"hono": "4.12.16",
+		"drizzle-orm": "^0.45.3",
+		"hono": "4.13.7",
 		"i18next": "^25.3.2",
 		"linkedom": "^0.18.10",
 		"postal-mime": "^2.4.3",
