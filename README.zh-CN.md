@@ -27,6 +27,9 @@
     <a href="https://github.com/beihaime/nova-mail/commits/main/">
       <img src="https://img.shields.io/github/last-commit/beihaime/nova-mail?style=flat" alt="Last commit">
     </a>
+    <a href="https://github.com/beihaime/nova-mail/commits/main/">
+      <img src="https://img.shields.io/github/commit-activity/t/beihaime/nova-mail?style=flat&label=total%20commits" alt="Total commits">
+    </a>
   </p>
 
   <p>
@@ -39,6 +42,16 @@
     <a href="https://pnpm.io/">
       <img src="https://img.shields.io/badge/package%20manager-pnpm-f69220?style=flat&logo=pnpm&logoColor=white" alt="pnpm">
     </a>
+  </p>
+
+  <p>
+    <a href="#功能">功能</a> ·
+    <a href="#架构">架构</a> ·
+    <a href="#部署">部署</a> ·
+    <a href="#配置参考">配置</a> ·
+    <a href="#安全说明">安全</a> ·
+    <a href="#本地开发">开发</a> ·
+    <a href="#贡献">贡献</a>
   </p>
 </div>
 
