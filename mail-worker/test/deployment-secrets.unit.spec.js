@@ -40,4 +40,22 @@ describe('deployment secret configuration', () => {
 		// An unmanaged plain-text var must never be dropped silently.
 		expect(workflow).toContain('this repository does not manage');
 	});
+
+	it('classifies live bindings with the tested planner instead of an ad-hoc allowlist', () => {
+		expect(workflow).toContain('node scripts/plan-jwt-migration.mjs --config "$CONFIG_FILE"');
+		expect(workflow).toContain('.drop_vapid_subject_var');
+		// The generated [vars] entry is removed when a Secret already owns the name.
+		expect(workflow).toContain("sed -i '/^vapid_subject = /d' \"$CONFIG_FILE\"");
+	});
+
+	it('treats vapid_subject as an ordinary binding and keeps the private key a secret', () => {
+		expect(config).toMatch(/^vapid_subject\s*=\s*"\$\{VAPID_SUBJECT\}"$/m);
+		// Secrets must never be declared as [vars].
+		expect(config).not.toMatch(/^vapid_private_key\s*=/m);
+		expect(config).not.toMatch(/^vapid_public_key\s*=/m);
+		expect(config).not.toMatch(/^jwt_secret\s*=/m);
+		// The subject is only secret-uploaded when an install already stores it
+		// that way; the normal path is the ordinary [vars] binding.
+		expect(workflow).toContain('no secret upload needed.');
+	});
 });

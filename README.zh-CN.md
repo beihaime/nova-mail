@@ -238,14 +238,20 @@ curl --fail-with-body -X POST https://<worker-or-custom-host>/api/bootstrap \
 
 ```bash
 # 在 mail-worker 目录执行；替换为实际的 D1 数据库 ID 或名称。
+# v3.4 – v3.7：OAuth 绑定/事务、会话索引、推送订阅表。
+pnpm wrangler d1 execute <D1_DATABASE> --remote --file migrations/v3_4_v3_7_tables.sql
 pnpm wrangler d1 execute <D1_DATABASE> --remote --file migrations/v3_8_body_type.sql
 pnpm wrangler d1 execute <D1_DATABASE> --remote --file migrations/v3_10_archived.sql
 pnpm wrangler d1 execute <D1_DATABASE> --remote --file migrations/v3_11_trash.sql
+# 规范化邮箱身份（`Dev@…` → `dev@…`，去除首尾空白），合并重复身份且不删除任何邮件，
+# 并建立 NOCASE 唯一索引。幂等：可重复执行。必须在发布按大小写不敏感匹配地址的
+# Worker 之前执行。
+pnpm wrangler d1 execute <D1_DATABASE> --remote --file migrations/v3_12_email_identity.sql
 pnpm wrangler d1 execute <D1_DATABASE> --remote --file migrations/v3_13_sessions.sql
 pnpm wrangler d1 execute <D1_DATABASE> --remote --file migrations/v3_14_user_preferences.sql
 ```
 
-不要盲目重复执行 v3.8、v3.10 或 v3.11：SQLite 不支持 `ADD COLUMN IF NOT EXISTS`。先通过 `pragma_table_info` 检查，再只应用缺失的变更。GitHub Actions 部署工作流在具备 D1 写权限时，会对后续邮件、会话和偏好迁移进行受控检查。
+不要盲目重复执行 v3.8、v3.10 或 v3.11：SQLite 不支持 `ADD COLUMN IF NOT EXISTS`。先通过 `pragma_table_info` 检查，再只应用缺失的变更。GitHub Actions 部署工作流在具备 D1 写权限时，会对更早的邮件、会话和偏好迁移进行受控检查。工作流还会建立 v3.15 的“按邮箱作用域”的 Message-ID 唯一索引（需要先扫描重复行，无法用纯 SQL 完成），并且在 `scripts/verify-schema.sh` 确认完整所需 schema 与规范化身份之前拒绝部署。
 
 ### 5. 配置邮件路由与发信
 
@@ -276,8 +282,10 @@ Turnstile 需要 `TURNSTILE_SECRET_KEY` 和正确的 `TURNSTILE_HOSTNAME`。要�
 node scripts/generate-vapid-keys.mjs
 pnpm wrangler secret put vapid_public_key
 pnpm wrangler secret put vapid_private_key
-pnpm wrangler secret put vapid_subject
+pnpm wrangler secret put vapid_subject   # 可选：等价的普通 vapid_subject [vars] 亦可
 ```
+
+`vapid_private_key` 必须保持为 Worker Secret。`vapid_public_key` 不属于敏感信息，但同样以 secret 形式上传。`vapid_subject` 是公开的 `mailto:`/`https:` 联系方式：GitHub Actions 工作流会将其注入为普通的 `vapid_subject` `[vars]` binding；若某安装已将其保存为 Worker Secret，则会保留该 secret 而不会覆盖它。
 
 Telegram、S3 兼容对象存储、转发、Webhook、黑名单规则、Resend token 和 AI 验证码提取均在 **系统设置** 中由管理员配置。Webhook 仅允许 HTTPS，Worker 会拒绝不安全的字面 IP 范围且不跟随重定向；若需要防范 DNS rebinding，请使用 allowlist 或受控 egress。
 
@@ -303,6 +311,7 @@ Telegram、S3 兼容对象存储、转发、Webhook、黑名单规则、Resend t
 | `analysis_cache` | 可选 | 分析缓存开关 |
 | `CORS_ORIGIN`、`CORS_ORIGINS` | 可选 | 附加 API CORS origins |
 | `project_link` | 可选 | 设置中展示的项目链接 |
+| `vapid_subject` | 可选 | 公开的 Web Push 联系方式（`mailto:`/`https:`），非敏感 |
 
 ### Secrets
 
@@ -314,7 +323,7 @@ Telegram、S3 兼容对象存储、转发、Webhook、黑名单规则、Resend t
 | `GITHUB_CLIENT_ID`、`GITHUB_CLIENT_SECRET` | GitHub OAuth | GitHub OAuth 客户端凭据 |
 | `GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET` | Google OAuth binding 配置 | Google OAuth 客户端凭据 |
 | `resend_webhook_secret` | Resend webhook | 验证 Resend webhook 签名 |
-| `vapid_public_key`、`vapid_private_key`、`vapid_subject` | Web Push | VAPID 订阅和投递密钥 |
+| `vapid_public_key`、`vapid_private_key` | Web Push | VAPID 订阅和投递密钥；仅私钥敏感 |
 
 Worker 没有 `RESEND_API_KEY` 环境 binding：Resend token 是管理员按域名保存的设置。Telegram 和 S3 兼容存储凭据也由受保护的系统设置管理，因此未复制到上表。
 

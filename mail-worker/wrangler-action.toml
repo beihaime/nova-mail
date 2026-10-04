@@ -49,6 +49,12 @@ domain = "${DOMAIN}"
 admin = "${ADMIN}"
 project_link = "${PROJECT_LINK}"
 TURNSTILE_HOSTNAME = "${CUSTOM_DOMAIN}"
+# Public Web Push contact identifier (`mailto:`/`https:`). This is an ordinary
+# binding, not a secret: `vapid_public_key` and `vapid_private_key` are uploaded
+# as Worker Secrets by the push-key step, and only the private key is sensitive.
+# The name is lowercase on purpose — Cloudflare binding names are case-sensitive
+# and the Worker reads `env.vapid_subject`.
+vapid_subject = "${VAPID_SUBJECT}"
 
 [build]
 command = "pnpm --prefix ../mail-vue install && pnpm --prefix ../mail-vue run build"

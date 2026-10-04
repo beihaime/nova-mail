@@ -238,14 +238,21 @@ New installations use bootstrap. Existing installations must apply only migratio
 
 ```bash
 # Run from mail-worker. Substitute the actual D1 database ID or name.
+# v3.4 – v3.7: OAuth links/transactions, conversation indexes, push subscriptions.
+pnpm wrangler d1 execute <D1_DATABASE> --remote --file migrations/v3_4_v3_7_tables.sql
 pnpm wrangler d1 execute <D1_DATABASE> --remote --file migrations/v3_8_body_type.sql
 pnpm wrangler d1 execute <D1_DATABASE> --remote --file migrations/v3_10_archived.sql
 pnpm wrangler d1 execute <D1_DATABASE> --remote --file migrations/v3_11_trash.sql
+# Canonicalizes mailbox identities (`Dev@…` → `dev@…`, trims padding), merges any
+# duplicate identities without deleting mail, and installs the NOCASE unique keys.
+# Idempotent: safe to run again. Required before a Worker that matches addresses
+# case-insensitively is released.
+pnpm wrangler d1 execute <D1_DATABASE> --remote --file migrations/v3_12_email_identity.sql
 pnpm wrangler d1 execute <D1_DATABASE> --remote --file migrations/v3_13_sessions.sql
 pnpm wrangler d1 execute <D1_DATABASE> --remote --file migrations/v3_14_user_preferences.sql
 ```
 
-Do not blindly rerun the v3.8, v3.10, or v3.11 files: SQLite has no `ADD COLUMN IF NOT EXISTS`. Inspect `pragma_table_info` first and apply only missing changes. The GitHub Actions deployment workflow performs guarded checks for the later mail, session, and preferences migrations when it has D1 write permission.
+Do not blindly rerun the v3.8, v3.10, or v3.11 files: SQLite has no `ADD COLUMN IF NOT EXISTS`. Inspect `pragma_table_info` first and apply only missing changes. The GitHub Actions deployment workflow performs guarded checks for the earlier mail, session, and preferences migrations when it has D1 write permission. It also installs the v3.15 mailbox-scoped Message-ID unique index (which needs a duplicate scan, so it cannot be plain SQL) and refuses to deploy unless `scripts/verify-schema.sh` confirms the full required schema and canonical identities.
 
 ### 5. Configure email routing and sending
 
@@ -276,8 +283,10 @@ Turnstile verification requires `TURNSTILE_SECRET_KEY` and an accurate `TURNSTIL
 node scripts/generate-vapid-keys.mjs
 pnpm wrangler secret put vapid_public_key
 pnpm wrangler secret put vapid_private_key
-pnpm wrangler secret put vapid_subject
+pnpm wrangler secret put vapid_subject   # optional: a plain vapid_subject [vars] entry is equivalent
 ```
+
+`vapid_private_key` must stay a Worker Secret. `vapid_public_key` is not sensitive but is uploaded as a secret. `vapid_subject` is a public `mailto:`/`https:` contact identifier: the GitHub Actions workflow injects it as an ordinary `vapid_subject` `[vars]` binding, and preserves an installation that already stores it as a Worker Secret instead of shadowing it.
 
 Telegram, S3-compatible object storage, forwarding, webhooks, blacklist rules, Resend tokens, and AI code extraction are configured by an administrator in **System Settings**. Webhook destinations are limited to HTTPS and the Worker rejects unsafe literal IP ranges and redirects; use an allowlist or controlled egress if DNS rebinding is a concern.
 
@@ -303,6 +312,7 @@ The included workflow tests before deploying. Its required deployment inputs are
 | `analysis_cache` | Optional | Analytics-cache toggle |
 | `CORS_ORIGIN`, `CORS_ORIGINS` | Optional | Additional API CORS origins |
 | `project_link` | Optional | Project link exposed by settings |
+| `vapid_subject` | Optional | Public Web Push contact identifier (`mailto:`/`https:`); not a secret |
 
 ### Secrets
 
@@ -314,7 +324,7 @@ The included workflow tests before deploying. Its required deployment inputs are
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | GitHub OAuth | GitHub OAuth client credentials |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google OAuth binding configuration | Google OAuth client credentials |
 | `resend_webhook_secret` | Resend webhooks | Verifies Resend webhook signatures |
-| `vapid_public_key`, `vapid_private_key`, `vapid_subject` | Web Push | VAPID subscription and delivery keys |
+| `vapid_public_key`, `vapid_private_key` | Web Push | VAPID subscription and delivery keys; only the private key is sensitive |
 
 The Worker has no `RESEND_API_KEY` environment binding: Resend tokens are per-domain administrator settings. Likewise, Telegram and S3-compatible credentials are managed through protected system settings, not copied into this table.
 

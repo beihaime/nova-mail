@@ -158,4 +158,29 @@ describeSqlite('existing-installation send lifecycle migration', () => {
 		}
 		expect(workflow).toContain("for column in body_type trashed trashed_at trash_archived send_operation_id");
 	});
+
+	it('applies the v3.4–v3.15 chain in order and gates the deploy on the schema check', () => {
+		const deployAt = workflow.indexOf('开始部署 / Start deployment');
+		const tablesAt = workflow.indexOf('migrations/v3_4_v3_7_tables.sql');
+		const identityAt = workflow.indexOf('migrations/v3_12_email_identity.sql');
+		const messageIdAt = workflow.indexOf('idx_email_mailbox_message_id_unique');
+		const gateAt = workflow.indexOf('bash scripts/verify-schema.sh "$DB_ID"');
+
+		expect(tablesAt).toBeGreaterThan(-1);
+		expect(identityAt).toBeGreaterThan(-1);
+		expect(messageIdAt).toBeGreaterThan(-1);
+		expect(gateAt).toBeGreaterThan(-1);
+
+		// The tables the v3.12 identity merge re-points (OAuth links, push
+		// subscriptions) must exist before the merge runs.
+		expect(tablesAt).toBeLessThan(identityAt);
+		// Nothing is deployed until the whole chain and the schema gate ran.
+		expect(identityAt).toBeLessThan(deployAt);
+		expect(messageIdAt).toBeLessThan(deployAt);
+		expect(gateAt).toBeLessThan(deployAt);
+
+		// The chain must also be reachable for a new installation: the same
+		// object is verified after bootstrap.
+		expect(workflow.indexOf('bash scripts/verify-schema.sh "$VERIFY_DB_ID"')).toBeGreaterThan(deployAt);
+	});
 });
