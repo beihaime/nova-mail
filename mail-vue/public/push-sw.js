@@ -4,7 +4,10 @@
  *
  * This file is NOT a service worker of its own: vite-plugin-pwa generates the
  * Workbox worker and pulls this in through `workbox.importScripts`, so the app
- * keeps one registration, one scope and one update cycle.
+ * keeps one registration, one scope and one update cycle. The branding
+ * migration marker intentionally changes this imported worker when retired
+ * icon URLs are removed, prompting existing installs to run Workbox's
+ * precache cleanup without invalidating runtime caches.
  *
  * The payload is intentionally tiny (sender + subject only, see
  * `pushService.notifyNewMail`) — an endpoint or a mail body never reaches the
