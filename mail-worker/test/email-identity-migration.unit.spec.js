@@ -23,7 +23,6 @@ const workflow = readFileSync(
 	new URL('../../.github/workflows/deploy-cloudflare.yml', import.meta.url),
 	'utf8',
 );
-const readme = readFileSync(new URL('../../README.md', import.meta.url), 'utf8');
 
 let DatabaseSync = null;
 try {
@@ -171,9 +170,5 @@ describe('email identity migration wiring', () => {
 		expect(workflow).toContain('Non-canonical mailbox identities remain in the deployed D1.');
 		expect(workflow).toContain('idx_user_email_nocase');
 		expect(workflow).toContain('idx_account_email_nocase');
-	});
-
-	it('is documented for operators who upgrade an existing database by hand', () => {
-		expect(readme).toContain('migrations/v3_12_email_identity.sql');
 	});
 });

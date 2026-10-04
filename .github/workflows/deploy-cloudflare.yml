@@ -48,6 +48,15 @@ jobs:
       - name: 🧪 运行测试 / Run test suite
         run: pnpm test
 
+      # Documentation is checked only where the canonical READMEs live. A fork
+      # that customizes README.md must never fail `pnpm test` (or its pipeline)
+      # because the migration list reads differently; the migration and schema
+      # regression coverage above stays repository-owner agnostic.
+      - name: 📖 校验迁移文档 / Verify migration documentation
+        if: github.repository == 'beihaime/nova-mail'
+        working-directory: ./mail-worker
+        run: node scripts/check-migration-docs.mjs
+
   Deploy-nova-mail:
     name: 🏗️ Build and Deploy
     needs: Test
