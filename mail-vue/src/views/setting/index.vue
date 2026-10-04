@@ -1677,8 +1677,14 @@ function submitPwd() {
 
   .theme-miniature {
     position: relative;
-    width: 100%;
+    /* A preview is an icon, not a fluid row. Giving every mode the same
+       fixed box prevents the System split's paint from appearing to pull its
+       outer rectangle toward either edge of a differently sized card. */
+    width: min(72px, 100%);
     height: 38px;
+    justify-self: center;
+    margin-inline: auto;
+    flex-shrink: 0;
     overflow: hidden;
     display: block;
     border: 1px solid color-mix(in srgb, var(--nova-divider) 80%, transparent);
