@@ -39,7 +39,7 @@ export {
 };
 
 /** `message_id` compared the way `normalizeMessageId` reads it. */
-const bareMessageId = sql`lower(replace(replace(coalesce(${email.messageId}, ''), '<', ''), '>', ''))`;
+const bareMessageId = sql`lower(trim(coalesce(${email.messageId}, ''), '<> '))`;
 
 /** Stored rows whose `message_id` matches one of `ids` (bare comparison). */
 async function selectByMessageIds(c, userId, ids) {
@@ -156,16 +156,18 @@ export async function resolveThreadForMessage(c, headers) {
  * Rows without a Message-ID are never deduped (nothing reliable to match on);
  * deleted rows are still matched so a retry cannot resurrect deleted mail.
  */
-export async function findExistingMessage(c, { userId, messageId }) {
+export async function findExistingMessage(c, { userId, accountId, messageId }) {
 	const id = normalizeMessageId(messageId);
 	const owner = Number(userId) || 0;
-	if (!id || !owner) return null;
+	const mailbox = Number(accountId) || 0;
+	if (!id || !owner || !mailbox) return null;
 
 	return orm(c)
 		.select()
 		.from(email)
 		.where(and(
 			eq(email.userId, owner),
+			eq(email.accountId, mailbox),
 			eq(bareMessageId, id),
 		))
 		.orderBy(asc(email.emailId))

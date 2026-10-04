@@ -11,6 +11,7 @@ import verifyRecordService from './verify-record-service';
 import userContext from '../security/user-context';
 import domainUtils from '../utils/domain-uitls';
 import urlSafety from '../utils/url-safety';
+import { configuredDomains } from '../utils/configured-domains';
 
 function isMaskedSecret(value) {
 	if (value == null || typeof value !== 'string') return false;
@@ -38,21 +39,7 @@ const settingService = {
 			throw new BizError('数据库未初始化 Database not initialized.');
 		}
 
-		let domainList = c.env.domain;
-
-		if (typeof domainList === 'string') {
-			try {
-				domainList = JSON.parse(domainList)
-			} catch (error) {
-				throw new BizError(t('notJsonDomain'));
-			}
-		}
-
-		if (!c.env.domain) {
-			throw new BizError(t('noDomainVariable'));
-		}
-
-		domainList = domainList.map(item => '@' + item);
+		const domainList = configuredDomains(c.env.domain).map(item => '@' + item);
 		setting.domainList = domainList;
 
 		let projectLink = c.env.project_link;

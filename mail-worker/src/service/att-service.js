@@ -53,7 +53,7 @@ const attService = {
 		).all();
 	},
 
-	async toImageUrlHtml(c, content, userId) {
+	async toImageUrlHtml(c, content, userId, sendKey = '') {
 
 		const { r2Domain } = await settingService.query(c);
 		const ossPrefix = domainUtils.toOssDomain(r2Domain);
@@ -64,7 +64,7 @@ const attService = {
 
 		let imageDataList = [];
 
-		for (const img of images) {
+		for (const [imageOrdinal, img] of images.entries()) {
 
 			//邮件正文base64图片转cid附件
 			const src = img.getAttribute('src');
@@ -74,7 +74,9 @@ const attService = {
 					throw new BizError('Unsafe inline attachment type');
 				}
 				const buff = await file.arrayBuffer();
-				const cid = uuidv4().replace(/-/g, '');
+				const cid = sendKey
+					? await fileUtils.getBuffHash(new TextEncoder().encode(`${sendKey}:${imageOrdinal}`))
+					: uuidv4().replace(/-/g, '');
 				const key = constant.ATTACHMENT_PREFIX + await fileUtils.getBuffHash(buff) + fileUtils.getExtFileName(file.name);
 
 				img.setAttribute('src', 'cid:' + cid);
@@ -94,7 +96,9 @@ const attService = {
 			//邮件正文站内图片转cid附件
 			if (src && ((ossPrefix && src.startsWith(ossPrefix + '/attachments/')) || src.startsWith('attachments/'))) {
 
-				const cid = uuidv4().replace(/-/g, '')
+				const cid = sendKey
+					? await fileUtils.getBuffHash(new TextEncoder().encode(`${sendKey}:${imageOrdinal}`))
+					: uuidv4().replace(/-/g, '')
 				img.setAttribute('src', 'cid:' + cid);
 
 				const attData = {};
@@ -162,16 +166,16 @@ const attService = {
 		return { imageDataList, html: document.toString() };
 	},
 
-	async saveSendAtt(c, attList, userId, accountId, emailId) {
+	async saveSendAtt(c, attList, userId, accountId, emailId, operationId = '') {
 
 		const attDataList = [];
 
-		for (let att of attList) {
+		for (const [ordinal, att] of attList.entries()) {
 			att.filename = normalizeAttachmentFilename(att.filename || 'attachment');
 			att.type = normalizeMimeType(att.type || att.mimeType || att.contentType);
 			att.buff = fileUtils.base64ToUint8Array(att.content);
 			att.key = constant.ATTACHMENT_PREFIX + await fileUtils.getBuffHash(att.buff) + fileUtils.getExtFileName(att.filename);
-			const attData = { userId, accountId, emailId };
+			const attData = { userId, accountId, emailId, sendOperationId: operationId, sendOrdinal: ordinal };
 			attData.key = att.key;
 			attData.size = att.buff.length;
 			attData.filename = att.filename;
@@ -180,7 +184,11 @@ const attService = {
 			attDataList.push(attData);
 		}
 
-		await orm(c).insert(att).values(attDataList).run();
+		if (operationId) {
+			for (const row of attDataList) await orm(c).insert(att).values(row).onConflictDoNothing().run();
+		} else {
+			await orm(c).insert(att).values(attDataList).run();
+		}
 
 		for (let att of attList) {
 			await r2Service.putObj(c, att.key, att.buff, {
@@ -191,9 +199,9 @@ const attService = {
 
 	},
 
-	async saveArticleAtt(c, attDataList, userId, accountId, emailId) {
+	async saveArticleAtt(c, attDataList, userId, accountId, emailId, operationId = '') {
 
-		for (let attData of attDataList) {
+		for (const [ordinal, attData] of attDataList.entries()) {
 			attData.filename = normalizeAttachmentFilename(attData.filename || 'attachment');
 			attData.mimeType = normalizeMimeType(attData.mimeType);
 			if (attData.contentId && !isSafeInlineMimeType(attData.mimeType)) attData.contentId = null;
@@ -201,6 +209,8 @@ const attService = {
 			attData.emailId = emailId;
 			attData.accountId = accountId;
 			attData.type = attConst.type.EMBED;
+			attData.sendOperationId = operationId;
+			attData.sendOrdinal = ordinal;
 			if (!attData.buff) {
 				continue;
 			}
@@ -212,7 +222,11 @@ const attService = {
 			delete attData.buff;
 		}
 
-		await orm(c).insert(att).values(attDataList).run();
+		if (operationId) {
+			for (const row of attDataList) await orm(c).insert(att).values(row).onConflictDoNothing().run();
+		} else {
+			await orm(c).insert(att).values(attDataList).run();
+		}
 
 	},
 

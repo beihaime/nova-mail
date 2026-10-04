@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { contentDisposition, normalizeAttachment, normalizeAttachmentFilename, normalizeRecipientLists, safeMessageId, validateOutgoingMail } from '../src/utils/outgoing-mail-validation';
+import { MAIL_LIMITS } from '../src/const/mail-limits';
 
 const validMessage = {
 	receiveEmail: ['person@example.net'],
@@ -29,6 +30,12 @@ describe('outgoing mail validation', () => {
 			cc: ['cc@example.net'],
 			bcc: ['bcc@example.net'],
 		});
+	});
+
+	it('caps the combined submitted recipient count before recipient normalization', () => {
+		const addresses = Array.from({ length: MAIL_LIMITS.MAX_RECIPIENTS_PER_MESSAGE }, (_, index) => `r${index}@example.net`);
+		expect(() => normalizeRecipientLists({ receiveEmail: addresses.slice(0, 20), cc: addresses.slice(20, 35), bcc: addresses.slice(35) })).not.toThrow();
+		expect(() => normalizeRecipientLists({ receiveEmail: [...addresses, 'one-more@example.net'] })).toThrow('Too many recipients');
 	});
 
 	it.each([

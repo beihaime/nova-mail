@@ -16,11 +16,13 @@ describe('outbound Cc/Bcc provider payloads', () => {
 		await emailService.sendByResend('token', {
 			name: 'Nova', accountEmail: 'sender@example.com', receiveEmail: ['to@example.net'],
 			subject: 'To only', text: 'body', html: '<p>body</p>', attachments: [],
+			idempotencyKey: 'operation-123',
 		});
 		const payload = mocks.resendSend.mock.calls.at(-1)[0];
 		expect(payload.to).toEqual(['to@example.net']);
 		expect(payload).not.toHaveProperty('cc');
 		expect(payload).not.toHaveProperty('bcc');
+		expect(mocks.resendSend.mock.calls.at(-1)[1]).toEqual({ idempotencyKey: 'operation-123' });
 	});
 
 	it('adds Cc and Bcc only when supplied', async () => {

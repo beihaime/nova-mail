@@ -8,6 +8,7 @@ import account from '../entity/account';
 import { and, asc, eq, gt, inArray, count, sql, or, lt, desc } from 'drizzle-orm';
 import {accountConst, isDel, settingConst} from '../const/entity-const';
 import settingService from './setting-service';
+import { hasConfiguredDomain } from '../utils/configured-domains';
 import turnstileService from './turnstile-service';
 import roleService from './role-service';
 import { t } from '../i18n/i18n';
@@ -37,7 +38,7 @@ const accountService = {
 			throw new BizError(t('notEmail'));
 		}
 
-		if (!c.env.domain.includes(emailUtils.getDomain(email))) {
+		if (!hasConfiguredDomain(c.env.domain, emailUtils.getDomain(email))) {
 			throw new BizError(t('notExistDomain'));
 		}
 

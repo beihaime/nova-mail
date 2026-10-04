@@ -183,6 +183,10 @@ export async function email(message, env, ctx) {
 		}
 
 		let emailRow = await emailService.receive({ env }, params, cidAttachments, r2Domain);
+		// A retried inbound delivery has already stored its complete message and
+		// attachments. Do not attach this retry's files to the existing row or
+		// send duplicate notifications/forwards.
+		if (emailRow.deduplicated) return;
 
 		attachments.forEach(attachment => {
 			attachment.emailId = emailRow.emailId;

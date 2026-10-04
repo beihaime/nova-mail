@@ -7,6 +7,8 @@ export const  att = sqliteTable('attachments', {
 	emailId: integer('email_id').notNull(),
 	accountId: integer('account_id').notNull(),
 	key: text('key').notNull(),
+	sendOperationId: text('send_operation_id').default('').notNull(),
+	sendOrdinal: integer('send_ordinal').default(-1).notNull(),
 	filename: text('filename'),
 	mimeType: text('mime_type'),
 	size: integer('size'),
@@ -18,4 +20,3 @@ export const  att = sqliteTable('attachments', {
 	encoding: text('encoding'),
 	createTime: text('create_time').default(sql`CURRENT_TIMESTAMP`).notNull(),
 });
-

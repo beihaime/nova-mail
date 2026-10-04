@@ -14,6 +14,7 @@ import email from '../entity/email';
 import rateLimitUtils from '../utils/rate-limit-utils';
 import userContext from '../security/user-context';
 import { pageNumber, pageSize } from '../utils/pagination';
+import { hasConfiguredDomain } from '../utils/configured-domains';
 
 const publicService = {
 	assertAdmin(c) {
@@ -109,7 +110,7 @@ const publicService = {
 				throw new BizError(t('notEmail'));
 			}
 
-			if (!c.env.domain.includes(emailUtils.getDomain(emailRow.email))) {
+			if (!hasConfiguredDomain(c.env.domain, emailUtils.getDomain(emailRow.email))) {
 				throw new BizError(t('notEmailDomain'));
 			}
 

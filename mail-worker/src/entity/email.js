@@ -21,6 +21,7 @@ export const email = sqliteTable('email', {
 	inReplyTo: text('in_reply_to').default(''),
 	relation: text('relation').default(''),
 	messageId: text('message_id').default(''),
+	sendOperationId: text('send_operation_id').default('').notNull(),
 	// Conversation key. Every message of one conversation (original + replies +
 	// the user's own replies) shares it; the Inbox collapses rows by this value.
 	threadId: text('thread_id').default('').notNull(),

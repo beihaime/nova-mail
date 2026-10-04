@@ -22,6 +22,7 @@ import settingService from './setting-service';
 import starService from './star-service';
 import userContext from '../security/user-context';
 import { pageNumber, pageSize } from '../utils/pagination';
+import { hasConfiguredDomain } from '../utils/configured-domains';
 
 const userService = {
 
@@ -367,7 +368,7 @@ const userService = {
 		let { email, type, password } = params;
 		email = emailUtils.normalizeEmail(email);
 
-		if (!c.env.domain.includes(emailUtils.getDomain(email))) {
+		if (!hasConfiguredDomain(c.env.domain, emailUtils.getDomain(email))) {
 			throw new BizError(t('notEmailDomain'));
 		}
 

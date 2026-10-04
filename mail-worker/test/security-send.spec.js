@@ -38,6 +38,6 @@ describe('send authorization order', () => {
     mocks.account.mockResolvedValue({ userId: 1, email: 'owner@example.com' });
     await expect(emailService.send({ env: { admin: 'owner@example.com' } }, params, 1))
       .rejects.toThrow('stopped after authorized lookup');
-    expect(mocks.resolveImages).toHaveBeenCalledWith(expect.anything(), params.content, 1);
+    expect(mocks.resolveImages).toHaveBeenCalledWith(expect.anything(), params.content, 1, expect.any(String));
   });
 });

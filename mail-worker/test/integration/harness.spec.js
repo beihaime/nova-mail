@@ -22,6 +22,7 @@ describe('integration harness', () => {
 		expect(tables).toContain('push_subscription');
 		expect(tables).toContain('auth_session');
 		expect(tables).toContain('user_security_settings');
+		expect(tables).toContain('outbound_send');
 	});
 
 	it('applies the ALTER-based migrations, not just the base tables', async () => {
@@ -39,6 +40,8 @@ describe('integration harness', () => {
 		expect(columns).toContain('trashed');
 		expect(columns).toContain('trashed_at');
 		expect(columns).toContain('trash_archived');
+		// v3.16: retry-safe outbound delivery records its durable operation id.
+		expect(columns).toContain('send_operation_id');
 	});
 
 	it('binds a usable JWT secret and the test mail domain', async () => {

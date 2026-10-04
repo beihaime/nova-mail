@@ -25,6 +25,7 @@ import user from '../entity/user';
 import { and, eq } from 'drizzle-orm';
 import sessionService from './session-service';
 import securityAlertService from './security-alert-service';
+import { hasConfiguredDomain } from '../utils/configured-domains';
 
 const loginService = {
 
@@ -72,7 +73,7 @@ const loginService = {
 			throw new BizError(t('pwdMinLength'));
 		}
 
-		if (!c.env.domain.includes(emailUtils.getDomain(email))) {
+		if (!hasConfiguredDomain(c.env.domain, emailUtils.getDomain(email))) {
 			throw new BizError(t('notEmailDomain'));
 		}
 

@@ -36,6 +36,7 @@ function isMailbox(value) {
 export function normalizeRecipientLists({ receiveEmail, cc = [], bcc = [] } = {}) {
 	if (!Array.isArray(receiveEmail) || receiveEmail.length === 0) fail('Invalid recipient list');
 	if (!Array.isArray(cc) || !Array.isArray(bcc)) fail('Invalid recipient list');
+	if (receiveEmail.length + cc.length + bcc.length > MAIL_LIMITS.MAX_RECIPIENTS_PER_MESSAGE) fail('Too many recipients');
 
 	const seen = new Set();
 	const clean = (addresses) => addresses.reduce((result, address) => {

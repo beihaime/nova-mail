@@ -153,6 +153,8 @@ const show = ref(false);
 const percent = ref(0)
 let percentMessage = null
 let sending = false
+let sendKey = ''
+let sendPayload = ''
 const defValue = ref('')
 const contactsTabRef = ref({})
 const showContacts = ref(false)
@@ -369,7 +371,12 @@ async function sendEmail() {
   // open conversation as soon as the API confirms.
   const sentType = form.sendType
 
-  emailSend(form, (e) => {
+  const payload = JSON.stringify(toRaw(form))
+  if (payload !== sendPayload) {
+    sendKey = crypto.randomUUID()
+    sendPayload = payload
+  }
+  emailSend({ ...toRaw(form), idempotencyKey: sendKey }, (e) => {
     percent.value = Math.round((e.loaded * 98) / e.total)
   }).then(emailList => {
     const email = emailList[0]
@@ -436,6 +443,8 @@ function addRecipientRecord() {
 }
 
 function resetForm() {
+  sendKey = ''
+  sendPayload = ''
   form.receiveEmail = []
   form.cc = []
   form.bcc = []

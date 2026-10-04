@@ -37,8 +37,62 @@ const dbInit = {
 		await this.v3_12DB(c);
 		await this.v3_13DB(c);
 		await this.v3_14DB(c);
+		await this.v3_15DB(c);
+		await this.v3_16DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
+	},
+
+	/** Durable outbound lifecycle and uniqueness for retried finalization. */
+	async v3_16DB(c) {
+		const db = c.env.db;
+		await db.prepare(`CREATE TABLE IF NOT EXISTS outbound_send (
+			operation_id TEXT PRIMARY KEY, user_id INTEGER NOT NULL, request_key TEXT NOT NULL,
+			request_hash TEXT NOT NULL, status TEXT NOT NULL, quota_cost INTEGER NOT NULL DEFAULT 0,
+			provider_id TEXT NOT NULL DEFAULT '', email_id INTEGER, created_at INTEGER NOT NULL,
+			updated_at INTEGER NOT NULL, UNIQUE(user_id, request_key),
+			CHECK (status IN ('reserved','dispatching','accepted','finalizing','failed','finalized'))
+		)`).run();
+		for (const [table, column, definition] of [
+			['email', 'send_operation_id', "TEXT NOT NULL DEFAULT ''"],
+			['attachments', 'send_operation_id', "TEXT NOT NULL DEFAULT ''"],
+			['attachments', 'send_ordinal', 'INTEGER NOT NULL DEFAULT -1'],
+		]) {
+			const present = await db.prepare(`SELECT 1 FROM pragma_table_info('${table}') WHERE name = ?`).bind(column).first();
+			if (!present) await db.prepare(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`).run();
+		}
+		await db.batch([
+			db.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_email_send_operation
+				ON email(send_operation_id, type, account_id, to_email) WHERE send_operation_id != ''`),
+			db.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_attachment_send_operation
+				ON attachments(send_operation_id, email_id, send_ordinal, type) WHERE send_operation_id != ''`),
+			db.prepare(`CREATE INDEX IF NOT EXISTS idx_outbound_send_user_status ON outbound_send(user_id, status, updated_at)`),
+		]);
+	},
+
+	/** Scope Message-ID uniqueness to one receiving mailbox. Keep legacy rows. */
+	async v3_15DB(c) {
+		const db = c.env.db;
+		const existing = await db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_email_mailbox_message_id_unique'").first();
+		if (existing) return;
+		// Some older databases never acquired the old index because duplicate
+		// rows already existed. Preserve those rows and uniquely index every new
+		// delivery; the runtime lookup still deduplicates against legacy rows.
+		const duplicate = await db.prepare(`
+			SELECT 1 FROM email WHERE trim(message_id, '<> ') != ''
+			GROUP BY user_id, account_id, lower(trim(message_id, '<> '))
+			HAVING count(*) > 1 LIMIT 1
+		`).first();
+		const lastLegacyId = duplicate
+			? (await db.prepare('SELECT coalesce(max(email_id), 0) AS id FROM email').first()).id
+			: 0;
+		const uniqueIndex = `CREATE UNIQUE INDEX idx_email_mailbox_message_id_unique
+			ON email(user_id, account_id, lower(trim(message_id, '<> ')))
+			WHERE trim(message_id, '<> ') != ''${lastLegacyId ? ` AND email_id > ${Number(lastLegacyId)}` : ''}`;
+		await db.batch([
+			db.prepare('DROP INDEX IF EXISTS idx_email_message_id_unique'),
+			db.prepare(uniqueIndex),
+		]);
 	},
 
 	async v3_14DB(c) {
@@ -317,16 +371,8 @@ const dbInit = {
 			}
 		}
 
-		// Best-effort uniqueness guard so a webhook / Cloudflare retry cannot
-		// insert the same message twice. Legacy duplicate rows would make this
-		// fail, in which case the application-level check still applies.
-		try {
-			await c.env.db.prepare(
-				`CREATE UNIQUE INDEX IF NOT EXISTS idx_email_message_id_unique ON email(user_id, message_id) WHERE message_id != '';`
-			).run();
-		} catch (e) {
-			console.warn(`跳过 Message-ID 唯一索引（存在历史重复）：${e.message}`);
-		}
+		// v3.15 installs the mailbox-scoped uniqueness index after all older
+		// schema migrations have run.
 	},
 
 	async v3_4DB(c) {

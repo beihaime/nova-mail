@@ -10,6 +10,7 @@ import {
 	sessionFor,
 	updateSetting,
 } from './helpers';
+import emailService from '../../src/service/email-service';
 
 /**
  * The archive flag and the undo endpoints behind the mobile swipe actions.
@@ -139,6 +140,41 @@ describe('archiving', () => {
 });
 
 describe('Trash and restore', () => {
+	it('does not permanently delete a message restored after Trash selection', async () => {
+		const principal = await sessionFor(await createAccount());
+		const row = await seedEmail(principal, { subject: 'restore-race' });
+		const key = `attachments/restore-race-${row.email_id}.txt`;
+		await env.db.prepare('INSERT INTO attachments (user_id, email_id, account_id, key, type) VALUES (?, ?, ?, ?, 0)')
+			.bind(principal.userId, row.email_id, principal.accountId, key).run();
+		await env.r2.put(key, 'kept');
+		await api(`/api/email/delete?emailIds=${row.email_id}`, { method: 'DELETE', token: principal.token });
+		const context = {
+			env,
+			testHooks: { beforeConditionalTrashDelete: async () => {
+				await emailService.restoreFromTrash({ env }, { emailIds: [row.email_id] }, principal.userId);
+			} },
+		};
+		await emailService.deleteForever(context, { emailIds: String(row.email_id) }, principal.userId);
+		expect(await env.db.prepare('SELECT email_id FROM email WHERE email_id = ?').bind(row.email_id).first()).not.toBeNull();
+		expect(await env.db.prepare('SELECT att_id FROM attachments WHERE email_id = ?').bind(row.email_id).first()).not.toBeNull();
+		expect(await env.r2.get(key)).not.toBeNull();
+	});
+
+	it('does not delete a message restored while emptying Trash', async () => {
+		const principal = await sessionFor(await createAccount());
+		const row = await seedEmail(principal, { subject: 'empty-race' });
+		const key = `attachments/empty-race-${row.email_id}.txt`;
+		await env.db.prepare('INSERT INTO attachments (user_id, email_id, account_id, key, type) VALUES (?, ?, ?, ?, 0)')
+			.bind(principal.userId, row.email_id, principal.accountId, key).run();
+		await env.r2.put(key, 'kept');
+		await api(`/api/email/delete?emailIds=${row.email_id}`, { method: 'DELETE', token: principal.token });
+		await emailService.emptyTrash({ env, testHooks: { beforeConditionalTrashDelete: async () => {
+			await emailService.restoreFromTrash({ env }, { emailIds: [row.email_id] }, principal.userId);
+		} } }, { accountId: principal.accountId }, principal.userId);
+		expect(await env.db.prepare('SELECT email_id FROM email WHERE email_id = ?').bind(row.email_id).first()).not.toBeNull();
+		expect(await env.db.prepare('SELECT att_id FROM attachments WHERE email_id = ?').bind(row.email_id).first()).not.toBeNull();
+		expect(await env.r2.get(key)).not.toBeNull();
+	});
 	it('moves an All Mail deletion to the recipient owner\'s Trash instead of physically deleting it', async () => {
 		const admin = await sessionFor(await createAdmin());
 		const owner = await sessionFor(await createAccount());

@@ -77,7 +77,34 @@ describe('push configuration', () => {
 	});
 });
 
+describe('subscription endpoint validation', () => {
+	it.each([
+		'http://push.example.test/send',
+		'https://127.0.0.1/send',
+		'https://[::1]/send',
+		'https://169.254.169.254/latest/meta-data',
+	])('rejects an unsafe endpoint before it can be persisted: %s', async endpoint => {
+		await expect(pushService.subscribe({}, {
+			endpoint, keys: { p256dh: 'key', auth: 'auth' },
+		}, 7)).rejects.toThrow();
+	});
+});
+
 describe('notifyNewMail', () => {
+	it.each([
+		'http://push.example.test/send',
+		'https://127.0.0.1/send',
+		'https://[::1]/send',
+		'https://10.0.0.1/send',
+		'https://192.168.1.1/send',
+		'https://169.254.169.254/latest/meta-data',
+		'https://metadata.google.internal/computeMetadata/v1',
+	])('never fetches an unsafe stored endpoint: %s', async endpoint => {
+		const env = await vapidEnv();
+		state.rows = [{ id: 1, endpoint, p256dh: 'not-used', auth: 'not-used' }];
+		await pushService.notifyNewMail(env, 7, { emailId: 1 });
+		expect(fetchCalls).toHaveLength(0);
+	});
 	it('does nothing at all when push is not configured', async () => {
 		const result = await pushService.notifyNewMail({}, 7, { emailId: 1, from: 'a@b.c', subject: 'x' });
 
@@ -140,6 +167,19 @@ describe('notifyNewMail', () => {
 		for (const forbidden of ['content', 'html', 'text', 'preview', 'bodyhtml', 'recipient']) {
 			expect(serialized).not.toContain(forbidden);
 		}
+	});
+
+	it('rejects redirect chains during push delivery', async () => {
+		const env = await vapidEnv();
+		const subscription = await createSubscription();
+		state.rows = [{ id: 1, endpoint: 'https://fcm.googleapis.com/fcm/send/redirect', p256dh: subscription.p256dh, auth: subscription.auth }];
+		globalThis.fetch = vi.fn(async (url, init) => {
+			fetchCalls.push({ url, init });
+			return new Response('', { status: 302, headers: { Location: 'https://127.0.0.1/' } });
+		});
+		await pushService.notifyNewMail(env, 7, { emailId: 1 });
+		expect(fetchCalls).toHaveLength(1);
+		expect(fetchCalls[0].init.redirect).toBe('error');
 	});
 
 	it('drops a subscription the push service reports as gone', async () => {

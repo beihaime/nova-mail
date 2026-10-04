@@ -3,6 +3,7 @@ import pushSubscription from '../entity/push-subscription';
 import { and, asc, eq } from 'drizzle-orm';
 import { t } from '../i18n/i18n';
 import BizError from '../error/biz-error';
+import urlSafety from '../utils/url-safety';
 import {
 	buildVapidAuthorization,
 	encryptPayload,
@@ -72,16 +73,8 @@ const pushService = {
 			throw new BizError(t('pushSubscriptionInvalid'));
 		}
 
-		// Only http(s) push endpoints are acceptable; never fetch a local address.
-		let parsed;
-		try {
-			parsed = new URL(endpoint);
-		} catch {
-			throw new BizError(t('pushSubscriptionInvalid'));
-		}
-		if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-			throw new BizError(t('pushSubscriptionInvalid'));
-		}
+		try { urlSafety.assertSafeWebhookUrl(endpoint); }
+		catch { throw new BizError(t('pushSubscriptionInvalid')); }
 
 		// Atomic upsert on the unique endpoint: re-subscribing from the same
 		// browser refreshes the row (and re-homes it to the signed-in user)
@@ -193,6 +186,8 @@ const pushService = {
 
 		await Promise.all(subscriptions.map(async subscription => {
 			try {
+				// Revalidate stored rows too: subscriptions may predate this policy.
+				const endpoint = urlSafety.assertSafeWebhookUrl(subscription.endpoint);
 				const body = await encryptPayload({
 					payload,
 					p256dh: subscription.p256dh,
@@ -200,14 +195,15 @@ const pushService = {
 				});
 
 				const authorization = await buildVapidAuthorization({
-					endpoint: subscription.endpoint,
+					endpoint,
 					publicKey: vapid.publicKey,
 					privateKey: vapid.privateKey,
 					subject: vapid.subject,
 				});
 
-				const response = await fetch(subscription.endpoint, {
+				const response = await fetch(endpoint, {
 					method: 'POST',
+					redirect: 'error',
 					headers: {
 						Authorization: authorization,
 						'Content-Encoding': 'aes128gcm',

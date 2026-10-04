@@ -59,7 +59,9 @@ app.get('/email/attList', async (c) => {
 });
 
 app.post('/email/send', async (c) => {
-	const email = await emailService.send(c, await readLimitedJson(c), userContext.getUserId(c));
+	const params = await readLimitedJson(c);
+	params.idempotencyKey ||= c.req.header('Idempotency-Key');
+	const email = await emailService.send(c, params, userContext.getUserId(c));
 	return c.json(result.ok(email));
 });
 

@@ -30,6 +30,7 @@ import threadService from './thread-service';
 import senderAvatarService from './sender-avatar-service';
 import pushService from './push-service';
 import { pageSize } from '../utils/pagination';
+import sendLifecycle from './send-lifecycle';
 
 const MAX_SEARCH_LENGTH = 200;
 
@@ -591,11 +592,7 @@ const emailService = {
 	async deleteForever(c, params, userId) {
 		const emailIdList = await ownedThreadMessageIds(c, userId, params?.emailIds);
 		if (!emailIdList.length) return;
-		const rows = await orm(c).select({ emailId: email.emailId }).from(email).where(and(
-			eq(email.userId, userId), eq(email.trashed, 1), inArray(email.emailId, emailIdList)
-		)).all();
-		if (!rows.length) return;
-		await this.physicsDelete(c, { emailIds: rows.map(row => row.emailId).join(',') });
+		await this.deleteTrashedRows(c, userId, emailIdList);
 	},
 
 	async emptyTrash(c, params, userId) {
@@ -611,7 +608,37 @@ const emailService = {
 			eq(email.trashed, 1)
 		];
 		const rows = await orm(c).select({ emailId: email.emailId }).from(email).where(and(...conditions)).all();
-		if (rows.length) await this.physicsDelete(c, { emailIds: rows.map(row => row.emailId).join(',') });
+		if (rows.length) await this.deleteTrashedRows(c, userId, rows.map(row => row.emailId), accountId);
+	},
+
+	async deleteTrashedRows(c, userId, emailIds, accountId = null) {
+		if (!emailIds.length) return;
+		const db = c.env.db;
+		const placeholders = emailIds.map(() => '?').join(',');
+		const scope = `user_id = ? AND trashed = 1 AND email_id IN (${placeholders})
+			AND account_id IN (SELECT account_id FROM account WHERE user_id = ?)${accountId ? ' AND account_id = ?' : ''}`;
+		const binds = [userId, ...emailIds, userId, ...(accountId ? [accountId] : [])];
+		const candidates = await db.prepare(`SELECT a.email_id, a.key FROM attachments a WHERE a.email_id IN
+			(SELECT email_id FROM email WHERE ${scope})`).bind(...binds).all();
+		await c.testHooks?.beforeConditionalTrashDelete?.();
+		// D1 batch is one transaction. Restore and this conditional deletion
+		// serialize; only rows still in Trash can lose attachments or stars.
+		const results = await db.batch([
+			db.prepare(`DELETE FROM attachments WHERE email_id IN (SELECT email_id FROM email WHERE ${scope})`).bind(...binds),
+			db.prepare(`DELETE FROM star WHERE email_id IN (SELECT email_id FROM email WHERE ${scope})`).bind(...binds),
+			db.prepare(`DELETE FROM email WHERE ${scope} RETURNING email_id`).bind(...binds),
+		]);
+		const deleted = new Set((results[2]?.results || []).map(row => row.email_id));
+		const keys = [...new Set((candidates.results || []).filter(row => deleted.has(row.email_id)).map(row => row.key))];
+		const orphaned = [];
+		for (const key of keys) {
+			const remaining = await db.prepare('SELECT 1 FROM attachments WHERE key = ? LIMIT 1').bind(key).first();
+			if (!remaining) orphaned.push(key);
+		}
+		if (orphaned.length) {
+			try { await attService.batchDelete(c, orphaned); }
+			catch (error) { console.error('删除附件文件失败：', error); }
+		}
 	},
 
 	/**
@@ -639,7 +666,7 @@ const emailService = {
 		try {
 			const existing = await threadService.findExistingMessage(c, params);
 			if (existing) {
-				return existing;
+				return { ...existing, deduplicated: true };
 			}
 
 			thread = await threadService.resolveThreadForMessage(c, params);
@@ -657,7 +684,16 @@ const emailService = {
 
 		params.content = this.imgReplace(params.content, cidAttList, r2domain);
 
-		return orm(c).insert(email).values({ ...params }).returning().get();
+		try {
+			return await orm(c).insert(email).values({ ...params }).returning().get();
+		} catch (error) {
+			// The lookup above closes the normal retry path. This second lookup
+			// closes the concurrent-delivery gap protected by the mailbox-scoped
+			// unique index, without treating an unrelated database failure as mail.
+			const existing = await threadService.findExistingMessage(c, params);
+			if (existing) return { ...existing, deduplicated: true };
+			throw error;
+		}
 	},
 
 	//邮件发送
@@ -712,21 +748,6 @@ const emailService = {
 
 		}
 
-		//如果不是管理员，权限设置了发送次数
-		if (!emailUtils.sameEmail(c.env.admin, userRow.email) && roleRow.sendCount) {
-
-			if (userRow.sendCount >= roleRow.sendCount) {
-				if (roleRow.sendType === 'day') throw new BizError(t('daySendLimit'), 403);
-				if (roleRow.sendType === 'count') throw new BizError(t('totalSendLimit'), 403);
-			}
-
-			if (userRow.sendCount + allRecipients.length > roleRow.sendCount) {
-				if (roleRow.sendType === 'day') throw new BizError(t('daySendLack'), 403);
-				if (roleRow.sendType === 'count') throw new BizError(t('totalSendLack'), 403);
-			}
-
-		}
-
 		const accountRow = await accountService.selectById(c, accountId);
 
 		if (!accountRow) {
@@ -754,7 +775,8 @@ const emailService = {
 			throw new BizError(t('noSendProvider'));
 		}
 		// Only resolve user-supplied object keys after sender ownership and send permission checks.
-		let { imageDataList, html } = await attService.toImageUrlHtml(c, content, userId);
+		const idempotencyKey = params.idempotencyKey || crypto.randomUUID();
+		let { imageDataList, html } = await attService.toImageUrlHtml(c, content, userId, `${userId}:${idempotencyKey}`);
 		if (imageDataList.length + attachments.length > MAIL_LIMITS.MAX_ATTACHMENT_COUNT) {
 			throw new BizError(t('attLimit'));
 		}
@@ -780,10 +802,32 @@ const emailService = {
 
 		}
 
-		let sendResult = {};
+		const quotaCost = roleRow.sendCount && roleRow.sendType !== 'internal' ? allRecipients.length : 0;
+		const quotaLimit = !emailUtils.sameEmail(c.env.admin, userRow.email) && roleRow.sendCount
+			? Number(roleRow.sendCount) : null;
+		const operation = await sendLifecycle.reserve(c, {
+			userId, key: idempotencyKey, params: { ...params, idempotencyKey: undefined },
+			cost: quotaCost, limit: quotaLimit,
+		});
+		if (operation.status === 'finalized') {
+			const result = await orm(c).select().from(email).where(eq(email.emailId, operation.email_id)).get();
+			if (!result) throw new BizError('Finalized send record is missing', 502);
+			result.attList = await attService.selectByEmailIds(c, [result.emailId]);
+			return [result];
+		}
+		if (operation.status === 'failed') throw new BizError('The previous send failed before delivery; retry with a new key', 409);
+		if (operation.status === 'dispatching') throw new BizError('Send delivery is pending reconciliation', 409);
+
+		let sendResult = { data: { id: operation.provider_id } };
 
 		//存在站外邮箱时，如果配置了 Cloudflare Email Service 就优先使用，否则使用 Resend
-		if (!allInternal) {
+		if (operation.status === 'reserved') {
+			if (!await sendLifecycle.claimDispatch(c, operation.operation_id)) {
+				throw new BizError('Send is already in progress', 409);
+			}
+			let providerAccepted = false;
+			try {
+			if (!allInternal) {
 
 			if (useCloudflareEmail) {
 				sendResult = await this.sendByCloudflareEmail(c, {
@@ -797,7 +841,8 @@ const emailService = {
 					html,
 					attachments: [...imageDataList, ...attachments],
 					sendType,
-					messageId: emailRow.messageId
+					messageId: emailRow.messageId,
+					idempotencyKey: operation.operation_id
 				});
 			} else {
 				sendResult = await this.sendByResend(resendToken, {
@@ -811,10 +856,28 @@ const emailService = {
 					html,
 					attachments: [...imageDataList, ...attachments],
 					sendType,
-					messageId: emailRow.messageId
+					messageId: emailRow.messageId,
+					idempotencyKey: operation.operation_id
 				});
 			}
 
+			}
+			if (sendResult.error) {
+				await sendLifecycle.failedBeforeAcceptance(c, operation.operation_id);
+				throw new BizError(sendResult.error.message);
+			}
+			providerAccepted = true;
+			// A failed acceptance write leaves dispatching (uncertain) and must not
+			// trigger a second provider call on retry.
+			await sendLifecycle.accepted(c, operation.operation_id, sendResult.data?.id);
+			} catch (error) {
+				// Only failures before the acceptance write release the reservation.
+				// If D1 cannot record provider acceptance, keep dispatching: retrying
+				// that key must reconcile manually instead of delivering twice.
+				const current = await c.env.db.prepare('SELECT status FROM outbound_send WHERE operation_id = ?').bind(operation.operation_id).first();
+				if (!providerAccepted && current?.status === 'dispatching') await sendLifecycle.failedBeforeAcceptance(c, operation.operation_id);
+				throw error;
+			}
 		}
 
 		const { data, error } = sendResult;
@@ -823,6 +886,11 @@ const emailService = {
 		if (error) {
 			throw new BizError(error.message);
 		}
+		if (!await sendLifecycle.claimFinalize(c, operation.operation_id)) {
+			throw new BizError('Send finalization is already in progress', 409);
+		}
+		try {
+		await c.testHooks?.beforeSendFinalization?.();
 
 		imageDataList = imageDataList.map(item => ({...item, contentId: `<${item.contentId}>`}))
 
@@ -844,6 +912,7 @@ const emailService = {
 		emailData.type = emailConst.type.SEND;
 		emailData.userId = userId;
 		emailData.resendEmailId = data?.id;
+		emailData.sendOperationId = operation.operation_id;
 
 		const recipient = [];
 
@@ -903,22 +972,20 @@ const emailService = {
 			}
 		}
 
-		//如果权限有发送次数增加用户发送次数
-		if (roleRow.sendCount && roleRow.sendType !== 'internal') {
-			await userService.incrUserSendCount(c, allRecipients.length, userId);
-		}
-
 		//保存到数据库并返回结果
-		const emailResult = await orm(c).insert(email).values(emailData).returning().get();
+		let emailResult = await orm(c).insert(email).values(emailData).onConflictDoNothing().returning().get();
+		if (!emailResult) emailResult = await orm(c).select().from(email)
+			.where(and(eq(email.sendOperationId, operation.operation_id), eq(email.type, emailConst.type.SEND))).get();
+		if (!emailResult) throw new BizError('Sent-mail record could not be recovered', 502);
 
 		//保存内嵌附件
 		if (imageDataList.length > 0) {
-			await attService.saveArticleAtt(c, imageDataList, userId, accountId, emailResult.emailId);
+			await attService.saveArticleAtt(c, imageDataList, userId, accountId, emailResult.emailId, operation.operation_id);
 		}
 
 		//保存普通附件
 		if (attachments?.length > 0) {
-			await attService.saveSendAtt(c, attachments, userId, accountId, emailResult.emailId);
+			await attService.saveSendAtt(c, attachments, userId, accountId, emailResult.emailId, operation.operation_id);
 		}
 
 		const attList = await attService.selectByEmailIds(c, [emailResult.emailId]);
@@ -942,7 +1009,13 @@ const emailService = {
 			await c.env.kv.put(kvConst.SEND_DAY_COUNT + dateStr, JSON.stringify(daySendTotal), { expirationTtl: 60 * 60 * 24 });
 		}
 
+		await sendLifecycle.finalized(c, operation.operation_id, emailResult.emailId);
 		return [ emailResult ];
+		} catch (error) {
+			try { await sendLifecycle.retryFinalize(c, operation.operation_id); }
+			catch (recoveryError) { console.error('Send finalization state recovery failed', recoveryError); }
+			throw error;
+		}
 	},
 
 	async sendByCloudflareEmail(c, params) {
@@ -1008,7 +1081,7 @@ const emailService = {
 			};
 		}
 
-		return await resend.emails.send(sendForm);
+		return await resend.emails.send(sendForm, { idempotencyKey: params.idempotencyKey });
 	},
 
 	async toCloudflareAttachments(attachments) {
@@ -1251,11 +1324,19 @@ const emailService = {
 				delete emailData.parentMessageId;
 			}
 
-			const emailRow = await orm(c).insert(email).values(emailData).returning().get();
+			let emailRow = emailData.sendOperationId
+				? await orm(c).insert(email).values(emailData).onConflictDoNothing().returning().get()
+				: await orm(c).insert(email).values(emailData).returning().get();
+			const inserted = Boolean(emailRow);
+			if (!emailRow && emailData.sendOperationId) emailRow = await orm(c).select().from(email).where(and(
+				eq(email.sendOperationId, emailData.sendOperationId), eq(email.type, emailConst.type.RECEIVE),
+				eq(email.accountId, emailData.accountId), eq(email.toEmail, emailData.toEmail)
+			)).get();
+			if (!emailRow) throw new BizError('Internal delivery could not be recovered', 502);
 
 			// The recipient may be a different user of this instance: notify their
 			// devices too, so on-site mail behaves like an external delivery.
-			if (emailRow.userId > 0 && emailRow.status === emailConst.status.RECEIVE) {
+			if (inserted && emailRow.userId > 0 && emailRow.status === emailConst.status.RECEIVE) {
 				pushService.scheduleNewMail(c, emailRow.userId, {
 					emailId: emailRow.emailId,
 					from: emailRow.sendEmail,
@@ -1270,7 +1351,8 @@ const emailService = {
 				attValues.accountId = emailRow.accountId;
 				attValues.userId = emailRow.userId;
 				attValues.attId = null;
-				await orm(c).insert(att).values(attValues).run();
+				const query = orm(c).insert(att).values(attValues);
+				await (attValues.sendOperationId ? query.onConflictDoNothing() : query).run();
 			}
 
 		}
