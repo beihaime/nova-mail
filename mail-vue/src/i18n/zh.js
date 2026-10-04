@@ -416,6 +416,7 @@ const zh = {
     restoreSuccessMsg: '恢复成功',
     banRestore: '确认禁用 {msg} 吗？',
     logOut: '退出',
+    logoutSuccess: '已成功退出登录',
     clearContentConfirm: '确定要清空所有内容吗？',
     emptyRecipientMsg: '收件人邮箱地址不能为空',
     emptySubjectMsg: '主题不能为空',

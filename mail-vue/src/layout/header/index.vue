@@ -157,7 +157,7 @@ import {accountList} from "@/request/account.js";
 import {useAccountStore} from "@/store/account.js";
 import {useEmailStore} from "@/store/email.js";
 import {useMailSearch} from "@/composables/use-mail-search.js";
-import {clearAuthenticatedSession} from '@/utils/session-state.js';
+import {beginLogout, endLogout} from '@/utils/session-state.js';
 
 defineExpose({ closeProfilePopup })
 
@@ -332,10 +332,20 @@ function changeAside() {
 function clickLogout() {
   closeProfilePopup()
   logoutLoading.value = true
-  logout().then(() => {
-    clearAuthenticatedSession()
-    router.replace('/login')
+  const token = localStorage.getItem('token')
+
+  // Do this before revoking remotely. It prevents mailbox polling or component
+  // teardown work from issuing another authenticated request during logout.
+  beginLogout()
+  router.replace('/login')
+
+  logout(token).then(() => {
+    ElMessage({ message: t('logoutSuccess'), type: 'success', plain: true, grouping: true })
+  }).catch(() => {
+    // The HTTP interceptor surfaces real logout failures. Expected 401s from
+    // other requests are suppressed there while logout is in progress.
   }).finally(() => {
+    endLogout()
     logoutLoading.value = false
   })
 }

@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   replace: vi.fn(),
   navigate: vi.fn(),
   message: vi.fn(),
+  logoutInProgress: false,
 }))
 
 vi.mock('@/router', () => ({ default: { replace: mocks.replace, push: mocks.navigate } }))
@@ -22,6 +23,7 @@ vi.mock('@/i18n/index.js', () => ({ default: { global: { t: (key) => key } } }))
 // test only exercises the token clearing, not the store wiring.
 vi.mock('@/utils/session-state.js', () => ({
   clearAuthenticatedSession: () => { localStorage.removeItem('token') },
+  isLogoutInProgress: () => mocks.logoutInProgress,
 }))
 
 const { default: http } = await import('@/axios/index.js')
@@ -95,6 +97,7 @@ describe('route guard', () => {
 describe('HTTP 401 handling', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.logoutInProgress = false
     globalThis.ElMessage = mocks.message
     localStorage.setItem('token', 'stale-jwt')
   })
@@ -131,5 +134,52 @@ describe('HTTP 401 handling', () => {
 
     await expect(http.get('/email/latest', { noMsg: true })).rejects.toMatchObject({ code: 500 })
     expect(mocks.message).not.toHaveBeenCalled()
+  })
+
+  it('suppresses an expected 401 from a request started after local logout', async () => {
+    localStorage.removeItem('token')
+    mocks.logoutInProgress = true
+    http.defaults.adapter = adapterReturning({ code: 401, message: '登录已过期' })
+
+    await expect(http.get('/email/latest')).rejects.toMatchObject({ code: 401 })
+
+    expect(mocks.message).not.toHaveBeenCalled()
+    expect(mocks.replace).not.toHaveBeenCalled()
+  })
+
+  it('suppresses a 401 returned for an in-flight request after logout revokes its token', async () => {
+    let respond
+    let requestStarted
+    const started = new Promise(resolve => { requestStarted = resolve })
+    http.defaults.adapter = config => new Promise(resolve => {
+      respond = () => resolve({
+        data: { code: 401, message: '登录已过期' }, status: 200, statusText: 'OK', headers: {}, config,
+      })
+      requestStarted()
+    })
+
+    const pending = http.get('/email/latest')
+    await started
+    localStorage.removeItem('token')
+    mocks.logoutInProgress = true
+    respond()
+
+    await expect(pending).rejects.toThrow('Session changed')
+    expect(mocks.message).not.toHaveBeenCalled()
+    expect(mocks.replace).not.toHaveBeenCalled()
+  })
+
+  it('keeps the captured token on the logout request after local state is cleared', async () => {
+    localStorage.removeItem('token')
+    mocks.logoutInProgress = true
+    let authorization
+    http.defaults.adapter = async (config) => {
+      authorization = config.headers.Authorization
+      return { data: { code: 200, data: null }, status: 200, statusText: 'OK', headers: {}, config }
+    }
+
+    await expect(http.delete('/logout', { logoutToken: 'revoked-jwt', isLogoutRequest: true })).resolves.toBeNull()
+
+    expect(authorization).toBe('revoked-jwt')
   })
 })

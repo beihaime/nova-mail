@@ -2,10 +2,12 @@ import axios from "axios";
 import router from "@/router";
 import i18n from "@/i18n/index.js";
 import {useSettingStore} from "@/store/setting.js";
-import {clearAuthenticatedSession} from '@/utils/session-state.js';
+import {clearAuthenticatedSession, isLogoutInProgress} from '@/utils/session-state.js';
 
 const currentAuthorization = () => `${localStorage.getItem('token')}`
-const isStaleRequest = config => Boolean(config) && config.headers?.Authorization !== currentAuthorization()
+const isLogoutRequest = config => Boolean(config?.isLogoutRequest)
+const isStaleRequest = config => Boolean(config) && !isLogoutRequest(config) && config.headers?.Authorization !== currentAuthorization()
+const isExpectedLogoutAuthFailure = config => !isLogoutRequest(config) && Boolean(config?.suppressAuthError)
 
 let http = axios.create({
     baseURL: import.meta.env.VITE_BASE_URL
@@ -13,7 +15,12 @@ let http = axios.create({
 
 http.interceptors.request.use(config => {
     const { lang } = useSettingStore();
-    config.headers.Authorization = currentAuthorization()
+    // Logout clears local storage before making its request, but it must still
+    // carry the token being revoked. No other request may opt into this.
+    config.headers.Authorization = config.logoutToken || currentAuthorization()
+    // Persist this decision on the request. It may complete after navigation
+    // and after the logout flag has been reset, but its 401 is still expected.
+    if (!isLogoutRequest(config) && isLogoutInProgress()) config.suppressAuthError = true
     config.headers['accept-language'] = lang
     return config
 })
@@ -31,6 +38,7 @@ http.interceptors.response.use((res) => {
             const data = res.data
 
             if (data.code === 401) {
+                if (isExpectedLogoutAuthFailure(res.config)) return reject(data)
                 if (!noMsg) ElMessage({
                     message: data.message,
                     type: 'error',
@@ -91,6 +99,7 @@ http.interceptors.response.use((res) => {
 
         if (isStaleRequest(error.config)) return Promise.reject(error)
         if (error.response?.status === 401) {
+            if (isExpectedLogoutAuthFailure(error.config)) return Promise.reject(error)
             clearAuthenticatedSession()
             router.replace('/login')
             return Promise.reject(error)

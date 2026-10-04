@@ -7,6 +7,24 @@ import { useUserStore } from '@/store/user.js'
 import { useWriterStore } from '@/store/writer.js'
 import { watch } from 'vue'
 
+// A logout invalidates the server-side token before every in-flight mailbox
+// request has necessarily finished. Keep this short-lived flag so the HTTP
+// client can distinguish those expected 401s from an expired session.
+let logoutInProgress = false
+
+export function beginLogout() {
+  logoutInProgress = true
+  clearAuthenticatedSession()
+}
+
+export function endLogout() {
+  logoutInProgress = false
+}
+
+export function isLogoutInProgress() {
+  return logoutInProgress
+}
+
 export function clearUserScopedState() {
   useEmailStore().$reset()
   useWriterStore().$reset()
