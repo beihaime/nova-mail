@@ -5,6 +5,7 @@ compatibility_date = "2025-06-04"
 # production config (wrangler.toml) also carries TURNSTILE_HOSTNAME, which the
 # Worker uses for both the Turnstile hostname check and the CORS allowlist —
 # without this the CI deploy would quietly drop it. Keep it in both places.
+workers_dev = true
 keep_vars = true
 
 [observability]
