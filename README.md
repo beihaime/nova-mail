@@ -92,7 +92,7 @@ Nova Mail is a self-hosted webmail application built on Cloudflare Workers. It c
 - Password login plus GitHub, Google, and Linux DO OAuth login/account linking when those providers are configured.
 - Device/session inventory, individual or other-session revocation, and optional login alerts by email or Telegram.
 - Account deletion controls and role-based permissions.
-- Administrator views for analytics, users and accounts, all mail, roles, invite codes, and system settings.
+- Administrator views at [`/admin`](/admin) for analytics, users and accounts, all mail, roles, invite codes, and system settings.
 
 ## Sending HTML and Markdown mail
 
