@@ -75,6 +75,8 @@ const zh = {
     accountInformation: '账户信息',
     linkedProviders: '已关联服务',
     managedAddresses: '已管理邮箱',
+    addEmailAddress: '添加邮箱地址',
+    noManagedAddresses: '暂无邮箱地址',
     dangerZone: '危险操作',
     personalization: '个性化',
     personalizationDesc: '外观、语言与邮件偏好',

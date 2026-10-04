@@ -1,21 +1,37 @@
 <template>
-  <section class="addresses-view">
-    <account page-mode />
-  </section>
+  <div class="box">
+    <div class="settings-content">
+      <div class="settings-subpage-header">
+        <button class="settings-back-button" type="button" :aria-label="$t('back')" @click="router.back()">
+          <Icon icon="solar:arrow-left-linear" width="20" height="20" />
+        </button>
+        <h1>{{ $t('emailAddresses') }}</h1>
+      </div>
+      <account-addresses />
+    </div>
+  </div>
 </template>
 
 <script setup>
-import { defineOptions } from 'vue'
-import account from '@/layout/account/index.vue'
+import {defineOptions} from 'vue'
+import {Icon} from '@iconify/vue'
+import {useRouter} from 'vue-router'
+import AccountAddresses from '@/components/account-addresses/index.vue'
 
 defineOptions({ name: 'addresses' })
+
+const router = useRouter()
 </script>
 
-<style scoped>
-.addresses-view {
-  height: 100%;
-  min-height: 0;
-  overflow: auto;
-  background: var(--el-bg-color);
+<style scoped lang="scss">
+@use '../../styles/settings-ui' as *;
+
+.box { @include nova-settings-page; }
+.settings-content { @include nova-settings-content; }
+.settings-subpage-header { @include nova-settings-subpage-header; }
+.settings-back-button { @include nova-settings-back-button; }
+
+@media (max-width: 767px) {
+  .settings-subpage-header { @include nova-settings-subpage-header-mobile; }
 }
 </style>

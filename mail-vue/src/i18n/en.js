@@ -75,6 +75,8 @@ const en = {
     accountInformation: 'Account information',
     linkedProviders: 'Linked providers',
     managedAddresses: 'Managed addresses',
+    addEmailAddress: 'Add email address',
+    noManagedAddresses: 'No email addresses yet',
     dangerZone: 'Danger zone',
     personalization: 'Personalization',
     personalizationDesc: 'Appearance, language and mail preferences',

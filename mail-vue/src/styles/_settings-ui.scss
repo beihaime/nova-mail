@@ -1,0 +1,247 @@
+// ---------------------------------------------------------------------------
+// Shared "Account & Security" visual language.
+//
+// The Settings page (views/setting/index.vue) is the source of truth for the
+// Nova Mail settings design language. These mixins are the single definition of
+// its primitives; the Settings page and the Account addresses sub-page both
+// include them, so an address row can never drift into a second design system.
+//
+// Every colour is a Nova theme token — no literal light/dark values live here.
+// ---------------------------------------------------------------------------
+
+// Page shell ---------------------------------------------------------------
+@mixin nova-settings-page {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  height: 100%;
+  overflow-y: auto;
+  padding: 40px 32px;
+
+  @media (min-width: 768px) {
+    /* A tall subpage must not move the shared centered column when its
+       scrollbar appears; reserve an equal gutter on both sides. */
+    scrollbar-gutter: stable both-edges;
+  }
+
+  @media (max-width: 767px) {
+    padding: calc(env(safe-area-inset-top, 0px) + 24px) 16px 30px;
+    /* Mobile browsers already use overlay scroll indicators. */
+    scrollbar-width: none;
+    &::-webkit-scrollbar { display: none; }
+  }
+}
+
+@mixin nova-settings-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: 1040px;
+  min-width: 0;
+  margin-inline: auto;
+}
+
+// Section ------------------------------------------------------------------
+@mixin nova-settings-section {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  margin: 0 0 30px;
+}
+
+@mixin nova-settings-section-mobile {
+  margin-bottom: 24px;
+}
+
+@mixin nova-settings-section-title {
+  margin: 0;
+  color: var(--nm-text-primary);
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+// Sub-page header ----------------------------------------------------------
+@mixin nova-settings-subpage-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  margin-bottom: 28px;
+
+  h1 { margin: 0; color: var(--nm-text-primary); font-size: 22px; line-height: 1.2; }
+}
+
+@mixin nova-settings-subpage-header-mobile {
+  margin-bottom: 22px;
+  h1 { font-size: 20px; }
+}
+
+@mixin nova-settings-back-button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 10px;
+  color: var(--nm-text-secondary);
+  background: transparent;
+  cursor: pointer;
+
+  &:hover { color: var(--nm-text-primary); background: var(--nm-hover); }
+  &:focus-visible { outline: none; box-shadow: var(--nova-button-focus-ring); }
+}
+
+// Grouped surface ----------------------------------------------------------
+@mixin nova-settings-panel {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--nova-divider);
+  border-radius: 12px;
+  background: var(--nova-surface);
+}
+
+@mixin nova-settings-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  min-height: 64px;
+  padding: 14px 18px;
+  box-sizing: border-box;
+}
+
+@mixin nova-settings-row-divider {
+  .settings-row + .settings-row { border-top: 1px solid var(--nova-divider-soft); }
+}
+
+@mixin nova-settings-row-mobile {
+  gap: 12px;
+  min-height: 58px;
+  padding: 12px 14px;
+}
+
+@mixin nova-settings-row-title {
+  color: var(--nm-text-primary);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+@mixin nova-settings-row-copy {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+
+  small { color: var(--nm-text-muted); font-size: 13px; line-height: 1.4; }
+}
+
+@mixin nova-settings-text-action {
+  flex: 0 0 auto;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--nova-button-radius);
+  color: var(--nm-accent);
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover { background: var(--nm-hover); }
+  &:active { background: var(--nova-button-active); }
+  &:focus-visible { outline: none; box-shadow: var(--nova-button-focus-ring); }
+}
+
+// Navigation row (the "Settings action" pattern) ---------------------------
+@mixin nova-settings-category-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 74px;
+  padding: 13px 14px;
+  gap: 14px;
+  border: 1px solid transparent;
+  border-radius: var(--nova-button-radius);
+  color: var(--nm-text-primary);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--nova-motion-fast) var(--nova-motion-ease), border-color var(--nova-motion-fast) var(--nova-motion-ease);
+
+  &:hover,
+  &:focus-visible {
+    border-color: var(--nova-divider);
+    background: var(--nm-hover);
+  }
+
+  &:focus-visible { outline: none; box-shadow: var(--nova-button-focus-ring); }
+}
+
+@mixin nova-settings-category-row-mobile {
+  min-height: 68px;
+  padding-inline: 8px;
+  gap: 12px;
+}
+
+@mixin nova-settings-category-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  border-radius: 12px;
+  color: var(--nm-accent);
+  background: var(--nm-accent-subtle);
+}
+
+@mixin nova-settings-category-icon-mobile {
+  width: 36px;
+  height: 36px;
+  flex-basis: 36px;
+  border-radius: 10px;
+}
+
+@mixin nova-settings-category-copy {
+  display: grid;
+  min-width: 0;
+  flex: 1 1 auto;
+  gap: 3px;
+
+  strong { font-size: 15px; font-weight: 600; }
+  small { overflow: hidden; color: var(--nm-text-muted); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+}
+
+@mixin nova-settings-category-copy-mobile {
+  strong { font-size: 14px; }
+  small { font-size: 12px; }
+}
+
+@mixin nova-settings-category-chevron {
+  flex: 0 0 auto;
+  color: var(--nm-text-muted);
+}
+
+// Compact leading icon inside a list row -----------------------------------
+@mixin nova-settings-list-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  color: var(--nm-text-secondary);
+  background: var(--nm-accent-subtle);
+}
+
+@mixin nova-settings-list-icon-mobile {
+  flex-basis: 30px;
+  width: 30px;
+  height: 30px;
+}

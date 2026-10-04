@@ -116,10 +116,7 @@
       </div>
       </div>
     </section>
-    <section v-if="section === 'addresses'" class="settings-section addresses-page">
-      <h2 class="settings-section-title">{{ $t('managedAddresses') }}</h2>
-      <div class="settings-panel addresses-panel"><account page-mode :show-page-intro="false" /></div>
-    </section>
+    <account-addresses v-if="section === 'addresses'" />
 
     <section v-if="section === 'personalization'" class="settings-section appearance">
       <h2 class="settings-section-title">{{ $t('visualStyle') }}</h2>
@@ -402,7 +399,7 @@ import {accountSetName} from "@/request/account.js";
 import {useAccountStore} from "@/store/account.js";
 import {useI18n} from "vue-i18n";
 import {useSettingStore} from "@/store/setting.js";
-import account from '@/layout/account/index.vue';
+import AccountAddresses from '@/components/account-addresses/index.vue';
 import packageInfo from '../../../package.json';
 import {useUiStore} from "@/store/ui.js";
 import {getSessions, revokeSession, revokeOtherSessions, getLoginAlerts, updateLoginAlerts} from '@/request/security.js';
@@ -1052,59 +1049,18 @@ function submitPwd() {
 
 </script>
 <style scoped lang="scss">
+@use '../../styles/settings-ui' as *;
+
 .box {
   /* The page owns its width so long account names / emails can never stretch it
      past the viewport; content shrinks instead (see min-width: 0 below). */
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  box-sizing: border-box;
-  height: 100%;
-  overflow-y: auto;
-  padding: 40px 32px;
+  @include nova-settings-page;
 
-  @media (min-width: 768px) {
-    /* A tall subpage must not move the shared centered column when its
-       scrollbar appears; reserve an equal gutter on both sides. */
-    scrollbar-gutter: stable both-edges;
-  }
+  .settings-content { @include nova-settings-content; }
 
-  @media (max-width: 767px) {
-    padding: calc(env(safe-area-inset-top, 0px) + 24px) 16px 30px;
-    /* Mobile browsers already use overlay scroll indicators. Avoid a desktop
-       scrollbar taking 10px from just the long subpages in narrow previews. */
-    scrollbar-width: none;
-    &::-webkit-scrollbar { display: none; }
-  }
+  .settings-section { @include nova-settings-section; }
 
-  .settings-content {
-    display: flex;
-    flex-direction: column;
-    flex: 1 1 auto;
-    width: 100%;
-    max-width: 1040px;
-    min-width: 0;
-    margin-inline: auto;
-  }
-
-  .settings-section {
-    display: grid;
-    align-content: start;
-    gap: 12px;
-    width: 100%;
-    min-width: 0;
-    margin: 0 0 30px;
-  }
-
-  .settings-section-title {
-    margin: 0;
-    color: var(--nm-text-primary);
-    font-size: 16px;
-    font-weight: 650;
-    line-height: 1.35;
-  }
+  .settings-section-title { @include nova-settings-section-title; }
 
   .settings-section-description {
     margin: -6px 0 0;
@@ -1113,46 +1069,15 @@ function submitPwd() {
     line-height: 1.45;
   }
 
-  .settings-panel {
-    width: 100%;
-    min-width: 0;
-    overflow: hidden;
-    border: 1px solid var(--nova-divider);
-    border-radius: 12px;
-    background: var(--nova-surface);
-  }
+  .settings-panel { @include nova-settings-panel; }
 
-  .settings-row {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    min-width: 0;
-    min-height: 64px;
-    padding: 14px 18px;
-    box-sizing: border-box;
-  }
+  .settings-row { @include nova-settings-row; }
 
-  .settings-row + .settings-row { border-top: 1px solid var(--nova-divider-soft); }
-  .settings-row-title { color: var(--nm-text-primary); font-size: 14px; font-weight: 500; }
-  .settings-row-copy { display: grid; min-width: 0; gap: 4px; }
-  .settings-row-copy small { color: var(--nm-text-muted); font-size: 13px; line-height: 1.4; }
+  @include nova-settings-row-divider;
+  .settings-row-title { @include nova-settings-row-title; }
+  .settings-row-copy { @include nova-settings-row-copy; }
 
-  .settings-text-action {
-    flex: 0 0 auto;
-    padding: 6px 8px;
-    border: 0;
-    border-radius: var(--nova-button-radius);
-    color: var(--nm-accent);
-    background: transparent;
-    font: inherit;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-
-  .settings-text-action:hover { background: var(--nm-hover); }
-  .settings-text-action:active { background: var(--nova-button-active); }
-  .settings-text-action:focus-visible { outline: none; box-shadow: var(--nova-button-focus-ring); }
+  .settings-text-action { @include nova-settings-text-action; }
 
   .settings-home {
     display: grid;
@@ -1168,12 +1093,6 @@ function submitPwd() {
   .settings-category-row.danger-entry .settings-category-icon,
   .settings-category-row.danger-entry .settings-category-copy strong { color: var(--nova-danger); }
   .settings-category-row.danger-entry .settings-category-icon { background: color-mix(in srgb, var(--nova-danger) 10%, transparent); }
-  .addresses-page { flex: 1 1 auto; min-height: 0; grid-template-rows: auto minmax(320px, 1fr); }
-  .addresses-panel { min-height: 0; height: 100%; }
-  .addresses-panel :deep(.account-box.address-page) { border: 0 !important; background: var(--nova-surface); }
-  .addresses-panel :deep(.account-box.address-page .head-opt) { max-width: none; padding-inline: 18px; }
-  .addresses-panel :deep(.account-box.address-page .scrollbar) { max-width: none; }
-  .addresses-panel :deep(.account-box.address-page .item) { margin-inline: 18px; }
 
   .settings-home-title {
     margin-bottom: 12px;
@@ -1182,67 +1101,17 @@ function submitPwd() {
     font-weight: 700;
   }
 
-  .settings-category-row {
-    display: flex;
-    align-items: center;
-    width: 100%;
-    min-height: 74px;
-    padding: 13px 14px;
-    gap: 14px;
-    border: 1px solid transparent;
-    border-radius: var(--nova-button-radius);
-    color: var(--nm-text-primary);
-    background: transparent;
-    text-align: left;
-    cursor: pointer;
-    transition: background-color var(--nova-motion-fast) var(--nova-motion-ease), border-color var(--nova-motion-fast) var(--nova-motion-ease);
-  }
+  .settings-category-row { @include nova-settings-category-row; }
 
-  .settings-category-row:hover,
-  .settings-category-row:focus-visible {
-    border-color: var(--nova-divider);
-    background: var(--nm-hover);
-  }
+  .settings-category-icon { @include nova-settings-category-icon; }
 
-  .settings-category-row:focus-visible,
-  .settings-back-button:focus-visible {
-    outline: none;
-    box-shadow: var(--nova-button-focus-ring);
-  }
+  .settings-category-copy { @include nova-settings-category-copy; }
 
-  .settings-category-icon {
-    display: grid;
-    place-items: center;
-    width: 40px;
-    height: 40px;
-    flex: 0 0 40px;
-    border-radius: 12px;
-    color: var(--nm-accent);
-    background: var(--nm-accent-subtle);
-  }
+  .settings-category-chevron { @include nova-settings-category-chevron; }
 
-  .settings-category-copy {
-    display: grid;
-    min-width: 0;
-    flex: 1 1 auto;
-    gap: 3px;
-  }
+  .settings-subpage-header { @include nova-settings-subpage-header; }
 
-  .settings-category-copy strong { font-size: 15px; font-weight: 600; }
-  .settings-category-copy small { overflow: hidden; color: var(--nm-text-muted); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
-  .settings-category-chevron { flex: 0 0 auto; color: var(--nm-text-muted); }
-
-  .settings-subpage-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    min-height: 38px;
-    margin-bottom: 28px;
-  }
-
-  .settings-subpage-header h1 { margin: 0; color: var(--nm-text-primary); font-size: 22px; line-height: 1.2; }
-  .settings-back-button { display: grid; place-items: center; width: 36px; height: 36px; border: 0; border-radius: 10px; color: var(--nm-text-secondary); background: transparent; cursor: pointer; }
-  .settings-back-button:hover { color: var(--nm-text-primary); background: var(--nm-hover); }
+  .settings-back-button { @include nova-settings-back-button; }
 
   .about-page { display: grid; gap: 22px; color: var(--nm-text-secondary); }
   .about-brand { display: flex; align-items: center; gap: 12px; color: var(--nm-text-primary); font-size: 20px; font-weight: 700; }
@@ -1517,7 +1386,7 @@ function submitPwd() {
   /* ---------- Notification sound ---------- */
   .session-list { display: grid; min-height: 64px; }
   .session-row { min-height: 98px; }
-  .session-icon { display: grid; place-items: center; flex: 0 0 36px; width: 36px; height: 36px; border-radius: 10px; color: var(--nm-text-secondary); background: var(--nm-accent-subtle); }
+  .session-icon { @include nova-settings-list-icon; }
   .session-details { min-width: 0; flex: 1; }
   .session-title { color: var(--nm-text-primary); font-size: 14px; font-weight: 600; }
   .session-meta { color: var(--nm-text-muted); font-size: 12px; margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1767,28 +1636,24 @@ function submitPwd() {
   .appearance-reset-row :deep(.el-button) { flex: 0 0 auto; }
 
   @media (max-width: 767px) {
-    .settings-section { margin-bottom: 24px; }
-    .settings-row { gap: 12px; min-height: 58px; padding: 12px 14px; }
+    .settings-section { @include nova-settings-section-mobile; }
+    .settings-row { @include nova-settings-row-mobile; }
     .profile-row { grid-template-columns: minmax(80px, 30%) minmax(0, 1fr); }
     .profile-value { gap: 4px; }
     .profile-value .settings-text-action { padding-inline: 4px; }
     .mail-density-setting .settings-control-row { flex-direction: column; align-items: stretch; }
     .session-row { align-items: flex-start; }
-    .session-icon { flex-basis: 30px; width: 30px; height: 30px; }
+    .session-icon { @include nova-settings-list-icon-mobile; }
     .session-action { flex-basis: 80px; min-width: 0; }
     .session-current { text-align: right; white-space: normal; }
     .session-meta { white-space: normal; overflow-wrap: anywhere; }
     .danger-row { flex-wrap: wrap; }
     .danger-row :deep(.el-button) { margin-left: auto; }
-    .addresses-panel :deep(.account-box.address-page .head-opt) { padding-inline: 14px; }
-    .addresses-panel :deep(.account-box.address-page .item) { margin-inline: 14px; }
     .settings-home-title { font-size: 20px; }
-    .settings-category-row { min-height: 68px; padding-inline: 8px; gap: 12px; }
-    .settings-category-icon { width: 36px; height: 36px; flex-basis: 36px; border-radius: 10px; }
-    .settings-category-copy strong { font-size: 14px; }
-    .settings-category-copy small { font-size: 12px; }
-    .settings-subpage-header { margin-bottom: 22px; }
-    .settings-subpage-header h1 { font-size: 20px; }
+    .settings-category-row { @include nova-settings-category-row-mobile; }
+    .settings-category-icon { @include nova-settings-category-icon-mobile; }
+    .settings-category-copy { @include nova-settings-category-copy-mobile; }
+    .settings-subpage-header { @include nova-settings-subpage-header-mobile; }
     .about-page { gap: 18px; }
     .time-format-options { width: 100%; }
     .time-format-option { padding-inline: 10px; }
