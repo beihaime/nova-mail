@@ -42,461 +42,296 @@
   </p>
 </div>
 
-Nova Mail is a modern web mail client based on the open-source [cloud-mail](https://github.com/maillab/cloud-mail) project. It keeps the original Cloudflare-based mail workflow while providing a cleaner interface, multi-address account management, and integrated OAuth authentication.
+Nova Mail is a self-hosted webmail application built on Cloudflare Workers. It combines a Vue 3 client with a Worker that receives mail through Cloudflare Email Routing, stores mailbox data in D1, and serves the application at the edge.
+
+[Report an issue](https://github.com/beihaime/nova-mail/issues) · [MIT License](LICENSE)
 
 ## Preview
 
-### Login
+![Nova Mail login](doc/demo/loginDemo.png)
 
-![Nova Mail Login](doc/demo/loginDemo.png)
-
-### Login — dark theme
-
-![Nova Mail Login in dark theme](doc/demo/logindark.png)
-
-### Mail interface
-
-![Nova Mail Mail View](doc/demo/webview.png)
+![Nova Mail mailbox](doc/demo/webview.png)
 
 ## Features
 
-- Responsive desktop and mobile mail interface
-- Light and dark themes with Nova Mail branding, preset palettes, custom palette import/export, and PWA support
-- Inbox, sent mail, drafts, starred mail, archive, spam, trash, folders, and search
-- Multiple email addresses per Nova Mail account with address switching and a dedicated address-management page
-- Compose, reply, forward, mark read/unread, star, delete, archive, attachments, and email printing
-- Sanitized rich HTML email rendering, Markdown rendering, and plain-text email support
-- Automatic code-block detection and syntax highlighting for HTML, Markdown, and plain-text mail; supports common languages, language labels, line numbers, and copying the original code
-- GitHub OAuth login and account linking
-- Google OAuth/OIDC login and account linking
-- Cloudflare Turnstile verification for protected account operations
-- Admin user and mailbox management with roles and permissions
-- Cloudflare Email Workers receiving, Resend sending/status webhooks, and R2 attachment storage
-- Optional Telegram forwarding, webhook forwarding, verification-code extraction with Workers AI, and analytics
-- English and Simplified Chinese localization
-- Desktop mail keyboard shortcuts for navigation, selection, search, reading, composing, and common mail actions
+### Mail
 
-### Desktop keyboard shortcuts
+- Conversation-based Inbox and reader, with quoted-reply collapsing and live reply updates.
+- Inbox, Sent, Drafts, Starred, Archive, and Trash mailboxes; search, sorting, read/unread state, bulk actions, and undoable archive/trash/restore mutations.
+- Compose, reply, reply-all, forward, CC/BCC, printing, attachments, and internal delivery between Nova Mail addresses.
+- HTML, Markdown, and plain-text rendering; code blocks can show language, line numbers, syntax highlighting, and copy controls.
+- Sender avatars resolved from local identities, BIMI, Gravatar, or a registrable sender domain when available.
+- Inbound filtering, optional automatic cleanup, forwarding to email, Telegram, or a webhook, and optional Workers AI verification-code extraction.
 
-Keyboard shortcuts are enabled on desktop widths only and are ignored while
-typing in an input, textarea, select, or editable message area. Press `?` to
-open the in-app shortcut reference.
+### Experience
 
-| Keys | Action |
-| --- | --- |
-| `C` | Compose a message |
-| `/` | Focus mail search |
-| `G`, then `I/S/D/A/T` | Go to Inbox, Sent, Drafts, Archive, or Trash |
-| `J` / `↓`, `K` / `↑` | Move through the message list |
-| `Enter` / `O` | Open the selected message |
-| `X` | Select or clear the selected message |
-| `S` | Star or unstar the selected message |
-| `E` | Archive the selected message |
-| `#` / `Delete` | Move the selected message to Trash |
-| `Shift-I` / `Shift-U` | Mark the selected message read or unread |
-| `R` / `A` / `F` | Reply, reply all, or forward while reading |
-| `J` / `K` | Read the next or previous message |
-| `Esc` | Close dialogs, compose, search, profile menus, or the reader |
-| `Ctrl-Enter` | Send the open message |
+- Responsive desktop and mobile layouts, including configurable mobile swipe actions for archive or trash.
+- Installable PWA with an adaptive theme colour and optional Web Push notifications.
+- Light, dark, and system appearance modes; preset and editable light/dark colour palettes with import/export.
+- Configurable compact or normal mail-list density, 12/24-hour times, notification sound, and English/Simplified Chinese UI.
+- Desktop keyboard shortcuts for search, navigation, selection, composing, mailbox actions, and reading; press `?` in the app for the reference.
 
-### Theme palettes
+### Accounts and administration
 
-Nova Mail applies a complete five-color palette to both light and dark modes:
-accent, background, foreground, surface, and border. Select a preset from
-**Settings → Visual Style**, then optionally fine-tune or import/export a custom
-palette without changing the mail layout.
+- Multiple email addresses per account, address switching, and per-address receive controls.
+- Password login plus GitHub, Google, and Linux DO OAuth login/account linking when those providers are configured.
+- Device/session inventory, individual or other-session revocation, and optional login alerts by email or Telegram.
+- Account deletion controls and role-based permissions.
+- Administrator views for analytics, users and accounts, all mail, roles, invite codes, and system settings.
 
-Built-in presets: **Nova Default**, **Terracotta**, **Forest**, **Lavender**,
-**Matcha**, **Graphite**, **Sakura**, **Arctic**, **Mocha**,
-**Amber**, **Aurora**, **Cobalt**, **Orchid**, **Crimson**, **Pine**, **Lunar**,
-and **Cyber**. Each preset includes coordinated light and dark values.
-
-## Sending HTML and Markdown mail
-
-Nova Mail stores a body type per message and chooses the renderer from it, so a
-message body has to arrive as the right MIME part.
-
-| Body | MIME part | Reader | Inbox row preview |
-| --- | --- | --- | --- |
-| HTML | `text/html` | sanitized, then rendered in a sandboxed iframe | plain text, tags stripped |
-| Markdown | `text/markdown` | markdown-it, sanitized, hardened links | markdown flattened to one line |
-| Plain text | `text/plain` | escaped | used as-is |
-
-Rules:
-
-- Keep `Content-Type` in the **message headers**, followed by one blank line and
-  then the body. Never paste a whole raw message (with `MIME-Version:` /
-  `Content-Type:`) into the body of another mail — Nova unwraps a nested raw
-  message both on ingest and at read time, but sending it properly is better.
-- Prefer `multipart/alternative` with the `text/plain` part first: the row preview
-  uses it and the reader renders the `text/html` part.
-- `text/markdown` is not a body type Postal MIME knows, so the part arrives as an
-  attachment; Nova lifts it back into the body and drops it from the attachment
-  list, so it is never offered as a "body.md" file.
-- Markdown that arrives in a `text/plain` part (or with no `Content-Type`) is
-  detected from strong signals only — an ATX heading, a code fence or a real
-  markdown link — and rendered as markdown. `2 * 3 = 6` and
-  `- sent from my phone` stay plain text.
-- Remote images are blocked until the reader taps "Show images"; links are
-  sanitized and hardened. Inline CSS and table layout are the reliable way to
-  style an HTML mail — `<script>`, event handlers, external stylesheets and
-  `javascript:` URLs are stripped.
-
-### Code blocks and syntax highlighting
-
-For the complete recognition rules, supported languages, examples, security
-model, and verification notes, see [Code blocks and syntax highlighting](doc/CODE_HIGHLIGHTING.md).
-
-The reader renders explicit Markdown fenced blocks and HTML `<pre>` / `<code>`
-content as code. It also conservatively detects consecutive code-like lines in
-plain-text mail and in HTML mail that represents pasted code as `<div>` / `<br>`
-elements. A single sentence containing parentheses or a colon is not enough to
-be treated as code.
-
-Python, Java, JavaScript, TypeScript, C/C++, C#, Go, Rust, Shell, JSON, HTML,
-CSS, and SQL are highlighted when the language can be identified. Each code
-block uses JetBrains Mono where available, provides a language label, compact
-line numbers, horizontal scrolling, and a Copy button that copies the original
-source rather than highlighted markup. Unknown languages remain safe plaintext.
-
-### HTML mail
+## Architecture
 
 ```text
-From: Tester <tester@example.com>
-To: you@yourdomain.com
-Subject: HTML test
-MIME-Version: 1.0
-Content-Type: multipart/alternative; boundary="nova-demo"
+Inbound email
+  Cloudflare Email Routing
+          |
+          v
+  Nova Mail Worker ── Postal MIME parsing ── D1 (users, mail, settings, sessions)
+          |                                      |
+          |                                      +── KV (session/cache/object fallback)
+          +── R2 or S3 (optional attachments)    +── Web Push subscriptions
+          +── Telegram / email forwarding / HTTPS webhook (optional)
 
---nova-demo
-Content-Type: text/plain; charset=utf-8
+Web client ── Vue 3 SPA served as Worker Static Assets ── Worker API
 
-Hello from Nova Mail
-
---nova-demo
-Content-Type: text/html; charset=utf-8
-
-<!DOCTYPE html>
-<html>
-  <body style="margin:0;padding:24px;font-family:-apple-system,'PingFang SC',sans-serif;color:#1c1c1e;">
-    <h1 style="margin:0 0 12px;font-size:22px;">Hello from Nova Mail</h1>
-    <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">This is an <strong>HTML</strong> mail with a <a href="https://example.com" style="color:#247cff;">link</a>.</p>
-    <a href="https://example.com" style="display:inline-block;padding:10px 18px;border-radius:10px;background:#247cff;color:#ffffff;text-decoration:none;">Open example.com</a>
-  </body>
-</html>
---nova-demo--
+Outbound email ── Cloudflare Email Sending, or Resend per sending domain
+Authentication ── password + optional GitHub / Google / Linux DO OAuth
 ```
 
-A single-part mail is enough when there is no plain-text alternative:
-
-```text
-From: Tester <tester@example.com>
-To: you@yourdomain.com
-Subject: HTML test
-MIME-Version: 1.0
-Content-Type: text/html; charset=utf-8
-
-<!DOCTYPE html>
-<html>
-  <body style="margin:0;padding:24px;font-family:-apple-system,'PingFang SC',sans-serif;color:#1c1c1e;">
-    <p style="margin:0;font-size:15px;line-height:1.6;">Hello from <strong>Nova Mail</strong>.</p>
-  </body>
-</html>
-```
-
-### Markdown mail
-
-```text
-From: Tester <tester@example.com>
-To: you@yourdomain.com
-Subject: Markdown test
-MIME-Version: 1.0
-Content-Type: text/markdown; charset=utf-8
-
-# Hello
-
-**Bold** text with a [link](https://example.com).
-```
-
-The reader renders the headings, emphasis, links, tables and code blocks; the
-Inbox row shows `Hello Bold text with a link.`
+The Worker also runs an hourly scheduled task for maintenance, counters, delayed receive completion, cleanup, OAuth cleanup, and analytics-cache refresh.
 
 ## Tech stack
 
-### Frontend
+| Area | Current implementation |
+| --- | --- |
+| Client | Vue 3, Vite, Vue Router, Pinia, Element Plus, Vue I18n |
+| Mail UI | TinyMCE, DOMPurify, markdown-it, highlight.js, ECharts |
+| Edge/API | Cloudflare Workers, Hono, Wrangler |
+| Data | Cloudflare D1 with Drizzle ORM; Cloudflare KV |
+| Object storage | Cloudflare R2 when bound, S3-compatible storage when configured, otherwise KV |
+| Mail | Cloudflare Email Routing and Email Sending; Postal MIME; Resend |
+| Identity and protection | JWT-backed server sessions, Turnstile, GitHub/Google/Linux DO OAuth, Web Push/VAPID |
+| Optional processing | Cloudflare Workers AI, Telegram, outbound HTTPS webhooks |
 
-- Vue 3 and Vite
-- Vue Router and Pinia
-- Element Plus
-- Iconify and the Nova Mail SVG icon assets
-- DOMPurify for email HTML sanitization
-- `vite-plugin-pwa`
+## Deployment
 
-### Backend and infrastructure
+### Prerequisites
 
-- Cloudflare Workers with Hono
-- Cloudflare D1 for application data
-- Cloudflare KV for sessions, temporary OAuth grants, and cached settings
-- Cloudflare R2 for attachments and stored objects
-- Cloudflare Email Workers for inbound email handling
-- Resend for outbound email and delivery webhooks
-- Cloudflare Turnstile for bot verification
-- Cloudflare Workers AI for optional verification-code extraction
-- Drizzle ORM and Postal MIME
+- Node.js 20 or newer and pnpm 12 (the repository pins `pnpm@12.4.2`).
+- A Cloudflare account with Workers, D1, and KV enabled.
+- A verified Cloudflare zone if receiving mail or using a custom hostname.
+
+Clone and install the workspace:
+
+```bash
+git clone https://github.com/beihaime/nova-mail.git
+cd nova-mail
+pnpm install
+```
+
+### 1. Create and bind Cloudflare resources
+
+Create a D1 database and KV namespace, then copy their IDs into `mail-worker/wrangler.toml`. The binding names are part of the application contract and must remain `db` and `kv`.
+
+```bash
+cd mail-worker
+pnpm wrangler d1 create nova-mail
+pnpm wrangler kv namespace create nova-mail
+```
+
+In `wrangler.toml`, set `database_name`/`database_id` in `[[d1_databases]]` and the `id` in `[[kv_namespaces]]`. Configure the non-secret variables in `[vars]`:
+
+```toml
+[vars]
+domain = ["example.com"]
+admin = "admin@example.com"
+TURNSTILE_HOSTNAME = "mail.example.com"
+```
+
+`domain` is an array of email domains Nova Mail may manage. `admin` must be an email address that will be created or used as the administrator. If deploying on a custom hostname, add the matching `[[routes]]` entry to the manual Wrangler configuration, or use the repository workflow's `CUSTOM_DOMAIN` input. The Worker can initially be deployed at its `workers.dev` URL.
+
+R2 is optional: uncomment and populate the `r2` binding only when using an R2 bucket. Without R2 or S3 configuration, attachments use KV storage. The existing `[ai]` binding enables the optional Workers AI integration; leave `ai_model` unset unless verification-code extraction is enabled in System Settings.
+
+### 2. Add Worker secrets
+
+Use Worker secrets for credentials; do not put them in `[vars]`, the repository, or a client build. Run these from `mail-worker`:
+
+```bash
+pnpm wrangler secret put jwt_secret
+pnpm wrangler secret put BOOTSTRAP_TOKEN
+pnpm wrangler secret put TURNSTILE_SECRET_KEY
+```
+
+Generate independent random values for `jwt_secret` and `BOOTSTRAP_TOKEN`; the bootstrap token must be at least 32 characters and is only for a new database. Add feature-specific secrets only when enabling the associated feature.
+
+### 3. Build, deploy, and initialize a new database
+
+`wrangler.toml` builds the Vue application into `mail-worker/dist` during deployment:
+
+```bash
+pnpm deploy
+```
+
+Call the bootstrap endpoint exactly once against the deployed Worker URL. It applies the complete schema defined in `src/init/init.js` and atomically consumes the bootstrap token.
+
+```bash
+curl --fail-with-body -X POST https://<worker-or-custom-host>/api/bootstrap \
+  -H "X-Bootstrap-Token: $BOOTSTRAP_TOKEN"
+```
+
+An initialized installation returns HTTP 409. Do not reset a production database to make this endpoint available; remove or rotate `BOOTSTRAP_TOKEN` after successful initialization.
+
+### 4. Upgrade an existing database
+
+New installations use bootstrap. Existing installations must apply only migrations that are not already present, before deploying code that depends on them. The currently shipped standalone migrations are in `mail-worker/migrations/`:
+
+```bash
+# Run from mail-worker. Substitute the actual D1 database ID or name.
+pnpm wrangler d1 execute <D1_DATABASE> --remote --file migrations/v3_8_body_type.sql
+pnpm wrangler d1 execute <D1_DATABASE> --remote --file migrations/v3_10_archived.sql
+pnpm wrangler d1 execute <D1_DATABASE> --remote --file migrations/v3_11_trash.sql
+pnpm wrangler d1 execute <D1_DATABASE> --remote --file migrations/v3_13_sessions.sql
+pnpm wrangler d1 execute <D1_DATABASE> --remote --file migrations/v3_14_user_preferences.sql
+```
+
+Do not blindly rerun the v3.8, v3.10, or v3.11 files: SQLite has no `ADD COLUMN IF NOT EXISTS`. Inspect `pragma_table_info` first and apply only missing changes. The GitHub Actions deployment workflow performs guarded checks for the later mail, session, and preferences migrations when it has D1 write permission.
+
+### 5. Configure email routing and sending
+
+For inbound mail, verify the domain in Cloudflare, enable **Email Routing**, create the addresses or catch-all you intend Nova Mail to receive, and choose **Send to a Worker** with this Worker as the destination. The configured `domain` list and user address permissions must include the recipient domain.
+
+For outbound mail, configure one of the following:
+
+- Bind Cloudflare Email Sending as `email` in Wrangler to use Cloudflare's sending API.
+- Or, in **Admin → System Settings**, add a Resend API token for each sender domain. External recipients require a configured sending provider; internal Nova Mail delivery does not.
+
+Resend delivery-status webhooks are accepted at `/api/webhooks`; configure the webhook signing secret as the `resend_webhook_secret` Worker secret.
+
+### 6. Configure optional sign-in and notifications
+
+Register these exact OAuth callbacks with the provider, replacing the hostname:
+
+```text
+https://<host>/api/oauth/github/callback
+https://<host>/api/oauth/google/callback
+https://<host>/api/oauth/linuxdo/callback
+```
+
+GitHub uses `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` Worker bindings. Google can use `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` bindings or the administrator's Google OAuth settings. Enable the provider in System Settings as applicable. Google uses OpenID Connect scopes `openid`, `email`, and `profile`.
+
+Turnstile verification requires `TURNSTILE_SECRET_KEY` and an accurate `TURNSTILE_HOSTNAME`. To enable Web Push, generate a VAPID key pair with the provided script:
+
+```bash
+node scripts/generate-vapid-keys.mjs
+pnpm wrangler secret put vapid_public_key
+pnpm wrangler secret put vapid_private_key
+pnpm wrangler secret put vapid_subject
+```
+
+Telegram, S3-compatible object storage, forwarding, webhooks, blacklist rules, Resend tokens, and AI code extraction are configured by an administrator in **System Settings**. Webhook destinations are limited to HTTPS and the Worker rejects unsafe literal IP ranges and redirects; use an allowlist or controlled egress if DNS rebinding is a concern.
+
+### GitHub Actions deployment
+
+The included workflow tests before deploying. Its required deployment inputs are `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `D1_DATABASE_ID`, `KV_NAMESPACE_ID`, `DOMAIN` (a JSON array), `ADMIN`, and `JWT_SECRET`. `BOOTSTRAP_TOKEN` is required only to initialize a new database. `CUSTOM_DOMAIN`, `R2_BUCKET_NAME`, `AI_MODEL`, `ANALYSIS_CACHE`, `PROJECT_LINK`, and VAPID values are optional. Enable Actions after forking the repository; otherwise pushes will not create deployment runs.
+
+## Configuration reference
+
+### Bindings and non-secret variables
+
+| Name | Required | Purpose |
+| --- | --- | --- |
+| `db` | Yes | D1 database binding for application data |
+| `kv` | Yes | KV binding for auth state, caches, and object-storage fallback |
+| `assets` | Yes | Worker Static Assets binding serving `./dist` |
+| `domain` | Yes | Array of managed email domains |
+| `admin` | Yes | Administrator email address |
+| `TURNSTILE_HOSTNAME` | Recommended | Allowed Turnstile/CORS hostname |
+| `r2` | Optional | R2 attachment/object storage binding |
+| `email` | Optional | Cloudflare Email Sending binding |
+| `ai` / `ai_model` | Optional | Workers AI verification-code extraction |
+| `analysis_cache` | Optional | Analytics-cache toggle |
+| `CORS_ORIGIN`, `CORS_ORIGINS` | Optional | Additional API CORS origins |
+| `project_link` | Optional | Project link exposed by settings |
+
+### Secrets
+
+| Secret | Required | Purpose |
+| --- | --- | --- |
+| `jwt_secret` | Yes | Signs authentication tokens |
+| `BOOTSTRAP_TOKEN` | New database only | Single-use database bootstrap authorization |
+| `TURNSTILE_SECRET_KEY` | When Turnstile is enabled | Server-side Turnstile verification |
+| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | GitHub OAuth | GitHub OAuth client credentials |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google OAuth binding configuration | Google OAuth client credentials |
+| `resend_webhook_secret` | Resend webhooks | Verifies Resend webhook signatures |
+| `vapid_public_key`, `vapid_private_key`, `vapid_subject` | Web Push | VAPID subscription and delivery keys |
+
+The Worker has no `RESEND_API_KEY` environment binding: Resend tokens are per-domain administrator settings. Likewise, Telegram and S3-compatible credentials are managed through protected system settings, not copied into this table.
+
+## Security notes
+
+Nova Mail includes the following current controls; they reduce specific risks and should be kept configured correctly rather than treated as a security guarantee.
+
+- Authenticated API requests require a valid JWT, active server-side session, and KV-backed auth state. Sessions are stored hashed and can be revoked per device.
+- Admin API prefixes require an administrator session; sensitive actions also use role permissions. Delegated roles cannot exceed the actor's permissions, domain scope, or relevant quotas.
+- Mail and attachment identifiers are checked against the owner before access or mutation. Attachments are served through authenticated routes; direct `/attachments/` paths return 404.
+- HTML mail is sanitized then rendered in a sandboxed iframe. Link/image handling is constrained, and attachment/message input has size, count, MIME, and filename validation.
+- OAuth transactions use expiring, single-use state records, `__Host-` HttpOnly/Secure/SameSite cookies, PKCE, nonce validation, and short-lived browser-bound completion grants.
+- Registration redemption is atomic; login and registration are rate limited. The bootstrap endpoint uses a constant-time token comparison and cannot initialize an existing application.
+- Resend webhooks are signature-verified. Outbound webhook URLs are restricted to HTTPS, unsafe literal IP ranges are rejected, and redirects are not followed.
+- API responses set browser security headers, and Turnstile verification validates the expected hostname when enabled.
+
+Keep object storage private. Do not expose the attachments prefix through an R2 public domain, S3 bucket policy, or CDN rule.
+
+## Development
+
+From the repository root:
+
+```bash
+pnpm install
+pnpm dev
+```
+
+Available root scripts are:
+
+```bash
+pnpm build
+pnpm test
+pnpm test:frontend
+pnpm test:worker
+pnpm test:worker:unit
+pnpm test:worker:integration
+```
+
+`pnpm dev` starts Vite and `wrangler dev` for the two workspace packages. The Worker development command uses `mail-worker/wrangler-dev.toml`; set its D1/KV IDs and Worker secrets before testing authenticated flows. Worker integration tests use the isolated bindings in `wrangler.vitest.toml` and do not require Cloudflare credentials.
 
 ## Project structure
 
 ```text
 nova-mail/
-├── mail-vue/                  # Vue frontend
-│   ├── src/components/        # Shared UI components
-│   ├── src/layout/            # Application shell and header/sidebar
-│   ├── src/router/            # Vue Router routes
-│   ├── src/store/             # Pinia stores
-│   ├── src/views/             # Mail, settings, login, preview, and admin views
-│   ├── src/icons/             # Nova Mail SVG icon system
-│   ├── public/                # Static assets and PWA icons
-│   ├── package.json
-│   └── vite.config.js
-├── mail-worker/               # Cloudflare Worker backend
-│   ├── src/api/               # HTTP API routes
-│   ├── src/service/           # Authentication, mail, OAuth, storage, and settings logic
-│   ├── src/entity/            # D1/Drizzle entities
-│   ├── src/email/             # Cloudflare Email Worker handler
-│   ├── src/security/          # Authentication and permission middleware
-│   ├── src/hono/              # Hono application setup
-│   ├── src/index.js           # Worker entry point
-│   ├── wrangler.toml          # Production Worker configuration
-│   ├── wrangler-dev.toml      # Local development configuration
-│   └── package.json
-├── doc/demo/                  # README screenshots
-├── LICENSE
+├── mail-vue/                 # Vue SPA, PWA assets, UI tests
+│   ├── src/views/            # Mail, settings, login, and admin views
+│   ├── src/components/       # Mail list, HTML frame, editor, avatars, shortcuts
+│   └── public/               # PWA icons, push handler, static editor assets
+├── mail-worker/              # Cloudflare Worker
+│   ├── src/api/              # HTTP endpoints
+│   ├── src/email/            # Cloudflare Email Routing handler
+│   ├── src/service/          # Mail, auth, storage, OAuth, and integrations
+│   ├── src/security/         # Session and authorization middleware
+│   ├── migrations/           # Standalone upgrades for existing D1 databases
+│   └── wrangler*.toml        # Production, development, test, and CI configs
+├── doc/demo/                 # README screenshots
+├── .github/workflows/        # Test-and-deploy workflow
 └── README.md
 ```
 
-## Development
+## Contributing
 
-### Requirements
-
-- Node.js 20 or newer
-- pnpm 12
-- A Cloudflare account for Worker/D1/KV development
-
-The repository is a single pnpm workspace with two packages, `mail-vue` and `mail-worker`, and one lockfile at the root. Install everything once:
-
-```bash
-git clone https://github.com/beihaime/nova-mail.git
-cd nova-mail
-
-pnpm install
-```
-
-Start both development servers (the Vite dev server and `wrangler dev`) in one terminal:
-
-```bash
-pnpm dev
-```
-
-Or start them separately:
-
-```bash
-pnpm --filter ./mail-vue dev
-pnpm --filter ./mail-worker dev
-```
-
-Build the frontend into the Worker's asset directory:
-
-```bash
-pnpm build
-```
-
-Run the test suites (frontend vitest + jsdom, and the Worker's unit and
-integration tests). `pnpm test` is the same command CI uses to gate a deploy:
-
-```bash
-pnpm test
-pnpm test:frontend
-pnpm test:worker
-```
-
-The Worker's `deploy:test` script deploys the test-environment Wrangler
-configuration; review `wrangler-test.toml` before using it.
-
-### Tests
-
-The suites are split by what they can prove:
-
-- **Frontend** (`mail-vue/test`, vitest + jsdom) — route-guard and 401
-  redirects, the list pagination cursor rules, compose validation, and the
-  mail-body render pipeline (DOMPurify output parsed back into a real DOM).
-- **Worker unit** (`mail-worker/test`, vitest in Node) — pure logic: thread
-  keys, body classification, security helpers, push payloads.
-- **Worker integration** (`mail-worker/test/integration`, vitest +
-  `@cloudflare/vitest-pool-workers`) — the real Worker inside workerd with local
-  D1/KV/R2. The schema is built by the Worker's own `dbInit.init()`, so the
-  tests run against the production schema. Covered: authentication and the
-  permission gate, mailbox list pagination and threading, delete (soft and
-  physical) with ownership checks, internal send/receive fan-out, OAuth grant
-  completion, and private-attachment authorization.
-
-`mail-worker/wrangler.vitest.toml` is the binding set used only by the
-integration suite; it declares throwaway local D1/KV/R2 resources and needs no
-Cloudflare credentials.
-
-## Configuration
-
-Cloudflare bindings and non-secret variables are defined in `mail-worker/wrangler.toml` and its environment-specific variants. Common settings include:
-
-- `domain`: allowed mail domains
-- `admin`: administrator email address
-- `TURNSTILE_HOSTNAME`: hostname expected by Turnstile verification
-- `ai_model`: optional Workers AI model
-
-Configure secrets with Wrangler. Never commit their values:
-
-```bash
-cd mail-worker
-pnpm wrangler secret put jwt_secret
-pnpm wrangler secret put BOOTSTRAP_TOKEN
-pnpm wrangler secret put TURNSTILE_SECRET_KEY
-pnpm wrangler secret put GITHUB_CLIENT_SECRET
-pnpm wrangler secret put GOOGLE_CLIENT_SECRET
-pnpm wrangler secret put resend_webhook_secret
-```
-
-The corresponding public/provider configuration is managed through the existing settings flow and `GOOGLE_CLIENT_ID`/`GITHUB_CLIENT_ID` may be supplied as Worker environment variables where applicable. OAuth client secrets are server-side only.
-
-### OAuth callback URLs
-
-The Worker callback paths are:
-
-```text
-https://<your-domain>/api/oauth/github/callback
-https://<your-domain>/api/oauth/google/callback
-```
-
-Register the exact deployed URLs in the GitHub and Google provider consoles. For the current deployment, the Google callback is:
-
-```text
-https://mail.beihaime.com/api/oauth/google/callback
-```
-
-Google login requests only the OpenID Connect identity scopes (`openid`, `email`, and `profile`). Nova Mail does not place provider access tokens in the browser or in the repository.
-
-## Deployment
-
-The production configuration uses a Cloudflare Worker with Static Assets. The frontend build output is written to the Worker asset directory configured in `mail-worker/wrangler.toml`.
-
-Build and deploy from the Worker directory:
-
-```bash
-cd mail-worker
-pnpm deploy
-```
-
-Before deploying by hand, review the selected Wrangler configuration, D1 and KV bindings, Static Assets directory, custom domain, and required secrets.
-
-For a new database only, initialize the schema once after deployment. `BOOTSTRAP_TOKEN` must be a separately generated random secret; it is never the JWT signing secret and is sent in a request header rather than a URL:
-
-```bash
-curl --fail-with-body -X POST https://your-worker.example/api/bootstrap \
-  -H "X-Bootstrap-Token: $BOOTSTRAP_TOKEN"
-```
-
-The bootstrap token is consumed atomically and cannot be used again. After a successful initialization, remove `BOOTSTRAP_TOKEN` from the deployed Worker (or rotate it immediately); it is needed only for a genuinely new D1 installation.
-
-### Webhook outbound security
-
-Webhook destinations must use HTTPS. Nova Mail rejects local, private, link-local, reserved, metadata, and other unsafe literal IP destinations, and it never follows webhook redirects. Cloudflare Workers' standard `fetch` API does not expose DNS answers or let this Worker pin a checked DNS address to the later outbound connection. Therefore, an arbitrary public hostname can still be a DNS-rebinding/private-DNS risk where the deployment permits access to private networks. For that deployment model, configure an administrator-managed hostname allowlist or route webhooks through a controlled outbound proxy/Cloudflare egress policy; do not treat the in-Worker URL filter as DNS-rebinding protection.
-
-### Attachment storage
-
-Mail attachments are private objects. Do not configure an R2 custom domain, S3 bucket policy, or CDN rule that publicly serves the `attachments/` prefix. Nova Mail retrieves attachments only through its authenticated `/api/oss/*` authorization path; reserve public storage paths such as `static/` for non-sensitive UI assets.
-
-### GitHub Actions pipeline
-
-`.github/workflows/deploy-cloudflare.yml` runs on every push to `main` that touches `mail-worker/**` or `mail-vue/**`, and can also be started manually (`workflow_dispatch`, or `gh workflow run deploy-cloudflare.yml`). A `Test` job runs `pnpm install --frozen-lockfile` and `pnpm test` first, and the deploy job declares `needs: Test`, so a failing test blocks the release before anything reaches Cloudflare. The deploy job then renders `wrangler-action.toml` from repository secrets, builds the frontend, deploys the Worker, bootstraps only a new database when a separate `BOOTSTRAP_TOKEN` is configured, and reads the schema back.
-
-**A fork does not run workflows until they are enabled.** GitHub disables Actions in forked repositories, so the first step is to open the repository's **Actions** tab and click *"I understand my workflows, go ahead and enable them"*. Until that is done every push looks fine while nothing is deployed and no run is even recorded.
-
-#### Repository secrets
-
-Every value is read as `secrets.NAME || vars.NAME`, so repository **variables** work too — but put credentials in **Secrets**, because variable values are printed verbatim to the run log. All values must be a single line: the pipeline substitutes them into a TOML file with `sed`, and a wrapped paste breaks that step.
-
-| Secret | Required | Value | If it is missing or wrong |
-| --- | --- | --- | --- |
-| `CLOUDFLARE_API_TOKEN` | yes | API token, see the permissions below | run fails in "Set up environment" |
-| `CLOUDFLARE_ACCOUNT_ID` | yes | Cloudflare account ID | run fails in "Set up environment" |
-| `JWT_SECRET` | yes | random, 32+ characters, no `?` `%` `#` `/` `\` `\|` `&` | signs login tokens; a new value signs every session out |
-| `BOOTSTRAP_TOKEN` | new installations only | independent random secret of at least 32 characters, stored as a GitHub and Worker secret | initializes a fresh D1 database once; never use the JWT secret |
-| `ADMIN` | yes | the administrator's **email address**, matching a real account | that account is treated as an ordinary user and gets no admin rights |
-| `DOMAIN` | yes | a JSON array, e.g. `["example.com"]` | a bare `example.com` fails the `jq` validation and stops the run |
-| `D1_DATABASE_ID` | yes¹ | `pnpm wrangler d1 list`, or `wrangler.toml` | without it the pipeline looks for a database named `$NAME` and **creates an empty one** |
-| `KV_NAMESPACE_ID` | yes¹ | `pnpm wrangler kv namespace list` | without it a new KV namespace named `$NAME` is created and the cached counters are lost |
-| `CUSTOM_DOMAIN` | no | e.g. `mail.example.com` | the `routes` block is dropped and the initialization call falls back to the `workers.dev` URL |
-| `NAME` | no | defaults to `nova-mail` | must match the deployed Worker name |
-| `AI_MODEL`, `ANALYSIS_CACHE`, `R2_BUCKET_NAME`, `PROJECT_LINK`, `CF_EMAIL` | no | see `wrangler-action.toml` | the R2 binding and `project_link` are removed when unset |
-
-¹ Optional in the workflow, but leaving them out points the deployment at newly created, empty resources instead of the existing ones.
-
-#### API token permissions
-
-| Resource | Permission | Needed for |
-| --- | --- | --- |
-| Account | Workers Scripts · Edit | deploying the Worker |
-| Account | Workers KV Storage · Edit | the KV binding |
-| Account | D1 · Edit | the schema verification step; without it that step only warns |
-| Zone | Workers Routes · Edit | the `custom_domain` route |
-| Zone | Zone · Read | resolving that route |
-
-The "Edit Cloudflare Workers" template covers both zone rows and the account rows except D1 — add D1 by hand.
-
-#### Database initialization
-
-Schema setup is versioned in `mail-worker/src/init/init.js`. Only a new installation can use the one-time bootstrap route; send an independent `BOOTSTRAP_TOKEN` in a header:
-
-```bash
-curl --fail-with-body -X POST https://<your-domain>/api/bootstrap \
-  -H "X-Bootstrap-Token: $BOOTSTRAP_TOKEN"
-```
-
-The pipeline calls this only when `BOOTSTRAP_TOKEN` is configured; initialized databases return 409 without rerunning migrations. Existing installations must apply later migrations through a controlled deployment process before running code that requires them. Two things are worth knowing:
-
-- Legacy compatibility migrations may contain repeatable checks, so **`success` does not prove every migration applied** — that is why the pipeline reads the schema back and fails when a required column or table is missing. Authentication migrations are intentionally strict: a failure to create `auth_session` aborts bootstrap instead of allowing an unverifiable session to continue. The same checks can be run by hand in the D1 console: `SELECT name FROM pragma_table_info('email');` and `SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('auth_session', 'user_security_settings');`
-- The token is single-use. Never recreate or reset a production D1 database to make bootstrap available again.
-
-Individual migrations are also kept runnable on their own under `mail-worker/migrations/`. For example, an existing database upgrading to the Trash mailbox must apply v3.11 before it runs a Trash-aware Worker:
-
-```bash
-cd mail-worker
-pnpm wrangler d1 execute <database-id> --remote --file migrations/v3_11_trash.sql
-```
-
-The deployment workflow performs this v3.11 upgrade automatically, before deploying the Worker, when its Cloudflare token has D1 · Edit permission. For a manual deployment, run it once yourself. Do not re-run the file after the columns exist: SQLite has no `ADD COLUMN IF NOT EXISTS`. Verify the result with `SELECT name FROM pragma_table_info('email');`; it must include `trashed`, `trashed_at`, and `trash_archived`.
-
-The v3.13 session migration is also applied by the deployment workflow to the explicit `D1_DATABASE_ID` used by `wrangler-action.toml`. It creates `auth_session` and `user_security_settings` with `IF NOT EXISTS` plus the active-session index. The workflow refuses to create or select a new database when `D1_DATABASE_ID` is missing, prints the binding/name/ID before applying the SQL, and verifies both tables after deployment. For a controlled manual upgrade, run `pnpm wrangler d1 execute <database-id> --remote --file migrations/v3_13_sessions.sql` from `mail-worker` after confirming the ID is the Worker’s actual `db` binding.
-
-The v3.14 migration adds `user_preferences` for account-scoped mail-list density (`normal` by default). The deployment workflow applies it to the same D1 binding before deploying the Worker and verifies the `mail_list_density` column. For manual deployments, apply `mail-worker/migrations/v3_14_user_preferences.sql` to the Worker’s actual D1 database first; local and preview databases must be migrated separately. No existing user or session rows are modified.
-
-#### Troubleshooting
-
-| Symptom | Cause |
-| --- | --- |
-| The push succeeds, nothing is deployed, `gh run list` shows no runs | the fork's Actions were never enabled |
-| `jq: parse error: Invalid numeric literal` / "DOMAIN must be a JSON array" | `DOMAIN` is not a JSON array |
-| `sed: unterminated 's' command` | one of the substituted secrets contains a newline (a wrapped paste) |
-| `Invalid TOML document ... admin = "..."` | `ADMIN` holds something that is not a plain email address |
-| `Couldn't find DB with name ...` from `d1 execute` | the API token has no D1 permission, or the account ID is wrong |
-| The deploy succeeds but the mail list is empty | the Worker ended up bound to a different, newly created D1 database |
-
-Inbound mail is handled by the Worker Email handler, while outbound delivery and delivery-status events use the configured Resend integration. Attachments are authorized against the owning user before R2 objects are served.
-
-## Upstream & credits
-
-Nova Mail is based on [maillab/cloud-mail](https://github.com/maillab/cloud-mail). The upstream project and its original authors remain credited under the original license. Nova Mail adds its own branding and frontend, authentication, and security-related changes on top of that codebase.
+Fork the repository, create a focused branch, make and test your change, then open a pull request describing the behaviour and verification. Please avoid committing credentials, generated local state, or production configuration values.
 
 ## License
 
-This project is licensed under the MIT License.
+Nova Mail is released under the [MIT License](LICENSE). The license retains copyright notices for the original project and Nova Mail modifications.
 
-See [LICENSE](LICENSE) for details. The repository retains the original copyright notice and the Nova Mail modification copyright notice.
+## Author
+
+Beihaime — <https://github.com/beihaime>
