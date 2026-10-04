@@ -20,6 +20,18 @@ const storageCleanupService = {
 			 WHERE next_attempt_at <= ? ORDER BY created_at LIMIT ?`
 		).bind(now, Math.min(Math.max(Number(limit) || 1, 1), MAX_ATTEMPTS_PER_RUN)).all();
 		for (const row of rows.results || []) {
+			// Frozen outbound snapshots retain content-addressed objects until their
+			// operation is finalized or manually resolved. A cleanup job must never
+			// invalidate an otherwise safe provider replay.
+			const retained = await c.env.db.prepare(`SELECT 1 FROM outbound_send_attachment a
+				JOIN outbound_send o ON o.operation_id = a.operation_id
+				WHERE o.status != 'finalized' AND a.object_key = ? LIMIT 1`)
+				.bind(row.object_key).first();
+			if (retained) {
+				await c.env.db.prepare('UPDATE storage_cleanup SET next_attempt_at = ?, updated_at = ? WHERE object_key = ?')
+					.bind(now + 60 * 60 * 1000, now, row.object_key).run();
+				continue;
+			}
 			try {
 				await r2Service.delete(c, row.object_key);
 				await c.env.db.prepare('DELETE FROM storage_cleanup WHERE object_key = ?').bind(row.object_key).run();

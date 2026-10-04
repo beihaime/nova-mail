@@ -1,7 +1,11 @@
 import BizError from '../error/biz-error';
+import { canonicalize, snapshotHash } from './outbound-send-snapshot';
 
 const STALE_RESERVATION_MS = 10 * 60 * 1000;
 const FINALIZE_LEASE_MS = 60 * 1000;
+// Resend guarantees idempotency for 24h; leave margin for clocks and retries.
+export const SAFE_REPLAY_WINDOW_MS = 23 * 60 * 60 * 1000;
+const RECONCILE_LEASE_MS = 60 * 1000;
 
 function validKey(value) {
 	return typeof value === 'string' && /^[A-Za-z0-9_-]{8,128}$/.test(value);
@@ -14,13 +18,16 @@ async function requestHash(params) {
 }
 
 const sendLifecycle = {
-	async reserve(c, { userId, key, params, cost, limit }) {
+	async reserve(c, { userId, key, params, snapshot, cost, limit }) {
 		if (!validKey(key)) throw new BizError('Invalid send idempotency key');
 		const db = c.env.db;
 		const hash = await requestHash(params);
+		const canonicalSnapshot = snapshot ? canonicalize(snapshot) : null;
+		const immutableHash = snapshot ? await snapshotHash(snapshot) : null;
 		const now = Date.now();
 		// Reclaim abandoned reservations only. Dispatching may already have reached
 		// a provider, so it must never be automatically released or retried.
+		const attachmentReferences = snapshot?.attachments || [];
 		await db.batch([
 			db.prepare(`UPDATE user SET send_count = max(0, CAST(send_count AS INTEGER) -
 				(SELECT coalesce(sum(quota_cost), 0) FROM outbound_send WHERE user_id = ? AND status = 'reserved' AND updated_at < ?))
@@ -40,6 +47,13 @@ const sendLifecycle = {
 				AND CAST(send_count AS INTEGER) + ? <= ?`)
 				.bind(cost, userId, operationId, cost, quotaLimit),
 			db.prepare(`DELETE FROM outbound_send WHERE operation_id = ? AND changes() = 0`).bind(operationId),
+			...(snapshot ? [db.prepare(`INSERT OR IGNORE INTO outbound_send_snapshot (operation_id, canonical_payload, payload_hash, created_at)
+				SELECT ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM outbound_send WHERE operation_id = ?)`)
+				.bind(operationId, canonicalSnapshot, immutableHash, now, operationId)] : []),
+			...attachmentReferences.map((attachment, ordinal) => db.prepare(`INSERT OR IGNORE INTO outbound_send_attachment
+				(operation_id, ordinal, object_key) SELECT ?, ?, ?
+				WHERE EXISTS (SELECT 1 FROM outbound_send WHERE operation_id = ?)`)
+				.bind(operationId, ordinal, attachment.key, operationId)),
 		]);
 		const row = await db.prepare('SELECT * FROM outbound_send WHERE user_id = ? AND request_key = ?')
 			.bind(userId, key).first();
@@ -89,6 +103,29 @@ const sendLifecycle = {
 	async retryFinalize(c, operationId) {
 		await c.env.db.prepare(`UPDATE outbound_send SET status = 'accepted', updated_at = ?
 			WHERE operation_id = ? AND status = 'finalizing'`).bind(Date.now(), operationId).run();
+	},
+
+	async claimReconciliation(c, operationId) {
+		const now = Date.now();
+		const token = crypto.randomUUID();
+		const row = await c.env.db.prepare(`UPDATE outbound_send SET reconcile_lease_until = ?, reconcile_lease_token = ?, updated_at = ?
+			WHERE operation_id = ? AND status = 'dispatching' AND created_at >= ?
+			AND reconcile_lease_until < ?
+			RETURNING *`).bind(now + RECONCILE_LEASE_MS, token, now, operationId, now - SAFE_REPLAY_WINDOW_MS, now).first();
+		return row || null;
+	},
+
+	async releaseReconciliation(c, operationId, token) {
+		await c.env.db.prepare(`UPDATE outbound_send SET reconcile_lease_until = 0, reconcile_lease_token = ''
+			WHERE operation_id = ? AND reconcile_lease_token = ?`).bind(operationId, token).run();
+	},
+
+	async reconciliationState(c, operationId) {
+		const row = await c.env.db.prepare('SELECT * FROM outbound_send WHERE operation_id = ?').bind(operationId).first();
+		if (!row) return { state: 'missing' };
+		if (row.status !== 'dispatching') return { state: row.status, row };
+		if (Date.now() - row.created_at >= SAFE_REPLAY_WINDOW_MS) return { state: 'manual_review_required', row };
+		return { state: 'eligible', row };
 	},
 };
 

@@ -41,6 +41,10 @@ const dbInit = {
 		await this.v3_16DB(c);
 		await this.v3_17DB(c);
 		await this.v3_18DB(c);
+		await this.v3_19DB(c);
+		await this.v3_20DB(c);
+		await this.v3_21DB(c);
+		await this.v3_22DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
 	},
@@ -59,6 +63,35 @@ const dbInit = {
 			event_id TEXT PRIMARY KEY, event_type TEXT NOT NULL, resend_email_id TEXT NOT NULL,
 			created_at INTEGER NOT NULL
 		)`).run();
+	},
+
+	async v3_19DB(c) {
+		await c.env.db.prepare(`CREATE TABLE IF NOT EXISTS outbound_send_snapshot (
+			operation_id TEXT PRIMARY KEY REFERENCES outbound_send(operation_id) ON DELETE CASCADE,
+			canonical_payload TEXT NOT NULL, payload_hash TEXT NOT NULL, created_at INTEGER NOT NULL
+		)`).run();
+	},
+
+	async v3_20DB(c) {
+		const present = await c.env.db.prepare("SELECT 1 FROM pragma_table_info('outbound_send') WHERE name = 'reconcile_lease_until'").first();
+		if (!present) await c.env.db.prepare("ALTER TABLE outbound_send ADD COLUMN reconcile_lease_until INTEGER NOT NULL DEFAULT 0").run();
+		await c.env.db.prepare('CREATE INDEX IF NOT EXISTS idx_outbound_send_reconcile ON outbound_send(status, created_at, reconcile_lease_until)').run();
+	},
+
+	/** Immutable attachment references held by unresolved outbound snapshots. */
+	async v3_21DB(c) {
+		await c.env.db.prepare(`CREATE TABLE IF NOT EXISTS outbound_send_attachment (
+			operation_id TEXT NOT NULL REFERENCES outbound_send(operation_id) ON DELETE CASCADE,
+			ordinal INTEGER NOT NULL, object_key TEXT NOT NULL,
+			PRIMARY KEY(operation_id, ordinal)
+		)`).run();
+		await c.env.db.prepare('CREATE INDEX IF NOT EXISTS idx_outbound_send_attachment_key ON outbound_send_attachment(object_key)').run();
+	},
+
+	/** A lease owner must not release a subsequently claimed reconciliation lease. */
+	async v3_22DB(c) {
+		const present = await c.env.db.prepare("SELECT 1 FROM pragma_table_info('outbound_send') WHERE name = 'reconcile_lease_token'").first();
+		if (!present) await c.env.db.prepare("ALTER TABLE outbound_send ADD COLUMN reconcile_lease_token TEXT NOT NULL DEFAULT ''").run();
 	},
 
 	/** Durable outbound lifecycle and uniqueness for retried finalization. */

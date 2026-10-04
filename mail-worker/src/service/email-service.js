@@ -31,6 +31,7 @@ import senderAvatarService from './sender-avatar-service';
 import pushService from './push-service';
 import { pageSize } from '../utils/pagination';
 import sendLifecycle from './send-lifecycle';
+import outboundSendSnapshot from './outbound-send-snapshot';
 
 const MAX_SEARCH_LENGTH = 200;
 
@@ -801,15 +802,52 @@ const emailService = {
 			}
 
 		}
+		// Freeze local conversation placement before reserving the operation.  A
+		// later edit/delete of the original message must not change a retry's Sent
+		// copy or its provider reply headers.
+		let localThread = { threadId: '', parentMessageId: 0 };
+		try {
+			const thread = await threadService.resolveThreadForMessage(c, {
+				userId, subject, sendEmail: accountRow.email, toEmail: receiveEmail[0] || '',
+				recipient: receiveEmail.map(address => ({ address, name: '' })), messageId: '',
+				inReplyTo: sendType === 'reply' ? emailRow.messageId : '',
+				references: sendType === 'reply' ? emailRow.messageId : '',
+				threadId: sendType === 'reply' ? emailRow.threadId : '',
+				parentMessageId: sendType === 'reply' ? emailRow.emailId : 0,
+			});
+			localThread = {
+				threadId: thread.threadId || (sendType === 'reply' ? emailRow.threadId : '') || threadService.newThreadId(),
+				parentMessageId: thread.parentMessageId || (sendType === 'reply' ? Number(emailRow.emailId) || 0 : 0),
+			};
+		} catch (error) {
+			if (!threadService.isMissingThreadColumn(error)) throw error;
+		}
 
 		const quotaCost = roleRow.sendCount && roleRow.sendType !== 'internal' ? allRecipients.length : 0;
 		const quotaLimit = !emailUtils.sameEmail(c.env.admin, userRow.email) && roleRow.sendCount
 			? Number(roleRow.sendCount) : null;
+		// Freeze bytes and metadata before reservation. The operation, its snapshot,
+		// attachment references, and quota reservation are then persisted together
+		// before any provider call is allowed.
+		const frozenAttachments = await attService.freezeForOutboundSnapshot(c, imageDataList, attachments);
+		const snapshot = {
+			version: 1, userId, accountId, provider: allInternal ? 'internal' : (useCloudflareEmail ? 'cloudflare' : 'resend'),
+			from: { email: accountRow.email, name }, to: receiveEmail, cc, bcc,
+			subject, text: text || '', html: html || '', sendType: sendType || '',
+			replyMessageId: emailRow.messageId || '', storageDomain: r2Domain || '',
+			local: { ...localThread, inReplyTo: sendType === 'reply' ? emailRow.messageId || '' : '', relation: sendType === 'reply' ? emailRow.messageId || '' : '' },
+			attachments: frozenAttachments,
+		};
 		const operation = await sendLifecycle.reserve(c, {
 			userId, key: idempotencyKey, params: { ...params, idempotencyKey: undefined },
+			snapshot,
 			cost: quotaCost, limit: quotaLimit,
 		});
 		if (operation.status === 'finalized') {
+			// A crash after marking finalized but before payload cleanup is safe: the
+			// next idempotent retry removes the sensitive snapshot without touching
+			// the already durable Sent record.
+			await outboundSendSnapshot.purge(c, operation.operation_id);
 			const result = await orm(c).select().from(email).where(eq(email.emailId, operation.email_id)).get();
 			if (!result) throw new BizError('Finalized send record is missing', 502);
 			result.attList = await attService.selectByEmailIds(c, [result.emailId]);
@@ -817,6 +855,8 @@ const emailService = {
 		}
 		if (operation.status === 'failed') throw new BizError('The previous send failed before delivery; retry with a new key', 409);
 		if (operation.status === 'dispatching') throw new BizError('Send delivery is pending reconciliation', 409);
+		const immutableSnapshot = await outboundSendSnapshot.loadVerified(c, operation.operation_id);
+		const immutableAttachments = await attService.loadFrozenSnapshotAttachments(c, immutableSnapshot.attachments);
 
 		let sendResult = { data: { id: operation.provider_id } };
 
@@ -827,36 +867,26 @@ const emailService = {
 			}
 			let providerAccepted = false;
 			try {
-			if (!allInternal) {
+			if (immutableSnapshot.provider !== 'internal') {
 
-			if (useCloudflareEmail) {
+			if (immutableSnapshot.provider === 'cloudflare') {
 				sendResult = await this.sendByCloudflareEmail(c, {
-					name,
-					accountEmail: accountRow.email,
-					receiveEmail,
-					cc,
-					bcc,
-					subject,
-					text,
-					html,
-					attachments: [...imageDataList, ...attachments],
-					sendType,
-					messageId: emailRow.messageId,
+					name: immutableSnapshot.from.name,
+					accountEmail: immutableSnapshot.from.email,
+					receiveEmail: immutableSnapshot.to, cc: immutableSnapshot.cc, bcc: immutableSnapshot.bcc,
+					subject: immutableSnapshot.subject, text: immutableSnapshot.text, html: immutableSnapshot.html,
+					attachments: immutableAttachments, sendType: immutableSnapshot.sendType,
+					messageId: immutableSnapshot.replyMessageId,
 					idempotencyKey: operation.operation_id
 				});
 			} else {
 				sendResult = await this.sendByResend(resendToken, {
-					name,
-					accountEmail: accountRow.email,
-					receiveEmail,
-					cc,
-					bcc,
-					subject,
-					text,
-					html,
-					attachments: [...imageDataList, ...attachments],
-					sendType,
-					messageId: emailRow.messageId,
+					name: immutableSnapshot.from.name,
+					accountEmail: immutableSnapshot.from.email,
+					receiveEmail: immutableSnapshot.to, cc: immutableSnapshot.cc, bcc: immutableSnapshot.bcc,
+					subject: immutableSnapshot.subject, text: immutableSnapshot.text, html: immutableSnapshot.html,
+					attachments: immutableAttachments, sendType: immutableSnapshot.sendType,
+					messageId: immutableSnapshot.replyMessageId,
 					idempotencyKey: operation.operation_id
 				});
 			}
@@ -892,85 +922,46 @@ const emailService = {
 		try {
 		await c.testHooks?.beforeSendFinalization?.();
 
-		imageDataList = imageDataList.map(item => ({...item, contentId: `<${item.contentId}>`}))
+		imageDataList = immutableAttachments.filter(item => item.kind === 'embed').map(item => ({...item, contentId: `<${item.contentId}>`}))
 
 		//把图片标签cid标签切换会通用url
-		html = this.imgReplace(html, imageDataList, r2Domain);
+		html = this.imgReplace(immutableSnapshot.html, imageDataList, immutableSnapshot.storageDomain);
 
 		//封装数据保存到数据库
 		const emailData = {};
-		emailData.sendEmail = accountRow.email;
-		emailData.name = name;
-		emailData.subject = subject;
+		emailData.sendEmail = immutableSnapshot.from.email;
+		emailData.name = immutableSnapshot.from.name;
+		emailData.subject = immutableSnapshot.subject;
 		emailData.content = html;
-		emailData.text = text;
+		emailData.text = immutableSnapshot.text;
 		// Outbound mail written in the composer is HTML; a text-only body is
 		// stored as plain so the reader escapes it instead of rendering markup.
 		emailData.bodyType = html && html.trim() ? MAIL_BODY.HTML : MAIL_BODY.PLAIN;
-		emailData.accountId = accountId;
-		emailData.status = useCloudflareEmail ? emailConst.status.DELIVERED : emailConst.status.SENT;
+		emailData.accountId = immutableSnapshot.accountId;
+		emailData.status = immutableSnapshot.provider === 'cloudflare' ? emailConst.status.DELIVERED : emailConst.status.SENT;
 		emailData.type = emailConst.type.SEND;
-		emailData.userId = userId;
+		emailData.userId = immutableSnapshot.userId;
 		emailData.resendEmailId = data?.id;
 		emailData.sendOperationId = operation.operation_id;
 
 		const recipient = [];
 
-		receiveEmail.forEach(item => {
+		immutableSnapshot.to.forEach(item => {
 			recipient.push({ address: item, name: '' });
 		});
 
 		emailData.recipient = JSON.stringify(recipient);
-		emailData.cc = JSON.stringify(cc.map(address => ({ address, name: '' })));
-		emailData.bcc = JSON.stringify(bcc.map(address => ({ address, name: '' })));
+		emailData.cc = JSON.stringify(immutableSnapshot.cc.map(address => ({ address, name: '' })));
+		emailData.bcc = JSON.stringify(immutableSnapshot.bcc.map(address => ({ address, name: '' })));
 
 		// Every message belongs to a conversation. This is assigned here too — a
 		// mail the user starts is the root of a new thread, and without a key the
 		// reply that eventually arrives (whose In-Reply-To we cannot match, since
 		// outbound Message-IDs are provider generated) would open a second one.
-		const threadHeaders = {
-			userId,
-			subject,
-			sendEmail: accountRow.email,
-			toEmail: receiveEmail[0] || '',
-			recipient,
-		};
-
-		if (sendType === 'reply') {
-			emailData.inReplyTo = emailRow.messageId;
-			emailData.relation = emailRow.messageId;
-
-			// Keep the reply inside the conversation it answers so the reader can
-			// reload the whole thread (and the Inbox never splits it). A reply
-			// sent before the v3.6 migration runs simply has no thread key.
-			try {
-				const thread = await threadService.resolveThreadForMessage(c, {
-					...threadHeaders,
-					messageId: '',
-					inReplyTo: emailRow.messageId,
-					references: emailRow.messageId,
-					threadId: emailRow.threadId,
-					parentMessageId: emailRow.emailId
-				});
-				emailData.threadId = thread.threadId || emailRow.threadId || threadService.newThreadId();
-				emailData.parentMessageId = thread.parentMessageId || Number(emailRow.emailId) || 0;
-			} catch (error) {
-				if (!threadService.isMissingThreadColumn(error)) throw error;
-			}
-		} else {
-			// New outbound mail: start its own conversation, unless it is a
-			// continuation the headers/subject can already place.
-			try {
-				const thread = await threadService.resolveThreadForMessage(c, {
-					...threadHeaders,
-					messageId: '',
-				});
-				emailData.threadId = thread.threadId || threadService.newThreadId();
-				emailData.parentMessageId = thread.parentMessageId || 0;
-			} catch (error) {
-				if (!threadService.isMissingThreadColumn(error)) throw error;
-			}
-		}
+		emailData.inReplyTo = immutableSnapshot.local.inReplyTo;
+		emailData.relation = immutableSnapshot.local.relation;
+		emailData.threadId = immutableSnapshot.local.threadId;
+		emailData.parentMessageId = immutableSnapshot.local.parentMessageId;
 
 		//保存到数据库并返回结果
 		let emailResult = await orm(c).insert(email).values(emailData).onConflictDoNothing().returning().get();
@@ -979,21 +970,14 @@ const emailService = {
 		if (!emailResult) throw new BizError('Sent-mail record could not be recovered', 502);
 
 		//保存内嵌附件
-		if (imageDataList.length > 0) {
-			await attService.saveArticleAtt(c, imageDataList, userId, accountId, emailResult.emailId, operation.operation_id);
-		}
-
-		//保存普通附件
-		if (attachments?.length > 0) {
-			await attService.saveSendAtt(c, attachments, userId, accountId, emailResult.emailId, operation.operation_id);
-		}
+		await attService.attachFrozenSnapshot(c, immutableSnapshot.attachments, immutableSnapshot.userId, immutableSnapshot.accountId, emailResult.emailId, operation.operation_id);
 
 		const attList = await attService.selectByEmailIds(c, [emailResult.emailId]);
 		emailResult.attList = attList;
 
 		//如果全是站内接收方，直接写入数据库
-		if (allInternal) {
-			await this.HandleOnSiteEmail(c, allRecipients, emailResult, attList);
+		if (immutableSnapshot.provider === 'internal') {
+			await this.HandleOnSiteEmail(c, [...immutableSnapshot.to, ...immutableSnapshot.cc, ...immutableSnapshot.bcc], emailResult, attList);
 		}
 
 		await senderAvatarService.attach(c, [emailResult]);
@@ -1003,17 +987,94 @@ const emailService = {
 
 		//记录每天发件次数统计
 		if (!daySendTotal) {
-			await c.env.kv.put(kvConst.SEND_DAY_COUNT + dateStr, JSON.stringify(allRecipients.length), { expirationTtl: 60 * 60 * 24 });
+			await c.env.kv.put(kvConst.SEND_DAY_COUNT + dateStr, JSON.stringify(immutableSnapshot.to.length + immutableSnapshot.cc.length + immutableSnapshot.bcc.length), { expirationTtl: 60 * 60 * 24 });
 		} else  {
-			daySendTotal = Number(daySendTotal) + allRecipients.length
+			daySendTotal = Number(daySendTotal) + immutableSnapshot.to.length + immutableSnapshot.cc.length + immutableSnapshot.bcc.length
 			await c.env.kv.put(kvConst.SEND_DAY_COUNT + dateStr, JSON.stringify(daySendTotal), { expirationTtl: 60 * 60 * 24 });
 		}
 
 		await sendLifecycle.finalized(c, operation.operation_id, emailResult.emailId);
+		// The Sent row and attachment associations are durable now. Retain only
+		// operation metadata; the sensitive immutable body is no longer needed.
+		await outboundSendSnapshot.purge(c, operation.operation_id);
 		return [ emailResult ];
 		} catch (error) {
 			try { await sendLifecycle.retryFinalize(c, operation.operation_id); }
 			catch (recoveryError) { console.error('Send finalization state recovery failed', recoveryError); }
+			throw error;
+		}
+	},
+
+	/**
+	 * Safe recovery for snapshot-backed Resend operations. Callers must finish
+	 * the accepted operation through the normal idempotent send/finalize path;
+	 * this method never invents a payload or a replacement idempotency key.
+	 */
+	async reconcileDispatching(c, operationId) {
+		const claim = await sendLifecycle.claimReconciliation(c, operationId);
+		if (!claim) return sendLifecycle.reconciliationState(c, operationId);
+		try {
+			let snapshot;
+			try {
+				snapshot = await outboundSendSnapshot.loadVerified(c, operationId);
+			} catch (error) {
+				// Operations created before snapshots cannot be reconstructed safely.
+				if (error instanceof BizError && error.message === 'Send operation requires manual review') {
+					return { state: 'manual_review_required', legacy: true };
+				}
+				throw error;
+			}
+			if (snapshot.provider !== 'resend') return { state: 'manual_review_required' };
+			const { resendTokens } = await settingService.query(c);
+			const token = resendTokens[emailUtils.getDomain(snapshot.from.email)];
+			if (!token) return { state: 'manual_review_required' };
+			const attachments = await attService.loadFrozenSnapshotAttachments(c, snapshot.attachments);
+			const result = await this.sendByResend(token, {
+				name: snapshot.from.name, accountEmail: snapshot.from.email,
+				receiveEmail: snapshot.to, cc: snapshot.cc, bcc: snapshot.bcc,
+				subject: snapshot.subject, text: snapshot.text, html: snapshot.html,
+				attachments, sendType: snapshot.sendType, messageId: snapshot.replyMessageId,
+				idempotencyKey: operationId,
+			});
+			if (result?.error) return { state: 'uncertain' };
+			await sendLifecycle.accepted(c, operationId, result?.data?.id);
+			const accepted = await c.env.db.prepare('SELECT * FROM outbound_send WHERE operation_id = ?').bind(operationId).first();
+			const sent = await this.finalizeSnapshot(c, accepted, snapshot);
+			return { state: 'finalized', providerId: result?.data?.id || '', emailId: sent.emailId };
+		} finally {
+			await sendLifecycle.releaseReconciliation(c, operationId, claim.reconcile_lease_token);
+		}
+	},
+
+	/** Finalization used by reconciliation; it reads no mutable compose/account data. */
+	async finalizeSnapshot(c, operation, snapshot) {
+		if (!await sendLifecycle.claimFinalize(c, operation.operation_id)) {
+			const existing = await orm(c).select().from(email).where(eq(email.sendOperationId, operation.operation_id)).get();
+			if (existing) return existing;
+			throw new BizError('Send finalization is already in progress', 409);
+		}
+		try {
+			const embeds = (await attService.loadFrozenSnapshotAttachments(c, snapshot.attachments)).filter(item => item.kind === 'embed')
+				.map(item => ({ ...item, contentId: `<${item.contentId}>` }));
+			const html = this.imgReplace(snapshot.html, embeds, snapshot.storageDomain);
+			const recipient = snapshot.to.map(address => ({ address, name: '' }));
+			let row = await orm(c).insert(email).values({
+				sendEmail: snapshot.from.email, name: snapshot.from.name, subject: snapshot.subject, content: html, text: snapshot.text,
+				bodyType: html && html.trim() ? MAIL_BODY.HTML : MAIL_BODY.PLAIN, accountId: snapshot.accountId, userId: snapshot.userId,
+				status: snapshot.provider === 'cloudflare' ? emailConst.status.DELIVERED : emailConst.status.SENT, type: emailConst.type.SEND, resendEmailId: operation.provider_id,
+				sendOperationId: operation.operation_id, recipient: JSON.stringify(recipient),
+				cc: JSON.stringify(snapshot.cc.map(address => ({ address, name: '' }))), bcc: JSON.stringify(snapshot.bcc.map(address => ({ address, name: '' }))),
+				inReplyTo: snapshot.local.inReplyTo, relation: snapshot.local.relation,
+				threadId: snapshot.local.threadId, parentMessageId: snapshot.local.parentMessageId,
+			}).onConflictDoNothing().returning().get();
+			if (!row) row = await orm(c).select().from(email).where(eq(email.sendOperationId, operation.operation_id)).get();
+			if (!row) throw new BizError('Sent-mail record could not be recovered', 502);
+			await attService.attachFrozenSnapshot(c, snapshot.attachments, snapshot.userId, snapshot.accountId, row.emailId, operation.operation_id);
+			await sendLifecycle.finalized(c, operation.operation_id, row.emailId);
+			await outboundSendSnapshot.purge(c, operation.operation_id);
+			return row;
+		} catch (error) {
+			await sendLifecycle.retryFinalize(c, operation.operation_id);
 			throw error;
 		}
 	},

@@ -15,6 +15,49 @@ import BizError from '../error/biz-error';
 import { email } from '../entity/email';
 
 const attService = {
+	/** Freeze attachment bytes into content-addressed storage before provider dispatch. */
+	async freezeForOutboundSnapshot(c, imageDataList, attachments) {
+		const frozen = [];
+		for (const image of imageDataList) {
+			const bytes = image.buff || image.content;
+			if (!bytes) continue;
+			await r2Service.putObj(c, image.key, bytes, {
+				contentType: normalizeMimeType(image.mimeType),
+				cacheControl: image.contentId ? 'max-age=259200' : 'private, no-store',
+				contentDisposition: contentDisposition(image.filename || 'attachment', Boolean(image.contentId)),
+			});
+			frozen.push({ key: image.key, filename: image.filename || '', mimeType: normalizeMimeType(image.mimeType), size: image.size || bytes.byteLength, contentId: image.contentId || '', kind: 'embed' });
+		}
+		for (const raw of attachments) {
+			const filename = normalizeAttachmentFilename(raw.filename || 'attachment');
+			const mimeType = normalizeMimeType(raw.type || raw.mimeType || raw.contentType);
+			const bytes = fileUtils.base64ToUint8Array(raw.content);
+			const key = constant.ATTACHMENT_PREFIX + await fileUtils.getBuffHash(bytes) + fileUtils.getExtFileName(filename);
+			await r2Service.putObj(c, key, bytes, { contentType: mimeType, contentDisposition: contentDisposition(filename) });
+			frozen.push({ key, filename, mimeType, size: bytes.byteLength, contentId: '', kind: 'attachment' });
+		}
+		return frozen;
+	},
+
+	async loadFrozenSnapshotAttachments(c, frozen) {
+		const result = [];
+		for (const item of frozen || []) {
+			const object = await r2Service.getObj(c, item.key);
+			if (!object) throw new BizError('Frozen outbound attachment is unavailable', 409);
+			result.push({ ...item, content: object instanceof ArrayBuffer ? object : await object.arrayBuffer() });
+		}
+		return result;
+	},
+
+	async attachFrozenSnapshot(c, frozen, userId, accountId, emailId, operationId) {
+		for (const [ordinal, item] of (frozen || []).entries()) {
+			await orm(c).insert(att).values({
+				userId, accountId, emailId, key: item.key, filename: item.filename, mimeType: item.mimeType,
+				size: item.size, type: item.kind === 'embed' ? attConst.type.EMBED : attConst.type.ATT,
+				contentId: item.contentId || null, sendOperationId: operationId, sendOrdinal: ordinal,
+			}).onConflictDoNothing().run();
+		}
+	},
 
 	async addAtt(c, attachments) {
 

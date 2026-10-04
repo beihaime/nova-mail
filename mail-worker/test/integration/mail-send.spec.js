@@ -3,6 +3,9 @@ import { env } from 'cloudflare:test';
 import { emailConst, settingConst } from '../../src/const/entity-const';
 import emailService from '../../src/service/email-service';
 import { api, context, createAccount, createAdmin, openSend, sessionFor, updateSetting } from './helpers';
+import { canonicalize, snapshotHash } from '../../src/service/outbound-send-snapshot';
+import sendLifecycle, { SAFE_REPLAY_WINDOW_MS } from '../../src/service/send-lifecycle';
+import storageCleanupService from '../../src/service/storage-cleanup-service';
 
 /**
  * Critical path: sending and receiving.
@@ -256,6 +259,144 @@ describe('outbound mail', () => {
 		release({ messageId: `provider-${Date.now()}` });
 		await expect(first).resolves.toHaveLength(1);
 		expect(provider.send).toHaveBeenCalledTimes(1);
+	});
+
+	it('reconciles only a verified immutable Resend snapshot and finalizes it once', async () => {
+		const sender = await createAdmin();
+		const operationId = crypto.randomUUID();
+		const attachmentKey = `attachments/reconcile-snapshot-${operationId}.txt`;
+		await env.r2.put(attachmentKey, 'frozen attachment');
+		const snapshot = {
+			version: 1, userId: sender.userId, accountId: sender.accountId, provider: 'resend',
+			from: { email: sender.email, name: 'Frozen sender' }, to: ['recovery@outside.example'], cc: [], bcc: [],
+			subject: 'frozen subject', text: 'frozen text', html: '<p>frozen</p>', sendType: '', replyMessageId: '', storageDomain: '',
+			local: { threadId: 'snapshot-thread', parentMessageId: 0, inReplyTo: '', relation: '' },
+			attachments: [{ key: attachmentKey, filename: 'frozen.txt', mimeType: 'text/plain', size: 17, contentId: '', kind: 'attachment' }],
+		};
+		const now = Date.now();
+		await env.db.batch([
+			env.db.prepare(`INSERT INTO outbound_send (operation_id,user_id,request_key,request_hash,status,quota_cost,created_at,updated_at)
+				VALUES (?,?,?,?, 'dispatching',1,?,?)`).bind(operationId, sender.userId, `reconcile-${now}`, 'hash', now, now),
+			env.db.prepare('INSERT INTO outbound_send_snapshot (operation_id,canonical_payload,payload_hash,created_at) VALUES (?,?,?,?)')
+				.bind(operationId, canonicalize(snapshot), await snapshotHash(snapshot), now),
+		]);
+		const c = context();
+		c.set('setting', { resendTokens: { 'example.com': 'test-token' } });
+		const provider = vi.spyOn(emailService, 'sendByResend').mockResolvedValue({ data: { id: 'resend-recovered-id' } });
+		try {
+			await env.db.prepare('UPDATE account SET name = ? WHERE account_id = ?').bind('Mutated account', sender.accountId).run();
+			const result = await emailService.reconcileDispatching(c, operationId);
+			expect(result.state).toBe('finalized');
+			expect(provider).toHaveBeenCalledOnce();
+			expect(provider.mock.calls[0][1]).toMatchObject({ subject: 'frozen subject', accountEmail: sender.email, idempotencyKey: operationId });
+			expect(await env.db.prepare('SELECT subject, name, text FROM email WHERE send_operation_id = ?').bind(operationId).first())
+				.toMatchObject({ subject: 'frozen subject', name: 'Frozen sender', text: 'frozen text' });
+			expect(await env.db.prepare('SELECT count(*) AS total FROM email WHERE send_operation_id = ?').bind(operationId).first())
+				.toMatchObject({ total: 1 });
+			expect(await env.db.prepare('SELECT count(*) AS total FROM attachments WHERE send_operation_id = ?').bind(operationId).first())
+				.toMatchObject({ total: 1 });
+			await emailService.finalizeSnapshot(c, await env.db.prepare('SELECT * FROM outbound_send WHERE operation_id = ?').bind(operationId).first(), snapshot);
+			expect(await env.db.prepare('SELECT count(*) AS total FROM email WHERE send_operation_id = ?').bind(operationId).first())
+				.toMatchObject({ total: 1 });
+		} finally { provider.mockRestore(); }
+	});
+
+	it('replays a provider-accepted snapshot after the local acceptance write fails', async () => {
+		const sender = await createAdmin();
+		const c = context();
+		c.set('setting', { send: settingConst.send.OPEN, domainList: ['@example.com'], resendTokens: { 'example.com': 'test-token' }, r2Domain: '' });
+		const calls = new Map();
+		const provider = vi.spyOn(emailService, 'sendByResend').mockImplementation(async (_token, request) => {
+			calls.set(request.idempotencyKey, (calls.get(request.idempotencyKey) || 0) + 1);
+			return { data: { id: `resend-${request.idempotencyKey}` } };
+		});
+		const accepted = vi.spyOn(sendLifecycle, 'accepted').mockRejectedValueOnce(new Error('forced acceptance write failure'));
+		const params = { accountId: sender.accountId, receiveEmail: ['acceptance-failure@outside.example'], subject: 'acceptance snapshot', content: '<p>original body</p>', text: 'original text', sendType: '', attachments: [], idempotencyKey: 'snapshot-acceptance-failure' };
+		try {
+			await expect(emailService.send(c, params, sender.userId)).rejects.toThrow('forced acceptance write failure');
+			params.content = '<p>mutated after dispatch</p>';
+			params.text = 'mutated after dispatch';
+			const operation = await env.db.prepare('SELECT * FROM outbound_send WHERE user_id = ? AND request_key = ?').bind(sender.userId, params.idempotencyKey).first();
+			expect(operation.status).toBe('dispatching');
+			accepted.mockRestore();
+			const result = await emailService.reconcileDispatching(c, operation.operation_id);
+			expect(result.state).toBe('finalized');
+			expect(calls.get(operation.operation_id)).toBe(2);
+			expect(await env.db.prepare('SELECT subject, text, content FROM email WHERE send_operation_id = ?').bind(operation.operation_id).first())
+				.toMatchObject({ subject: 'acceptance snapshot', text: 'original text', content: '<p>original body</p>' });
+		} finally { accepted.mockRestore(); provider.mockRestore(); }
+	});
+
+	it('keeps snapshot attachments available while dispatching and releases them after finalization', async () => {
+		const sender = await createAdmin();
+		const operationId = crypto.randomUUID();
+		const key = `attachments/snapshot-retained-${operationId}.txt`;
+		const now = Date.now();
+		await env.r2.put(key, 'frozen attachment');
+		await env.db.batch([
+			env.db.prepare(`INSERT INTO outbound_send (operation_id,user_id,request_key,request_hash,status,quota_cost,created_at,updated_at)
+				VALUES (?,?,?,?, 'dispatching',1,?,?)`).bind(operationId, sender.userId, `attachment-${now}`, 'hash', now, now),
+			env.db.prepare('INSERT INTO outbound_send_attachment (operation_id,ordinal,object_key) VALUES (?,?,?)').bind(operationId, 0, key),
+		]);
+		const c = context();
+		await storageCleanupService.enqueue(c, [key]);
+		await storageCleanupService.process(c);
+		expect(await env.r2.get(key)).not.toBeNull();
+		await env.db.prepare("UPDATE outbound_send SET status = 'finalized' WHERE operation_id = ?").bind(operationId).run();
+		await env.db.prepare('DELETE FROM outbound_send_attachment WHERE operation_id = ?').bind(operationId).run();
+		await env.db.prepare('UPDATE storage_cleanup SET next_attempt_at = 0 WHERE object_key = ?').bind(key).run();
+		await storageCleanupService.process(c);
+		expect(await env.r2.get(key)).toBeNull();
+	});
+
+	it('allows only one worker to claim a snapshot reconciliation lease', async () => {
+		const sender = await createAdmin();
+		const operationId = crypto.randomUUID();
+		const snapshot = { version: 1, userId: sender.userId, accountId: sender.accountId, provider: 'resend', from: { email: sender.email, name: 'Frozen' }, to: ['lease@outside.example'], cc: [], bcc: [], subject: 'lease', text: '', html: '', sendType: '', replyMessageId: '', storageDomain: '', local: { threadId: 'lease-thread', parentMessageId: 0, inReplyTo: '', relation: '' }, attachments: [] };
+		const now = Date.now();
+		await env.db.batch([
+			env.db.prepare(`INSERT INTO outbound_send (operation_id,user_id,request_key,request_hash,status,quota_cost,created_at,updated_at)
+				VALUES (?,?,?,?, 'dispatching',1,?,?)`).bind(operationId, sender.userId, `lease-${now}`, 'hash', now, now),
+			env.db.prepare('INSERT INTO outbound_send_snapshot (operation_id,canonical_payload,payload_hash,created_at) VALUES (?,?,?,?)').bind(operationId, canonicalize(snapshot), await snapshotHash(snapshot), now),
+		]);
+		let release;
+		const provider = vi.spyOn(emailService, 'sendByResend').mockImplementation(() => new Promise(resolve => { release = resolve; }));
+		const firstContext = context(); firstContext.set('setting', { resendTokens: { 'example.com': 'test-token' } });
+		const secondContext = context(); secondContext.set('setting', { resendTokens: { 'example.com': 'test-token' } });
+		try {
+			const first = emailService.reconcileDispatching(firstContext, operationId);
+			await vi.waitFor(() => expect(provider).toHaveBeenCalledOnce());
+			const second = await emailService.reconcileDispatching(secondContext, operationId);
+			expect(second.state).toBe('eligible');
+			expect(provider).toHaveBeenCalledOnce();
+			release({ data: { id: 'lease-provider-id' } });
+			await expect(first).resolves.toMatchObject({ state: 'finalized' });
+			expect(await env.db.prepare('SELECT count(*) AS total FROM email WHERE send_operation_id = ?').bind(operationId).first()).toMatchObject({ total: 1 });
+		} finally { provider.mockRestore(); }
+	});
+
+	it('never replays a legacy, expired, or corrupt dispatching operation', async () => {
+		const sender = await createAdmin();
+		const c = context();
+		c.set('setting', { resendTokens: { 'example.com': 'test-token' } });
+		const provider = vi.spyOn(emailService, 'sendByResend').mockResolvedValue({ data: { id: 'must-not-send' } });
+		const now = Date.now();
+		const legacy = crypto.randomUUID();
+		const expired = crypto.randomUUID();
+		const corrupt = crypto.randomUUID();
+		const payload = { version: 1, userId: sender.userId, accountId: sender.accountId, provider: 'resend', from: { email: sender.email, name: 'x' }, to: ['x@outside.example'], cc: [], bcc: [], subject: 'x', text: '', html: '', sendType: '', replyMessageId: '', storageDomain: '', local: { threadId: '', parentMessageId: 0, inReplyTo: '', relation: '' }, attachments: [] };
+		await env.db.batch([
+			...[[legacy, now], [expired, now - SAFE_REPLAY_WINDOW_MS - 1], [corrupt, now]].map(([id, created]) => env.db.prepare(`INSERT INTO outbound_send (operation_id,user_id,request_key,request_hash,status,quota_cost,created_at,updated_at)
+				VALUES (?,?,?,?, 'dispatching',1,?,?)`).bind(id, sender.userId, `blocked-${id}`, 'hash', created, created)),
+			env.db.prepare('INSERT INTO outbound_send_snapshot (operation_id,canonical_payload,payload_hash,created_at) VALUES (?,?,?,?)').bind(expired, canonicalize(payload), await snapshotHash(payload), now),
+			env.db.prepare('INSERT INTO outbound_send_snapshot (operation_id,canonical_payload,payload_hash,created_at) VALUES (?,?,?,?)').bind(corrupt, canonicalize(payload), 'bad-hash', now),
+		]);
+		try {
+			expect((await emailService.reconcileDispatching(c, legacy)).state).toBe('manual_review_required');
+			expect((await emailService.reconcileDispatching(c, expired)).state).toBe('manual_review_required');
+			await expect(emailService.reconcileDispatching(c, corrupt)).rejects.toThrow('integrity check failed');
+			expect(provider).not.toHaveBeenCalled();
+		} finally { provider.mockRestore(); }
 	});
 });
 
