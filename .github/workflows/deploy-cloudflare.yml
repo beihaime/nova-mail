@@ -58,7 +58,7 @@ jobs:
       CUSTOM_DOMAIN: ${{ secrets.CUSTOM_DOMAIN || vars.CUSTOM_DOMAIN }}
       DOMAIN: ${{ secrets.DOMAIN || vars.DOMAIN }}
       ADMIN: ${{ secrets.ADMIN || vars.ADMIN }}
-      JWT_SECRET: ${{ secrets.JWT_SECRET || vars.JWT_SECRET }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
       BOOTSTRAP_TOKEN: ${{ secrets.BOOTSTRAP_TOKEN }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN || vars.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || vars.CLOUDFLARE_ACCOUNT_ID }}
@@ -113,7 +113,7 @@ jobs:
           # neither the variable nor the real problem, so reject the shape up
           # front. `[![:print:]]` catches newlines, carriage returns, tabs and
           # other control characters; plain spaces are fine.
-          for entry in NAME CUSTOM_DOMAIN DOMAIN ADMIN JWT_SECRET R2_BUCKET_NAME PROJECT_LINK ANALYSIS_CACHE AI_MODEL; do
+          for entry in NAME CUSTOM_DOMAIN DOMAIN ADMIN R2_BUCKET_NAME PROJECT_LINK ANALYSIS_CACHE AI_MODEL; do
             entry_value="${!entry}"
             case "$entry_value" in
               *[![:print:]]*)
@@ -126,8 +126,8 @@ jobs:
           # `|` delimits the sed substitutions and `&` re-inserts the matched
           # text, so either one would corrupt the generated config instead of
           # failing loudly.
-          if [ -z "$JWT_SECRET" ] || grep -q '[?%#/\\|&]' <<< "$JWT_SECRET"; then
-            echo "❌ JWT_SECRET variable is empty or contains invalid characters (?, %, #, /, \\, |, &)."
+          if [ -z "$JWT_SECRET" ]; then
+            echo "❌ JWT_SECRET repository secret is required."
             exit 1
           fi
 
@@ -181,7 +181,6 @@ jobs:
           sed -i "s|\${CUSTOM_DOMAIN}|${CUSTOM_DOMAIN}|g" "$CONFIG_FILE"
           sed -i "s|\"\${DOMAIN}\"|${DOMAIN}|g" "$CONFIG_FILE"
           sed -i "s|\${ADMIN}|${ADMIN}|g" "$CONFIG_FILE"
-          sed -i "s|\${JWT_SECRET}|${JWT_SECRET}|g" "$CONFIG_FILE"
           sed -i "s|\${R2_BUCKET_NAME}|${R2_BUCKET_NAME}|g" "$CONFIG_FILE"
           sed -i "s|\${PROJECT_LINK}|${PROJECT_LINK}|g" "$CONFIG_FILE"
           sed -i "s|\${ANALYSIS_CACHE}|${ANALYSIS_CACHE}|g" "$CONFIG_FILE"
@@ -191,6 +190,18 @@ jobs:
           sed -i "s|\${LINUXDO_CALLBACK_URL}|${LINUXDO_CALLBACK_URL}|g" "$CONFIG_FILE"
 
           echo "✅ Environment setup completed."
+
+      - name: 🔐 配置 JWT 签名密钥 / Configure JWT signing secret
+        working-directory: ./mail-worker
+        run: |
+          # stdin keeps the signing key out of generated config, command lines,
+          # artifacts, and deployment summaries. Set JWT_SECRET as a GitHub
+          # Actions secret, never as a repository/environment variable.
+          if ! printf '%s' "$JWT_SECRET" | pnpm wrangler secret put jwt_secret -c wrangler-action.toml; then
+            echo "❌ Failed to upload jwt_secret as a Worker secret."
+            exit 1
+          fi
+          echo "✅ jwt_secret uploaded as a Worker secret."
 
       - name: ⚡ 设置KV数据库 / Set up KV database
         working-directory: ./mail-worker
@@ -452,8 +463,8 @@ jobs:
           echo "🛠️ Checking database bootstrap status..."
           sleep 15
 
-          WORKER_URL="${{ steps.deploy.outputs.worker_url }}"
-          WORKER_URL="${WORKER_URL:-${CUSTOM_DOMAIN:+https://$CUSTOM_DOMAIN}}"
+          WORKER_URL="${CUSTOM_DOMAIN:+https://$CUSTOM_DOMAIN}"
+          WORKER_URL="${WORKER_URL:-${{ steps.deploy.outputs.worker_url }}}"
 
           if [ -z "$WORKER_URL" ]; then
             echo "❌ Preview URL not available. Please set CUSTOM_DOMAIN."

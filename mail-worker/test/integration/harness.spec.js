@@ -23,6 +23,8 @@ describe('integration harness', () => {
 		expect(tables).toContain('auth_session');
 		expect(tables).toContain('user_security_settings');
 		expect(tables).toContain('outbound_send');
+		expect(tables).toContain('storage_cleanup');
+		expect(tables).toContain('resend_webhook_event');
 	});
 
 	it('applies the ALTER-based migrations, not just the base tables', async () => {

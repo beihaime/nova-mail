@@ -39,8 +39,26 @@ const dbInit = {
 		await this.v3_14DB(c);
 		await this.v3_15DB(c);
 		await this.v3_16DB(c);
+		await this.v3_17DB(c);
+		await this.v3_18DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
+	},
+
+	async v3_17DB(c) {
+		await c.env.db.prepare(`CREATE TABLE IF NOT EXISTS storage_cleanup (
+			object_key TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT 'pending', attempts INTEGER NOT NULL DEFAULT 0,
+			last_error TEXT NOT NULL DEFAULT '', next_attempt_at INTEGER NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+			CHECK (status IN ('pending', 'retrying'))
+		)`).run();
+		await c.env.db.prepare('CREATE INDEX IF NOT EXISTS idx_storage_cleanup_due ON storage_cleanup(next_attempt_at)').run();
+	},
+
+	async v3_18DB(c) {
+		await c.env.db.prepare(`CREATE TABLE IF NOT EXISTS resend_webhook_event (
+			event_id TEXT PRIMARY KEY, event_type TEXT NOT NULL, resend_email_id TEXT NOT NULL,
+			created_at INTEGER NOT NULL
+		)`).run();
 	},
 
 	/** Durable outbound lifecycle and uniqueness for retried finalization. */

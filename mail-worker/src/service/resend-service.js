@@ -24,9 +24,16 @@ const resendService = {
 	},
 
 	async webhooks(c, body) {
+		const eventId = String(body?.id || c.req.header('svix-id') || '').trim();
+		const resendEmailId = String(body?.data?.email_id || '').trim();
+		if (!eventId || !resendEmailId) throw new BizError('Invalid Resend webhook event');
+		const inserted = await c.env.db.prepare(
+			`INSERT OR IGNORE INTO resend_webhook_event (event_id, event_type, resend_email_id, created_at) VALUES (?, ?, ?, ?)`
+		).bind(eventId, String(body.type || ''), resendEmailId, Date.now()).run();
+		if (!inserted.meta?.changes) return { replay: true };
 
 		const params = {
-			resendEmailId: body.data.email_id,
+			resendEmailId,
 			status: emailConst.status.SENT
 		}
 
@@ -54,14 +61,18 @@ const resendService = {
 
 		if (body.type === 'email.failed') {
 			params.status = emailConst.status.FAILED
-			params.message = body.data.failed.reason
+			params.message = String(body.data?.failed?.reason || '').slice(0, 500)
+		}
+		if (!['email.sent', 'email.delivered', 'email.complained', 'email.bounced', 'email.delivery_delayed', 'email.failed'].includes(body.type)) {
+			return { ignored: true };
 		}
 
-		const emailRow = await emailService.updateEmailStatus(c, params)
+		const emailRow = await emailService.updateEmailStatusMonotonic(c, params)
 
 		if (!emailRow) {
 			throw new BizError('更新邮件状态记录失败');
 		}
+		return { updated: true };
 
 	}
 }

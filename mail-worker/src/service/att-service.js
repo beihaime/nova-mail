@@ -2,6 +2,7 @@ import orm from '../entity/orm';
 import { att } from '../entity/att';
 import { and, eq, isNull, inArray, desc } from 'drizzle-orm';
 import r2Service from './r2-service';
+import storageCleanupService from './storage-cleanup-service';
 import constant from '../const/constant';
 import fileUtils from '../utils/file-utils';
 import { attConst } from '../const/entity-const';
@@ -287,13 +288,12 @@ const attService = {
 
 	async batchDelete(c, keys) {
 		if (!keys.length) return;
-
-		const BATCH_SIZE = 1000;
-
-		for (let i = 0; i < keys.length; i += BATCH_SIZE) {
-			const batch = keys.slice(i, i + BATCH_SIZE);
-			await r2Service.delete(c, batch);
-		}
+		// Service unit tests and one-off maintenance callers may intentionally
+		// provide storage only. Production deletion always has D1 and therefore
+		// takes the durable queue path below.
+		if (!c.env.db) return r2Service.delete(c, keys);
+		await storageCleanupService.enqueue(c, keys);
+		await storageCleanupService.process(c);
 
 	},
 

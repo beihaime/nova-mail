@@ -7,6 +7,7 @@ import kvObjService from './service/kv-obj-service';
 import oauthService from './service/oauth-service';
 import analysisService from './service/analysis-service';
 import { withSpaCsp } from './security/spa-csp';
+import storageCleanupService from './service/storage-cleanup-service';
 export default {
 	 async fetch(req, env, ctx) {
 
@@ -43,5 +44,6 @@ export default {
 		await emailService.autoClean({ env })
 		await analysisService.refreshEchartsCache({ env })
 		await oauthService.clearNoBindOathUser({ env })
+		await storageCleanupService.process({ env })
 	},
 };

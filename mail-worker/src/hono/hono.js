@@ -63,10 +63,12 @@ app.use('*', async (c, next) => {
 
 app.onError((err, c) => {
 	if (err.name === 'BizError') {
-		console.log(err.message);
-	} else {
-		console.error(err);
+		return c.json(result.fail(err.message, err.code));
 	}
+	const requestId = crypto.randomUUID();
+	// Keep useful, non-sensitive correlation data server-side. Do not serialize
+	// provider/D1/storage exceptions, request headers, or mail content to clients.
+	console.error('Unhandled Nova Mail request error', { requestId, name: err?.name || 'Error' });
 
 	if (err.message === `Cannot read properties of undefined (reading 'get')`) {
 		return c.json(result.fail('KV数据库未绑定<br/>KV database not bound',502));
@@ -84,7 +86,8 @@ app.onError((err, c) => {
 		return c.json(result.fail('请按照文档更新数据库<br/>Please update the database as documented',502));
 	}
 
-	return c.json(result.fail(err.message, err.code));
+	c.header('X-Request-Id', requestId);
+	return c.json(result.fail('Internal server error', 500), 500);
 });
 
 export default app;

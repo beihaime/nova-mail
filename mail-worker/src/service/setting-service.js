@@ -18,6 +18,17 @@ function isMaskedSecret(value) {
 	return value.includes('******') || value === '********';
 }
 
+const MAX_BACKGROUND_BYTES = 5 * 1024 * 1024;
+
+function rasterBackgroundType(bytes) {
+	const data = new Uint8Array(bytes);
+	if (data.length < 12 || data.length > MAX_BACKGROUND_BYTES) return '';
+	if (data[0] === 0x89 && data[1] === 0x50 && data[2] === 0x4e && data[3] === 0x47 && data[4] === 0x0d && data[5] === 0x0a && data[6] === 0x1a && data[7] === 0x0a) return 'image/png';
+	if (data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff) return 'image/jpeg';
+	if (String.fromCharCode(...data.slice(0, 4)) === 'RIFF' && String.fromCharCode(...data.slice(8, 12)) === 'WEBP') return 'image/webp';
+	return '';
+}
+
 const settingService = {
 
 	async refresh(c) {
@@ -65,6 +76,10 @@ const settingService = {
 			await this.query(c),
 			verifyRecordService.selectListByIP(c)
 		]);
+		// Legacy SVG backgrounds may be active documents when navigated directly
+		// on the application origin. Keep the object for administrators to replace,
+		// but never publish it as a usable login background.
+		if (/\.svg(?:$|[?#])/i.test(String(settingRow.background || ''))) settingRow.background = '';
 
 
 		if (!showSiteKey) {
@@ -184,21 +199,26 @@ const settingService = {
 	async setBackground(c, params) {
 
 		let { background } = params
-
-		await this.deleteBackground(c);
+		let upload = null;
 
 		if (background && !background.startsWith('http')) {
 
 			const file = fileUtils.base64ToFile(background)
 
 			const arrayBuffer = await file.arrayBuffer();
+			const contentType = rasterBackgroundType(arrayBuffer);
+			if (!contentType) throw new BizError('Background must be a PNG, JPEG, or WebP image no larger than 5 MB');
 			background = constant.BACKGROUND_PREFIX + await fileUtils.getBuffHash(arrayBuffer) + fileUtils.getExtFileName(file.name);
+			upload = { arrayBuffer, contentType };
+		}
 
+		await this.deleteBackground(c);
 
-			await r2Service.putObj(c, background, arrayBuffer, {
-				contentType: file.type,
+		if (upload) {
+			await r2Service.putObj(c, background, upload.arrayBuffer, {
+				contentType: upload.contentType,
 				cacheControl: `public, max-age=31536000, immutable`,
-				contentDisposition: `inline; filename="${file.name}"`
+				contentDisposition: `inline; filename="background.${upload.contentType === 'image/png' ? 'png' : upload.contentType === 'image/jpeg' ? 'jpg' : 'webp'}"`
 			});
 
 		}

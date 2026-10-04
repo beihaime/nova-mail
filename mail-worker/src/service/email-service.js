@@ -1484,6 +1484,28 @@ const emailService = {
 		}).where(eq(email.resendEmailId, resendEmailId)).returning().get();
 	},
 
+	async updateEmailStatusMonotonic(c, { status, resendEmailId, message }) {
+		const terminal = [emailConst.status.BOUNCED, emailConst.status.COMPLAINED, emailConst.status.FAILED];
+		let condition = 'status = ?';
+		let binds = [status, message ?? null, resendEmailId];
+		if (status === emailConst.status.DELIVERED) {
+			condition = 'status IN (?, ?)';
+			binds.push(emailConst.status.SENT, emailConst.status.DELAYED);
+		} else if (status === emailConst.status.DELAYED) {
+			condition = 'status = ?';
+			binds.push(emailConst.status.SENT);
+		} else if (terminal.includes(status)) {
+			condition = 'status NOT IN (?, ?, ?)';
+			binds.push(...terminal);
+		} else {
+			// A late `sent` event cannot downgrade delivered or terminal mail.
+			condition = 'status = ?';
+			binds.push(emailConst.status.SENT);
+		}
+		return c.env.db.prepare(`UPDATE email SET status = ?, message = ? WHERE resend_email_id = ? AND ${condition} RETURNING *`)
+			.bind(...binds).first();
+	},
+
 	async selectUserEmailCountList(c, userIds, type, del = isDel.NORMAL) {
 		const result = await orm(c)
 			.select({
