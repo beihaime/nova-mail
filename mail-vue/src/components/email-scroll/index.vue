@@ -2378,7 +2378,7 @@ function loadData() {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
-  height: 48px;
+  min-height: 48px;
   gap: 12px;
   padding: 0 14px;
   box-shadow: inset 0 -1px 0 var(--nova-divider);
@@ -2387,11 +2387,22 @@ function loadData() {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
+    min-width: 0;
     position: relative;
     column-gap: 14px;
     row-gap: 0;
     padding-left: 2px;
     color: var(--el-text-color-primary);;
+  }
+
+  /* Slot content comes from several mail views. It must occupy the flexible
+     grid track instead of preserving a max-content width and colliding with
+     the checkbox or right-hand controls. */
+  .selection-slot {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    flex: 1 1 auto;
   }
 
   .header-right {
@@ -2471,6 +2482,7 @@ ul {
   .header-actions {
     grid-template-columns: var(--mail-list-selection-column) minmax(0, 1fr) auto;
     column-gap: var(--mail-list-column-gap);
+    height: auto;
     padding-right: var(--mail-list-horizontal-padding);
     padding-left: var(--mail-list-checkbox-inset);
   }

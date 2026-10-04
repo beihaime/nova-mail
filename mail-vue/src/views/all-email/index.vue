@@ -18,44 +18,46 @@
 
     >
       <template #first>
-        <el-input
-            v-model="searchValue"
-            :placeholder="$t('searchByContent')"
-            class="search-input"
-        >
-          <template #prefix>
-            <div @click.stop="openSelect">
-              <el-select
-                  ref="mySelect"
-                  v-model="params.searchType"
-                  :placeholder="$t('select')"
-                  class="select"
-              >
-                <el-option key="3" :label="$t('sender')" :value="'name'"/>
-                <el-option key="4" :label="$t('subject')" :value="'subject'"/>
-                <el-option key="1" :label="$t('user')" :value="'user'"/>
-                <el-option key="2" :label="$t('selectEmail')" :value="'account'"/>
-              </el-select>
-              <div class="search-type">
-                <span>{{ selectTitle }}</span>
-                <Icon class="setting-icon" icon="mingcute:down-small-fill" width="20" height="20"/>
+        <div class="all-mail-toolbar-controls">
+          <el-input
+              v-model="searchValue"
+              :placeholder="$t('searchByContent')"
+              class="search-input"
+          >
+            <template #prefix>
+              <div @click.stop="openSelect">
+                <el-select
+                    ref="mySelect"
+                    v-model="params.searchType"
+                    :placeholder="$t('select')"
+                    class="select"
+                >
+                  <el-option key="3" :label="$t('sender')" :value="'name'"/>
+                  <el-option key="4" :label="$t('subject')" :value="'subject'"/>
+                  <el-option key="1" :label="$t('user')" :value="'user'"/>
+                  <el-option key="2" :label="$t('selectEmail')" :value="'account'"/>
+                </el-select>
+                <div class="search-type">
+                  <span>{{ selectTitle }}</span>
+                  <Icon class="setting-icon" icon="mingcute:down-small-fill" width="20" height="20"/>
+                </div>
               </div>
-            </div>
-          </template>
-        </el-input>
-        <el-select v-model="params.type" placeholder="Select" class="status-select" @change="typeSelectChange">
-          <el-option key="1" :label="$t('all')" value="all"/>
-          <el-option key="3" :label="$t('received')" value="receive"/>
-          <el-option key="2" :label="$t('sent')" value="send"/>
-          <el-option key="4" :label="$t('selectDeleted')" value="delete"/>
-          <el-option key="4" :label="$t('noRecipientTitle')" value="noone"/>
-        </el-select>
-        <Icon class="icon" icon="iconoir:search" @click="search" width="20" height="20"/>
-        <Icon class="icon" @click="changeTimeSort" icon="material-symbols-light:timer-arrow-down-outline"
-              v-if="params.timeSort === 0" width="28" height="28"/>
-        <Icon class="icon" @click="changeTimeSort" icon="material-symbols-light:timer-arrow-up-outline" v-else
-              width="28" height="28"/>
-        <Icon class="icon clear" icon="fluent:broom-sparkle-16-regular" width="22" height="22" @click="openBathDelete"/>
+            </template>
+          </el-input>
+          <el-select v-model="params.type" placeholder="Select" class="status-select" @change="typeSelectChange">
+            <el-option key="1" :label="$t('all')" value="all"/>
+            <el-option key="3" :label="$t('received')" value="receive"/>
+            <el-option key="2" :label="$t('sent')" value="send"/>
+            <el-option key="4" :label="$t('selectDeleted')" value="delete"/>
+            <el-option key="4" :label="$t('noRecipientTitle')" value="noone"/>
+          </el-select>
+          <Icon class="icon toolbar-icon-action" icon="iconoir:search" @click="search" width="20" height="20"/>
+          <Icon class="icon toolbar-icon-action" @click="changeTimeSort" icon="material-symbols-light:timer-arrow-down-outline"
+                v-if="params.timeSort === 0" width="28" height="28"/>
+          <Icon class="icon toolbar-icon-action" @click="changeTimeSort" icon="material-symbols-light:timer-arrow-up-outline" v-else
+                width="28" height="28"/>
+          <Icon class="icon clear toolbar-icon-action" icon="fluent:broom-sparkle-16-regular" width="22" height="22" @click="openBathDelete"/>
+        </div>
       </template>
     </emailScroll>
     <el-dialog v-model="showBathDelete" :title="$t('clearEmail')" width="335"
@@ -413,7 +415,9 @@ async function latest() {
 }
 
 .search-input {
-  width: 100%;
+  flex: 1 1 220px;
+  min-width: 180px;
+  width: auto;
   max-width: 280px;
   height: 28px;
 
@@ -440,12 +444,25 @@ async function latest() {
 }
 
 .status-select {
-  margin-bottom: 2px;
+  flex: 0 0 102px;
   width: 102px;
 
   :deep(.el-select__wrapper) {
     min-height: 28px;
   }
+}
+
+.all-mail-toolbar-controls {
+  display: flex;
+  flex: 1 1 420px;
+  flex-wrap: wrap;
+  align-items: center;
+  min-width: 0;
+  gap: 8px 12px;
+}
+
+.toolbar-icon-action {
+  flex: 0 0 auto;
 }
 
 .input-with-select {

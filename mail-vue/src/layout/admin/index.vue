@@ -69,8 +69,10 @@ const workspaceItems = [
 .admin-sidebar {
   z-index: 30;
   display: flex;
+  box-sizing: border-box;
   width: 244px;
   min-width: 244px;
+  flex: 0 0 244px;
   min-height: 100dvh;
   flex-direction: column;
   padding: 24px 14px 18px;
