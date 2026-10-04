@@ -1,4 +1,7 @@
 import {addCollection} from "@iconify/vue";
+// Ordinary UI icons used across the app. Kept separate from the per-surface
+// sets below so branding changes can never drop a nav/action glyph.
+import './ui-icons.js'
 addCollection({
     "prefix": "hugeicons",
     "lastModified": 1757879391,

@@ -25,6 +25,12 @@
 <script setup>
 import {computed} from 'vue'
 import {useUiStore} from '@/store/ui.js'
+import {
+  appIconAssetKey,
+  isPreservedIconColor,
+  resolveAppIconAsset,
+  resolveAppIconName,
+} from '@/utils/app-icon-resolver.js'
 
 const props = defineProps({
   name: {type: String, required: true},
@@ -41,57 +47,17 @@ const uiStore = useUiStore()
 const assets = import.meta.glob('../../icons/svg/*.svg', {eager: true, query: '?url', import: 'default'})
 const rawAssets = import.meta.glob('../../icons/svg/nova-sidebar-*.svg', {eager: true, query: '?raw', import: 'default'})
 
-/** Icons that already carry brand/status colors — must not be inverted in dark mode. */
-const PRESERVE_COLOR_ICONS = new Set([
-  'add',
-  'alert-action',
-  'brand-app-dark',
-  'brand-app-light',
-  'brand-mark',
-  'checkbox-checked',
-  'checkbox-unchecked',
-  'compose',
-  'delete-action',
-  'document-action',
-  'download-action',
-  'favorite-action',
-  'flag-filled',
-  'folder-action',
-  'folder-blue',
-  'folder-green',
-  'folder-orange',
-  'folder-purple',
-  'folder-red',
-  'folder-yellow',
-  'inbox',
-  'mail-action',
-  'more-action',
-  'profile-avatar',
-  'send-action',
-  'settings-action',
-  'star-action',
-  'star-filled',
-  'status-blue',
-  'status-gray',
-  'status-green',
-  'status-red',
-  'status-yellow',
-  'tag-action',
-])
+const resolvedName = computed(() => resolveAppIconName(props.name, { dark: uiStore.dark }))
 
-const resolvedName = computed(() => {
-  if (props.name === 'brand-app') return uiStore.dark ? 'brand-app-dark' : 'brand-app-light'
-  // The toggle shows the theme the user can switch to, matching the existing interaction.
-  if (props.name === 'theme-toggle') return uiStore.dark ? 'theme-light' : 'theme-dark'
-  return props.name
-})
+const preserveColor = computed(() => props.preserve || isPreservedIconColor(resolvedName.value))
 
-const preserveColor = computed(() => props.preserve || PRESERVE_COLOR_ICONS.has(resolvedName.value))
-
-const source = computed(() => assets[`../../icons/svg/${resolvedName.value}.svg`] || assets['../../icons/svg/status-gray.svg'])
+// The asset lookup is constrained to the local icon directory by the resolver;
+// a name that is not bundled falls back to a neutral local glyph rather than a
+// branding asset.
+const source = computed(() => resolveAppIconAsset(assets, props.name, { dark: uiStore.dark }).src)
 // Source is restricted to the local icon directory above; no user-provided SVG
 // is ever rendered through v-html.
-const rawSource = computed(() => rawAssets[`../../icons/svg/${resolvedName.value}.svg`] || '')
+const rawSource = computed(() => rawAssets[appIconAssetKey(resolvedName.value)] || '')
 </script>
 
 <style scoped>
