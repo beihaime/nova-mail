@@ -82,7 +82,7 @@ Nova Mail is a self-hosted webmail application built on Cloudflare Workers. It c
 
 - Responsive desktop and mobile layouts, including configurable mobile swipe actions for archive or trash.
 - Installable PWA with an adaptive theme colour and optional Web Push notifications.
-- Light, dark, and system appearance modes; preset and editable light/dark colour palettes with import/export.
+- Rich theming system with light, dark, and system appearance modes, multiple built-in colour themes, custom palettes, and theme import/export.
 - Configurable compact or normal mail-list density, 12/24-hour times, notification sound, and English/Simplified Chinese UI.
 - Desktop keyboard shortcuts for search, navigation, selection, composing, mailbox actions, and reading; press `?` in the app for the reference.
 
