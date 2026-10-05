@@ -828,7 +828,14 @@ function formatName(email) {
       max-width: min(180px, 16vw);
       margin-left: 8px;
       text-align: left;
-      line-height: 1.2;
+      /* Both lines are single-line labels that truncate with `overflow: hidden`,
+         so the line box has to be at least the font's own content area. The
+         dropdown/tooltip wrapper above inherits a unitless `line-height: 1`, and
+         a sub-content-area line box puts the glyphs outside the box, where
+         `overflow: hidden` shaves the descenders of g/p/q/y off. `normal` takes
+         the height from the active font, so it stays correct for the fallback
+         stacks too; the row is centred and taller than this block either way. */
+      line-height: normal;
       strong, span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
       strong { font-size: 13px; font-weight: 650; color: var(--el-text-color-primary); }
       span { font-size: 11px; color: var(--regular-text-color); }
