@@ -364,14 +364,14 @@
       <div class="settings-panel about-details">
         <div class="settings-row">
           <span>{{ $t('author') }}</span>
-          <a class="about-link" href="https://github.com/beihaime" target="_blank" rel="noopener noreferrer">
-            beihaime <span aria-hidden="true">→</span>
+          <a class="about-link" href="https://github.com/beihaime" target="_blank" rel="noopener noreferrer" aria-label="Open beihaime on GitHub" title="Open beihaime on GitHub">
+            beihaime
           </a>
         </div>
         <div class="settings-row">
           <span>{{ $t('repository') }}</span>
-          <a class="about-link" href="https://github.com/beihaime/nova-mail" target="_blank" rel="noopener noreferrer">
-            github.com/beihaime/nova-mail <span aria-hidden="true">→</span>
+          <a class="about-link about-repository-link" href="https://github.com/beihaime/nova-mail" target="_blank" rel="noopener noreferrer" aria-label="Open GitHub repository" title="Open GitHub repository">
+            <Icon icon="mdi:github" width="18" height="18" aria-hidden="true" />
           </a>
         </div>
         <div class="settings-row"><span>{{ $t('appName') }}</span><span>Nova Mail</span></div>
@@ -1121,6 +1121,8 @@ function submitPwd() {
   .about-link:hover { color: var(--nm-accent-strong, var(--nm-accent)) !important; }
   .about-link:active { opacity: .72; }
   .about-link:focus-visible { outline: none; border-radius: 4px; box-shadow: var(--nova-button-focus-ring); }
+  .about-repository-link { display: inline-flex; align-items: center; justify-content: flex-end; min-width: 32px; min-height: 32px; color: var(--nm-text-secondary) !important; }
+  .about-repository-link:hover { color: var(--nm-text-primary) !important; }
 
   .account-link-section {
     order: 4;
