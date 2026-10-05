@@ -2772,14 +2772,22 @@ ul {
     background: var(--nova-surface);
   }
 
+  /* Shared mailbox boundary: it uses the same horizontal inset as each mail
+     row's divider, so Inbox, Unread and every other list begin consistently. */
+  .mobile-inbox-tools::after {
+    content: '';
+    display: block;
+    height: 1px;
+    margin: 0 16px 7px;
+    background: var(--nova-divider-soft, color-mix(in srgb, var(--nova-divider) 55%, transparent));
+  }
+
   /* ---------- Search row ---------- */
 
   .mobile-search-row {
     /* Page gutter shared with the app bar and mail rows. */
-    /* The row itself contributes 10px above its visible content, so 12px here
-       leaves a deliberate ~22px search-to-first-mail visual gap without a
-       leftover filter-row-sized spacer. */
-    padding: 2px 12px 12px;
+    /* Keep a compact 11px lead-in before the shared list divider. */
+    padding: 2px 12px 11px;
     box-sizing: border-box;
 
     /* Search field on the left, sort + multi-select on the right; the field
