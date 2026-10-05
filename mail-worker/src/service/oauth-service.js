@@ -113,7 +113,11 @@ const oauthService = {
 	async importLegacyAccount(c, provider, providerUserId) {
 		const legacy = await c.env.db.prepare('SELECT * FROM oauth WHERE platform = ? AND oauth_user_id = ? AND user_id > 0').bind(provider, providerUserId).first();
 		if (!legacy) return null;
-		try { await c.env.db.prepare('INSERT INTO oauth_accounts (user_id, provider, provider_user_id, provider_login, provider_avatar_url) VALUES (?, ?, ?, ?, ?)').bind(legacy.user_id, provider, providerUserId, legacy.username || null, legacy.avatar || null).run(); }
+		try {
+			// A lazy migration must retain its original connection order rather than
+			// making the account look newly connected when the user next signs in.
+			await c.env.db.prepare('INSERT INTO oauth_accounts (user_id, provider, provider_user_id, provider_login, provider_avatar_url, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(legacy.user_id, provider, providerUserId, legacy.username || null, legacy.avatar || null, legacy.create_time || new Date().toISOString()).run();
+		}
 		catch (error) { if (!String(error.message).includes('UNIQUE')) throw error; }
 		return this.findAccount(c, provider, providerUserId);
 	},

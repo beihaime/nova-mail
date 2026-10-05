@@ -1,7 +1,8 @@
 <template>
   <div class="account-box">
     <div class="account-switcher-identity">
-      <div class="account-switcher-avatar">{{ primaryAddress?.[0]?.toUpperCase() }}</div>
+      <img v-if="currentAvatar.url" class="account-switcher-avatar account-switcher-avatar-image" :src="currentAvatar.url" alt="" @error="handleAvatarError" />
+      <div v-else class="account-switcher-avatar">{{ currentAvatar.initial }}</div>
       <div><strong>{{ userStore.user.name || primaryAddress }}</strong><span>{{ $t('accountLabel') }}</span></div>
       <small>{{ $t('primaryAddress') }} · {{ primaryAddress }}</small>
     </div>
@@ -98,11 +99,17 @@ import {useUserStore} from "@/store/user.js";
 import {hasPerm} from "@/perm/perm.js"
 import {AccountAllReceiveEnum} from "@/enums/account-enum.js";
 import {useAccountAddresses} from "@/composables/use-account-addresses.js";
+import {computed} from 'vue';
 
 defineOptions({name: 'AccountSwitcher'})
 
 const userStore = useUserStore();
 const accountStore = useAccountStore();
+const currentAvatar = computed(() => userStore.currentAvatar)
+
+function handleAvatarError() {
+  userStore.markAvatarUnavailable(currentAvatar.value.url)
+}
 
 // Address state and every address action live in one shared composable so the
 // Settings sub-page renders the same data without duplicating a request layer.
@@ -150,6 +157,7 @@ path[fill="#ffdda1"] {
       padding: 16px 14px 10px;
       border-bottom: 1px solid var(--nova-divider);
       .account-switcher-avatar { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--nova-selected); color: var(--el-color-primary); font-weight: 700; }
+      .account-switcher-avatar-image { object-fit: cover; }
       strong { font-size: 14px; }
       span, small { color: var(--regular-text-color); font-size: 12px; }
       small { grid-column: 1 / -1; padding-top: 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

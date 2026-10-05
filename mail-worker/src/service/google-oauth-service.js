@@ -116,10 +116,13 @@ const googleOauthService = {
 		if (account) return account;
 		// Migrate a legacy Google OAuth row lazily so existing Google users keep access
 		// while all new bindings use the provider-agnostic oauth_accounts table.
-		const legacy = await c.env.db.prepare("SELECT user_id, username, name, avatar FROM oauth WHERE platform = 'google' AND oauth_user_id = ? AND user_id > 0").bind(providerUserId).first();
+		const legacy = await c.env.db.prepare("SELECT user_id, username, name, avatar, create_time FROM oauth WHERE platform = 'google' AND oauth_user_id = ? AND user_id > 0").bind(providerUserId).first();
 		if (!legacy) return null;
 		try {
-			await c.env.db.prepare('INSERT INTO oauth_accounts (user_id, provider, provider_user_id, provider_login, provider_avatar_url) VALUES (?, ?, ?, ?, ?)').bind(legacy.user_id, PROVIDER, providerUserId, legacy.username, legacy.avatar).run();
+			// Preserve the original binding time when upgrading legacy accounts. A
+			// lazy import must not make an old Google account appear newer than an
+			// already-linked provider.
+			await c.env.db.prepare('INSERT INTO oauth_accounts (user_id, provider, provider_user_id, provider_login, provider_avatar_url, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(legacy.user_id, PROVIDER, providerUserId, legacy.username, legacy.avatar, legacy.create_time || new Date().toISOString()).run();
 		} catch (error) {
 			if (!String(error.message).includes('UNIQUE')) throw error;
 		}
@@ -127,8 +130,8 @@ const googleOauthService = {
 	},
 
 	async getConnectedAccount(c, userId) {
-		const account = await c.env.db.prepare('SELECT provider_login, provider_avatar_url FROM oauth_accounts WHERE provider = ? AND user_id = ?').bind(PROVIDER, userId).first();
-		return account ? { connected: true, email: account.provider_login, avatarUrl: account.provider_avatar_url } : { connected: false };
+		const account = await c.env.db.prepare('SELECT oauth_account_id, provider_login, provider_avatar_url, created_at FROM oauth_accounts WHERE provider = ? AND user_id = ?').bind(PROVIDER, userId).first();
+		return account ? { connected: true, email: account.provider_login, avatarUrl: account.provider_avatar_url, connectedAt: account.created_at, connectionOrder: account.oauth_account_id } : { connected: false };
 	},
 
 	async assertLinkSession(c, state) {

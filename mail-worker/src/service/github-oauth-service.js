@@ -55,8 +55,8 @@ const githubOauthService = {
 
 	async findAccount(c, providerUserId) { return c.env.db.prepare('SELECT * FROM oauth_accounts WHERE provider = ? AND provider_user_id = ?').bind(PROVIDER, providerUserId).first(); },
 	async getConnectedAccount(c, userId) {
-		const account = await c.env.db.prepare('SELECT provider_login, provider_avatar_url FROM oauth_accounts WHERE provider = ? AND user_id = ?').bind(PROVIDER, userId).first();
-		return account ? { connected: true, login: account.provider_login, avatarUrl: account.provider_avatar_url } : { connected: false };
+		const account = await c.env.db.prepare('SELECT oauth_account_id, provider_login, provider_avatar_url, created_at FROM oauth_accounts WHERE provider = ? AND user_id = ?').bind(PROVIDER, userId).first();
+		return account ? { connected: true, login: account.provider_login, avatarUrl: account.provider_avatar_url, connectedAt: account.created_at, connectionOrder: account.oauth_account_id } : { connected: false };
 	},
 
 	async assertLinkSession(c, transaction) {

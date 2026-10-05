@@ -823,12 +823,10 @@ onMounted(async () => {
     try {
       const account = await githubConnectedAccount()
       Object.assign(githubAccount, account)
-      userStore.githubConnected = Boolean(account?.connected)
-      userStore.githubAvatar = account?.connected && account?.avatarUrl ? account.avatarUrl : ''
+      userStore.setConnectedAccount('github', account)
       const google = await googleConnectedAccount()
       Object.assign(googleAccount, google)
-      userStore.googleConnected = Boolean(google?.connected)
-      userStore.googleAvatar = google?.connected && google?.avatarUrl ? google.avatarUrl : ''
+      userStore.setConnectedAccount('google', google)
       const status = route.query.google
       if (status === 'connected') ElMessage({ message: t('googleConnected'), type: 'success', plain: true })
       if (status === 'failed') ElMessage({ message: t('googleLoginFailed'), type: 'warning', plain: true })
@@ -876,7 +874,7 @@ async function connectGoogle() {
 
 function handleGoogleAvatarError() {
   googleAccount.avatarUrl = ''
-  userStore.googleAvatar = ''
+  userStore.markAvatarUnavailable(userStore.connectedAccounts.find(account => account.provider === 'google')?.avatarUrl)
 }
 
 function disconnectGoogle() {
@@ -889,8 +887,7 @@ function disconnectGoogle() {
     try {
       await disconnectGoogleAccount()
       Object.assign(googleAccount, { connected: false, email: '', avatarUrl: '' })
-      userStore.googleConnected = false
-      userStore.googleAvatar = ''
+      userStore.setConnectedAccount('google', { connected: false })
       ElMessage({ message: t('googleDisconnected'), type: 'success', plain: true })
     } finally {
       googleLoading.value = false
@@ -902,7 +899,7 @@ function handleGithubAvatarError() {
   // The connection is still valid if GitHub temporarily declines the avatar
   // request. Fall back to the provider mark instead of a broken image.
   githubAccount.avatarUrl = ''
-  userStore.githubAvatar = ''
+  userStore.markAvatarUnavailable(userStore.connectedAccounts.find(account => account.provider === 'github')?.avatarUrl)
 }
 
 function disconnectGithub() {
@@ -915,8 +912,7 @@ function disconnectGithub() {
     try {
       await disconnectGithubAccount()
       Object.assign(githubAccount, { connected: false, login: '', avatarUrl: '' })
-      userStore.githubConnected = false
-      userStore.githubAvatar = ''
+      userStore.setConnectedAccount('github', { connected: false })
       ElMessage({ message: t('githubDisconnected'), type: 'success', plain: true })
     } finally {
       githubLoading.value = false

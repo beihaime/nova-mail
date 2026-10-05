@@ -23,9 +23,9 @@
       </el-tooltip>
       <el-dropdown v-if="!isMobileViewport" ref="userinfoRef" @visible-change="e => userInfoShow = e" :teleported="false" popper-class="detail-dropdown">
         <div class="avatar" @click.stop="openAccountSwitcher" >
-          <img v-if="currentAvatar" class="avatar-image" :src="currentAvatar" alt="" @error="handleAvatarError" />
+          <img v-if="currentAvatar.url" class="avatar-image" :src="currentAvatar.url" alt="" @error="handleAvatarError" />
           <div v-else class="avatar-text">
-            <div>{{ formatName(currentAccount.email || userStore.user.email) }}</div>
+            <div>{{ currentAvatar.initial }}</div>
           </div>
           <div class="account-summary">
             <strong>{{ accountDisplayName }}</strong>
@@ -36,8 +36,8 @@
         <template #dropdown>
           <div class="user-details">
             <div class="account-dropdown-head">
-              <img v-if="currentAvatar" class="account-dropdown-avatar account-dropdown-avatar-image" :src="currentAvatar" alt="" @error="handleAvatarError" />
-              <div v-else class="account-dropdown-avatar">{{ formatName(primaryAddress) }}</div>
+              <img v-if="currentAvatar.url" class="account-dropdown-avatar account-dropdown-avatar-image" :src="currentAvatar.url" alt="" @error="handleAvatarError" />
+              <div v-else class="account-dropdown-avatar">{{ currentAvatar.initial }}</div>
               <div>
                 <strong>{{ accountDisplayName }}</strong>
                 <span>{{ $t('accountLabel') }}</span>
@@ -86,8 +86,8 @@
           :aria-expanded="mobileProfileOpen"
           @click="openAccountSwitcher"
       >
-        <img v-if="currentAvatar" class="avatar-image" :src="currentAvatar" alt="" @error="handleAvatarError" />
-        <div v-else class="avatar-text"><div>{{ formatName(currentAccount.email || userStore.user.email) }}</div></div>
+        <img v-if="currentAvatar.url" class="avatar-image" :src="currentAvatar.url" alt="" @error="handleAvatarError" />
+        <div v-else class="avatar-text"><div>{{ currentAvatar.initial }}</div></div>
       </button>
     </div>
     <Teleport to="body">
@@ -103,8 +103,8 @@
         >
           <div class="mobile-profile-sheet-handle" aria-hidden="true"></div>
           <div class="mobile-profile-sheet-head">
-            <img v-if="currentAvatar" class="mobile-profile-avatar mobile-profile-avatar-image" :src="currentAvatar" alt="" @error="handleAvatarError" />
-            <div v-else class="mobile-profile-avatar">{{ formatName(primaryAddress) }}</div>
+            <img v-if="currentAvatar.url" class="mobile-profile-avatar mobile-profile-avatar-image" :src="currentAvatar.url" alt="" @error="handleAvatarError" />
+            <div v-else class="mobile-profile-avatar">{{ currentAvatar.initial }}</div>
             <div class="mobile-profile-identity">
               <strong>{{ accountDisplayName }}</strong>
               <span>{{ $t('accountLabel') }}</span>
@@ -180,7 +180,7 @@ const mobileProfileSheetRef = ref(null)
 const currentAccount = computed(() => accountStore.currentAccount || {})
 const primaryAddress = computed(() => userStore.user.email || currentAccount.value.email || '')
 const accountDisplayName = computed(() => userStore.user.name || formatName(primaryAddress.value))
-const currentAvatar = computed(() => userStore.githubAvatar || userStore.googleAvatar)
+const currentAvatar = computed(() => userStore.currentAvatar)
 
 const accountCount = computed(() => {
   return userStore.user.role.accountCount
@@ -293,8 +293,7 @@ onMounted(() => {
   loadAccounts().catch(() => {
     accounts.value = []
   })
-  userStore.refreshGithubAccount()
-  userStore.refreshGoogleAccount()
+  userStore.refreshConnectedAccounts()
   window.addEventListener('resize', syncViewport)
   window.addEventListener('popstate', closeProfilePopup)
 })
@@ -312,8 +311,7 @@ function syncViewport() {
 watch(() => route.fullPath, closeProfilePopup)
 
 function handleAvatarError() {
-  if (userStore.githubAvatar) userStore.githubAvatar = ''
-  else userStore.googleAvatar = ''
+  userStore.markAvatarUnavailable(currentAvatar.value.url)
 }
 
 function changeLang(lang) {
