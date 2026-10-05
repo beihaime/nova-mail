@@ -24,6 +24,16 @@ const routes = [
                 }
             },
             {
+                path: '/unread',
+                name: 'unread',
+                component: () => import('@/views/email/index.vue'),
+                meta: {
+                    title: 'unreadMail',
+                    name: 'unread',
+                    menu: true
+                }
+            },
+            {
                 path: '/trash',
                 name: 'trash',
                 component: () => import('@/views/trash/index.vue'),

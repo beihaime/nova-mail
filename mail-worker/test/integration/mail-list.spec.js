@@ -3,9 +3,10 @@ import { env } from 'cloudflare:test';
 import { settingConst } from '../../src/const/entity-const';
 import { api, createAccount, seedEmail, sessionFor, updateSetting } from './helpers';
 
-async function listFor(principal, { size = 10, emailId, type = 0 } = {}) {
+async function listFor(principal, { size = 10, emailId, type = 0, unread } = {}) {
 	const params = new URLSearchParams({ accountId: String(principal.accountId), type: String(type), size: String(size) });
 	if (emailId) params.set('emailId', String(emailId));
+	if (unread !== undefined) params.set('unread', String(unread));
 
 	const response = await api(`/api/email/list?${params}`, { token: principal.token });
 	const body = await response.json();
@@ -63,6 +64,20 @@ describe('mailbox list pagination', () => {
 		expect(theirs.list.map((row) => row.subject)).toContain('not-yours');
 		// The stranger only ever sees their own single message.
 		expect(theirs.total).toBe(1);
+	});
+});
+
+describe('Unread mailbox', () => {
+	it('returns only unread received mail and a matching total', async () => {
+		const principal = await sessionFor(await createAccount());
+		await seedEmail(principal, { subject: 'unread message', unread: 0 });
+		await seedEmail(principal, { subject: 'read message', unread: 1 });
+
+		const data = await listFor(principal, { size: 50, unread: 0 });
+
+		expect(data.total).toBe(1);
+		expect(data.list.map(row => row.subject)).toEqual(['unread message']);
+		expect(data.list.every(row => row.unread === 0)).toBe(true);
 	});
 });
 

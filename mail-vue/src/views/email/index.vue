@@ -57,8 +57,8 @@ onMounted(() => {
   latest()
 })
 
-watch(() => route.query.q, () => {
-  if (route.name === 'email') scroll.value?.refreshList()
+watch(() => [route.query.q, route.name], () => {
+  if (['email', 'unread'].includes(route.name)) scroll.value?.refreshList()
 })
 
 
@@ -98,7 +98,7 @@ async function latest() {
     let autoRefresh = settingStore.settings.autoRefresh;
     await sleep(autoRefresh > 1 ? autoRefresh * 1000 : 3000);
 
-    if (route.name !== 'email') {
+    if (!['email', 'unread'].includes(route.name)) {
       continue;
     }
 
@@ -167,7 +167,19 @@ function getEmailList(emailId, size) {
   const accountId =  accountStore.currentAccountId;
   const allReceive = accountStore.currentAccount.allReceive;
   return emailStore.fetchList(full =>
-    emailList(accountId, allReceive, emailId, params.timeSort, size, 0, full, keyword.value)
+    emailList(
+      accountId,
+      allReceive,
+      emailId,
+      params.timeSort,
+      size,
+      0,
+      full,
+      keyword.value,
+      0,
+      0,
+      route.name === 'unread' ? 0 : ''
+    )
   ).then(data => {
     data.latestEmail.reqAccountId = accountId;
     data.latestEmail.allReceive = allReceive;

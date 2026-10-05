@@ -123,7 +123,7 @@ const emailService = {
 
 	async list(c, params, userId) {
 
-		let { emailId, type, accountId, size, timeSort, allReceive, full, keyword, archived, trashed } = params;
+		let { emailId, type, accountId, size, timeSort, allReceive, full, keyword, archived, trashed, unread } = params;
 
 		size = pageSize(size);
 		// Trash contains both received and sent copies.  Normal folders still send
@@ -143,6 +143,9 @@ const emailService = {
 		// Archive is the previous folder state once a row is in Trash, not a
 		// second Trash sub-folder.  Show both archived and inbox rows there.
 		archived = trashed ? null : (Number(archived) === 1 ? 1 : 0);
+		// An omitted value means every read state. The Unread mailbox explicitly
+		// requests 0, matching the persisted enum (`0 = unread`, `1 = read`).
+		unread = String(unread ?? '') === '0' ? emailConst.unread.UNREAD : null;
 
 		if (!allTypes && isNaN(type)) {
 			type = 0;
@@ -164,8 +167,8 @@ const emailService = {
 			allReceive = accountRow.allReceive;
 		}
 
-		const filters = this.emailListFilters({ userId, accountId, type, allReceive, emailId, timeSort, keyword, archived, trashed });
-		const countFilters = this.emailListFilters({ userId, accountId, type, allReceive, withCursor: false, keyword, archived, trashed });
+		const filters = this.emailListFilters({ userId, accountId, type, allReceive, emailId, timeSort, keyword, archived, trashed, unread });
+		const countFilters = this.emailListFilters({ userId, accountId, type, allReceive, withCursor: false, keyword, archived, trashed, unread });
 		const columns = full ? emailListColumns : emailBriefColumns;
 
 		// The Inbox (received mail) is a conversation list: rows are collapsed to
@@ -420,7 +423,7 @@ const emailService = {
 		return list;
 	},
 
-	emailListFilters({ userId, accountId, type, allReceive, emailId, timeSort, keyword, archived = 0, trashed = 0, withCursor = true }) {
+	emailListFilters({ userId, accountId, type, allReceive, emailId, timeSort, keyword, archived = 0, trashed = 0, unread = null, withCursor = true }) {
 		const conditions = [
 			eq(email.userId, userId),
 			type === null ? undefined : eq(email.type, type),
@@ -429,6 +432,7 @@ const emailService = {
 			// Archive view for `archived = 1`, so neither can leak into the other.
 			archived === null ? undefined : eq(email.archived, archived),
 			eq(email.trashed, trashed),
+			unread === null ? undefined : eq(email.unread, unread),
 			eq(account.isDel, isDel.NORMAL),
 		];
 		if (!allReceive) {

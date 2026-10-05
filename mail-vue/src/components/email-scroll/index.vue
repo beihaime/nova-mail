@@ -42,27 +42,11 @@
 
     <div
         class="mail-list-secondary-toolbar"
-        :class="{ 'has-secondary-toolbar': type === 'email' || selectedCount > 0 }"
+        :class="{ 'has-secondary-toolbar': selectedCount > 0 }"
     >
       <Transition name="secondary-toolbar-fade" mode="out-in">
-      <div v-if="isPhone && type === 'email' && selectedCount === 0" key="mobile-filters" class="mobile-filter-bar">
-        <!-- Filter tabs and the mobile selection toolbar share this exact slot
-             so entering selection never adds/removes a layout row. -->
-        <div class="mobile-filters">
-          <button
-              v-for="filter in mobileFilters"
-              :key="filter.key"
-              class="nova-segmented-button"
-              :class="{ active: mobileFilter === filter.key }"
-              @click="selectMobileFilter(filter.key)"
-          >
-            <span class="mobile-filter-label">{{ filter.label }}</span>
-          </button>
-        </div>
-      </div>
-
       <div
-          v-else-if="!isPhone || selectedCount > 0"
+          v-if="!isPhone || selectedCount > 0"
           key="selection-toolbar"
           class="header-actions"
       >
@@ -128,20 +112,6 @@
     </div>
 
     <div ref="scroll" class="scroll">
-      <div
-          v-if="type === 'email' &&
-                isPhone &&
-                !loading &&
-                emailList.length &&
-                !visibleList.some(item => !item.expand)"
-          class="mobile-filter-empty"
-      >
-        {{
-          mobileFilter === 'attachments' && !attachmentDataReady
-            ? $t('checkingAttachments')
-            : $t('noMessagesFound')
-        }}
-      </div>
       <UseVirtualList ref="scrollbarRef"
                         @scroll="onScroll"
                         :list="visibleList"
@@ -587,7 +557,6 @@ const mobileSearchInput = computed({
   get: () => emailStore.mobileSearch,
   set: value => { emailStore.mobileSearch = value }
 })
-const mobileFilter = ref('all')
 const mobileSelecting = ref(false)
 const keyboardFocusedId = ref(0)
 
@@ -600,13 +569,6 @@ const selectionActions = computed(() => ({
   trash: props.type !== 'trash' && typeof props.emailDelete === 'function',
   permanentDelete: props.type === 'trash' && typeof props.emailDelete === 'function',
 }))
-
-const mobileFilters = computed(() => [
-  { key: 'all', label: t('all') },
-  { key: 'unread', label: t('unreadMail') },
-  { key: 'attachments', label: t('withAttachments') },
-  { key: 'starred', label: t('starred') }
-])
 
 let longPressTimer = null
 let longPressTriggered = false
@@ -723,10 +685,6 @@ const list = computed(() => {
   return [...emailList, ...expandList]
 })
 
-const attachmentDataReady = computed(() =>
-  emailList.every(item => !!emailStore.detailMap[item.emailId])
-)
-
 const visibleList = computed(() => {
   if (!isPhone.value || props.type !== 'email') {
     return list.value
@@ -736,14 +694,6 @@ const visibleList = computed(() => {
 
   return list.value.filter(item => {
     if (item.expand) return true
-
-    const matchesFilter =
-      mobileFilter.value === 'all' ||
-      (mobileFilter.value === 'unread' &&
-        item.unread === EmailUnreadEnum.UNREAD) ||
-      (mobileFilter.value === 'attachments' &&
-        !!emailStore.detailMap[item.emailId]?.attList?.length) ||
-      (mobileFilter.value === 'starred' && !!item.isStar)
 
     const matchesSearch =
       !query ||
@@ -756,7 +706,7 @@ const visibleList = computed(() => {
         String(value || '').toLocaleLowerCase().includes(query)
       )
 
-    return matchesFilter && matchesSearch
+    return matchesSearch
   })
 })
 
@@ -766,10 +716,6 @@ const lastVisibleMailIndex = computed(() => {
   }
   return -1
 })
-
-function selectMobileFilter(filter) {
-  mobileFilter.value = filter
-}
 
 /**
  * Right-hand list timestamp.
@@ -2634,7 +2580,7 @@ ul {
 @media (max-width: 767px) {
   .email-container {
     --mail-list-avatar-column: 46px;
-    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
   }
 
   .mail-list-secondary-toolbar {
@@ -2798,7 +2744,6 @@ ul {
 
 .mobile-inbox-tools,
 .mobile-row-star,
-.mobile-filter-empty,
 /* Swipe actions are a phone-only affordance; the media query below lays them
    out. Without this the desktop layout would show both action panels. */
 .swipe-actions {
@@ -2807,12 +2752,12 @@ ul {
 
 @media (max-width: 767px) {
   .email-container {
-    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
     background: var(--nova-surface);
     color: var(--mobile-primary);
   }
 
-  /* ---------- Inbox tools (search + filter rows) ---------- */
+  /* ---------- Inbox tools ---------- */
 
   .mobile-inbox-tools {
     display: block;
@@ -2827,7 +2772,8 @@ ul {
 
   .mobile-search-row {
     /* Page gutter shared with the app bar and mail rows. */
-    padding: 2px 12px 8px;
+    /* Deliberate breathing room replaces the removed filter-row divider. */
+    padding: 2px 12px 18px;
     box-sizing: border-box;
 
     /* Search field on the left, sort + multi-select on the right; the field
@@ -2916,78 +2862,6 @@ ul {
 
   .mobile-search-clear:active {
     background: var(--nova-hover);
-  }
-
-  /* ---------- Filters ---------- */
-
-  .mobile-filter-bar {
-    height: 48px;
-    min-height: 48px;
-    min-width: 0;
-
-    /* Symmetric page gutter: the four chips fill the row edge to edge, so the
-       group is centred in the bar instead of leaning left. */
-    padding: 8px 12px;
-
-    display: flex;
-    align-items: center;
-
-    border-bottom: 1px solid var(--nova-divider-soft, color-mix(in srgb, var(--nova-divider) 55%, transparent));
-  }
-
-  .mobile-filters {
-    flex: 1 1 auto;
-    min-width: 0;
-
-    /* One equal column per filter: `minmax(0, 1fr)` lets a long label shrink
-       instead of pushing its neighbours out of line, so the four cells stay
-       identical whether or not one of them is active. */
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    align-items: center;
-    gap: 0;
-  }
-
-  .mobile-filters button {
-    /* Every chip carries the same box whether or not it is active, so toggling
-       a filter cannot shift its neighbours. The content is centred inside the
-       cell, which keeps the labels optically on the row's centre line. */
-    width: 100%;
-    max-width: 100%;
-    min-width: 0;
-    height: 32px;
-    padding: 0 4px;
-    box-sizing: border-box;
-
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-
-    border: 0;
-    border-radius: 999px;
-
-    color: var(--mobile-secondary);
-    background: transparent;
-
-    overflow: hidden;
-
-    font-size: clamp(10.5px, 3.15vw, 12.5px);
-    cursor: pointer;
-  }
-
-  .mobile-filters button.active {
-    color: var(--el-color-primary);
-    background: var(--nova-selected);
-
-    font-weight: 650;
-  }
-
-  .mobile-filter-label {
-    min-width: 0;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
   }
 
   /* Keep sorting at the right edge while the search field owns the remaining
@@ -3364,33 +3238,12 @@ ul {
 
   /* Starred rows use the theme accent on the phone list (the desktop list keeps
      the global treatment). `!important` outranks the global dark icon veil. */
-  /* ---------- Filtered empty ---------- */
 
   .scroll {
     position: relative;
     width: 100%;
     max-width: 100%;
     min-width: 0;
-  }
-
-  .mobile-filter-empty {
-    position: absolute;
-
-    z-index: 2;
-
-    left: 0;
-    right: 0;
-    top: 48%;
-
-    display: block;
-
-    text-align: center;
-
-    color: var(--mobile-tertiary);
-
-    font-size: 14px;
-
-    pointer-events: none;
   }
 
   /* End-of-list label: give it real air below the last message instead of

@@ -60,6 +60,12 @@ describe('emailList', () => {
 
     expect(mocks.get.mock.calls[0][1].params).toMatchObject({ type: 'all', trashed: 1, archived: 0 })
   })
+
+  it('forwards the unread mailbox filter without changing the Inbox default', () => {
+    emailList(7, 0, 0, 0, 50, 0, 1, '', 0, 0, 0)
+
+    expect(mocks.get.mock.calls[0][1].params.unread).toBe(0)
+  })
 })
 
 describe('delete and the swipe action routes', () => {

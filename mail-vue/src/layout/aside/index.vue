@@ -14,6 +14,11 @@
           <span class="nav-icon"><AppIcon name="nova-sidebar-inbox" :size="18" inline /></span>
           <span class="menu-name">{{$t('inbox')}}</span>
         </el-menu-item>
+        <el-menu-item class="nova-navigation-button" @click="router.push({name: 'unread'})" index="unread"
+                      :class="route.meta.name === 'unread' ? 'choose-item' : ''">
+          <span class="nav-icon"><AppIcon name="nova-sidebar-mail" :size="18" inline /></span>
+          <span class="menu-name">{{$t('unreadMail')}}</span>
+        </el-menu-item>
         <el-menu-item class="nova-navigation-button" @click="router.push({name: 'send'})" index="send" v-perm="'email:send'"
                       :class="route.meta.name === 'send' ? 'choose-item' : ''">
           <span class="nav-icon"><AppIcon name="nova-sidebar-sent" :size="18" inline /></span>
