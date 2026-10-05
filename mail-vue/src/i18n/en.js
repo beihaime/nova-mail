@@ -124,6 +124,8 @@ const en = {
     primaryAddress: 'Primary address',
     mailAddresses: 'Mail addresses',
     primary: 'Primary',
+    defaultSender: 'Default sender',
+    setAsDefaultSender: 'Set as default sender',
     manageAddresses: 'Manage addresses',
     userAccount: 'User Email Address',
     deleteUser: 'Delete Account',

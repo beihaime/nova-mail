@@ -32,7 +32,15 @@
         </span>
         <span class="settings-row-title address-email" :title="item.email">{{ item.email }}</span>
         <span v-if="item.email === primaryAddress" class="address-primary-badge">{{ $t('primary') }}</span>
+        <span v-if="isDefaultSender(item)" class="address-primary-badge address-default-badge">{{ $t('defaultSender') }}</span>
         <span class="address-actions" @click.stop>
+          <button
+            v-if="canSetDefaultSender(item)"
+            class="address-default-action"
+            type="button"
+            :disabled="defaultSenderSaving"
+            @click="setDefaultSender(item)"
+          >{{ $t('setAsDefaultSender') }}</button>
           <el-tooltip :content="$t('receiveEmail')" placement="top">
             <button
               class="nova-icon-button address-action"
@@ -61,6 +69,7 @@
             </button>
             <template #dropdown>
               <el-dropdown-menu>
+                <el-dropdown-item v-if="canSetDefaultSender(item)" @click="setDefaultSender(item)">{{ $t('setAsDefaultSender') }}</el-dropdown-item>
                 <el-dropdown-item @click="copyAccount(item.email)">{{ $t('copy') }}</el-dropdown-item>
                 <el-dropdown-item v-if="hasPerm('email:send')" @click="openSetName(item)">{{ $t('rename') }}</el-dropdown-item>
                 <el-dropdown-item v-if="item.accountId !== userStore.user.account.accountId" @click="setAsTop(item, index)">{{ $t('pin') }}</el-dropdown-item>
@@ -107,6 +116,7 @@ const userStore = useUserStore()
 const {
   accounts,
   primaryAddress,
+  defaultSenderSaving,
   loading,
   noLoading,
   skeletonRows,
@@ -119,6 +129,9 @@ const {
   setAsTop,
   remove,
   hasAddressMenu,
+  isDefaultSender,
+  canSetDefaultSender,
+  setDefaultSender,
 } = useAccountAddresses()
 
 const isChecked = (item) => item.accountId === accountStore.currentAccountId
@@ -184,6 +197,36 @@ const isAccent = (item) => isChecked(item) || item.email === primaryAddress.valu
   white-space: nowrap;
 }
 
+/* The effective default sender. Same pill as the primary badge: the two read as
+   one line of metadata ("Primary · Default sender") instead of two widgets. */
+.address-default-badge {
+  color: var(--nm-text-muted);
+  background: color-mix(in srgb, var(--nm-text-muted) 12%, transparent);
+}
+
+/* Unobtrusive text action: plain muted type, no border, no background. It reads
+   as metadata next to the address rather than a second primary button, and the
+   overflow menu keeps the same action reachable on narrow screens. */
+.address-default-action {
+  flex: 0 0 auto;
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--nm-text-muted);
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--nova-motion-fast) var(--nova-motion-ease),
+    background-color var(--nova-motion-fast) var(--nova-motion-ease);
+}
+
+.address-default-action:hover { color: var(--nm-accent); background: var(--nm-accent-subtle); }
+.address-default-action:focus-visible { color: var(--nm-accent); outline: none; box-shadow: inset var(--nova-button-focus-ring); }
+.address-default-action:disabled { cursor: default; opacity: 0.5; }
+
 .address-actions {
   display: flex;
   align-items: center;
@@ -212,8 +255,10 @@ const isAccent = (item) => isChecked(item) || item.email === primaryAddress.valu
   .address-action { --nova-icon-button-size: 30px; }
   .address-primary-badge { padding-inline: 6px; font-size: 10px; }
 
-  /* A phone row cannot hold three 34px targets plus a long address without
-     squeezing the address; copy moves into the overflow menu there. */
+  /* A phone row cannot hold three 34px targets, a label and a long address
+     without squeezing the address; copy and the default-sender label move into
+     the overflow menu there. */
   .address-copy-action { display: none; }
+  .address-default-action { display: none; }
 }
 </style>

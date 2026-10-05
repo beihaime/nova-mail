@@ -23,3 +23,12 @@ export function accountSetAllReceive(accountId) {
 export function accountSetAsTop(accountId) {
     return http.put('/account/setAsTop', {accountId})
 }
+
+/**
+ * Choose the default sender. The server re-authorizes the id (ownership, active
+ * state, send permission) and returns the preference it actually stored, so the
+ * caller can render the confirmed state instead of an optimistic guess.
+ */
+export function accountSetDefaultSender(accountId) {
+    return http.put('/account/setDefaultSender', {accountId})
+}

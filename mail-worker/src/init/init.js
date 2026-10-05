@@ -46,8 +46,29 @@ const dbInit = {
 		await this.v3_21DB(c);
 		await this.v3_22DB(c);
 		await this.v3_23DB(c);
+		await this.v3_24DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
+	},
+
+	/**
+	 * v3.24 — per-user default sender address.
+	 *
+	 * A nullable reference to one of the user's own `account` rows. Existing
+	 * users keep NULL, which means "no explicit choice" and is resolved at
+	 * runtime to the primary address (see senderAddressService), so the
+	 * migration never has to guess and write a possibly stale id.
+	 * `ON DELETE SET NULL` keeps the reference from dangling when an address row
+	 * is removed outside the Settings page.
+	 */
+	async v3_24DB(c) {
+		const present = await c.env.db
+			.prepare("SELECT 1 FROM pragma_table_info('user_preferences') WHERE name = 'default_sender_account_id'")
+			.first();
+		if (present) return;
+		await c.env.db.prepare(
+			'ALTER TABLE user_preferences ADD COLUMN default_sender_account_id INTEGER REFERENCES account(account_id) ON DELETE SET NULL'
+		).run();
 	},
 
 	async v3_17DB(c) {

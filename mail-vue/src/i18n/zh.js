@@ -124,6 +124,8 @@ const zh = {
     primaryAddress: '主邮箱地址',
     mailAddresses: '邮箱地址',
     primary: '主邮箱',
+    defaultSender: '默认发件人',
+    setAsDefaultSender: '设为默认发件人',
     manageAddresses: '管理邮箱地址',
     userAccount: '用户邮箱',
     deleteUser: '删除账户',

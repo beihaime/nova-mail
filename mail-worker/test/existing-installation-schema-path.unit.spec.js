@@ -43,6 +43,13 @@ const PRE_TABLE_COLUMNS = [
 	['account', 'sort', 'INTEGER NOT NULL DEFAULT 0'],
 ];
 
+// Columns belonging to a table created by a migration are added only after that
+// migration ran.
+const PREFERENCE_COLUMNS = [
+	// v3.24 — the per-user default sender. Added after v3.14 created the table.
+	['user_preferences', 'default_sender_account_id', 'INTEGER REFERENCES account(account_id) ON DELETE SET NULL'],
+];
+
 const SEND_COLUMNS = [
 	['email', 'send_operation_id', "TEXT NOT NULL DEFAULT ''"],
 	['attachments', 'send_operation_id', "TEXT NOT NULL DEFAULT ''"],
@@ -108,6 +115,7 @@ function applyExistingInstallPath(db) {
 	db.exec(v3_12);
 	db.exec(v3_13);
 	db.exec(v3_14);
+	ensureColumns(db, PREFERENCE_COLUMNS);
 
 	// v3.15 — mailbox-scoped Message-ID uniqueness. The workflow computes a
 	// legacy cutoff first; this fixture has no duplicate rows.
@@ -180,7 +188,7 @@ describeSqlite('existing-installation schema path', () => {
 	});
 
 	it('applies every guarded column the workflow declares', () => {
-		for (const [table, column] of [...PRE_TABLE_COLUMNS, ...SEND_COLUMNS, ...POST_TABLE_COLUMNS]) {
+		for (const [table, column] of [...PRE_TABLE_COLUMNS, ...PREFERENCE_COLUMNS, ...SEND_COLUMNS, ...POST_TABLE_COLUMNS]) {
 			expect(workflow).toContain(`ensure_column ${table} ${column}`);
 		}
 	});

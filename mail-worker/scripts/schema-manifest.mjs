@@ -30,7 +30,7 @@ export const REQUIRED_COLUMNS = Object.freeze({
 		'auth_results', 'trashed', 'trashed_at', 'trash_archived', 'send_operation_id',
 	],
 	attachments: ['send_operation_id', 'send_ordinal'],
-	user_preferences: ['mail_list_density'],
+	user_preferences: ['mail_list_density', 'default_sender_account_id'],
 	auth_session: ['session_id', 'user_id', 'token_hash', 'device_id', 'expires_at', 'revoked_at'],
 	user_security_settings: ['user_id', 'login_alert_email', 'login_alert_telegram', 'telegram_chat_id'],
 	outbound_send: [

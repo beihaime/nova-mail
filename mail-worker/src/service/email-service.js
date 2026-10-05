@@ -32,6 +32,7 @@ import pushService from './push-service';
 import { pageSize } from '../utils/pagination';
 import sendLifecycle from './send-lifecycle';
 import outboundSendSnapshot from './outbound-send-snapshot';
+import senderAddressService from './sender-address-service';
 
 const MAX_SEARCH_LENGTH = 200;
 
@@ -755,23 +756,14 @@ const emailService = {
 
 		}
 
-		const accountRow = await accountService.selectById(c, accountId);
-
-		if (!accountRow) {
-			throw new BizError(t('senderAccountNotExist'));
-		}
-
-		if (accountRow.userId !== userId) {
-			throw new BizError(t('sendEmailNotCurUser'));
-		}
-
-		if (!emailUtils.sameEmail(c.env.admin, userRow.email)) {
-			//用户没有这个域名的使用权限
-			if(!roleService.hasAvailDomainPerm(roleRow.availDomain, accountRow.email)) {
-				throw new BizError(t('noDomainPermSend'),403)
-			}
-
-		}
+		// The From identity is authorized here, at send time, from the caller's own
+		// address rows: ownership, active state and role/domain send permission.
+		// Neither the composer's dropdown nor a previously validated draft decides
+		// it, and any client-supplied From is rejected unless it names that same
+		// address (see senderAddressService.assertRequestedFrom).
+		const accountRow = await senderAddressService.requireSendableSender(
+			c, accountId, userId, { userRow, roleRow });
+		senderAddressService.assertRequestedFrom(params, accountRow);
 
 		const domain = emailUtils.getDomain(accountRow.email);
 		const resendToken = resendTokens[domain];

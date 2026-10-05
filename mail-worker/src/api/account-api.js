@@ -1,5 +1,6 @@
 import app from '../hono/hono';
 import accountService from '../service/account-service';
+import senderAddressService from '../service/sender-address-service';
 import result from '../model/result';
 import userContext from '../security/user-context';
 import userPreferencesService from '../service/user-preferences-service';
@@ -41,4 +42,18 @@ app.put('/account/setAllReceive', async (c) => {
 app.put('/account/setAsTop', async (c) => {
 	await accountService.setAsTop(c, await c.req.json(), userContext.getUserId(c));
 	return c.json(result.ok());
+});
+
+/**
+ * Choose which of the caller's own addresses is the default sender.
+ *
+ * The account id is re-authorized here (ownership, active state, role/domain send
+ * permission) instead of trusting the address list the Settings page rendered.
+ * A `null`/`0` id clears the preference so the runtime fallback decides.
+ */
+app.put('/account/setDefaultSender', async (c) => {
+	const body = await c.req.json();
+	const preference = await senderAddressService.setDefaultSender(
+		c, body?.accountId ?? null, userContext.getUserId(c));
+	return c.json(result.ok(preference));
 });

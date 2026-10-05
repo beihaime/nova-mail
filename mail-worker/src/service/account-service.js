@@ -14,6 +14,7 @@ import roleService from './role-service';
 import userContext from '../security/user-context';
 import { t } from '../i18n/i18n';
 import verifyRecordService from './verify-record-service';
+import senderAddressService from './sender-address-service';
 import { pageNumber, pageSize } from '../utils/pagination';
 
 const accountService = {
@@ -145,7 +146,11 @@ const accountService = {
 				)
 			.orderBy(desc(account.sort), asc(account.accountId))
 			.limit(size)
-			.all();
+			.all()
+			// The Settings → Account → Addresses page must not offer "Set as
+			// default sender" for an address the send API would refuse, so the
+			// same server-side rule annotates every row.
+			.then(rows => senderAddressService.decorateSendability(c, userId, rows));
 	},
 
 	async delete(c, params, userId) {
@@ -171,6 +176,9 @@ const accountService = {
 			and(eq(account.userId, userId),
 				eq(account.accountId, accountRow.accountId)))
 			.run();
+
+		// A deleted address must never survive as the configured default sender.
+		await senderAddressService.reconcileDefaultSender(c, userId);
 	},
 
 	selectById(c, accountId) {
@@ -237,6 +245,7 @@ const accountService = {
 
 	async physicsDeleteByUserIds(c, userIds) {
 		await emailService.physicsDeleteUserIds(c, userIds);
+		await senderAddressService.clearDefaultSenderForUserIds(c, userIds);
 		await orm(c).delete(account).where(inArray(account.userId,userIds)).run();
 	},
 
@@ -310,8 +319,20 @@ const accountService = {
 
 	async physicsDelete(c, params) {
 		const { accountId } = params
+		const owner = await orm(c).select({ userId: account.userId }).from(account)
+			.where(eq(account.accountId, Number(accountId))).get();
+		// Read the preference before the row disappears: `ON DELETE SET NULL`
+		// would erase it too, and then "the user had a default and it was this
+		// address" could no longer be repaired into a concrete fallback.
+		const configuredAccountId = owner?.userId != null
+			? await senderAddressService.getConfiguredAccountId(c, owner.userId).catch(() => null)
+			: null;
+		await senderAddressService.clearDefaultSenderForAccountIds(c, [accountId]);
 		await emailService.physicsDeleteByAccountId(c, accountId)
 		await orm(c).delete(account).where(eq(account.accountId, accountId)).run();
+		if (owner?.userId != null) {
+			await senderAddressService.reconcileDefaultSender(c, owner.userId, { configuredAccountId });
+		}
 	},
 
 	async setAllReceive(c, params, userId) {

@@ -23,6 +23,7 @@ import starService from './star-service';
 import userContext from '../security/user-context';
 import { pageNumber, pageSize } from '../utils/pagination';
 import { hasConfiguredDomain } from '../utils/configured-domains';
+import senderAddressService from './sender-address-service';
 
 const userService = {
 
@@ -49,6 +50,14 @@ const userService = {
 		user.permKeys = permKeys;
 		user.role = roleRow;
 		user.type = userRow.type;
+
+		// The effective default sender travels with the identity so a brand-new
+		// Compose window can start from it without a second request. A stored
+		// reference that is no longer usable is repaired here, so an address that
+		// an administrator disabled or removed elsewhere cannot leave a dangling
+		// preference behind.
+		user.defaultSender = await senderAddressService.reconcileDefaultSender(c, userId, { userRow, roleRow });
+		user.defaultSenderAccountId = user.defaultSender?.accountId ?? null;
 
 		if (emailUtils.sameEmail(c.env.admin, userRow.email)) {
 			user.role = constant.ADMIN_ROLE

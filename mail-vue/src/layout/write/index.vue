@@ -129,6 +129,14 @@ import router from "@/router/index.js";
 import {ElMessageBox} from "element-plus";
 import {accountList} from "@/request/account.js";
 import {restoreDraftRecipients, validateCompose} from "@/utils/compose-validate.js";
+import {
+  composeSenderFields,
+  newComposeSender,
+  ownedAddressSet,
+  parseAddressList,
+  resolveDraftSender,
+  resolveReplySenderAccount,
+} from "@/utils/sender-resolution.js";
 import {clearAuthenticatedSession} from '@/utils/session-state.js';
 
 defineExpose({
@@ -507,28 +515,20 @@ function openForward(email) {
   });
 }
 
-async function replyAccount(email) {
-  if (!email.accountId || email.accountId === accountStore.currentAccount?.accountId) {
-    return accountStore.currentAccount
-  }
-
-  const cached = accountStore.addresses.find(account => account.accountId === email.accountId)
-  if (cached) return cached
-
+/**
+ * The user's owned addresses for sender resolution. The shared singleton already
+ * caches the first page (with the server's `canSend` verdict); only a cold cache
+ * triggers the request, and a failure degrades to whatever is already known.
+ */
+async function ownedAddressList() {
+  if (accountStore.addresses?.length) return accountStore.addresses
   try {
     const addresses = await accountList(0, 30)
     accountStore.addresses = addresses
-    return addresses.find(account => account.accountId === email.accountId) || accountStore.currentAccount
+    return addresses
   } catch {
-    return accountStore.currentAccount
+    return accountStore.addresses || []
   }
-}
-
-function parseAddressList(value) {
-  let addresses = value
-  try { if (typeof addresses === 'string') addresses = JSON.parse(addresses) } catch { return [] }
-  if (!Array.isArray(addresses)) return []
-  return addresses.flatMap(item => item?.group || [item]).map(item => item?.address).filter(Boolean)
 }
 
 function currentSenderAddress() {
@@ -541,8 +541,15 @@ async function openReply(email, replyAll = false) {
 
   email.subject = email.subject || ''
 
+  // Resolve the identity first: the same address that received the message must
+  // be the one it is answered from, and it also decides whose addresses are
+  // excluded from a reply-all.
+  const addresses = await ownedAddressList()
+  const senderAccount = resolveReplySenderAccount(email, userStore.user, addresses, accountStore.currentAccount)
+  const senderAddress = (senderAccount?.email || currentSenderAddress()).toLowerCase()
+
   const sender = String(email.sendEmail || '')
-  const mine = sender.toLowerCase() === currentSenderAddress()
+  const mine = sender.toLowerCase() === senderAddress
   if (replyAll && mine) {
     form.receiveEmail.push(...parseAddressList(email.recipient))
     form.cc.push(...parseAddressList(email.cc).filter(address => !form.receiveEmail.some(to => to.toLowerCase() === address.toLowerCase())))
@@ -550,7 +557,8 @@ async function openReply(email, replyAll = false) {
     form.receiveEmail.push(sender)
   }
   if (replyAll && !mine) {
-    const excluded = new Set([currentSenderAddress(), sender.toLowerCase()])
+    // Never address the reply back to one of the user's own identities.
+    const excluded = ownedAddressSet(userStore.user, addresses, [senderAddress, sender])
     for (const address of [...parseAddressList(email.recipient), ...parseAddressList(email.cc)]) {
       const normalized = address.toLowerCase()
       if (!excluded.has(normalized)) {
@@ -568,8 +576,6 @@ async function openReply(email, replyAll = false) {
   form.emailId = email.emailId
 
   defValue.value = ''
-
-  const senderAccount = await replyAccount(email)
 
   setTimeout(async () => {
     const quotedHtml = email.content
@@ -600,16 +606,15 @@ async function openReply(email, replyAll = false) {
 }
 
 function open(preferredAccount) {
-  const account = preferredAccount || accountStore.currentAccount
-  if (!account?.email) {
-    form.sendEmail = userStore.user.email;
-    form.accountId = userStore.user.account.accountId;
-    form.name = userStore.user.name;
-  } else {
-    form.sendEmail = account.email;
-    form.accountId = account.accountId;
-    form.name = account.name;
-  }
+  // A completely new Compose window starts from the effective default sender:
+  // the user's configured choice, then the valid primary address, then the first
+  // usable address. Reply and forward pass their own identity explicitly.
+  const fields = preferredAccount
+      ? composeSenderFields(preferredAccount, userStore.user)
+      : newComposeSender(userStore.user, accountStore.addresses, accountStore.currentAccount)
+  form.sendEmail = fields.sendEmail;
+  form.accountId = fields.accountId;
+  form.name = fields.name;
   show.value = true;
   editor.value.focus()
 }
@@ -617,6 +622,11 @@ function open(preferredAccount) {
 function openDraft(draft) {
   Object.assign(form, {...draft})
   Object.assign(form, restoreDraftRecipients(draft))
+  // The draft keeps the sender it stored; only a legacy draft without one is
+  // initialized from the effective default sender.
+  const sender = resolveDraftSender(draft, userStore.user, accountStore.addresses, accountStore.currentAccount)
+  form.sendEmail = sender.sendEmail
+  form.accountId = sender.accountId
   showCc.value = form.cc.length > 0
   showBcc.value = form.bcc.length > 0
   defValue.value = ''

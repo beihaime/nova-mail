@@ -5,6 +5,7 @@ import {
   accountList,
   accountSetAllReceive,
   accountSetAsTop,
+  accountSetDefaultSender,
   accountSetName,
 } from '@/request/account.js'
 import {sleep} from '@/utils/time-utils.js'
@@ -55,11 +56,19 @@ function createAccountAddresses() {
 
   const primaryAddress = computed(() => userStore.user.email || '')
   const domainList = computed(() => settingStore.domainList)
+  /**
+   * The address the backend resolver actually chose (configured default, else
+   * the valid primary, else the first usable address). It travels with the
+   * identity, so Settings and the composer can never disagree about it.
+   */
+  const defaultSender = computed(() => userStore.user.defaultSender || null)
+  const defaultSenderAccountId = computed(() => defaultSender.value?.accountId ?? null)
 
   const accounts = reactive([])
   const noLoading = ref(false)
   const loading = ref(false)
   const followLoading = ref(false)
+  const defaultSenderSaving = ref(false)
   const skeletonRows = ref(10)
   const queryParams = {
     size: 30
@@ -310,6 +319,42 @@ function createAccountAddresses() {
     return !showNullSetting(item)
   }
 
+  function isDefaultSender(item) {
+    return Boolean(item?.accountId) && item.accountId === defaultSenderAccountId.value
+  }
+
+  /**
+   * The action is offered only for an address the server says may send and that
+   * is not already the effective default. The rule is the backend's own
+   * `canSend`, not a frontend guess at ownership or domain permission.
+   */
+  function canSetDefaultSender(item) {
+    if (!item?.accountId || isDefaultSender(item)) return false
+    if (!hasPerm('email:send')) return false
+    return item.canSend !== false
+  }
+
+  /**
+   * Persist the choice, then render exactly what the server confirmed. No
+   * optimistic mutation: a rejected address leaves the UI on the stored default.
+   */
+  function setDefaultSender(account) {
+    if (defaultSenderSaving.value) return
+    defaultSenderSaving.value = true
+    accountSetDefaultSender(account.accountId).then(preference => {
+      const confirmed = preference?.effectiveSender || null
+      userStore.user.defaultSender = confirmed
+      userStore.user.defaultSenderAccountId = confirmed?.accountId ?? null
+      ElMessage({message: t('setSuccess'), type: 'success', plain: true})
+    }).catch(() => {
+      // The server refused (or could not confirm) the change; reload the
+      // authoritative identity so a stale badge cannot survive.
+      userStore.refreshUserInfo()
+    }).finally(() => {
+      defaultSenderSaving.value = false
+    })
+  }
+
   function remove(account) {
     ElMessageBox.confirm(t('delConfirm', {msg: account.email}), {
       confirmButtonText: t('confirm'),
@@ -322,6 +367,9 @@ function createAccountAddresses() {
         if (accounts.length < queryParams.size) {
           getAccountList()
         }
+        // Deleting the current default sender makes the backend fall back to a
+        // valid address; reload the identity so the badge follows it.
+        if (isDefaultSender(account)) userStore.refreshUserInfo()
         ElMessage({message: t('delSuccessMsg'), type: 'success', plain: true})
       })
     })
@@ -395,6 +443,9 @@ function createAccountAddresses() {
     // data
     accounts,
     primaryAddress,
+    defaultSender,
+    defaultSenderAccountId,
+    defaultSenderSaving,
     domainList,
     loading,
     noLoading,
@@ -425,6 +476,9 @@ function createAccountAddresses() {
     setAllReceive,
     showNullSetting,
     hasAddressMenu,
+    isDefaultSender,
+    canSetDefaultSender,
+    setDefaultSender,
     remove,
     setAsTop,
     copyAccount,
