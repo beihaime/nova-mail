@@ -3,6 +3,16 @@ import {addCollection} from "@iconify/vue";
 // sets below so branding changes can never drop a nav/action glyph.
 import './ui-icons.js'
 addCollection({
+    "prefix": "lucide",
+    "width": 24,
+    "height": 24,
+    "icons": {
+        "github": {
+            "body": "<path fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"1.75\" d=\"M15 22v-2a4.8 4.8 0 0 0-1-3.5c3.28-.36 6.72-1.61 6.72-7.25A5.6 5.6 0 0 0 19.22 5.6A5.07 5.07 0 0 0 19.08 2S17.9 1.65 15 3.6a13.38 13.38 0 0 0-7 0C5.1 1.65 3.92 2 3.92 2a5.07 5.07 0 0 0-.14 3.6A5.6 5.6 0 0 0 2.28 9.25c0 5.64 3.44 6.89 6.72 7.25A4.8 4.8 0 0 0 8 20v2\"/><path fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"1.75\" d=\"M9 18c-4.51 2-5-2-7-2\"/>"
+        }
+    }
+})
+addCollection({
     "prefix": "hugeicons",
     "lastModified": 1757879391,
     "aliases": {},
