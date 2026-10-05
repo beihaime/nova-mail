@@ -3262,13 +3262,15 @@ ul {
     min-width: 0;
   }
 
-  /* End-of-list label: give it real air below the last message instead of
-     sitting flush against the final row. */
+  /* End-of-list label: a quiet, centered hint with enough air below the last
+     message to stay clear of the fixed mobile controls. */
   .noLoading {
-    min-height: 34px;
-    padding: 12px 0 8px;
-    font-size: 11px;
-    opacity: .56;
+    min-height: 36px;
+    padding: 16px 0 10px;
+    color: color-mix(in srgb, var(--mobile-tertiary) 78%, transparent);
+    font-size: 10px;
+    line-height: 1.3;
+    opacity: 1;
   }
 
   /* ---------- Swipe actions ----------
