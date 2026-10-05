@@ -79,7 +79,7 @@ describe('sanitizeMailHtml', () => {
     const html = sanitizeMailHtml(payload)
     const dom = inspect(html)
 
-    for (const tag of ['script', 'iframe', 'object', 'embed', 'form', 'style', 'link', 'base', 'meta', 'svg', 'math', 'template', 'input', 'button', 'dialog', 'video', 'audio', 'canvas']) {
+    for (const tag of ['script', 'iframe', 'object', 'embed', 'form', 'link', 'base', 'meta', 'svg', 'math', 'template', 'input', 'button', 'dialog', 'video', 'audio', 'canvas']) {
       expect(dom.tags, tag).not.toContain(tag)
     }
 
@@ -120,6 +120,26 @@ describe('sanitizeMailHtml', () => {
     expect(html).toContain('color: red')
     expect(html).toContain('font-size: 14px')
     expect(html).not.toContain('position')
+  })
+
+  it('keeps safe responsive email rules while dropping imports and unsafe CSS', () => {
+    const html = sanitizeMailHtml(`
+      <style>
+        @import url(https://evil.example/mail.css);
+        .hero { width: 600px; color: #fff; position: fixed; }
+        @media only screen and (max-width: 600px) {
+          .hero, table { width: 100%; max-width: 100%; }
+          img { height: auto; }
+        }
+      </style>
+      <table class="hero" width="600"><tr><td>Readable</td></tr></table>
+    `)
+
+    expect(html).toContain('<style>')
+    expect(html).toContain('@media only screen and (max-width: 600px)')
+    expect(html).toContain('.hero, table{width: 100%; max-width: 100%}')
+    expect(html).toContain('img{height: auto}')
+    expect(html).not.toMatch(/@import|url\s*\(|position\s*:/i)
   })
 
   it('is idempotent, so sanitizing twice is safe', () => {

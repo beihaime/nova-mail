@@ -20,12 +20,14 @@ import { enhanceCodeBlocks, enhanceHtmlTextCodeBlocks } from './code-blocks.js'
 
 /* ------------------------------------------------------------- sanitizing */
 
-// Tags that can execute, frame, submit or restyle. `svg`/`math` go too: they
-// carry their own scripting and foreign-content parsing rules.
+// Tags that can execute, frame or submit. `style` is handled separately: only
+// the constrained responsive-CSS subset in `sanitizeStyleSheet` is restored.
+// `svg`/`math` go too because they carry their own scripting/foreign-content
+// parsing rules.
 const FORBIDDEN_TAGS = [
   'script', 'noscript', 'iframe', 'frame', 'frameset', 'object', 'embed',
   'applet', 'param', 'form', 'input', 'button', 'select', 'option', 'textarea',
-  'style', 'link', 'base', 'meta', 'title', 'svg', 'math', 'template',
+  'link', 'base', 'meta', 'title', 'svg', 'math', 'template',
   'audio', 'video', 'source', 'track', 'canvas', 'dialog', 'slot', 'portal',
 ]
 
@@ -100,6 +102,60 @@ function sanitizeInlineStyle(style) {
   }).filter(Boolean).join('; ')
 }
 
+/**
+ * Keep the useful, non-executable part of a mail stylesheet.
+ *
+ * Email templates commonly put their narrow-layout rules in a `<style>` block.
+ * We cannot accept arbitrary CSS (it can fetch URLs or create deceptive
+ * overlays), but the same presentation property allowlist used for inline CSS
+ * is enough for the responsive rules used by major senders.  This deliberately
+ * small parser only retains ordinary selector/declaration rules and nested
+ * `@media` rules; unknown at-rules, imports and malformed blocks are dropped.
+ */
+function sanitizeStyleSheet(sheet) {
+  const source = String(sheet || '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/@(?:import|charset|namespace|font-face|keyframes|supports|layer)\b[^;{}]*(?:;|\{[\s\S]*?\})/gi, '')
+
+  const mediaConditionIsSafe = (condition) => (
+    /^(?=[\s\S]{1,240}$)[\w\s().,:-]+$/i.test(condition)
+    && /\b(?:width|height|orientation|resolution|screen|print|all)\b/i.test(condition)
+  )
+  const selectorIsSafe = (selector) => (
+    selector.length <= 1000
+    && !/[{};@]/.test(selector)
+    && !/(?:url\s*\(|expression\s*\(|behavior\s*:|-moz-binding)/i.test(selector)
+  )
+
+  const rules = []
+  let index = 0
+  while (index < source.length) {
+    while (/\s/.test(source[index] || '')) index++
+    const open = source.indexOf('{', index)
+    if (open < 0) break
+    const header = source.slice(index, open).trim()
+    let depth = 1
+    let end = open + 1
+    for (; end < source.length && depth; end++) {
+      if (source[end] === '{') depth++
+      if (source[end] === '}') depth--
+    }
+    if (depth) break
+
+    const body = source.slice(open + 1, end - 1)
+    if (/^@media\b/i.test(header)) {
+      const condition = header.replace(/^@media\b/i, '').trim()
+      const nested = sanitizeStyleSheet(body)
+      if (mediaConditionIsSafe(condition) && nested) rules.push(`@media ${condition}{${nested}}`)
+    } else if (selectorIsSafe(header)) {
+      const declarations = sanitizeInlineStyle(body)
+      if (declarations) rules.push(`${header}{${declarations}}`)
+    }
+    index = end
+  }
+  return rules.join('')
+}
+
 let hooksInstalled = false
 
 function installHooks() {
@@ -127,6 +183,30 @@ function installHooks() {
   })
 }
 
+function parkSafeStyleSheets(source) {
+  const root = parseFragment(source)
+  if (!root) return { html: source, styles: new Map() }
+
+  const styles = new Map()
+  root.querySelectorAll('style').forEach((style, index) => {
+    const css = sanitizeStyleSheet(style.textContent)
+    if (!css) {
+      style.remove()
+      return
+    }
+
+    // Only entries from this per-call map are restored after DOMPurify. A
+    // sender cannot turn a lookalike data attribute into a stylesheet.
+    const token = `nova-mail-style-${Math.random().toString(36).slice(2)}-${index}`
+    styles.set(token, css)
+    const marker = root.ownerDocument.createElement('span')
+    marker.setAttribute('data-nova-mail-style-token', token)
+    style.replaceWith(marker)
+  })
+
+  return { html: root.innerHTML, styles }
+}
+
 /**
  * Sanitize untrusted mail HTML.
  *
@@ -134,12 +214,13 @@ function installHooks() {
  * @returns {string} markup that only contains presentation-safe HTML
  */
 export function sanitizeMailHtml(html, { allowCodeControls = false } = {}) {
-  const source = String(html || '')
+  const input = String(html || '')
+  const { html: source, styles } = parkSafeStyleSheets(input)
   if (!source) return ''
 
   installHooks()
 
-  return DOMPurify.sanitize(source, {
+  const sanitized = DOMPurify.sanitize(source, {
     USE_PROFILES: { html: true },
     // A code-copy button is added only after an initial sanitize pass, from our
     // own renderer. Mail-provided buttons never survive that first pass.
@@ -150,6 +231,10 @@ export function sanitizeMailHtml(html, { allowCodeControls = false } = {}) {
     KEEP_CONTENT: true,
     RETURN_DOM_FRAGMENT: false,
   })
+
+  return sanitized.replace(/<span data-nova-mail-style-token="([a-z0-9-]+)"><\/span>/gi, (_match, token) => (
+    styles.has(token) ? `<style>${styles.get(token)}</style>` : ''
+  ))
 }
 
 /* -------------------------------------------------------- external content */

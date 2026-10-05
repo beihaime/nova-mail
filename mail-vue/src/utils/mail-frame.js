@@ -169,6 +169,10 @@ function buildFrameStyle(theme, background) {
          children's margins, which is what the height measurement reads. */
       display: flow-root;
     }
+    /* The iframe is the reader's actual content box.  This avoids the mobile
+       browser's default visual viewport (often 980px) being used for email
+       media queries, and therefore includes all host-card padding naturally. */
+    html, body, .nova-mail-body { width: 100%; min-width: 0; box-sizing: border-box; }
     /* A mail laid out at a fixed pixel width must never produce a horizontal
        scrollbar: the top-level blocks are capped to the available width. */
     body > * { max-width: 100% !important; box-sizing: border-box; }
@@ -179,7 +183,7 @@ function buildFrameStyle(theme, background) {
     /* Plain-text alternative, shown only when the markup had nothing to render. */
     .nova-fallback { margin: 0; font: inherit; color: inherit; white-space: pre-wrap; word-break: break-word; }
     img { max-width: 100%; height: auto; }
-    table { max-width: 100%; border-collapse: collapse; }
+    table { max-width: 100%; min-width: 0; border-collapse: collapse; }
     td, th { max-width: 100%; }
     h1, h2, h3, h4 { font-size: 18px; font-weight: 700; margin: 12px 0 6px; }
     p { margin: 0 0 10px; }
@@ -338,6 +342,7 @@ export function buildMailFrameDocument({
 <html lang="und">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
 <meta http-equiv="Content-Security-Policy" content="${escapeAttribute(buildCsp(frameNonce))}">
 <title>${escapeAttribute(title)}</title>
@@ -345,6 +350,9 @@ export function buildMailFrameDocument({
 </head>
 <body>
 <div class="nova-mail-body" data-nova-mail-body="1">${safeHtml}${fallback ? `<pre class="nova-fallback">${fallback}</pre>` : ''}</div>
+<!-- This must follow sender CSS so fixed-width legacy tables are reflowed on
+     narrow readers even when their template stylesheet appears later. -->
+<style>@media (max-width: 767px){.nova-mail-body table{width:100% !important;max-width:100% !important;min-width:0 !important}.nova-mail-body td,.nova-mail-body th{min-width:0 !important;max-width:100% !important;box-sizing:border-box}.nova-mail-body img{max-width:100% !important;height:auto !important}}</style>
 ${reporter}
 </body>
 </html>`

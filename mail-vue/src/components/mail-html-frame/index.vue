@@ -384,12 +384,18 @@ defineExpose({
 <style scoped>
 .mail-frame {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   display: block;
   background: var(--nova-background);
 }
 
 .mail-frame__iframe {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   display: block;
   border: 0;
   /* The untrusted document itself stays transparent, while its host always

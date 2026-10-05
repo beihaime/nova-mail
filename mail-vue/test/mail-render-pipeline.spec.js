@@ -29,7 +29,7 @@ function assertInert(container) {
 
   for (const element of elements) {
     const tag = element.tagName.toLowerCase()
-    expect(['script', 'iframe', 'object', 'embed', 'style', 'link', 'base', 'meta'], tag).not.toContain(tag)
+    expect(['script', 'iframe', 'object', 'embed', 'link', 'base', 'meta'], tag).not.toContain(tag)
 
     const attributes = Array.from(element.attributes, (attribute) => attribute.name.toLowerCase())
     expect(attributes.filter((name) => name.startsWith('on')), tag).toEqual([])

@@ -154,7 +154,7 @@ describe('frame document', () => {
     const { document } = build(
       '<iframe src="https://evil.example"></iframe><object data="x"></object>' +
       '<form action="//evil.example"><input></form><a href="javascript:alert(1)">x</a>' +
-      '<style>body{display:none}</style><base href="//evil.example">'
+      '<style>@import url(//evil.example/mail.css);</style><base href="//evil.example">'
     )
 
     expect(document).not.toMatch(/<iframe/i)
@@ -163,8 +163,9 @@ describe('frame document', () => {
     expect(document).not.toMatch(/<input/i)
     expect(document).not.toMatch(/javascript:/i)
     expect(document).not.toMatch(/<base/i)
-    // Only the frame's own stylesheet remains.
-    expect(document.match(/<style>/g)).toHaveLength(1)
+    // The frame stylesheet and its final responsive override remain; the mail's
+    // unsafe stylesheet was removed.
+    expect(document.match(/<style>/g)).toHaveLength(2)
   })
 
   it('keeps tables, inline css and links working', () => {
@@ -178,6 +179,22 @@ describe('frame document', () => {
     expect(document).toContain('href="https://example.com/page"')
     expect(document).toContain('target="_blank"')
     expect(document).toContain('rel="noopener noreferrer nofollow"')
+  })
+
+  it('makes a Steam-style fixed-width nested table readable on a narrow reader', () => {
+    const { document } = build(`
+      <style>@media only screen and (max-width: 600px){.steam-card{width:100%}}</style>
+      <table class="steam-card" width="600" style="width:600px"><tr><td width="600">
+        <table width="560" style="width:560px"><tr><td><img width="560" style="width:560px" src="https://cdn.example/hero.jpg"></td></tr></table>
+      </td></tr></table>
+    `, { allowImages: true })
+
+    expect(document).toContain('<meta name="viewport" content="width=device-width, initial-scale=1">')
+    expect(document).toContain('@media only screen and (max-width: 600px){.steam-card{width: 100%}}')
+    // This final rule follows sender markup, so it wins for ordinary fixed
+    // width attributes/styles and constrains nested tables and images alike.
+    expect(document).toContain('.nova-mail-body table{width:100% !important;max-width:100% !important;min-width:0 !important}')
+    expect(document).toContain('.nova-mail-body img{max-width:100% !important;height:auto !important}')
   })
 
   it('switches the stylesheet with the reader theme', () => {
