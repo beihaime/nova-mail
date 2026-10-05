@@ -107,7 +107,7 @@
     </div>
 
     <div class="aside-version">
-      Nova Mail · v{{ appVersion }}
+      Nova Mail · {{ appVersion }}
     </div>
   </footer>
 </template>
@@ -120,7 +120,7 @@ import {useUiStore} from "@/store/ui.js";
 import {useUserStore} from "@/store/user.js";
 import {computed} from "vue";
 import {useMediaQuery} from '@vueuse/core'
-import packageInfo from '../../../package.json'
+import {useAppVersion} from '@/composables/use-app-version.js'
 
 const settingStore = useSettingStore();
 const route = useRoute();
@@ -165,7 +165,7 @@ const sendRemainingPercent = computed(() =>
       )
     : 100
 )
-const appVersion = packageInfo.version
+const { version: appVersion } = useAppVersion()
 const openCompose = () => uiStore.writerRef?.open()
 
 </script>

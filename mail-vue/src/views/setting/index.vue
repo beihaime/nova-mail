@@ -400,7 +400,7 @@ import {useAccountStore} from "@/store/account.js";
 import {useI18n} from "vue-i18n";
 import {useSettingStore} from "@/store/setting.js";
 import AccountAddresses from '@/components/account-addresses/index.vue';
-import packageInfo from '../../../package.json';
+import {useAppVersion} from '@/composables/use-app-version.js';
 import {useUiStore} from "@/store/ui.js";
 import {getSessions, revokeSession, revokeOtherSessions, getLoginAlerts, updateLoginAlerts} from '@/request/security.js';
 import {connectGithubAccount, disconnectGithubAccount, githubConnectedAccount, connectGoogleAccount, disconnectGoogleAccount, googleConnectedAccount} from '@/request/ouath.js';
@@ -463,7 +463,7 @@ const securityEntries = computed(() => [
   { path: `${accountPath}/sessions`, title: 'deviceSessions', description: 'deviceSessionsDesc', icon: 'solar:devices-linear' },
   ...(canDeleteAccount.value ? [{ path: `${accountPath}/delete-account`, title: 'deleteUser', description: 'deleteAccountDesc', icon: 'solar:trash-bin-trash-linear', danger: true }] : []),
 ])
-const appVersion = packageInfo.version ? `v${String(packageInfo.version).replace(/^v/i, '')}` : ''
+const { version: appVersion } = useAppVersion()
 const densitySaving = ref(false)
 async function changeMailDensity(density) {
   if (densitySaving.value || settingStore.mailListDensity === density) return
