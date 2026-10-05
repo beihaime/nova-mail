@@ -2778,7 +2778,9 @@ ul {
     content: '';
     display: block;
     height: 1px;
-    margin: 0 16px 7px;
+    /* The divider is the list's top edge. The first row begins immediately
+       after it and supplies its own existing 10px content inset. */
+    margin: 0 16px;
     background: var(--nova-divider-soft, color-mix(in srgb, var(--nova-divider) 55%, transparent));
   }
 
