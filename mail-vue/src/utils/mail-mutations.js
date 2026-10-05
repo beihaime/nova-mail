@@ -17,6 +17,7 @@ import i18n from '@/i18n/index.js'
 import { ElMessage } from 'element-plus'
 import { runOptimisticMailMutation } from './optimistic-mail-mutation.js'
 import { showUndoSnackbar } from './undo-snackbar.js'
+import { useEmailStore } from '@/store/email.js'
 import {
   emailArchive,
   emailUnarchive,
@@ -99,6 +100,16 @@ function closeReader(ids) {
   context.close()
 }
 
+/**
+ * Forget the affected messages in the reader's own caches. The optimistic list
+ * removal already drops the row, but `detailMap` (and any locally appended
+ * reply) is what a later same-subject conversation would otherwise rebuild the
+ * deleted message from.
+ */
+function purgeEmailCache(ids) {
+  useEmailStore().removeEmails(ids)
+}
+
 function failMessage(text) {
   ElMessage({ message: text, type: 'error', plain: true })
 }
@@ -130,6 +141,7 @@ function runRemoval({
     ids: emailIds,
     apply: () => {
       removed = removeEverywhere(emailIds)
+      purgeEmailCache(emailIds)
       if (clearStar) clearStarHook?.(emailIds)
       closeReader(emailIds)
     },
@@ -146,6 +158,7 @@ function runRemoval({
     redo: undoable
       ? () => {
           removed = removeEverywhere(emailIds)
+          purgeEmailCache(emailIds)
           if (clearStar) clearStarHook?.(emailIds)
         }
       : undefined,

@@ -333,9 +333,12 @@ const { t } = useI18n()
 const quoteLabel = computed(() => `… ${t('showQuotedContent')}`)
 
 // ---------------------------------------------------------------- conversation
-// The API stores one row per message and exposes no thread endpoint, so the
-// conversation is assembled from every loaded message that shares a normalised
-// subject, plus anything sent from this session (see the email store).
+// The server returns the whole conversation (`GET /email/thread`) with its own
+// In-Reply-To / References / subject resolution and excludes messages the user
+// has deleted or moved to Trash. The local pool only fills gaps for rows the
+// server did not return (legacy rows, just-sent replies); it may never re-add a
+// message the server hid — `buildThreadMessages` drops any row whose mailbox
+// state differs from the opened message.
 const thread = computed(() => {
     const built = buildThreadMessages(
         email.value,

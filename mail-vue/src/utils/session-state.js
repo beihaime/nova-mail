@@ -5,6 +5,7 @@ import { useSettingStore } from '@/store/setting.js'
 import { useUiStore } from '@/store/ui.js'
 import { useUserStore } from '@/store/user.js'
 import { useWriterStore } from '@/store/writer.js'
+import { resetUserScopedCaches } from '@/utils/user-scoped-cache.js'
 import { watch } from 'vue'
 
 // A logout invalidates the server-side token before every in-flight mailbox
@@ -37,6 +38,11 @@ export function clearUserScopedState() {
   ui.previewData = {}
   ui.unreadNotifications = 0
   ui.asideCount = { email: 0, send: 0, sysEmail: 0 }
+
+  // Module-level caches (composable singletons) are not Pinia stores, so they
+  // must be told explicitly; otherwise a later login in the same tab could
+  // render the previous user's addresses from memory.
+  resetUserScopedCaches()
 
   // Remove data persisted by older builds and user-specific admin searches.
   for (const key of ['email', 'writer', 'all-email-params', 'user-params']) {

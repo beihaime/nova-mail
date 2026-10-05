@@ -69,6 +69,25 @@ export const useEmailStore = defineStore('email', {
                 }
             }
         },
+        /**
+         * Drop messages that left the current mailbox (trashed, restored,
+         * archived or permanently deleted) from every in-memory cache.
+         *
+         * `detailMap` is the pool the reader assembles conversations from, so a
+         * stale body left behind here is exactly what lets a deleted message
+         * reappear when a later message with the same subject is opened. The
+         * server also excludes hidden rows; this keeps the client from ever
+         * resurfacing one it already holds.
+         */
+        removeEmails(emailIds) {
+            const ids = new Set((Array.isArray(emailIds) ? emailIds : [emailIds]).map(Number).filter(Boolean))
+            if (!ids.size) return
+            for (const id of ids) delete this.detailMap[id]
+            if (ids.has(Number(this.contentData.email?.emailId))) {
+                this.contentData.email = null
+            }
+            this.threadMessages = this.threadMessages.filter(item => !ids.has(Number(item.emailId)))
+        },
         fetchList(request) {
             const epoch = this.mailboxEpoch
             return request(0).then(data => {

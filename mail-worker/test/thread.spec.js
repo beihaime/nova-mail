@@ -221,6 +221,49 @@ describe('subject fallback', () => {
       userId: 8, accountId: 2, subject: 'Re: Nihao', ...conversation,
     }, index).threadId).toBe('');
   });
+
+  it('never uses a trashed or soft-deleted sibling as a subject anchor', () => {
+    const index = createThreadIndex();
+    indexThreadMessage(index, storedRow({ emailId: 1, subject: 'Test', trashed: 1 }), 't1');
+    indexThreadMessage(index, storedRow({ emailId: 2, subject: 'Soft', isDel: 1 }), 't2');
+
+    // Deleted history must not pull a new message back into its conversation.
+    expect(resolveThreadKey({
+      userId: 7, accountId: 3, subject: 'Test', ...conversation,
+    }, index).threadId).toBe('');
+    expect(resolveThreadKey({
+      userId: 7, accountId: 3, subject: 'Soft', ...conversation,
+    }, index).threadId).toBe('');
+  });
+
+  it('still links across a deleted ancestor through real reply headers', () => {
+    const index = createThreadIndex();
+    indexThreadMessage(index, storedRow({ emailId: 1, trashed: 1 }), 't1');
+
+    // Header threading is authoritative: a genuine reply keeps its conversation
+    // even when the ancestor has been moved to Trash.
+    expect(resolveThreadKey({
+      userId: 7, accountId: 3, inReplyTo: '<root@mail.example>', subject: 'Re: Nihao', ...conversation,
+    }, index)).toEqual({ threadId: 't1', parentMessageId: 1 });
+  });
+
+  it('does not merge two live mails that only share the owner address', () => {
+    const index = createThreadIndex();
+    indexThreadMessage(index, storedRow({
+      emailId: 1, subject: 'Hello',
+      sendEmail: 'one@shop.example',
+      toEmail: 'me@beihaime.com',
+      recipient: JSON.stringify([{ address: 'me@beihaime.com' }]),
+    }), 't1');
+
+    // Different senders, same recipient (the mailbox owner): not a conversation.
+    expect(resolveThreadKey({
+      userId: 7, accountId: 3, subject: 'Hello',
+      sendEmail: 'two@shop.example',
+      toEmail: 'me@beihaime.com',
+      recipient: JSON.stringify([{ address: 'me@beihaime.com' }]),
+    }, index).threadId).toBe('');
+  });
 });
 
 describe('conversation assembly', () => {

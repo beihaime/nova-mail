@@ -188,7 +188,16 @@ app.use('*', async (c, next) => {
 	c.set('user',authInfo.user)
 	c.set('session', session)
 
-	return await next();
+	await next();
+
+	// Every authenticated response is user-specific (addresses, mail, settings).
+	// A shared browser cache or intermediary replaying one user's data to another
+	// would be a cross-user leak, so they are never stored.
+	if (!c.res.headers.get('Cache-Control')) {
+		c.header('Cache-Control', 'private, no-store');
+	}
+
+	return;
 });
 
 function permKeyToPaths(permKeys) {

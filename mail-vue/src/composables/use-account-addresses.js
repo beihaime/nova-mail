@@ -1,4 +1,4 @@
-import {computed, nextTick, reactive, ref, watch} from 'vue'
+import {computed, effectScope, nextTick, reactive, ref, watch} from 'vue'
 import {
   accountAdd,
   accountDelete,
@@ -14,6 +14,7 @@ import {useAccountStore} from '@/store/account.js'
 import {useEmailStore} from '@/store/email.js'
 import {useUserStore} from '@/store/user.js'
 import {hasPerm} from '@/perm/perm.js'
+import {registerUserScopedCacheReset} from '@/utils/user-scoped-cache.js'
 import i18n from '@/i18n/index.js'
 import {AccountAllReceiveEnum} from '@/enums/account-enum.js'
 
@@ -34,6 +35,15 @@ let instance = null
 export function useAccountAddresses() {
   if (!instance) instance = createAccountAddresses()
   return instance
+}
+
+/**
+ * Drop the cached address list. Called on logout/identity change so a later
+ * login in the same browser tab can never render the previous user's addresses
+ * from this shared singleton.
+ */
+export function resetAccountAddresses() {
+  instance?.reset()
 }
 
 function createAccountAddresses() {
@@ -137,6 +147,28 @@ function createAccountAddresses() {
     scrollbarRef.value?.setScrollTop?.(0)
     accounts.splice(0, accounts.length)
     getAccountList()
+  }
+
+  /**
+   * Discard every address cached in memory and reset the pagination/dialog
+   * state. It must not issue a request: on logout there is no authenticated
+   * identity to load for.
+   */
+  function reset() {
+    accounts.splice(0, accounts.length)
+    accountStore.addresses = []
+    loading.value = false
+    followLoading.value = false
+    noLoading.value = false
+    renameTarget = null
+    accountName.value = null
+    setNameShow.value = false
+    showAdd.value = false
+  }
+
+  function canQueryAddresses() {
+    const permKeys = userStore.user?.permKeys
+    return Array.isArray(permKeys) && (permKeys.includes('*') || permKeys.includes('account:query'))
   }
 
   function add() {
@@ -342,7 +374,20 @@ function createAccountAddresses() {
     verifyToken = token
   }
 
-  if (hasPerm('account:query')) {
+  // This singleton outlives a logout/login in the same tab, so it is reset both
+  // by clearUserScopedState() and by watching the authenticated identity. The
+  // detached scope keeps the watcher alive after the component that first
+  // created the singleton unmounts.
+  registerUserScopedCacheReset(reset)
+  effectScope(true).run(() => {
+    watch(() => userStore.user?.userId, (userId, previousUserId) => {
+      if (userId === previousUserId) return
+      reset()
+      if (canQueryAddresses()) getAccountList()
+    })
+  })
+
+  if (canQueryAddresses()) {
     getAccountList()
   }
 
@@ -369,6 +414,7 @@ function createAccountAddresses() {
     // actions
     getAccountList,
     refresh,
+    reset,
     changeAccount,
     itemBg,
     add,

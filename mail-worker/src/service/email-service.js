@@ -56,43 +56,25 @@ function toEmailIdList(emailIds) {
 }
 
 /**
- * Expand selected messages into complete conversations owned by one mailbox.
+ * The caller's own rows among the selected message ids.
  *
- * The Inbox renders one (newest) message per thread, so deleting only that
- * representative leaves its older siblings alive. A later message with the
- * same subject can then attach to those siblings and make an apparently
- * deleted conversation reappear. Empty legacy thread ids deliberately resolve
- * to their own message only: treating every empty value as one conversation
- * would delete unrelated old mail.
+ * Trash, restore and permanent delete act on exactly the messages the user
+ * selected — never on their conversation. `trashed`/`is_del` belong to the
+ * individual message, so hiding a conversation's newest row must not silently
+ * rewrite the mailbox state of its older, still-visible siblings. Conversation
+ * membership is a query-time concern and is resolved by the visibility filters
+ * in `emailListFilters` / `thread`.
  */
-async function ownedThreadMessageIds(c, userId, emailIds) {
+async function ownedMessageIds(c, userId, emailIds) {
 	const selectedIds = toEmailIdList(emailIds);
 	if (!selectedIds.length) return [];
-
-	const anchors = await orm(c)
-		.select({ emailId: email.emailId, threadId: email.threadId, accountId: email.accountId })
-		.from(email)
-		.where(and(
-			eq(email.userId, userId),
-			inArray(email.emailId, selectedIds),
-		))
-		.all();
-
-	if (!anchors.length) return [];
-
-	const conversationFilters = anchors.map(anchor => and(
-		eq(email.accountId, anchor.accountId),
-		anchor.threadId
-			? eq(email.threadId, anchor.threadId)
-			: eq(email.emailId, anchor.emailId)
-	));
 
 	const rows = await orm(c)
 		.select({ emailId: email.emailId })
 		.from(email)
 		.where(and(
 			eq(email.userId, userId),
-			or(...conversationFilters),
+			inArray(email.emailId, selectedIds),
 		))
 		.all();
 
@@ -163,7 +145,12 @@ const emailService = {
 		full = full === 1;
 
 		if (isNaN(allReceive)) {
-			let accountRow = await accountService.selectById(c, accountId);
+			// The mailbox mode is read from an address the caller owns; a foreign
+			// account id is a 404 and never reveals another user's row.
+			const accountRow = await accountService.selectOwnedById(c, accountId, userId);
+			if (!accountRow) {
+				throw new BizError(t('notFound'), 404);
+			}
 			allReceive = accountRow.allReceive;
 		}
 
@@ -494,8 +481,17 @@ const emailService = {
 		return conditions;
 	},
 
+	/**
+	 * Move only the selected, owned messages to Trash.
+	 *
+	 * `trashed` is a property of the message, not of its conversation: a later
+	 * message that joins the same thread must not be able to un-hide it, and
+	 * deleting the Inbox's conversation representative must not silently move
+	 * the still-visible older messages of that conversation. Conversation views
+	 * exclude Trash rows at query time instead.
+	 */
 	async moveToTrash(c, params, userId) {
-		const emailIdList = await ownedThreadMessageIds(c, userId, params?.emailIds);
+		const emailIdList = await ownedMessageIds(c, userId, params?.emailIds);
 		if (!emailIdList.length) return { soft: true };
 
 		// Preserve the actual folder state before hiding the message. Attachments
@@ -518,9 +514,8 @@ const emailService = {
 	/**
 	 * Administrative All Mail uses the same non-destructive mailbox action.
 	 * Its route is protected by `all-email:delete`; unlike the user route it may
-	 * act on a row owned by another mailbox, so only the selected records (not
-	 * a cross-user thread expansion) are moved.  The owner can restore it from
-	 * their own Trash afterwards.
+	 * act on a row owned by another mailbox, so it also moves exactly the
+	 * selected records and never expands to the owner's conversation.
 	 */
 	async moveToTrashAdmin(c, params) {
 		const emailIdList = toEmailIdList(params?.emailIds);
@@ -566,14 +561,15 @@ const emailService = {
 	},
 
 	/**
-	 * Bring soft-deleted messages back (the swipe delete's "Undo").
+	 * Bring the selected soft-deleted messages back (the swipe delete's "Undo").
 	 *
-	 * A row that was physically deleted does not exist any more, so this matches
-	 * nothing and is a no-op — the client only offers Undo when `delete` reported
-	 * `soft: true`.
+	 * Restoring one message never restores its siblings: Trash state belongs to
+	 * the message. A row that was physically deleted does not exist any more, so
+	 * this matches nothing and is a no-op — the client only offers Undo when
+	 * `delete` reported `soft: true`.
 	 */
 	async restoreFromTrash(c, params, userId) {
-		const emailIdList = await ownedThreadMessageIds(c, userId, params?.emailIds);
+		const emailIdList = await ownedMessageIds(c, userId, params?.emailIds);
 		if (!emailIdList.length) return;
 
 		await orm(c).update(email).set({
@@ -594,8 +590,14 @@ const emailService = {
 
 	async restore(c, params, userId) { return this.restoreFromTrash(c, params, userId); },
 
+	/**
+	 * Permanently remove the selected trashed messages. `deleteTrashedRows`
+	 * re-checks `trashed = 1`, so a concurrent restore can never lose a message
+	 * that is no longer in Trash. Nothing remains for a subject match to
+	 * reconstruct from.
+	 */
 	async deleteForever(c, params, userId) {
-		const emailIdList = await ownedThreadMessageIds(c, userId, params?.emailIds);
+		const emailIdList = await ownedMessageIds(c, userId, params?.emailIds);
 		if (!emailIdList.length) return;
 		await this.deleteTrashedRows(c, userId, emailIdList);
 	},
@@ -1495,7 +1497,12 @@ const emailService = {
 		allReceive = Number(allReceive);
 
 		if (isNaN(allReceive)) {
-			let accountRow = await accountService.selectById(c, accountId);
+			// Owner-scoped: a foreign account id must not describe, or poll,
+			// another user's mailbox.
+			const accountRow = await accountService.selectOwnedById(c, accountId, userId);
+			if (!accountRow) {
+				throw new BizError(t('notFound'), 404);
+			}
 			allReceive = accountRow.allReceive;
 		}
 

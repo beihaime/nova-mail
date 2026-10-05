@@ -50,6 +50,10 @@ app.get('/user/allAccount', async (c) => {
 });
 
 app.delete('/user/deleteAccount', async (c) => {
+	// Cross-user address deletion is administrator-only. The middleware already
+	// gates the /user prefix; this keeps the service safe if it is ever reached
+	// by another route.
+	accountService.assertAdmin(c);
 	await accountService.physicsDelete(c, c.req.query());
 	return c.json(result.ok());
 });

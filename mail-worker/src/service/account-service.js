@@ -11,6 +11,7 @@ import settingService from './setting-service';
 import { hasConfiguredDomain } from '../utils/configured-domains';
 import turnstileService from './turnstile-service';
 import roleService from './role-service';
+import userContext from '../security/user-context';
 import { t } from '../i18n/i18n';
 import verifyRecordService from './verify-record-service';
 import { pageNumber, pageSize } from '../utils/pagination';
@@ -152,25 +153,23 @@ const accountService = {
 		let { accountId } = params;
 
 		const user = await userService.selectById(c, userId);
-		const accountRow = await this.selectById(c, accountId);
+		// Ownership is part of the lookup: a foreign or unknown id is a 404 and
+		// never reaches the mutation below, so no other user's row is touched.
+		const accountRow = await this.requireOwnedAccount(c, accountId, userId);
 
 		if (emailUtils.sameEmail(accountRow.email, user.email)) {
 			throw new BizError(t('delMyAccount'));
 		}
 
-		if (accountRow.userId !== user.userId) {
-			throw new BizError(t('noUserAccount'));
-		}
-
 		const { syncDelete } = await settingService.query(c);
 		if (syncDelete === settingConst.syncDelete.OPEN) {
-			await this.physicsDelete(c, { accountId });
+			await this.physicsDelete(c, { accountId: accountRow.accountId });
 			return;
 		}
 
 		await orm(c).update(account).set({ isDel: isDel.DELETE }).where(
 			and(eq(account.userId, userId),
-				eq(account.accountId, accountId)))
+				eq(account.accountId, accountRow.accountId)))
 			.run();
 	},
 
@@ -179,6 +178,46 @@ const accountService = {
 			and(eq(account.accountId, accountId),
 				eq(account.isDel, isDel.NORMAL)))
 			.get();
+	},
+
+	/**
+	 * Owner-scoped address lookup. The authenticated user id is a required part
+	 * of the WHERE clause, so a request can never read a row it does not own even
+	 * if the caller supplies another account's numeric id.
+	 */
+	selectOwnedById(c, accountId, userId) {
+		return orm(c).select().from(account).where(
+			and(
+				eq(account.accountId, accountId),
+				eq(account.userId, userId),
+				eq(account.isDel, isDel.NORMAL)))
+			.get();
+	},
+
+	/**
+	 * Resolve an address the caller is allowed to act on, or fail with the same
+	 * 404 used for a non-existent id. This is the single authorization gate every
+	 * address read and mutation goes through.
+	 */
+	async requireOwnedAccount(c, accountId, userId) {
+		const accountRow = await this.selectOwnedById(c, accountId, userId);
+		if (!accountRow) {
+			throw new BizError(t('notFound'), 404);
+		}
+		return accountRow;
+	},
+
+	/**
+	 * Administrator check for the cross-user address views. Mirrors the auth
+	 * middleware: role id 0 or the deployment's configured administrator email.
+	 * Frontend access to /admin is never treated as authorization.
+	 */
+	assertAdmin(c) {
+		const user = userContext.getUser(c);
+		const isAdmin = user && (user.type === 0 || emailUtils.sameEmail(user.email, c.env.admin));
+		if (!isAdmin) {
+			throw new BizError(t('unauthorized'), 403);
+		}
 	},
 
 	async insert(c, params) {
@@ -234,10 +273,16 @@ const accountService = {
 		if (name.length > 30) {
 			throw new BizError(t('usernameLengthLimit'));
 		}
+		await this.requireOwnedAccount(c, accountId, userId);
 		await orm(c).update(account).set({name}).where(and(eq(account.userId, userId),eq(account.accountId, accountId))).run();
 	},
 
 	async allAccount(c, params) {
+
+		// Defense in depth: the `/user` prefix is already administrator-gated by
+		// the auth middleware, but this service is the last line before every
+		// user's addresses are returned, so it re-checks the role itself.
+		this.assertAdmin(c);
 
 		let { userId, num, size } = params
 
@@ -249,6 +294,10 @@ const accountService = {
 		num = (num - 1) * size;
 
 		const userRow = await userService.selectByIdIncludeDel(c, userId);
+
+		if (!userRow) {
+			throw new BizError(t('notFound'), 404);
+		}
 
 		const list = await orm(c).select().from(account).where(and(
 			eq(account.userId, userId),
@@ -266,22 +315,29 @@ const accountService = {
 	},
 
 	async setAllReceive(c, params, userId) {
-		let a = null
 		const { accountId } = params;
-		const accountRow = await this.selectById(c, accountId);
-		if (accountRow.userId !== userId) {
-			return;
-		}
+		const accountRow = await this.requireOwnedAccount(c, accountId, userId);
 		await orm(c).update(account).set({ allReceive: accountConst.allReceive.CLOSE }).where(eq(account.userId, userId)).run();
-		await orm(c).update(account).set({ allReceive: accountRow.allReceive ? 0 : 1 }).where(eq(account.accountId, accountId)).run();
+		await orm(c).update(account).set({ allReceive: accountRow.allReceive ? 0 : 1 }).where(
+			and(eq(account.accountId, accountId), eq(account.userId, userId))).run();
 	},
 
 	async setAsTop(c, params, userId) {
 		const { accountId } = params;
+		await this.requireOwnedAccount(c, accountId, userId);
 		const userRow = await userService.selectById(c, userId);
-		const mainAccountRow = await accountService.selectByEmailIncludeDel(c, userRow.email);
+		const mainAccountRow = await orm(c).select().from(account).where(
+			and(
+				sql`${account.email} COLLATE NOCASE = ${emailUtils.normalizeEmail(userRow.email)}`,
+				eq(account.userId, userId)))
+			.get();
+		if (!mainAccountRow) {
+			throw new BizError(t('notFound'), 404);
+		}
 		let mainSort = mainAccountRow.sort === 0 ? 2 : mainAccountRow.sort + 1;
-		await orm(c).update(account).set({ sort: mainSort }).where(sql`${account.email} COLLATE NOCASE = ${emailUtils.normalizeEmail(userRow.email)}`).run();
+		await orm(c).update(account).set({ sort: mainSort }).where(
+			and(eq(account.userId, userId),
+				sql`${account.email} COLLATE NOCASE = ${emailUtils.normalizeEmail(userRow.email)}`)).run();
 		await orm(c).update(account).set({ sort: mainSort - 1 }).where(and(eq(account.accountId, accountId),eq(account.userId,userId))).run();
 	}
 };

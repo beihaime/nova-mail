@@ -11,6 +11,9 @@ const en = {
 	accountLimit: 'Email address limit reached',
 	delMyAccount: 'Cannot delete your own email',
 	noUserAccount: 'This email does not belong to the current user',
+	// Generic 404 used by address operations. It deliberately does not reveal
+	// whether the requested id exists for another account.
+	notFound: 'Resource not found',
 	usernameLengthLimit: 'Username length exceeds the limit',
 	noOsSendPic: 'Cannot send body images: object storage not configured',
 	noOsDomainSendAtt: 'Cannot send attachments: object storage domain not configured',

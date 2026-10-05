@@ -1,10 +1,14 @@
 /**
  * Conversation-thread helpers.
  *
- * Nova Mail stores one row per message (`email` table) and has no thread
- * endpoint, so a conversation is assembled on the client out of the messages
- * that share a normalised subject and/or are linked by their Message-ID /
- * In-Reply-To headers.
+ * Nova Mail stores one row per message (`email` table). The server owns thread
+ * resolution (`GET /email/thread`: In-Reply-To → References → subject fallback)
+ * and already excludes messages that are in Trash or soft-deleted. The client
+ * assembles the reader's view from that response plus its own cached bodies, so
+ * it repeats the same visibility rule: a row may only join the conversation when
+ * its `trashed` / `isDel` state matches the message the reader opened. Subject
+ * grouping is a compatibility fallback for legacy rows without a conversation
+ * key — it must never revive a deleted message or merge two distinct threads.
  *
  * The original email object is preserved on every thread message (see
  * `toThreadMessage`), so `email.content`, `email.attList` etc. keep working.
@@ -122,10 +126,34 @@ function messageOrder(message) {
     return Number.isFinite(parsed) ? parsed : Number.MAX_SAFE_INTEGER
 }
 
-/** True when the row may join the conversation (same account, identifiable). */
+/**
+ * Mailbox visibility of a row as a comparable signature.
+ *
+ * `trashed` and `isDel` belong to the individual message. A conversation view
+ * may only contain messages in the same mailbox state as the message the reader
+ * opened: a normal Inbox conversation never includes a Trash row, and the Trash
+ * conversation never includes a still-visible row that happened to share the
+ * subject or thread id.
+ */
+function visibilityKey(raw) {
+    const trashed = Number(raw?.trashed) === 1 ? 1 : 0
+    const deleted = Number(raw?.isDel ?? raw?.is_del ?? 0) !== 0 ? 1 : 0
+    return `${trashed}|${deleted}`
+}
+
+/** True when the row belongs to a normal (non-Trash, non-deleted) view. */
+export function isVisibleMessage(raw) {
+    return visibilityKey(raw) === '0|0'
+}
+
+/** True when the row may join the conversation (same mailbox state, identifiable). */
 function isCandidate(primary, raw) {
     if (!raw) return false
     if (!messageId(raw) && !raw.localId) return false
+
+    // A deleted/trashed row must never be pulled into a normal conversation,
+    // and a visible row must never appear inside the Trash conversation.
+    if (visibilityKey(primary) !== visibilityKey(raw)) return false
 
     // An explicit conversation key wins: the server already resolved the thread
     // from the reply headers, so membership is not an account question.
@@ -216,10 +244,14 @@ export function buildThreadMessages(primary, pool = [], extra = []) {
     }
 
     // 2) Same normalised subject — compatibility path for rows stored before
-    //    conversation keys existed (and for locally composed replies).
+    //    conversation keys existed (and for locally composed replies). A row
+    //    that already carries a *different* server-resolved conversation key is
+    //    not merged here: two unrelated mails that share a subject must stay
+    //    separate once the server has decided they are different threads.
     if (key) {
         for (const raw of [...others, ...extra]) {
             if (!isCandidate(primary, raw)) continue
+            if (primaryThreadId && raw?.threadId && raw.threadId !== primaryThreadId) continue
             if (threadSubjectKey(raw.subject) !== key) continue
             push(raw)
         }

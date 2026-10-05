@@ -174,11 +174,11 @@ describe('mail deletion', () => {
 		expect(stored.trashed).toBe(1);
 	});
 
-	it('deletes every message in the selected conversation', async () => {
+	it('deletes only the selected message and keeps its siblings visible', async () => {
 		await updateSetting({ sync_delete: settingConst.syncDelete.CLOSE });
 		const threadId = `delete-thread-${owner.userId}`;
-		const first = await seedEmail(owner, { subject: 'delete the whole thread', threadId });
-		const newest = await seedEmail(owner, { subject: 'Re: delete the whole thread', threadId });
+		const first = await seedEmail(owner, { subject: 'delete one message', threadId });
+		const newest = await seedEmail(owner, { subject: 'Re: delete one message', threadId });
 
 		const response = await api(`/api/email/delete?emailIds=${newest.email_id}`, {
 			method: 'DELETE',
@@ -186,17 +186,20 @@ describe('mail deletion', () => {
 		});
 		expect((await response.json()).code).toBe(200);
 
+		// Trash state belongs to the message: the sibling keeps its mailbox.
 		const rows = await env.db
 			.prepare('SELECT email_id, trashed FROM email WHERE email_id IN (?, ?) ORDER BY email_id')
 			.bind(first.email_id, newest.email_id)
 			.all();
 		expect(rows.results).toEqual([
-			{ email_id: first.email_id, trashed: 1 },
+			{ email_id: first.email_id, trashed: 0 },
 			{ email_id: newest.email_id, trashed: 1 },
 		]);
 
+		// The conversation stays in the Inbox, represented by the visible sibling.
 		const inbox = await listFor(owner, { size: 50 });
-		expect(inbox.list.map((item) => item.threadId)).not.toContain(threadId);
+		const representative = inbox.list.find((item) => item.threadId === threadId);
+		expect(representative?.emailId).toBe(first.email_id);
 	});
 
 	it('keeps the row in Trash when sync-delete is on', async () => {
@@ -216,7 +219,7 @@ describe('mail deletion', () => {
 		}
 	});
 
-	it('moves every message in a conversation to Trash when sync-delete is on', async () => {
+	it('moves only the selected message to Trash when sync-delete is on', async () => {
 		await updateSetting({ sync_delete: settingConst.syncDelete.OPEN });
 		try {
 			const threadId = `hard-delete-thread-${owner.userId}`;
@@ -229,7 +232,7 @@ describe('mail deletion', () => {
 				.prepare('SELECT trashed FROM email WHERE email_id IN (?, ?) ORDER BY email_id')
 				.bind(first.email_id, newest.email_id)
 				.all();
-			expect(rows.results).toEqual([{ trashed: 1 }, { trashed: 1 }]);
+			expect(rows.results).toEqual([{ trashed: 0 }, { trashed: 1 }]);
 		} finally {
 			await updateSetting({ sync_delete: settingConst.syncDelete.CLOSE });
 		}

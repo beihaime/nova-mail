@@ -211,19 +211,18 @@ describe('Trash and restore', () => {
 		expect((await listFor(principal)).list.map((item) => item.subject)).toContain('undo-me');
 	});
 
-	it('restores the complete conversation after a thread delete', async () => {
+	it('restores only the selected message after a per-message delete', async () => {
 		await updateSetting({ sync_delete: settingConst.syncDelete.CLOSE });
 		const principal = await sessionFor(await createAccount());
 		const threadId = `undo-thread-${principal.userId}`;
 		const first = await seedEmail(principal, { subject: 'undo the thread', threadId });
 		const newest = await seedEmail(principal, { subject: 'Re: undo the thread', threadId });
 
+		// Trash state belongs to the message: only the selected row is hidden.
 		await api(`/api/email/delete?emailIds=${newest.email_id}`, { method: 'DELETE', token: principal.token });
-		expect((await storedRow(first.email_id)).trashed).toBe(1);
+		expect((await storedRow(first.email_id)).trashed).toBe(0);
 		expect((await storedRow(newest.email_id)).trashed).toBe(1);
 
-		// The client only has the visible representative id, but Undo restores
-		// every sibling that the delete action changed.
 		await put(principal.token, '/api/email/restore', [newest.email_id]);
 		expect((await storedRow(first.email_id)).trashed).toBe(0);
 		expect((await storedRow(newest.email_id)).trashed).toBe(0);
@@ -311,7 +310,7 @@ describe('Trash and restore', () => {
 		expect((await listFor(sender, 1)).list.map(item => item.subject)).toContain('sent-copy');
 	});
 
-	it('does not move a different account of the same user when a thread is trashed', async () => {
+	it('does not move a different account of the same user when a message is trashed', async () => {
 		const principal = await sessionFor(await createAccount());
 		const secondary = await env.db.prepare(
 			'INSERT INTO account (email, name, user_id, is_del, all_receive) VALUES (?, ?, ?, 0, 0) RETURNING account_id, email',

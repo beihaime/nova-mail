@@ -14,7 +14,9 @@
  *   1. `In-Reply-To` matching a stored `message_id`
  *   2. any id in `References` matching a stored `message_id` (nearest first)
  *   3. the message already carrying a thread (re-delivery / internal copy)
- *   4. normalised subject, same user, and only with a shared participant
+ *   4. normalised subject, same user, and only with a real correspondent link
+ *      (a shared mailbox-owner address alone is not evidence), skipping any
+ *      deleted/trashed sibling
  *   5. otherwise start a new conversation
  */
 
@@ -138,6 +140,26 @@ export function sharesParticipant(left, right) {
 	return false;
 }
 
+/**
+ * True when one message's sender is a participant of the other.
+ *
+ * This is stricter than `sharesParticipant`, which also counted the mailbox
+ * owner's own address: two unrelated mails sent to the same user always share
+ * that address, so a shared inbox address is not evidence of a conversation.
+ * A real correspondent link (sender appears among the other message's
+ * addresses, in either direction) is.
+ */
+export function correspondentsOverlap(left, right) {
+	const leftAddrs = messageAddresses(left);
+	const rightAddrs = messageAddresses(right);
+	const leftSender = String(left?.sendEmail || '').trim().toLowerCase();
+	const rightSender = String(right?.sendEmail || '').trim().toLowerCase();
+
+	if (leftSender && rightAddrs.has(leftSender)) return true;
+	if (rightSender && leftAddrs.has(rightSender)) return true;
+	return false;
+}
+
 /** Register a stored message so later messages can link back to it. */
 export function indexThreadMessage(index, row, threadId) {
 	const messageId = normalizeMessageId(row?.messageId);
@@ -154,11 +176,27 @@ export function indexThreadMessage(index, row, threadId) {
 		bucket.push({
 			threadId,
 			emailId: Number(row.emailId) || 0,
+			sender: String(row.sendEmail || '').trim().toLowerCase(),
 			addresses: messageAddresses(row),
+			// A deleted/trashed row may keep its thread id, but it must never act
+			// as the subject anchor that pulls new mail back into deleted history.
+			visible: isVisibleMessage(row),
 		});
 		if (bucket.length > SUBJECT_BUCKET_LIMIT) bucket.shift();
 		index.bySubject.set(key, bucket);
 	}
+}
+
+/**
+ * True when a stored row is currently part of a normal conversation view:
+ * not soft-deleted and not in Trash. Missing fields default to visible so the
+ * pure helpers keep working for locally composed/local-only messages.
+ */
+export function isVisibleMessage(raw) {
+	if (!raw) return false;
+	if (Number(raw.trashed) === 1) return false;
+	if (Number(raw.isDel ?? raw.is_del ?? 0) !== 0) return false;
+	return true;
 }
 
 /**
@@ -185,17 +223,28 @@ export function resolveThreadKey(headers, index) {
 	}
 
 	// Priority 4: normalised subject, same user only (a conversation can span
-	// several of the user's addresses), and only when the two messages actually
-	// share a participant — otherwise two unrelated "Invoice" mails would merge.
+	// several of the user's addresses), and only when the two messages have a
+	// real correspondent link — otherwise two unrelated "Invoice" mails that
+	// merely share the owner's address would merge.
+	//
+	// Deleted / trashed siblings are skipped entirely: a subject match is only a
+	// fallback, never proof, and it must not pull a new message back into a
+	// conversation whose history the user has hidden. Real reply headers
+	// (In-Reply-To / References, above) still link across a deleted ancestor.
 	const subjectKey = threadSubjectKey(headers?.subject);
 	if (subjectKey) {
 		const bucket = bySubject.get(`${headers?.userId ?? 0}|${subjectKey}`);
 		if (bucket?.length) {
 			const wanted = messageAddresses(headers);
+			const wantedSender = String(headers?.sendEmail || '').trim().toLowerCase();
 			// Newest sibling first: the most recent matching conversation wins.
 			for (let i = bucket.length - 1; i >= 0; i--) {
-				if (sharesParticipant(wanted, bucket[i].addresses)) {
-					return { threadId: bucket[i].threadId, parentMessageId: 0 };
+				const sibling = bucket[i];
+				if (sibling.visible === false) continue;
+				const related = (wantedSender && sibling.addresses?.has(wantedSender))
+					|| (sibling.sender && wanted.has(sibling.sender));
+				if (related) {
+					return { threadId: sibling.threadId, parentMessageId: 0 };
 				}
 			}
 		}

@@ -122,7 +122,8 @@ function d1Source(options) {
 			const command = [
 				'SELECT email_id AS emailId, user_id AS userId, account_id AS accountId,',
 				'subject, message_id AS messageId, in_reply_to AS inReplyTo, relation,',
-				'send_email AS sendEmail, to_email AS toEmail, recipient',
+				'send_email AS sendEmail, to_email AS toEmail, recipient,',
+				'is_del AS isDel, trashed',
 				'FROM email',
 				`WHERE email_id > ${Number(cursor)}`,
 				'ORDER BY email_id ASC',

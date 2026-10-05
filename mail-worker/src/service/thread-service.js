@@ -12,6 +12,7 @@ import {
 	indexThreadMessage,
 	messageAddresses,
 	sharesParticipant,
+	correspondentsOverlap,
 	resolveThreadKey,
 	runThreadBackfill,
 } from '../lib/thread-key';
@@ -34,6 +35,7 @@ export {
 	indexThreadMessage,
 	messageAddresses,
 	sharesParticipant,
+	correspondentsOverlap,
 	resolveThreadKey,
 	runThreadBackfill,
 };
@@ -110,8 +112,10 @@ export async function resolveThreadForMessage(c, headers) {
 
 	// Priority 4: subject fallback over the user's most recent messages. It is
 	// deliberately per user (a conversation can span several of the user's
-	// addresses) and still requires a shared participant, so unrelated mail that
-	// merely reuses a subject never merges.
+	// addresses) and requires a real correspondent link, so unrelated mail that
+	// merely reuses a subject never merges. Trashed and soft-deleted rows are
+	// excluded: a matching subject must never pull new mail back into hidden
+	// history (real reply headers above still link across a deleted ancestor).
 	const subjectKey = threadSubjectKey(headers?.subject);
 	if (userId && subjectKey) {
 		const recent = await orm(c)
@@ -127,15 +131,15 @@ export async function resolveThreadForMessage(c, headers) {
 			.where(and(
 				eq(email.userId, userId),
 				eq(email.isDel, isDel.NORMAL),
+				eq(email.trashed, 0),
 			))
 			.orderBy(desc(email.emailId))
 			.limit(100)
 			.all();
 
-		const wanted = messageAddresses(headers);
 		const hit = recent.find(row =>
 			threadSubjectKey(row.subject) === subjectKey
-			&& sharesParticipant(wanted, messageAddresses(row))
+			&& correspondentsOverlap(headers, row)
 		);
 
 		if (hit) {
@@ -203,6 +207,10 @@ export async function backfillThreadIds(c) {
 				sendEmail: email.sendEmail,
 				toEmail: email.toEmail,
 				recipient: email.recipient,
+				// Visibility: a hidden row keeps its thread id but must not become
+				// the subject anchor for future mail.
+				isDel: email.isDel,
+				trashed: email.trashed,
 			})
 			.from(email)
 			.where(and(

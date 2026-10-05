@@ -18,10 +18,14 @@ const mocks = vi.hoisted(() => ({
   emailDeleteForever: vi.fn(),
   emailEmptyTrash: vi.fn(),
   showUndoSnackbar: vi.fn(),
+  removeEmails: vi.fn(),
 }))
 
 vi.mock('element-plus', () => ({ ElMessage: mocks.elMessage }))
 vi.mock('@/i18n/index.js', () => ({ default: { global: { t: key => key } } }))
+vi.mock('@/store/email.js', () => ({
+  useEmailStore: () => ({ removeEmails: mocks.removeEmails }),
+}))
 vi.mock('@/request/email.js', () => ({
   emailArchive: mocks.emailArchive,
   emailUnarchive: mocks.emailUnarchive,
@@ -101,6 +105,9 @@ describe('shared mail mutation layer', () => {
     mailMutations.archiveMessages([1])
 
     expect(controller.list.map(r => r.emailId)).toEqual([2])
+    // The reader's own cache must forget the row too, or a later same-subject
+    // conversation could rebuild it from the stale body.
+    expect(mocks.removeEmails).toHaveBeenCalledWith([1])
     expect(mocks.emailArchive).not.toHaveBeenCalled()
     await flush()
     expect(mocks.emailArchive).toHaveBeenCalledWith([1])
