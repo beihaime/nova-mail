@@ -2776,8 +2776,10 @@ ul {
 
   .mobile-search-row {
     /* Page gutter shared with the app bar and mail rows. */
-    /* Deliberate breathing room replaces the removed filter-row divider. */
-    padding: 2px 12px 18px;
+    /* The row itself contributes 10px above its visible content, so 12px here
+       leaves a deliberate ~22px search-to-first-mail visual gap without a
+       leftover filter-row-sized spacer. */
+    padding: 2px 12px 12px;
     box-sizing: border-box;
 
     /* Search field on the left, sort + multi-select on the right; the field
