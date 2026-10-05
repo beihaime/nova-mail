@@ -2580,7 +2580,11 @@ ul {
 @media (max-width: 767px) {
   .email-container {
     --mail-list-avatar-column: 46px;
-    grid-template-rows: auto minmax(0, 1fr);
+    /* The three direct children are search, the (normally zero-height)
+       selection toolbar, and the scrollable list. Keep all three tracks
+       explicit: otherwise the list becomes an implicit row after the flexible
+       toolbar track and is bottom-aligned when a mailbox has few messages. */
+    grid-template-rows: auto auto minmax(0, 1fr);
   }
 
   .mail-list-secondary-toolbar {
@@ -2752,7 +2756,7 @@ ul {
 
 @media (max-width: 767px) {
   .email-container {
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
     background: var(--nova-surface);
     color: var(--mobile-primary);
   }
