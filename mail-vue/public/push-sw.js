@@ -29,20 +29,25 @@ function readPayload(event) {
   if (!event.data) return {};
 
   try {
-    return event.data.json() || {};
+    const payload = event.data.json();
+    return payload && typeof payload === 'object' && !Array.isArray(payload) ? payload : {};
   } catch {
-    return { body: event.data.text() || '' };
+    try {
+      return { body: event.data.text() || '' };
+    } catch {
+      return {};
+    }
   }
 }
 
 self.addEventListener('push', (event) => {
   const payload = readPayload(event);
 
-  const title = payload.title || DEFAULT_TITLE;
+  const title = String(payload.title || DEFAULT_TITLE);
   const lines = [];
 
-  if (payload.body) lines.push(payload.body);
-  if (payload.subject) lines.push(payload.subject);
+  if (payload.body) lines.push(String(payload.body));
+  if (payload.subject) lines.push(String(payload.subject));
 
   const scope = self.registration.scope;
   const emailId = Number(payload.emailId) || 0;
@@ -55,7 +60,7 @@ self.addEventListener('push', (event) => {
     tag: emailId ? `nova-mail-${emailId}` : 'nova-mail',
     renotify: false,
     data: {
-      url: payload.url || '',
+      url: typeof payload.url === 'string' ? payload.url : '',
       emailId,
     },
   }));

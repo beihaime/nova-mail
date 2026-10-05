@@ -61,5 +61,13 @@ if (isUiPreview) {
     app.use(router).use(i18n).directive('perm', perm).component('AppIcon', AppIcon)
     app.config.devtools = true
     app.mount('#app')
+    // Re-home an existing browser subscription to the authenticated account and
+    // repair subscriptions removed or rotated while the app was not open. This
+    // is deliberately best-effort and never delays mounting the mail UI.
+    if (!bootError) {
+        import('@/utils/webPush.js').then(({syncPushSubscription}) => syncPushSubscription()).catch(error => {
+            console.warn('Nova Mail: could not sync push subscription', error)
+        })
+    }
     sessionStorage.removeItem(PRELOAD_RELOAD_KEY)
 }

@@ -195,7 +195,7 @@ describe('notifyNewMail', () => {
 		const result = await pushService.notifyNewMail(env, 7, { emailId: 5, from: 'a@b.c', subject: 's' });
 
 		expect(result).toEqual({ sent: 0 });
-		expect(removeSpy).toHaveBeenCalledWith(env, endpoint);
+    expect(removeSpy).toHaveBeenCalledWith(env, endpoint, 7);
 	});
 
 	it('survives a failing push service without throwing', async () => {

@@ -81,6 +81,42 @@ async function saveSubscription(subscription) {
     await pushSubscribe(serializeSubscription(subscription))
 }
 
+function subscriptionUsesKey(subscription, publicKey) {
+    const expected = urlBase64ToUint8Array(publicKey)
+    const actual = subscription?.options?.applicationServerKey
+    if (!actual) return true
+
+    const bytes = new Uint8Array(actual)
+    return bytes.length === expected.length && bytes.every((value, index) => value === expected[index])
+}
+
+async function ensurePushSubscription(registration, publicKey) {
+    let subscription = await registration.pushManager.getSubscription()
+
+    // Browsers expose the applicationServerKey on PushSubscription.options.
+    // If it differs, the old subscription cannot be delivered with the current
+    // VAPID identity and must be replaced without asking the user to clear data.
+    if (subscription && !subscriptionUsesKey(subscription, publicKey)) {
+        try { await pushUnsubscribe(subscription.endpoint) } catch (error) {
+            console.warn('Nova Mail: could not remove the old push subscription', error)
+        }
+        try { await subscription.unsubscribe() } catch (error) {
+            console.warn('Nova Mail: could not release the old push subscription', error)
+        }
+        subscription = null
+    }
+
+    if (!subscription) {
+        subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(publicKey),
+        })
+    }
+
+    await saveSubscription(subscription)
+    return subscription
+}
+
 /** Current state for the settings page. */
 export async function pushState() {
     if (!pushSupported()) {
@@ -92,15 +128,28 @@ export async function pushState() {
     // that as "on" is how a phone ends up looking enabled while the server has
     // nothing to sign with. `available` is the only honest source of truth.
     let available = false
+    let config = null
     try {
-        const config = await pushConfig()
+        config = await pushConfig()
         available = Boolean(config?.enabled && config.publicKey)
     } catch {
         available = false
     }
 
     const permission = Notification.permission
-    const subscription = permission === 'granted' ? await getPushSubscription() : null
+    let subscription = permission === 'granted' ? await getPushSubscription() : null
+    const registrationForState = permission === 'granted' && available ? await getRegistration() : null
+
+    // A browser can retain permission while its subscription disappears after
+    // an OS/browser update, or after the server removed a dead endpoint. Repair
+    // that state while the user is looking at settings.
+    if (permission === 'granted' && available && registrationForState && config?.publicKey) {
+        try {
+            subscription = await ensurePushSubscription(registrationForState, config.publicKey)
+        } catch (error) {
+            console.warn('Nova Mail: could not repair the push subscription', error)
+        }
+    }
 
     return { supported: true, available, permission, subscribed: Boolean(subscription) }
 }
@@ -137,16 +186,7 @@ export async function enablePush() {
     if (!registration?.pushManager) return { status: PUSH_STATUS.UNSUPPORTED }
 
     try {
-        let subscription = await registration.pushManager.getSubscription()
-
-        if (!subscription) {
-            subscription = await registration.pushManager.subscribe({
-                userVisibleOnly: true,
-                applicationServerKey: urlBase64ToUint8Array(config.publicKey),
-            })
-        }
-
-        await saveSubscription(subscription)
+        const subscription = await ensurePushSubscription(registration, config.publicKey)
         return { status: PUSH_STATUS.GRANTED, endpoint: subscription.endpoint }
     } catch (error) {
         console.warn('Nova Mail: could not enable push notifications', error)
@@ -186,11 +226,15 @@ export async function disablePush() {
 export async function syncPushSubscription() {
     if (!pushSupported() || Notification.permission !== 'granted') return false
 
-    const subscription = await getPushSubscription()
-    if (!subscription) return false
+    let config
+    try { config = await pushConfig() } catch { return false }
+    if (!config?.enabled || !config.publicKey) return false
+
+    const registration = await getRegistration()
+    if (!registration?.pushManager) return false
 
     try {
-        await saveSubscription(subscription)
+        await ensurePushSubscription(registration, config.publicKey)
         return true
     } catch (error) {
         console.warn('Nova Mail: could not sync the push subscription', error)

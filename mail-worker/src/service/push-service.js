@@ -128,9 +128,14 @@ const pushService = {
 	},
 
 	/** Best-effort cleanup for endpoints the push service reported as gone. */
-	async removeByEndpoint(env, endpoint) {
+	async removeByEndpoint(env, endpoint, userId) {
+		const owner = Number(userId) || 0;
+		if (!owner) return;
 		await orm({ env }).delete(pushSubscription)
-			.where(eq(pushSubscription.endpoint, endpoint))
+			.where(and(
+				eq(pushSubscription.endpoint, endpoint),
+				eq(pushSubscription.userId, owner),
+			))
 			.run();
 	},
 
@@ -221,7 +226,7 @@ const pushService = {
 
 				// 404/410 mean the subscription is gone for good: drop it.
 				if (response.status === 404 || response.status === 410) {
-					await this.removeByEndpoint(env, subscription.endpoint);
+					await this.removeByEndpoint(env, subscription.endpoint, owner);
 					return;
 				}
 
