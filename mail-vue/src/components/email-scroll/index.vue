@@ -2772,15 +2772,15 @@ ul {
     background: var(--nova-surface);
   }
 
-  /* Shared mailbox boundary: it uses the same horizontal inset as each mail
-     row's divider, so Inbox, Unread and every other list begin consistently. */
+  /* Shared mailbox boundary: this separates the search section from the list,
+     so it spans the outer mobile layout instead of following row content. */
   .mobile-inbox-tools::after {
     content: '';
     display: block;
     height: 1px;
     /* The divider is the list's top edge. The first row begins immediately
        after it and supplies its own existing 10px content inset. */
-    margin: 0 16px;
+    margin: 0;
     background: var(--nova-divider-soft, color-mix(in srgb, var(--nova-divider) 55%, transparent));
   }
 
