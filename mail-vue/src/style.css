@@ -640,6 +640,27 @@ html[data-theme-to="light"]::view-transition-old(root) {
 
 /* Mobile dark-mode icon normalization */
 @media (max-width: 767px) {
+  /* Keep every native scroll region touch-scrollable while removing only its
+     chrome. This lives at the app boundary so mailbox lists, readers, nested
+     settings panes and horizontal scrollers behave consistently on phones. */
+  *,
+  *::before,
+  *::after {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  *::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  /* Element Plus renders its own scrollbar bars instead of native chrome. */
+  .el-scrollbar__bar {
+    display: none !important;
+  }
+
   /* Phone document chrome. The app bar paints its own `env(safe-area-inset-top)`
      padding with the same token, but html/body must match too: otherwise the
      Element Plus page colour (#141414 in dark) shows as a near-black band above
