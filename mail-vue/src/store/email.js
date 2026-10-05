@@ -96,9 +96,17 @@ export const useEmailStore = defineStore('email', {
                 if (keepRead) {
                     item.unread = EmailUnreadEnum.READ
                 }
-                this.detailMap[item.emailId] = item
+                // Preserve the object the reader is already rendering. The
+                // list's background full fetch commonly completes just after
+                // navigation; replacing this object makes every reader
+                // consumer observe a new root value at once and can recreate
+                // expensive child DOM (notably the HTML frame).
+                const selected = currentId === item.emailId ? this.contentData.email : null
+                const target = selected || prev || item
+                if (target !== item) Object.assign(target, item)
+                this.detailMap[item.emailId] = target
                 if (currentId && item.emailId === currentId) {
-                    this.contentData.email = item
+                    this.contentData.email = target
                 }
             }
         },
@@ -132,11 +140,17 @@ export const useEmailStore = defineStore('email', {
         mergeFullEmail(row) {
             if (!row?.emailId) return
 
-            this.detailMap[row.emailId] = row
+            const id = Number(row.emailId)
+            const selected = Number(this.contentData.email?.emailId) === id
+                ? this.contentData.email
+                : null
+            const existing = this.detailMap[id]
+            const target = selected || existing || row
 
-            if (Number(this.contentData.email?.emailId) === Number(row.emailId)) {
-                this.contentData.email = row
-            }
+            if (target !== row) Object.assign(target, row)
+            this.detailMap[id] = target
+
+            if (selected) this.contentData.email = target
         },
         /**
          * Show a freshly sent reply/forward inside its conversation thread

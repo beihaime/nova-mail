@@ -5,9 +5,13 @@
     <div v-if="isDesktopReading" class="desktop-mail-workspace">
       <ContentPane ref="contentRef" class="desktop-reading-pane" />
     </div>
-    <router-view v-else class="main-view" v-slot="{ Component,route }">
+    <router-view v-else v-slot="{ Component,route }">
       <keep-alive :include="['email','all-email','send','sys-setting','star','user','role','analysis','reg-key','draft','trash']">
-        <component :is="Component" :key="route.name"/>
+        <component
+            :is="Component"
+            :key="route.name"
+            :class="route.name === 'content' ? 'main-view-reader' : 'main-view'"
+        />
       </keep-alive>
     </router-view>
   </div>
@@ -207,6 +211,15 @@ const handleResize = () => {
   animation: nova-view-in var(--nova-motion-base) var(--nova-motion-ease) forwards;
 }
 
+/* The reader owns its enter/leave transition. Keeping the generic route
+   animation off this view prevents a second fade/translate when its hydrated
+   data updates, especially on mobile where the reader is rendered by this
+   router-view. */
+.main-view-reader {
+  min-width: 0;
+  background: var(--el-bg-color);
+}
+
 .desktop-mail-workspace {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -214,7 +227,6 @@ const handleResize = () => {
   min-height: 0;
   height: 100%;
   background: var(--el-bg-color);
-  animation: nova-view-in var(--nova-motion-base) var(--nova-motion-ease) forwards;
 }
 
 .desktop-message-list { min-width: 0; }
