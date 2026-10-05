@@ -118,6 +118,31 @@ export function resolveReplySenderAccount(email, user, addresses = [], currentAc
 }
 
 /**
+ * The addresses the composer may offer as a `From` choice.
+ *
+ * Strictly the server-annotated address list: an address that is missing, still
+ * marked `canSend: false`, or filtered out as deleted must never be selectable.
+ * The effective default and the primary row are deliberately *not* appended —
+ * they only get a dropdown entry when the server says they can send.
+ */
+export function sendableAddressList(addresses = []) {
+  return (Array.isArray(addresses) ? addresses : []).filter(isSendableAddress)
+}
+
+/**
+ * Map a chosen address id back to the identity fields the message carries.
+ *
+ * This is the only place a manual `From` change is turned into state, and it
+ * returns message-scoped fields only: the stored Default Sender preference is
+ * never part of it, so picking another address cannot change it.
+ */
+export function senderChoiceFor(addresses = [], accountId) {
+  const row = sendableAddressList(addresses)
+    .find(item => item?.accountId != null && item.accountId === accountId)
+  return row ? composeSenderFields(row) : null
+}
+
+/**
  * The `From` fields a composer session carries.
  */
 export function composeSenderFields(account, user) {
@@ -144,20 +169,35 @@ export function newComposeSender(user, addresses = [], currentAccount = null) {
 }
 
 /**
- * Reopening a draft must never replace the sender it already stored; only a
- * legacy draft that carries no sender at all falls back to the effective
- * default. This is the rule that keeps "change From for one message" from
- * silently becoming a preference change (or a draft rewrite).
+ * Reopening a draft restores the sender it stored, not the current default.
+ *
+ * The stored account id is the identity; the stored address is the fallback for
+ * a draft whose id no longer lines up. Both are only trusted while the address
+ * is still owned and send-capable, so a sender that was deleted, disabled or
+ * lost its domain permission since the draft was written falls back to the
+ * normal resolution rules. With no authoritative list to check against (a cold
+ * cache) the draft is restored verbatim — the send API re-authorizes it anyway.
  */
 export function resolveDraftSender(draft, user, addresses = [], currentAccount = null) {
-  if (draft?.sendEmail && draft?.accountId) {
-    return {
-      sendEmail: draft.sendEmail,
-      accountId: draft.accountId,
-      name: draft.name ?? '',
+  const list = Array.isArray(addresses) ? addresses : []
+  const hasStoredSender = Boolean(draft?.sendEmail) && draft?.accountId != null
+
+  if (hasStoredSender) {
+    if (list.length === 0) {
+      return composeSenderFields({
+        email: draft.sendEmail,
+        accountId: draft.accountId,
+        name: draft.name,
+      }, user)
     }
+
+    const sendable = sendableAddressList(list)
+    const match = sendable.find(row => row.accountId === draft.accountId)
+      || sendable.find(row => sameAddress(row.email, draft.sendEmail))
+    if (match) return composeSenderFields(match, user)
   }
-  return newComposeSender(user, addresses, currentAccount)
+
+  return newComposeSender(user, list, currentAccount)
 }
 
 /**

@@ -200,6 +200,7 @@ const en = {
     unknown: 'Unknown',
     changePerm: 'Change Role',
     from: 'From',
+    noSendableAddress: 'No address can send mail',
     subject: 'Subject',
     sender: 'Sender',
     user: 'User',

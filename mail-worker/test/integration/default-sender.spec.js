@@ -314,6 +314,67 @@ describe('send-time sender authorization', () => {
 		expect(delivered.total).toBe(1);
 	});
 
+	it('rejects a From that names a different owned address than the account id', async () => {
+		await openSend();
+		const alice = await createSender(uniqueEmail('alice-owned'));
+		const recipient = await sessionFor(await createAccount());
+		const first = await addAddress(alice, uniqueEmail('alice-first'));
+		const second = await addAddress(alice, uniqueEmail('alice-second'));
+
+		const base = {
+			receiveEmail: [recipient.email],
+			subject: `owned-mismatch-${Date.now()}`,
+			content: '<p>hello</p>',
+			text: 'hello',
+			sendType: '',
+			attachments: [],
+		};
+
+		// Both addresses are the caller's own, but the message must be sent from
+		// the one the supplied id selects — not from whatever the client claims.
+		const swapped = await json(await api('/api/email/send', {
+			token: alice.token, method: 'POST',
+			body: { ...base, accountId: first.accountId, sendEmail: second.email },
+		}));
+		expect(swapped.code).toBe(403);
+
+		// The matching pair still sends.
+		const matching = await json(await api('/api/email/send', {
+			token: alice.token, method: 'POST',
+			body: { ...base, accountId: second.accountId, sendEmail: second.email },
+		}));
+		expect(matching.code).toBe(200);
+		expect(matching.data[0].sendEmail).toBe(second.email);
+	});
+
+	it('never changes the stored default when a message uses another address', async () => {
+		await openSend();
+		const alice = await createSender(uniqueEmail('alice-switch'));
+		const recipient = await sessionFor(await createAccount());
+		const preferred = await addAddress(alice, uniqueEmail('alice-preferred'));
+		const chosen = await addAddress(alice, uniqueEmail('alice-chosen'));
+
+		expect((await setDefault(alice, preferred.accountId)).code).toBe(200);
+
+		// Compose was switched to another address for this one message.
+		const sent = await json(await api('/api/email/send', {
+			token: alice.token, method: 'POST',
+			body: {
+				accountId: chosen.accountId, sendEmail: chosen.email, receiveEmail: [recipient.email],
+				subject: `manual-from-${Date.now()}`, content: '<p>hi</p>', text: 'hi',
+				sendType: '', attachments: [],
+			},
+		}));
+		expect(sent.code).toBe(200);
+		expect(sent.data[0].sendEmail).toBe(chosen.email);
+
+		// The per-message choice must not have become a preference change.
+		expect(await storedDefault(alice.userId)).toBe(preferred.accountId);
+		const info = await loginInfo(alice);
+		expect(info.defaultSender.email).toBe(preferred.email);
+		expect(info.defaultSenderAccountId).toBe(preferred.accountId);
+	});
+
 	it('rejects a deleted or disabled address at send time', async () => {
 		await openSend();
 		const alice = await createSender(uniqueEmail('alice-gone'));

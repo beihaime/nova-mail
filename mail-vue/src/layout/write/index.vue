@@ -6,15 +6,38 @@
           <span class="title-text">
             <AppIcon name="compose" :size="24"/>
           </span>
-          <span class="sender">{{ $t('sender') }}:</span>
           <span class="sender-name">{{ form.name }}</span>
-          <span class="send-email"><{{ form.sendEmail }}></span>
         </div>
         <div @click="close" style="cursor: pointer;">
           <Icon icon="material-symbols-light:close-rounded" width="22" height="22"/>
         </div>
       </div>
       <div class="container" :style="{ gridTemplateRows: `repeat(${headerRows}, auto) 1fr auto` }">
+        <el-dropdown
+            class="write-sender"
+            popper-class="write-sender-popper"
+            trigger="click"
+            :show-timeout="0"
+            :hide-timeout="0"
+            @visible-change="senderVisibleChange"
+        >
+          <button class="write-sender-trigger" type="button" :aria-label="t('from')">
+            <span class="write-sender-label">{{ $t('from') }}</span>
+            <span class="write-sender-value">{{ form.sendEmail }}</span>
+            <Icon class="write-sender-caret" icon="mingcute:down-small-fill" width="18" height="18"/>
+          </button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item
+                  v-for="item in senderOptions"
+                  :key="item.accountId"
+                  :class="{ 'is-current': item.accountId === form.accountId }"
+                  @click="changeSender(item)"
+              >{{ item.email }}</el-dropdown-item>
+              <el-dropdown-item v-if="senderOptions.length === 0" disabled>{{ $t('noSendableAddress') }}</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
         <el-input-tag  @add-tag="addTagChange" tag-type="primary" @input="inputChange" size="default" v-model="form.receiveEmail" >
           <template #prefix>
             <div class="item-title" >{{ $t('recipient') }}</div>
@@ -136,6 +159,8 @@ import {
   parseAddressList,
   resolveDraftSender,
   resolveReplySenderAccount,
+  sendableAddressList,
+  senderChoiceFor,
 } from "@/utils/sender-resolution.js";
 import {clearAuthenticatedSession} from '@/utils/session-state.js';
 
@@ -194,9 +219,16 @@ const form = reactive({
 const selectRecipientList = ref([])
 const showCc = ref(false)
 const showBcc = ref(false)
+/**
+ * The identities the `From` dropdown may offer: owned, active, send-capable
+ * addresses as reported by the server. The selected value itself lives on
+ * `form.sendEmail`, so a list that is still loading can never change what the
+ * message is sent from.
+ */
+const senderOptions = ref([])
 const ccVisible = computed(() => showCc.value || form.cc.length > 0)
 const bccVisible = computed(() => showBcc.value || form.bcc.length > 0)
-const headerRows = computed(() => 2 + Number(ccVisible.value) + Number(bccVisible.value))
+const headerRows = computed(() => 3 + Number(ccVisible.value) + Number(bccVisible.value))
 
 const contacts = computed(() => writerStore.sendRecipientRecord.map(item => ({email: item})))
 
@@ -531,6 +563,42 @@ async function ownedAddressList() {
   }
 }
 
+function setSenderOptions(addresses) {
+  senderOptions.value = sendableAddressList(addresses)
+  return senderOptions.value
+}
+
+/**
+ * Load (or refresh) the addresses the `From` dropdown may offer. Only addresses
+ * the server marked as send-capable reach the menu, so a disabled or
+ * domain-restricted address can never be picked.
+ */
+async function loadSenderOptions() {
+  return setSenderOptions(await ownedAddressList())
+}
+
+function senderVisibleChange(visible) {
+  // Refresh on open so an address added or disabled elsewhere is reflected
+  // before it can be chosen.
+  if (visible) loadSenderOptions()
+}
+
+/**
+ * Apply a manual `From` change to this message only.
+ *
+ * The stored Default Sender preference is changed exclusively from
+ * Settings → Account → Addresses; nothing in the composer writes it. The
+ * address and the account id always come from the same row, which is what the
+ * send API re-checks.
+ */
+function changeSender(item) {
+  const choice = senderChoiceFor(senderOptions.value, item?.accountId)
+  if (!choice) return
+  form.sendEmail = choice.sendEmail
+  form.accountId = choice.accountId
+  form.name = choice.name
+}
+
 function currentSenderAddress() {
   return (accountStore.currentAccount?.email || userStore.user?.email || '').toLowerCase()
 }
@@ -545,6 +613,7 @@ async function openReply(email, replyAll = false) {
   // be the one it is answered from, and it also decides whose addresses are
   // excluded from a reply-all.
   const addresses = await ownedAddressList()
+  setSenderOptions(addresses)
   const senderAccount = resolveReplySenderAccount(email, userStore.user, addresses, accountStore.currentAccount)
   const senderAddress = (senderAccount?.email || currentSenderAddress()).toLowerCase()
 
@@ -615,18 +684,26 @@ function open(preferredAccount) {
   form.sendEmail = fields.sendEmail;
   form.accountId = fields.accountId;
   form.name = fields.name;
+  // The dropdown is populated from the same address list, and refreshed again
+  // when it is opened.
+  loadSenderOptions()
   show.value = true;
   editor.value.focus()
 }
 
-function openDraft(draft) {
+async function openDraft(draft) {
+  // The address list is the authority that decides whether the sender the draft
+  // stored is still usable.
+  const addresses = await ownedAddressList()
+  setSenderOptions(addresses)
   Object.assign(form, {...draft})
   Object.assign(form, restoreDraftRecipients(draft))
-  // The draft keeps the sender it stored; only a legacy draft without one is
-  // initialized from the effective default sender.
-  const sender = resolveDraftSender(draft, userStore.user, accountStore.addresses, accountStore.currentAccount)
+  // The draft keeps the sender it stored; only one that is gone or can no longer
+  // send falls back to the effective default sender.
+  const sender = resolveDraftSender(draft, userStore.user, addresses, accountStore.currentAccount)
   form.sendEmail = sender.sendEmail
   form.accountId = sender.accountId
+  form.name = sender.name
   showCc.value = form.cc.length > 0
   showBcc.value = form.bcc.length > 0
   defValue.value = ''
@@ -719,6 +796,19 @@ function close() {
   cursor: pointer;
 }
 .cc-toggle:hover { color: var(--el-color-primary); background: var(--nova-hover); }
+
+/* The From menu is teleported out of the scoped tree, so its selected state is
+   styled here alongside the other composer popper rules. */
+.write-sender-popper .el-dropdown-menu__item.is-current {
+  color: var(--el-color-primary);
+  font-weight: 600;
+}
+.write-sender-popper .el-dropdown-menu__item {
+  max-width: 340px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 </style>
 <style scoped lang="scss">
 .send {
@@ -763,24 +853,15 @@ function close() {
       .title-left {
         align-items: center;
         display: grid;
-        grid-template-columns: auto auto auto 1fr;
+        grid-template-columns: auto 1fr;
       }
 
       .title-text {
       }
 
-      .sender {
-        margin-left: 8px;
-      }
-
       .sender-name {
         margin-left: 8px;
         font-weight: bold;
-      }
-
-      .send-email {
-        color: #999896;
-        margin-left: 5px;
         white-space: nowrap;
         text-overflow: ellipsis;
         overflow: hidden;
@@ -800,6 +881,53 @@ function close() {
       gap: 15px;
 
       .item-title {
+      }
+
+      /* The From selector reads as a line of metadata, not a form control: flat
+         until the pointer or keyboard reaches it, where it gains the same
+         subtle surface the rest of the app uses for interactive rows. The grid
+         item stays full width so the button can size to its address without a
+         circular max-width; the address itself truncates only on a narrow
+         composer. */
+      .write-sender-trigger {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        max-width: min(100%, 460px);
+        margin-left: -6px;
+        padding: 3px 6px;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--el-text-color-primary);
+        font: inherit;
+        font-size: 14px;
+        cursor: pointer;
+        transition: background-color var(--nova-motion-base) var(--nova-motion-ease);
+      }
+
+      .write-sender-trigger:hover,
+      .write-sender-trigger:focus-visible {
+        background: var(--light-ill);
+        outline: none;
+      }
+
+      .write-sender-label {
+        flex: 0 0 auto;
+        color: var(--el-text-color-secondary);
+        font-size: 13px;
+      }
+
+      .write-sender-value {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .write-sender-caret {
+        flex: 0 0 auto;
+        color: var(--el-text-color-secondary);
       }
 
       .button-item {

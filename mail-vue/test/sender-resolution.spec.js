@@ -8,6 +8,8 @@ import {
   parseAddressList,
   resolveDraftSender,
   resolveReplySenderAccount,
+  sendableAddressList,
+  senderChoiceFor,
 } from '../src/utils/sender-resolution.js'
 
 /**
@@ -124,6 +126,85 @@ describe('draft reopening', () => {
     const sender = resolveDraftSender({ subject: 'old draft' }, configured, ALIASES)
     expect(sender.sendEmail).toBe('github@domain.com')
     expect(sender.accountId).toBe(GITHUB.accountId)
+  })
+
+  it('falls back to the default when the draft’s sender can no longer send', () => {
+    const configured = user({ defaultSender: DEV })
+    const addresses = [PRIMARY, DEV, { ...GITHUB, canSend: false }]
+    const draft = { sendEmail: 'github@domain.com', accountId: GITHUB.accountId, name: 'github' }
+
+    const sender = resolveDraftSender(draft, configured, addresses)
+    expect(sender.sendEmail).toBe('dev@domain.com')
+    expect(sender.accountId).toBe(DEV.accountId)
+  })
+
+  it('falls back to the default when the draft’s sender was deleted', () => {
+    const configured = user({ defaultSender: DEV })
+    const draft = { sendEmail: 'github@domain.com', accountId: GITHUB.accountId, name: 'github' }
+    // github@ is no longer among the owned addresses.
+    const sender = resolveDraftSender(draft, configured, [PRIMARY, DEV])
+    expect(sender.sendEmail).toBe('dev@domain.com')
+  })
+
+  it('restores the draft verbatim while the address list is still loading', () => {
+    const draft = { sendEmail: 'dev@domain.com', accountId: DEV.accountId, name: 'dev' }
+    expect(resolveDraftSender(draft, user({ defaultSender: GITHUB }), [])).toEqual({
+      sendEmail: 'dev@domain.com',
+      accountId: DEV.accountId,
+      name: 'dev',
+    })
+  })
+
+  it('matches the draft by address when its account id no longer lines up', () => {
+    const draft = { sendEmail: 'dev@domain.com', accountId: 999, name: 'dev' }
+    const sender = resolveDraftSender(draft, user({ defaultSender: GITHUB }), ALIASES)
+    expect(sender.accountId).toBe(DEV.accountId)
+    expect(sender.sendEmail).toBe('dev@domain.com')
+  })
+})
+
+describe('composer From choices', () => {
+  it('offers only addresses the server says can send', () => {
+    const addresses = [
+      PRIMARY,
+      { ...DEV, canSend: false },
+      GITHUB,
+      { ...address(4, 'gone@domain.com'), isDel: 1 },
+      { accountId: 5, email: 'legacy@domain.com' },
+    ]
+    expect(sendableAddressList(addresses).map(row => row.email))
+      .toEqual(['beihaime@domain.com', 'github@domain.com', 'legacy@domain.com'])
+  })
+
+  it('maps a manual choice to the message’s sender fields', () => {
+    expect(senderChoiceFor(ALIASES, DEV.accountId)).toEqual({
+      sendEmail: 'dev@domain.com',
+      accountId: DEV.accountId,
+      name: 'dev',
+    })
+  })
+
+  it('refuses to build a choice from an address that is not offered', () => {
+    expect(senderChoiceFor(ALIASES, 999)).toBeNull()
+    expect(senderChoiceFor([{ ...DEV, canSend: false }], DEV.accountId)).toBeNull()
+    expect(senderChoiceFor([], DEV.accountId)).toBeNull()
+  })
+
+  it('changes only the message, never the stored default sender', () => {
+    // New compose starts from the configured default...
+    const configured = user({ defaultSender: GITHUB })
+    const initial = newComposeSender(configured, ALIASES)
+    expect(initial.sendEmail).toBe('github@domain.com')
+
+    // ...the composer switches From for this message only...
+    const switched = { ...initial, ...senderChoiceFor(ALIASES, DEV.accountId) }
+    expect(switched.sendEmail).toBe('dev@domain.com')
+    expect(switched.accountId).toBe(DEV.accountId)
+
+    // ...and the preference the next message reads is untouched.
+    expect(configured.defaultSender.email).toBe('github@domain.com')
+    expect(switched).not.toHaveProperty('defaultSender')
+    expect(newComposeSender(configured, ALIASES).sendEmail).toBe('github@domain.com')
   })
 })
 
