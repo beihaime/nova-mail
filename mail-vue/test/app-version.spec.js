@@ -4,6 +4,7 @@ import { resolve } from 'node:path'
 import {
   APP_VERSION_CACHE_DURATION,
   APP_VERSION_CACHE_KEY,
+  APP_VERSION_CACHE_SOURCE,
   GITHUB_LATEST_RELEASE_URL,
   createAppVersionSource,
 } from '../src/composables/use-app-version.js'
@@ -33,11 +34,17 @@ describe('app version source', () => {
 
     expect(source.version.value).toBe('v1.2.0')
     expect(fetchImpl).toHaveBeenCalledWith(GITHUB_LATEST_RELEASE_URL, expect.any(Object))
+    expect(JSON.parse(storage.getItem(APP_VERSION_CACHE_KEY))).toEqual({
+      source: APP_VERSION_CACHE_SOURCE,
+      tagName: 'v1.2.0',
+      expiresAt: 100 + APP_VERSION_CACHE_DURATION,
+    })
   })
 
   it('uses a fresh cached version without requesting GitHub', async () => {
     const storage = memoryStorage()
     storage.setItem(APP_VERSION_CACHE_KEY, JSON.stringify({
+      source: APP_VERSION_CACHE_SOURCE,
       tagName: 'v1.1.0',
       expiresAt: 100 + APP_VERSION_CACHE_DURATION,
     }))
@@ -48,6 +55,43 @@ describe('app version source', () => {
 
     expect(source.version.value).toBe('v1.1.0')
     expect(fetchImpl).not.toHaveBeenCalled()
+  })
+
+  it('refreshes legacy cache entries instead of trusting an old version source', async () => {
+    const storage = memoryStorage()
+    storage.setItem(APP_VERSION_CACHE_KEY, JSON.stringify({
+      tagName: 'v1.0.0',
+      expiresAt: 100 + APP_VERSION_CACHE_DURATION,
+    }))
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ tag_name: 'v1.2.0' }),
+    })
+    const source = createAppVersionSource({ fallbackVersion, fetchImpl, storage, now: () => 100 })
+
+    await source.load()
+
+    expect(source.version.value).toBe('v1.2.0')
+    expect(fetchImpl).toHaveBeenCalledOnce()
+  })
+
+  it('uses the build version if an expired release cache cannot be refreshed', async () => {
+    const storage = memoryStorage()
+    storage.setItem(APP_VERSION_CACHE_KEY, JSON.stringify({
+      source: APP_VERSION_CACHE_SOURCE,
+      tagName: 'v1.1.0',
+      expiresAt: 99,
+    }))
+    const source = createAppVersionSource({
+      fallbackVersion,
+      fetchImpl: vi.fn().mockRejectedValue(new Error('offline')),
+      storage,
+      now: () => 100,
+    })
+
+    await source.load()
+
+    expect(source.version.value).toBe(fallbackVersion)
   })
 
   it('keeps the build version when GitHub cannot be reached', async () => {

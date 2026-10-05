@@ -4,6 +4,7 @@ import packageInfo from '../../package.json'
 export const GITHUB_LATEST_RELEASE_URL = 'https://api.github.com/repos/beihaime/nova-mail/releases/latest'
 export const APP_VERSION_CACHE_KEY = 'nova-mail:latest-release-version'
 export const APP_VERSION_CACHE_DURATION = 6 * 60 * 60 * 1000
+export const APP_VERSION_CACHE_SOURCE = 'github-release'
 
 const packageVersion = packageInfo.version
   ? `v${String(packageInfo.version).replace(/^v/i, '')}`
@@ -22,6 +23,9 @@ const readCachedVersion = (storage, now) => {
 
   try {
     const cached = JSON.parse(storage.getItem(APP_VERSION_CACHE_KEY) || 'null')
+    // Values written by earlier implementations are not known to have come
+    // from GitHub, so they must not suppress a fresh release lookup.
+    if (cached?.source !== APP_VERSION_CACHE_SOURCE) return null
     if (typeof cached?.tagName !== 'string' || !cached.tagName) return null
     return { tagName: cached.tagName, fresh: Number(cached.expiresAt) > now }
   } catch {
@@ -34,6 +38,7 @@ const cacheVersion = (storage, tagName, now) => {
 
   try {
     storage.setItem(APP_VERSION_CACHE_KEY, JSON.stringify({
+      source: APP_VERSION_CACHE_SOURCE,
       tagName,
       expiresAt: now + APP_VERSION_CACHE_DURATION,
     }))
@@ -59,9 +64,9 @@ export function createAppVersionSource({
 
   const load = () => {
     const cached = readCachedVersion(storage, now())
-    if (cached) {
+    if (cached?.fresh) {
       version.value = cached.tagName
-      if (cached.fresh) return Promise.resolve(version.value)
+      return Promise.resolve(version.value)
     }
 
     if (request) return request

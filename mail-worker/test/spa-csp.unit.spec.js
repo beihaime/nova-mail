@@ -16,6 +16,10 @@ describe('SPA Content-Security-Policy', () => {
 		expect(SPA_CSP).not.toContain("'unsafe-inline' https://challenges.cloudflare.com");
 	});
 
+	it('permits the GitHub release API used by the shared app-version source', () => {
+		expect(SPA_CSP).toContain("connect-src 'self' https://challenges.cloudflare.com https://api.github.com");
+	});
+
 	it('sets CSP on HTML assets without altering other assets', async () => {
 		const html = withSpaCsp(new Response('<html></html>', { headers: { 'Content-Type': 'text/html; charset=utf-8' } }));
 		expect(html.headers.get('Content-Security-Policy')).toBe(SPA_CSP);

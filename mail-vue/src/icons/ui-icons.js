@@ -7,8 +7,9 @@ import {addCollection} from '@iconify/vue'
  * The Iconify runtime resolves an icon name from the collections registered
  * here first and only falls back to the public Iconify API for names it does
  * not know. The SPA is served with a strict Content-Security-Policy whose
- * `connect-src` allows only the app origin and the Cloudflare challenge, so
- * that fallback can never complete in production: any UI icon that is not
+ * `connect-src` permits the app origin, the Cloudflare challenge, and the
+ * GitHub release API, but not Iconify's public API. That fallback can never
+ * complete in production: any UI icon that is not
  * registered locally renders as an empty box while the surrounding container
  * (and the branding assets rendered through AppIcon) still look fine.
  *
