@@ -230,7 +230,7 @@ const loginService = {
 		email = emailUtils.normalizeEmail(email);
 
 		if ((!email || !password) && !noVerifyPwd) {
-			throw new BizError(t('emailAndPwdEmpty'));
+			throw new BizError(t('loginFailed'));
 		}
 
 		// Rate-limit password login only (OAuth uses createSession directly).
@@ -244,19 +244,19 @@ const loginService = {
 		const userRow = await userService.selectByEmailIncludeDel(c, email);
 
 		if (!userRow) {
-			throw new BizError(t('notExistUser'));
+			throw new BizError(t('loginFailed'));
 		}
 
 		if (userRow.isDel === isDel.DELETE) {
-			throw new BizError(t('isDelUser'));
+			throw new BizError(t('loginFailed'));
 		}
 
 		if (userRow.status === userConst.status.BAN) {
-			throw new BizError(t('isBanUser'));
+			throw new BizError(t('loginFailed'));
 		}
 
 		if (!noVerifyPwd && !await cryptoUtils.verifyPassword(password, userRow.salt, userRow.password)) {
-			throw new BizError(t('IncorrectPwd'));
+			throw new BizError(t('loginFailed'));
 		}
 		if (!noVerifyPwd && cryptoUtils.isLegacyPasswordHash(userRow.password)) {
 			const { salt, hash } = await cryptoUtils.hashPassword(password);
@@ -265,7 +265,7 @@ const loginService = {
 				.returning({ userId: user.userId }).get();
 			if (!upgraded) {
 				// A concurrent password change invalidates the credentials we just checked.
-				throw new BizError(t('IncorrectPwd'));
+				throw new BizError(t('loginFailed'));
 			}
 			userRow.password = hash;
 			userRow.salt = salt;

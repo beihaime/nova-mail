@@ -56,3 +56,28 @@ describe('rehash on password login', () => {
     }
   });
 });
+
+describe('non-enumerating password login errors', () => {
+  it('uses the same error for unknown, disabled, banned, and incorrect credentials', async () => {
+    const context = { env: {} };
+    const failures = [
+      undefined,
+      { userId: 1, email: 'owner@example.com', salt: 'salt', password: 'hash', isDel: 1, status: 0 },
+      { userId: 1, email: 'owner@example.com', salt: 'salt', password: 'hash', isDel: 0, status: 1 },
+      { userId: 1, email: 'owner@example.com', salt: 'salt', password: 'hash', isDel: 0, status: 0 },
+    ];
+
+    const messages = [];
+    for (const row of failures) {
+      mocks.selectUser.mockResolvedValueOnce(row);
+      try {
+        await loginService.login(context, { email: 'owner@example.com', password: 'wrong' });
+      } catch (error) {
+        messages.push(error.message);
+      }
+    }
+
+    expect(messages).toHaveLength(failures.length);
+    expect(new Set(messages).size).toBe(1);
+  });
+});
