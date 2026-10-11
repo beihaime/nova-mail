@@ -48,6 +48,9 @@
                 <div class="sender-line">
                   <strong class="sender-name">{{ message.from.name || message.from.email || '—' }}</strong>
                   <span v-if="message.from.email" class="sender-email">&lt;{{ message.from.email }}&gt;</span>
+                  <span v-if="message.isMine && message.deliveryStatus" class="message-delivery-pill" :class="`delivery-${message.deliveryStatus}`">
+                    {{ deliveryLabel(message.deliveryStatus) }}
+                  </span>
                 </div>
 
                 <!-- Collapsed card: compact recipient line. The expanded card
@@ -130,6 +133,11 @@
             <!-- Expanded body. Rendered only while the card is open, so a
                  collapsed card never contains `message.content` / quote markup. -->
             <div v-if="isMessageExpanded(message)" class="message-body">
+              <div v-if="message.isMine && message.deliveryStatus" class="delivery-summary" :class="`delivery-${message.deliveryStatus}`">
+                <strong>{{ $t('delivery') }}</strong>
+                <span>{{ deliveryLabel(message.deliveryStatus) }}<template v-if="message.deliveryStatus === 'delivered' && message.deliveredAt"> · {{ formatDeliveryDate(message.deliveredAt) }}</template></span>
+                <small v-if="message.deliveryFailureReason">{{ message.deliveryFailureReason }}</small>
+              </div>
               <el-alert v-if="message.status === 3" :closable="false" :title="toMessage(message.message)" class="email-msg" type="error" show-icon />
               <el-alert v-if="message.status === 4" :closable="false" :title="$t('complained')" class="email-msg" type="warning" show-icon />
               <el-alert v-if="message.status === 5" :closable="false" :title="$t('delayed')" class="email-msg" type="warning" show-icon />
@@ -328,6 +336,14 @@ function handleMobileReaderChange(event) {
 let previewUrl = null
 
 const { t } = useI18n()
+
+function deliveryLabel(status) {
+  return t({ pending: 'deliveryPending', sent: 'sent', delivered: 'delivered', delayed: 'deliveryDelayed', failed: 'deliveryFailed' }[status] || 'deliveryPending')
+}
+
+function formatDeliveryDate(value) {
+  return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(value))
+}
 
 // Label of the collapsed quoted-reply toggle (Gmail's "..." affordance).
 const quoteLabel = computed(() => `… ${t('showQuotedContent')}`)
@@ -1816,6 +1832,30 @@ defineExpose({
     }
   }
 }
+
+.delivery-summary {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: fit-content;
+  margin: 0 0 14px;
+  padding: 8px 11px;
+  border-radius: 9px;
+  background: var(--light-ill);
+  color: var(--regular-text-color);
+  font-size: 13px;
+}
+.delivery-summary strong { color: var(--primary-text-color); }
+.delivery-summary small { flex-basis: 100%; color: var(--secondary-text-color); }
+.delivery-failed { color: var(--danger-color, #f56c6c); }
+
+.message-delivery-pill {
+  margin-left: 4px;
+  font-size: 11px;
+  color: var(--secondary-text-color);
+}
+.message-delivery-pill.delivery-failed { color: var(--danger-color, #f56c6c); }
 
 .message-meta {
   max-width: 1100px;

@@ -33,6 +33,7 @@ import { pageSize } from '../utils/pagination';
 import sendLifecycle from './send-lifecycle';
 import outboundSendSnapshot from './outbound-send-snapshot';
 import senderAddressService from './sender-address-service';
+import { attachDeliveryInfo } from './delivery-status';
 
 const MAX_SEARCH_LENGTH = 200;
 
@@ -301,6 +302,8 @@ const emailService = {
 			isStar: item.starId != null ? 1 : 0
 		}));
 
+		await attachDeliveryInfo(c, list);
+
 		if (full) {
 			await this.emailAddAtt(c, list);
 		} else {
@@ -389,6 +392,7 @@ const emailService = {
 			.all();
 
 		await this.emailAddAtt(c, messages);
+		await attachDeliveryInfo(c, messages);
 		await senderAvatarService.attach(c, messages);
 
 		return {

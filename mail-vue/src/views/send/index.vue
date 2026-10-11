@@ -12,6 +12,7 @@
                @jump="jumpContent"
                :time-sort="params.timeSort"
                :type="'send'"
+               show-status
   />
 </template>
 

@@ -217,9 +217,11 @@
               <div class="title" :class="accountShow ? 'title-column' : 'title-column'">
 
                 <div class="email-sender" :style=" (showStatus ? 'gap: 10px;' : '') + ((item.unread === EmailUnreadEnum.UNREAD && showUnread)  ? 'font-weight: bold' : '')">
-                  <div class="email-status" v-if="showStatus">
+                  <div class="email-status" v-if="showStatus && item.type === 1 && item.statusIcon">
                     <el-tooltip effect="dark" :content="item.statusIcon.content">
-                      <Icon :icon="item.statusIcon.icon" :style="`color: ${item.statusIcon.color}`" width="20" height="20"/>
+                      <span role="img" :aria-label="item.statusIcon.content">
+                        <Icon :icon="item.statusIcon.icon" :style="`color: ${item.statusIcon.color}`" width="20" height="20"/>
+                      </span>
                     </el-tooltip>
                     <div class="del-status" v-if="item.isDel">
                       <el-tooltip effect="dark" :content="item.isDelContent">
@@ -1827,7 +1829,16 @@ function handleList(list) {
     if (email.isDel) {
       email.isDelContent = t('selectDeleted');
     }
-    email.statusIcon = statusIconMap[email.status];
+    const deliveryIconMap = {
+      pending: { icon: 'bi:send-arrow-up-fill', color: '#909399', content: t('deliveryPending') },
+      sent: { icon: 'bi:send-arrow-up-fill', color: '#51C76B', content: t('sent') },
+      delivered: { icon: 'bi:send-check-fill', color: '#51C76B', content: t('delivered') },
+      delayed: { icon: 'bi:send-arrow-up-fill', color: '#FBBD08', content: t('deliveryDelayed') },
+      failed: { icon: 'bi:send-x-fill', color: '#F56C6C', content: t('deliveryFailed') },
+    };
+    email.statusIcon = email.type === 1
+      ? deliveryIconMap[email.deliveryStatus] || statusIconMap[email.status]
+      : statusIconMap[email.status];
   })
 }
 
